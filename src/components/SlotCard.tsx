@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import {
   ArrowLeftRight,
   CalendarCheck2,
   Check,
+  CircleHelp,
   Clock3,
   LogOut,
   MapPin,
@@ -39,6 +40,7 @@ const phaseCopy = {
 }
 
 export function SlotCard({ poll, slot, user, members, disabled, onNotify, onError }: SlotCardProps) {
+  const substitutionTooltipId = useId()
   const [bookingOpen, setBookingOpen] = useState(false)
   const [substitutionOpen, setSubstitutionOpen] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -166,9 +168,28 @@ export function SlotCard({ poll, slot, user, members, disabled, onNotify, onErro
         )}
 
         {!disabled && userIsStarter && (
-          <button className="button button--ghost" type="button" onClick={() => setSubstitutionOpen(true)} disabled={busy}>
-            <ArrowLeftRight size={17} /> Passo il posto
-          </button>
+          <div className="substitution-action">
+            <button
+              className="button button--ghost"
+              type="button"
+              onClick={() => setSubstitutionOpen(true)}
+              disabled={busy}
+              aria-describedby={substitutionTooltipId}
+            >
+              <ArrowLeftRight size={17} /> Passo il posto
+            </button>
+            <button
+              className="substitution-action__help"
+              type="button"
+              aria-label="Come funziona Passo il posto"
+              aria-describedby={substitutionTooltipId}
+            >
+              <CircleHelp size={16} />
+            </button>
+            <span className="action-tooltip" id={substitutionTooltipId} role="tooltip">
+              Scegli chi ti sostituisce: prenderà la tua posizione e tu uscirai dallo slot. Se era in riserva, verrà rimosso dalla lista d’attesa.
+            </span>
+          </div>
         )}
 
         {!disabled && phase !== 'booked' && slot.signups.length >= 4 && (
@@ -206,4 +227,3 @@ export function SlotCard({ poll, slot, user, members, disabled, onNotify, onErro
     </article>
   )
 }
-

@@ -1,5 +1,5 @@
-import { useMemo, useState, type FormEvent } from 'react'
-import { CalendarPlus, Plus, Trash2 } from 'lucide-react'
+import { useMemo, useRef, useState, type FormEvent } from 'react'
+import { CalendarPlus, CopyPlus, Plus, Trash2 } from 'lucide-react'
 import type { CreatePollInput, SessionUser, SlotInput } from '../types'
 import { defaultSlotForWeek, nextMondayDate } from '../lib/domain'
 import { Modal } from './Modal'
@@ -11,13 +11,27 @@ interface CreatePollModalProps {
   onDone: (message: string) => void
 }
 
+interface EditableSlot extends SlotInput {
+  editorId: string
+}
+
+function nextDayAtSameTime(value: string) {
+  const [datePart, timePart] = value.split('T')
+  const [year, month, day] = datePart.split('-').map(Number)
+  if (!timePart || !year || !month || !day) return value
+
+  const nextDate = new Date(Date.UTC(year, month - 1, day + 1))
+  return `${nextDate.toISOString().slice(0, 10)}T${timePart}`
+}
+
 export function CreatePollModal({ user, onClose, onCreate, onDone }: CreatePollModalProps) {
   const initialWeek = useMemo(() => nextMondayDate(), [])
+  const nextEditorId = useRef(3)
   const [title, setTitle] = useState('Padel · prossima settimana')
   const [weekStart, setWeekStart] = useState(initialWeek)
-  const [slots, setSlots] = useState<SlotInput[]>([
-    { startsAt: defaultSlotForWeek(initialWeek, 1), durationMinutes: 90 },
-    { startsAt: defaultSlotForWeek(initialWeek, 3), durationMinutes: 90 },
+  const [slots, setSlots] = useState<EditableSlot[]>([
+    { editorId: 'slot-1', startsAt: defaultSlotForWeek(initialWeek, 1), durationMinutes: 90 },
+    { editorId: 'slot-2', startsAt: defaultSlotForWeek(initialWeek, 3), durationMinutes: 90 },
   ])
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -34,12 +48,27 @@ export function CreatePollModal({ user, onClose, onCreate, onDone }: CreatePollM
     })))
   }
 
+  const duplicateSlot = (index: number) => {
+    setSlots((current) => {
+      const source = current[index]
+      if (!source || current.length >= 14) return current
+
+      const duplicate: EditableSlot = {
+        ...source,
+        editorId: `slot-${nextEditorId.current++}`,
+        startsAt: nextDayAtSameTime(source.startsAt),
+      }
+      return [...current.slice(0, index + 1), duplicate, ...current.slice(index + 1)]
+    })
+  }
+
   const submit = async (event: FormEvent) => {
     event.preventDefault()
     setBusy(true)
     setError('')
     try {
-      await onCreate({ title, targetWeekStart: weekStart, slots }, user)
+      const slotInputs = slots.map(({ startsAt, durationMinutes }) => ({ startsAt, durationMinutes }))
+      await onCreate({ title, targetWeekStart: weekStart, slots: slotInputs }, user)
       onDone('Sondaggio creato. È ora di raccogliere le adesioni.')
       onClose()
     } catch (caught) {
@@ -74,7 +103,11 @@ export function CreatePollModal({ user, onClose, onCreate, onDone }: CreatePollM
               type="button"
               onClick={() => setSlots((current) => [
                 ...current,
-                { startsAt: defaultSlotForWeek(weekStart, current.length * 2 + 1), durationMinutes: 90 },
+                {
+                  editorId: `slot-${nextEditorId.current++}`,
+                  startsAt: defaultSlotForWeek(weekStart, current.length * 2 + 1),
+                  durationMinutes: 90,
+                },
               ])}
             >
               <Plus size={16} /> Aggiungi slot
@@ -83,7 +116,8 @@ export function CreatePollModal({ user, onClose, onCreate, onDone }: CreatePollM
 
           <div className="slot-editor__list">
             {slots.map((slot, index) => (
-              <div className="slot-editor__row" key={`${index}-${slot.startsAt}`}>
+              /* La chiave non dipende dai valori editabili: il controllo nativo mantiene il focus tra gli aggiornamenti. */
+              <div className="slot-editor__row" key={slot.editorId}>
                 <span className="slot-editor__number">{String(index + 1).padStart(2, '0')}</span>
                 <label className="field">
                   <span>Data e ora</span>
@@ -105,15 +139,26 @@ export function CreatePollModal({ user, onClose, onCreate, onDone }: CreatePollM
                     <option value={120}>120 min</option>
                   </select>
                 </label>
-                <button
-                  className="icon-button icon-button--danger"
-                  type="button"
-                  onClick={() => setSlots((current) => current.filter((_, itemIndex) => itemIndex !== index))}
-                  disabled={slots.length === 1}
-                  aria-label={`Elimina slot ${index + 1}`}
-                >
-                  <Trash2 size={18} />
-                </button>
+                <div className="slot-editor__actions">
+                  <button
+                    className="icon-button"
+                    type="button"
+                    onClick={() => duplicateSlot(index)}
+                    disabled={slots.length >= 14}
+                    aria-label={`Duplica slot ${index + 1} al giorno successivo`}
+                  >
+                    <CopyPlus size={18} />
+                  </button>
+                  <button
+                    className="icon-button icon-button--danger"
+                    type="button"
+                    onClick={() => setSlots((current) => current.filter((_, itemIndex) => itemIndex !== index))}
+                    disabled={slots.length === 1}
+                    aria-label={`Elimina slot ${index + 1}`}
+                  >
+                    <Trash2 size={18} />
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -130,4 +175,3 @@ export function CreatePollModal({ user, onClose, onCreate, onDone }: CreatePollM
     </Modal>
   )
 }
-
