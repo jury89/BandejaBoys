@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { BellRing, CalendarPlus, CheckCircle2, ChevronDown, LogOut, UsersRound } from 'lucide-react'
+import { BellRing, CalendarCheck2, CalendarDays, CalendarPlus, CheckCircle2, ChevronDown, LogOut, UsersRound } from 'lucide-react'
 import { useAuth } from '../AuthContext'
 import type { MemberProfile, PadelPoll } from '../types'
 import { getSlotPhase } from '../lib/domain'
@@ -10,14 +10,14 @@ import { Brand } from './Brand'
 import { CreatePollModal } from './CreatePollModal'
 import { PollCard } from './PollCard'
 
-type View = 'open' | 'closed'
+type FeedFilter = 'all' | 'booked'
 
 export function Dashboard() {
   const { user, signOut } = useAuth()
   const [polls, setPolls] = useState<PadelPoll[]>([])
   const [members, setMembers] = useState<MemberProfile[]>([])
   const [loading, setLoading] = useState(true)
-  const [view, setView] = useState<View>('open')
+  const [feedFilter, setFeedFilter] = useState<FeedFilter>('all')
   const [createOpen, setCreateOpen] = useState(false)
   const [toast, setToast] = useState<{ message: string; tone: 'success' | 'error' } | null>(null)
   const [accountOpen, setAccountOpen] = useState(false)
@@ -55,7 +55,15 @@ export function Dashboard() {
 
   if (!user) return null
 
-  const visiblePolls = polls.filter((poll) => poll.status === view)
+  const totalSlotCount = polls.reduce((total, poll) => total + poll.slots.length, 0)
+  const bookedSlotCount = polls.reduce(
+    (total, poll) => total + poll.slots.filter((slot) => getSlotPhase(slot) === 'booked').length,
+    0,
+  )
+  const visiblePolls = polls.filter(
+    (poll) => feedFilter === 'all' || poll.slots.some((slot) => getSlotPhase(slot) === 'booked'),
+  )
+  const visibleSlotCount = feedFilter === 'all' ? totalSlotCount : bookedSlotCount
   const notify = (message: string) => setToast({ message, tone: 'success' })
   const reportError = (message: string) => setToast({ message, tone: 'error' })
   const updatePoll = (updatedPoll: PadelPoll) => {
@@ -66,10 +74,6 @@ export function Dashboard() {
     <div className="app-shell">
       <header className="topbar">
         <Brand compact />
-        <nav className="topbar__nav" aria-label="Navigazione sondaggi">
-          <button className={view === 'open' ? 'is-active' : ''} type="button" onClick={() => setView('open')}>In corso</button>
-          <button className={view === 'closed' ? 'is-active' : ''} type="button" onClick={() => setView('closed')}>Archivio</button>
-        </nav>
         <div className="account-menu">
           <button className="account-menu__trigger" type="button" onClick={() => setAccountOpen((open) => !open)} aria-expanded={accountOpen}>
             <span className="avatar">{user.displayName.charAt(0).toUpperCase()}</span>
@@ -84,6 +88,31 @@ export function Dashboard() {
           )}
         </div>
       </header>
+
+      <nav className="feed-filter" aria-label="Filtra gli slot">
+        <div className="feed-filter__inner">
+          <button
+            className={feedFilter === 'all' ? 'is-active' : ''}
+            type="button"
+            aria-pressed={feedFilter === 'all'}
+            onClick={() => setFeedFilter('all')}
+          >
+            <CalendarDays size={17} />
+            <span>Tutti</span>
+            <strong>{totalSlotCount}</strong>
+          </button>
+          <button
+            className={feedFilter === 'booked' ? 'is-active' : ''}
+            type="button"
+            aria-pressed={feedFilter === 'booked'}
+            onClick={() => setFeedFilter('booked')}
+          >
+            <CalendarCheck2 size={17} />
+            <span>Slot prenotati</span>
+            <strong>{bookedSlotCount}</strong>
+          </button>
+        </div>
+      </nav>
 
       {!hasRemoteBackend && (
         <div className="demo-banner">
@@ -123,10 +152,10 @@ export function Dashboard() {
 
         <section className="feed-heading">
           <div>
-            <p className="eyebrow">{view === 'open' ? 'Bacheca attiva' : 'Storico'}</p>
-            <h2>{view === 'open' ? 'Sondaggi della squadra' : 'Sondaggi archiviati'}</h2>
+            <p className="eyebrow">{feedFilter === 'all' ? 'Bacheca completa' : 'Partite confermate'}</p>
+            <h2>{feedFilter === 'all' ? 'Tutti gli slot' : 'Slot prenotati'}</h2>
           </div>
-          <span>{visiblePolls.length} {visiblePolls.length === 1 ? 'sondaggio' : 'sondaggi'}</span>
+          <span>{visibleSlotCount} slot</span>
         </section>
 
         {loading ? (
@@ -139,6 +168,7 @@ export function Dashboard() {
                 poll={poll}
                 user={user}
                 members={members}
+                bookedOnly={feedFilter === 'booked'}
                 onPollChange={updatePoll}
                 onNotify={notify}
                 onError={reportError}
@@ -149,9 +179,9 @@ export function Dashboard() {
           <section className="empty-state">
             <div className="empty-state__court" aria-hidden="true"><span /><i /><i /><i /><i /></div>
             <p className="eyebrow">Campo libero</p>
-            <h2>{view === 'open' ? 'Ancora nessun sondaggio.' : 'L’archivio è vuoto.'}</h2>
-            <p>{view === 'open' ? 'Proponi gli slot della prossima settimana e fai partire le adesioni.' : 'I sondaggi chiusi compariranno qui.'}</p>
-            {view === 'open' && <button className="button button--primary" type="button" onClick={() => setCreateOpen(true)}><CalendarPlus size={18} /> Crea il primo sondaggio</button>}
+            <h2>{feedFilter === 'all' ? 'Ancora nessun sondaggio.' : 'Nessuno slot prenotato.'}</h2>
+            <p>{feedFilter === 'all' ? 'Proponi gli slot della prossima settimana e fai partire le adesioni.' : 'Quando un campo viene confermato, lo slot comparirà qui.'}</p>
+            {feedFilter === 'all' && <button className="button button--primary" type="button" onClick={() => setCreateOpen(true)}><CalendarPlus size={18} /> Crea il primo sondaggio</button>}
           </section>
         )}
       </main>

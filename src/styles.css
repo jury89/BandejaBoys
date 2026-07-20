@@ -602,25 +602,44 @@ p {
   min-height: 74px;
   align-items: center;
   padding: 12px max(24px, calc((100vw - 1280px) / 2));
-  grid-template-columns: 1fr auto 1fr;
+  grid-template-columns: 1fr auto;
   border-bottom: 1px solid rgba(200, 217, 224, 0.85);
   background: rgba(248, 251, 252, 0.96);
   backdrop-filter: blur(14px);
 }
 
-.topbar__nav {
+.feed-filter {
+  position: sticky;
+  top: 74px;
+  z-index: 19;
+  padding: 8px 24px;
+  border-bottom: 1px solid rgba(200, 217, 224, 0.9);
+  background: rgba(238, 245, 247, 0.94);
+  backdrop-filter: blur(14px);
+}
+
+.feed-filter__inner {
   display: flex;
+  width: min(460px, 100%);
   align-items: center;
+  margin: 0 auto;
   gap: 5px;
   padding: 4px;
-  border-radius: 10px;
+  border: 1px solid #cfdee4;
+  border-radius: 12px;
   background: #e8f0f3;
 }
 
-.topbar__nav button {
-  padding: 8px 15px;
+.feed-filter button {
+  display: flex;
+  min-height: 38px;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 8px 14px;
   border: 0;
-  border-radius: 7px;
+  border-radius: 8px;
   background: transparent;
   color: #627985;
   cursor: pointer;
@@ -628,10 +647,32 @@ p {
   font-weight: 800;
 }
 
-.topbar__nav button.is-active {
+.feed-filter button strong {
+  display: grid;
+  min-width: 22px;
+  height: 22px;
+  place-items: center;
+  padding-inline: 5px;
+  border-radius: 999px;
+  background: #d7e5ea;
+  color: #46616e;
+  font-size: 0.62rem;
+}
+
+.feed-filter button.is-active {
   background: var(--white);
   color: var(--ink);
   box-shadow: 0 2px 8px rgba(16, 42, 58, 0.07);
+}
+
+.feed-filter button.is-active strong {
+  background: var(--lime);
+  color: var(--deep);
+}
+
+.feed-filter button:focus-visible {
+  outline: 2px solid var(--ocean);
+  outline-offset: 2px;
 }
 
 .account-menu {
@@ -863,11 +904,27 @@ p {
 
 .poll-card__header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 20px;
   padding: 26px 28px 23px;
   border-bottom: 1px solid #deeaee;
+}
+
+.poll-card__identity {
+  min-width: 0;
+}
+
+.poll-card__week {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 8px;
+  color: var(--ocean);
+  font-size: 0.65rem;
+  font-weight: 900;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
 }
 
 .poll-card__header h2 {
@@ -879,10 +936,19 @@ p {
   text-transform: uppercase;
 }
 
-.poll-card__header > div > p:last-child {
+.poll-card__meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
   margin: 0;
   color: var(--muted);
   font-size: 0.68rem;
+}
+
+.poll-card__meta strong {
+  color: #45616e;
+  font-weight: 850;
 }
 
 .poll-card__slots {
@@ -1965,22 +2031,19 @@ p {
     backdrop-filter: none;
   }
 
-  .topbar__nav {
-    position: fixed;
-    right: 16px;
-    bottom: 16px;
-    left: 16px;
-    z-index: 40;
-    justify-content: stretch;
-    padding: 5px;
-    border: 1px solid #cadce3;
-    background: rgba(245, 249, 250, 0.96);
-    box-shadow: 0 13px 40px rgba(8, 39, 54, 0.18);
-    backdrop-filter: blur(12px);
+  .feed-filter {
+    top: 64px;
+    padding: 7px 10px;
+    backdrop-filter: none;
   }
 
-  .topbar__nav button {
-    flex: 1;
+  .feed-filter__inner {
+    width: 100%;
+  }
+
+  .feed-filter button {
+    min-height: 42px;
+    padding-inline: 8px;
   }
 
   .account-menu__trigger > span:nth-child(2),
@@ -1989,8 +2052,8 @@ p {
   }
 
   .dashboard {
-    width: min(100% - 28px, 680px);
-    padding-top: 40px;
+    width: min(100% - 16px, 680px);
+    padding-top: 32px;
   }
 
   .dashboard-intro {
@@ -2033,21 +2096,53 @@ p {
   }
 
   .poll-card__header {
-    flex-direction: column;
-    padding: 22px 20px;
+    display: grid;
+    padding: 16px;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 12px;
   }
 
-  .poll-card__header .button {
-    align-self: flex-start;
+  .poll-card__header h2 {
+    overflow-wrap: anywhere;
+    font-size: 1.55rem;
+  }
+
+  .poll-card__week {
+    margin-bottom: 6px;
+  }
+
+  .poll-card__meta {
+    font-size: 0.65rem;
+  }
+
+  .poll-card__manage.button {
+    width: 42px;
+    height: 42px;
+    padding: 0;
+    border-radius: 50%;
+  }
+
+  .poll-card__manage-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .closed-banner {
+    padding: 8px 16px;
+    font-size: 0.62rem;
   }
 
   .poll-card__slots {
-    padding: 12px;
+    padding: 8px;
+    gap: 12px;
   }
 
   .site-footer {
-    width: calc(100% - 28px);
-    margin-bottom: 75px;
+    width: calc(100% - 16px);
   }
 
   .site-footer > span {
@@ -2096,7 +2191,7 @@ p {
   }
 
   .dashboard {
-    width: calc(100% - 20px);
+    width: calc(100% - 12px);
   }
 
   .scoreboard > div {

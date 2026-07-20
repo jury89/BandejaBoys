@@ -50,4 +50,30 @@ describe('accesso locale', () => {
     expect(await screen.findByText('18:45')).toBeInTheDocument()
     expect(screen.getByText('Data e ora dello slot aggiornate.')).toBeInTheDocument()
   }, 15_000)
+
+  it('filtra la bacheca tra tutti gli slot e quelli prenotati', async () => {
+    const user = userEvent.setup()
+    render(
+      <AuthProvider>
+        <App />
+      </AuthProvider>,
+    )
+
+    await user.click(await screen.findByRole('button', { name: 'Crea account' }))
+    await user.type(screen.getByLabelText('Nome visibile'), 'Jury')
+    await user.type(screen.getByLabelText('Email'), 'jury@example.test')
+    await user.type(screen.getByLabelText('Password'), 'segreto123')
+    await user.click(screen.getByRole('button', { name: /Crea il mio account/ }))
+
+    const allFilter = await screen.findByRole('button', { name: /^Tutti/ })
+    const bookedFilter = screen.getByRole('button', { name: /^Slot prenotati/ })
+    expect(allFilter).toHaveAttribute('aria-pressed', 'true')
+
+    await user.click(bookedFilter)
+    expect(bookedFilter).toHaveAttribute('aria-pressed', 'true')
+    expect(await screen.findByText('Nessuno slot prenotato.')).toBeInTheDocument()
+
+    await user.click(allFilter)
+    expect(await screen.findByText('Padel · prossima settimana')).toBeInTheDocument()
+  }, 15_000)
 })

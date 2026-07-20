@@ -19,6 +19,8 @@
 6. Qualunque membro autenticato può usare **Segna come prenotato** per registrare il campo all’**Oasi Boschetto** con un solo tocco, anche se i quattro giocatori non sono ancora completi. Il circolo è una costante di dominio e non viene richiesto nell’interfaccia.
 7. L'autore può archiviare il sondaggio quando non serve più raccogliere modifiche.
 
+La bacheca non separa più i sondaggi in due viste aperti/archiviati. Il filtro sticky sotto l’header offre **Tutti**, che mantiene consultabile l’intera cronologia, e **Slot prenotati**, che include soltanto i sondaggi con almeno una prenotazione e mostra al loro interno esclusivamente gli slot prenotati. Le schede dei sondaggi archiviati restano riconoscibili e non consentono modifiche.
+
 Data e ora di uno slot già pubblicato possono essere corrette da qualunque membro autenticato. La modifica conserva adesioni, riserve e dati del campo, impedisce duplicati e riordina gli slot cronologicamente.
 
 Il nome mostrato viene risolto sempre dal profilo `users/{uid}` più recente. Le copie presenti in adesioni, prenotazioni e sondaggi restano soltanto un fallback per profili non più disponibili; la parte locale dell’email non viene mai usata come nome. Al termine della registrazione l’`AuthContext` applica subito il profilo completo, evitando lo stato transitorio prodotto da Firebase prima dell’aggiornamento di `displayName`.
