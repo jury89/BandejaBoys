@@ -5,6 +5,7 @@ import { firestore, hasRemoteBackend } from './firebase'
 
 const DISMISSAL_KEY_PREFIX = 'bandeja-boys:notification-prompt-dismissed:'
 const VAPID_PUBLIC_KEY = import.meta.env.VITE_WEB_PUSH_VAPID_PUBLIC_KEY
+const PERMISSION_TIMEOUT_MS = 15_000
 
 export type PushNotificationState =
   | 'loading'
@@ -46,6 +47,24 @@ function base64UrlToUint8Array(value: string): Uint8Array<ArrayBuffer> {
   const base64 = (value + padding).replace(/-/g, '+').replace(/_/g, '/')
   const raw = window.atob(base64)
   return Uint8Array.from(raw, (character) => character.charCodeAt(0))
+}
+
+export async function requestNotificationPermission(
+  timeoutMs = PERMISSION_TIMEOUT_MS,
+): Promise<NotificationPermission> {
+  let timeoutId: number | undefined
+  const timeout = new Promise<never>((_, reject) => {
+    timeoutId = window.setTimeout(
+      () => reject(new Error('Il browser non ha risposto. Riprova dalle impostazioni del sito.')),
+      timeoutMs,
+    )
+  })
+
+  try {
+    return await Promise.race([Notification.requestPermission(), timeout])
+  } finally {
+    window.clearTimeout(timeoutId)
+  }
 }
 
 async function subscriptionId(endpoint: string): Promise<string> {
@@ -102,7 +121,7 @@ async function enablePush(user: SessionUser): Promise<void> {
   if (!supportsPush()) throw new Error('Le notifiche push non sono supportate su questo dispositivo.')
   if (!VAPID_PUBLIC_KEY) throw new Error('Le notifiche non sono ancora configurate.')
 
-  const permission = await Notification.requestPermission()
+  const permission = await requestNotificationPermission()
   if (permission !== 'granted') throw new Error('Permesso notifiche non concesso.')
 
   const registration = await registerNotificationWorker()

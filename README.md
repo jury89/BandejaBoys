@@ -80,6 +80,8 @@ Il workflow [`.github/workflows/notifications.yml`](.github/workflows/notificati
 
 Su Android e desktop l’attivazione avviene direttamente dal pannello mostrato al primo accesso. Su iPhone e iPad Web Push è disponibile per le web app aggiunte alla schermata Home: il sito mostra prima le istruzioni di installazione, poi richiede il permesso quando viene aperto dalla nuova icona.
 
+Se il browser non restituisce l’esito del permesso entro 15 secondi, l’interfaccia interrompe l’attesa e permette di riprovare senza rimanere bloccata su “Attivazione…”.
+
 ## Comandi
 
 | Comando | Scopo |
