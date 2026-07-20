@@ -227,12 +227,12 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
             type="button"
             onClick={book}
             disabled={busy}
-            aria-label={`Conferma prenotazione all’Oasi Boschetto`}
+            aria-label="Segna il campo come prenotato all’Oasi Boschetto"
           >
             <span className="booking-action__icon" aria-hidden="true"><CalendarCheck2 size={19} /></span>
             <span className="booking-action__copy">
               <small>{DEFAULT_VENUE}</small>
-              <strong>{busy ? 'Conferma in corso…' : 'Conferma prenotazione'}</strong>
+              <strong>{busy ? 'Salvataggio…' : 'Segna come prenotato'}</strong>
             </span>
             <ArrowRight className="booking-action__arrow" size={18} aria-hidden="true" />
           </button>

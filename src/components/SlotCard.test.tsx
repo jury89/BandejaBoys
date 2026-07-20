@@ -77,7 +77,10 @@ describe('azioni dello slot', () => {
 
     expect(slot.signups).toHaveLength(1)
     expect(screen.getByText(DEFAULT_VENUE)).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: `Conferma prenotazione all’Oasi Boschetto` }))
+    expect(screen.getByText('Segna come prenotato')).toBeInTheDocument()
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Segna il campo come prenotato all’Oasi Boschetto' }),
+    )
 
     await waitFor(() => expect(setBooking).toHaveBeenCalledWith(poll.id, slot.id, { bookedBy: user }))
     expect(onPollChange).toHaveBeenCalledWith(updatedPoll)
