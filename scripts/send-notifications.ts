@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { initializeApp } from 'firebase/app'
+import { deleteApp, initializeApp } from 'firebase/app'
 import { getAuth, signInWithEmailAndPassword } from 'firebase/auth'
 import {
   collection,
@@ -10,6 +10,7 @@ import {
   getFirestore,
   serverTimestamp,
   setDoc,
+  terminate,
 } from 'firebase/firestore'
 import webpush, { type PushSubscription } from 'web-push'
 import type { PadelPoll } from '../src/types'
@@ -108,4 +109,6 @@ for (const notification of notifications) {
 }
 
 console.log(`Notifiche: ${sent} inviate, ${skipped} già consegnate, ${removed} dispositivi rimossi, ${failed} errori.`)
+await terminate(db)
+await deleteApp(app)
 if (failed > 0) process.exitCode = 1
