@@ -16,12 +16,13 @@ describe('accesso locale', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Crea account' }))
     await user.type(screen.getByLabelText('Nome visibile'), 'Jury')
-    await user.type(screen.getByLabelText('Email'), 'jury@example.test')
+    await user.type(screen.getByLabelText('Email'), 'jury.rossi@example.test')
     await user.type(screen.getByLabelText('Password'), 'segreto123')
     await user.click(screen.getByRole('button', { name: /Crea il mio account/ }))
 
     expect(await screen.findByText(/Mettiamo in campo/)).toBeInTheDocument()
     expect(screen.getByText('Jury')).toBeInTheDocument()
+    expect(screen.queryByText('jury.rossi')).not.toBeInTheDocument()
     expect(screen.getByText(/Demo locale/)).toBeInTheDocument()
   }, 15_000)
 

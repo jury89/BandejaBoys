@@ -1,6 +1,7 @@
 import { Archive, CalendarDays, RotateCcw } from 'lucide-react'
 import type { MemberProfile, PadelPoll, SessionUser } from '../types'
 import { weekLabel } from '../lib/format'
+import { resolveMemberName } from '../lib/memberNames'
 import { repository } from '../lib/repository'
 import { SlotCard } from './SlotCard'
 
@@ -15,6 +16,7 @@ interface PollCardProps {
 
 export function PollCard({ poll, user, members, onPollChange, onNotify, onError }: PollCardProps) {
   const canManage = poll.createdBy === user.id
+  const creatorName = resolveMemberName(members, poll.createdBy, poll.createdByName)
 
   const toggleStatus = async () => {
     try {
@@ -33,7 +35,7 @@ export function PollCard({ poll, user, members, onPollChange, onNotify, onError 
         <div>
           <p className="eyebrow"><CalendarDays size={14} /> Settimana {weekLabel(poll.targetWeekStart)}</p>
           <h2>{poll.title}</h2>
-          <p>Creato da {poll.createdByName} · {poll.slots.length} {poll.slots.length === 1 ? 'slot' : 'slot'}</p>
+          <p>Creato da {creatorName} · {poll.slots.length} {poll.slots.length === 1 ? 'slot' : 'slot'}</p>
         </div>
         {canManage && (
           <button className="button button--ghost button--small" type="button" onClick={toggleStatus}>

@@ -8,7 +8,7 @@ Il sito è disponibile su [bandeja-boys.web.app](https://bandeja-boys.web.app). 
 
 ## Cosa fa
 
-- Registrazione e accesso con email e password.
+- Registrazione e accesso con email e password; il nome inserito nel profilo resta l’unico nome mostrato nell’interfaccia e non viene mai ricavato dall’indirizzo email.
 - Creazione di un sondaggio per la settimana successiva con uno o più slot, duplicabili al giorno seguente mantenendo ora e durata.
 - Modifica di data e ora degli slot già pubblicati senza perdere adesioni, riserve o prenotazione.
 - Scelta esplicita al momento dell’adesione: ogni giocatore può segnarsi come **Titolare** oppure direttamente come **Riserva**. I quattro posti da titolare e la lista d’attesa mantengono l’ordine cronologico.

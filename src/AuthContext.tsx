@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { SessionUser } from './types'
 import {
   registerAccount,
@@ -12,7 +12,7 @@ interface AuthContextValue {
   user: SessionUser | null
   loading: boolean
   signIn: typeof signIn
-  register: typeof registerAccount
+  register: (displayName: string, email: string, password: string) => Promise<void>
   signOut: typeof signOut
   resetPassword: typeof resetPassword
 }
@@ -32,9 +32,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [],
   )
 
+  const register = useCallback(async (displayName: string, email: string, password: string) => {
+    const profile = await registerAccount(displayName, email, password)
+    setUser(profile)
+  }, [])
+
   const value = useMemo(
-    () => ({ user, loading, signIn, register: registerAccount, signOut, resetPassword }),
-    [user, loading],
+    () => ({ user, loading, signIn, register, signOut, resetPassword }),
+    [user, loading, register],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

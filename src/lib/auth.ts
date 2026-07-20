@@ -70,7 +70,7 @@ export function subscribeToSession(listener: (user: SessionUser | null) => void)
         user
           ? {
               id: user.uid,
-              displayName: user.displayName || user.email?.split('@')[0] || 'Giocatore',
+              displayName: user.displayName?.trim() || 'Giocatore',
               email: user.email ?? '',
               createdAt: Number(user.metadata.creationTime ? new Date(user.metadata.creationTime) : Date.now()),
             }
@@ -89,7 +89,7 @@ export async function registerAccount(
   displayName: string,
   email: string,
   password: string,
-): Promise<void> {
+): Promise<SessionUser> {
   const cleanName = displayName.trim()
   const cleanEmail = email.trim().toLowerCase()
   if (cleanName.length < 2) throw new Error('Inserisci il nome che vedranno gli amici.')
@@ -105,7 +105,7 @@ export async function registerAccount(
       createdAt: Date.now(),
     }
     await setDoc(doc(firestore, 'users', profile.id), profile)
-    return
+    return profile
   }
 
   const accounts = readAccounts()
@@ -122,6 +122,7 @@ export async function registerAccount(
   writeAccounts([...accounts, account])
   localStorage.setItem(SESSION_KEY, account.id)
   emitAuthChange()
+  return accountProfile(account)
 }
 
 export async function signIn(email: string, password: string): Promise<void> {

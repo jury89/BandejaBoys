@@ -22,6 +22,7 @@ import {
   MAX_STARTERS,
 } from '../lib/domain'
 import { slotDateParts } from '../lib/format'
+import { resolveMemberName } from '../lib/memberNames'
 import { repository } from '../lib/repository'
 import { EditSlotModal } from './EditSlotModal'
 import { SubstitutionModal } from './SubstitutionModal'
@@ -55,6 +56,8 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
   const PhaseIcon = phaseCopy[phase].icon
   const joined = slot.signups.some((signup) => signup.userId === user.id)
   const userIsStarter = isStarter(slot, user.id)
+  const memberName = (userId: string | undefined, savedName: string | undefined) =>
+    resolveMemberName(members, userId, savedName)
 
   const syncPoll = async (work: () => Promise<PadelPoll>) => {
     const updated = await work()
@@ -78,7 +81,7 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
     if (losesPriority && !window.confirm('Se ti ritiri, la prima riserva entra tra i titolari. Continuare?')) return
     await run(
       () => repository.leaveSlot(poll.id, slot.id, user.id),
-      losesPriority ? `${reserves[0].displayName} è stato promosso tra i titolari.` : 'Adesione rimossa.',
+      losesPriority ? `${memberName(reserves[0].userId, reserves[0].displayName)} è stato promosso tra i titolari.` : 'Adesione rimossa.',
     )
   }
 
@@ -134,7 +137,7 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
           <span className="booking-strip__pin" aria-hidden="true"><MapPin size={16} /></span>
           <span className="booking-strip__copy">
             <strong>{DEFAULT_VENUE}</strong>
-            <small>Prenotazione confermata da {slot.bookedByName}</small>
+            <small>Prenotazione confermata da {memberName(slot.bookedBy, slot.bookedByName)}</small>
           </span>
           <span className="booking-strip__stamp"><Check size={13} /> Confermato</span>
         </div>
@@ -149,9 +152,11 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
               <span className="court-player__marker">{index + 1}</span>
               {signup ? (
                 <span className="court-player__name">
-                  <strong>{signup.displayName}</strong>
+                  <strong>{memberName(signup.userId, signup.displayName)}</strong>
                   {signup.userId === user.id && <small>Tu</small>}
-                  {signup.substitutedFor && <small>per {signup.substitutedFor.displayName}</small>}
+                  {signup.substitutedFor && (
+                    <small>per {memberName(signup.substitutedFor.userId, signup.substitutedFor.displayName)}</small>
+                  )}
                 </span>
               ) : (
                 <span className="court-player__name court-player__name--empty">Posto libero</span>
@@ -171,7 +176,7 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
             {reserves.map((reserve, index) => (
               <li className={reserve.userId === user.id ? 'is-you' : ''} key={reserve.id}>
                 <span>{index + 1}</span>
-                <strong>{reserve.displayName}</strong>
+                <strong>{memberName(reserve.userId, reserve.displayName)}</strong>
                 {reserve.userId === user.id && <small>Tu</small>}
               </li>
             ))}

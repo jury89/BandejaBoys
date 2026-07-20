@@ -35,6 +35,39 @@ const poll: PadelPoll = {
 describe('azioni dello slot', () => {
   afterEach(() => vi.restoreAllMocks())
 
+  it('mostra il nome attuale del profilo al posto della vecchia copia ricavata dall’email', () => {
+    const mattia: SessionUser = {
+      id: 'mattia',
+      displayName: 'Mattia Baruffaldi',
+      email: 'mattia.baruffaldi@example.test',
+      createdAt: 2,
+    }
+    const legacySlot: PadelSlot = {
+      ...slot,
+      signups: [{
+        id: 'signup-mattia',
+        userId: mattia.id,
+        displayName: 'mattia.baruffaldi',
+        joinedAt: 1,
+      }],
+    }
+
+    render(
+      <SlotCard
+        poll={{ ...poll, slots: [legacySlot] }}
+        slot={legacySlot}
+        user={user}
+        members={[user, mattia]}
+        onPollChange={vi.fn()}
+        onNotify={vi.fn()}
+        onError={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByText('Mattia Baruffaldi')).toBeInTheDocument()
+    expect(screen.queryByText('mattia.baruffaldi')).not.toBeInTheDocument()
+  })
+
   it('spiega in modo accessibile cosa fa Passo il posto', () => {
     render(
       <SlotCard
