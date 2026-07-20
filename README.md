@@ -11,8 +11,8 @@ Il sito è disponibile su [bandeja-boys.web.app](https://bandeja-boys.web.app). 
 - Registrazione e accesso con email e password.
 - Creazione di un sondaggio per la settimana successiva con uno o più slot, duplicabili al giorno seguente mantenendo ora e durata.
 - Modifica di data e ora degli slot già pubblicati senza perdere adesioni, riserve o prenotazione.
-- Adesioni ordinate in modo atomico: i primi quattro sono titolari, gli altri entrano in lista d'attesa.
-- Promozione automatica della prima riserva quando un titolare si ritira.
+- Scelta esplicita al momento dell’adesione: ogni giocatore può segnarsi come **Titolare** oppure direttamente come **Riserva**. I quattro posti da titolare e la lista d’attesa mantengono l’ordine cronologico.
+- Promozione automatica della prima riserva quando un titolare si ritira da una formazione completa.
 - Sostituzione diretta: un titolare passa la propria posizione a un altro membro; se il sostituto era in riserva, il suo vecchio posto viene rimosso. Un tooltip accessibile chiarisce l’effetto prima dell’azione.
 - Stato dello slot immediatamente leggibile: raccolta adesioni, da prenotare, campo prenotato. L’azione **Segna come prenotato** registra con un solo tocco la prenotazione all’**Oasi Boschetto**, anche prima di raggiungere quattro giocatori.
 - Autore della conferma e archivio dei sondaggi chiusi.

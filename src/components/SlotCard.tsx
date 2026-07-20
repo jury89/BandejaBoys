@@ -12,14 +12,14 @@ import {
   PhoneCall,
   UserRoundPlus,
 } from 'lucide-react'
-import type { MemberProfile, PadelPoll, PadelSlot, SessionUser } from '../types'
+import type { MemberProfile, PadelPoll, PadelSlot, SessionUser, SignupRole } from '../types'
 import {
   DEFAULT_VENUE,
   getReserves,
-  getSignupPosition,
   getSlotPhase,
   getStarters,
   isStarter,
+  MAX_STARTERS,
 } from '../lib/domain'
 import { slotDateParts } from '../lib/format'
 import { repository } from '../lib/repository'
@@ -53,8 +53,7 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
   const reserves = getReserves(slot)
   const phase = getSlotPhase(slot)
   const PhaseIcon = phaseCopy[phase].icon
-  const position = getSignupPosition(slot, user.id)
-  const joined = position >= 0
+  const joined = slot.signups.some((signup) => signup.userId === user.id)
   const userIsStarter = isStarter(slot, user.id)
 
   const syncPoll = async (work: () => Promise<PadelPoll>) => {
@@ -80,6 +79,13 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
     await run(
       () => repository.leaveSlot(poll.id, slot.id, user.id),
       losesPriority ? `${reserves[0].displayName} è stato promosso tra i titolari.` : 'Adesione rimossa.',
+    )
+  }
+
+  const join = async (role: SignupRole) => {
+    await run(
+      () => repository.joinSlot(poll.id, slot.id, user, role),
+      role === 'starter' ? 'Sei tra i titolari.' : `Sei la riserva n° ${reserves.length + 1}.`,
     )
   }
 
@@ -171,7 +177,7 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
             ))}
           </ol>
         ) : (
-          <p>Chi si aggiunge dopo i primi quattro comparirà qui.</p>
+          <p>Chi sceglie Riserva o arriva dopo i primi quattro comparirà qui.</p>
         )}
       </section>
 
@@ -179,20 +185,38 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
         {!disabled && (
           joined ? (
             <button className="button button--secondary button--grow" type="button" onClick={leave} disabled={busy}>
-              <LogOut size={17} /> {position < 4 ? 'Ritirati' : 'Lascia la riserva'}
+              <LogOut size={17} /> {userIsStarter ? 'Ritirati' : 'Lascia la riserva'}
             </button>
           ) : (
-            <button
-              className="button button--primary button--grow"
-              type="button"
-              onClick={() => run(
-                () => repository.joinSlot(poll.id, slot.id, user),
-                slot.signups.length < 4 ? 'Sei tra i titolari.' : `Sei la riserva n° ${slot.signups.length - 3}.`,
-              )}
-              disabled={busy}
-            >
-              <UserRoundPlus size={17} /> Ci sono
-            </button>
+            <div className="join-choice" role="group" aria-label="Scegli come partecipare">
+              <p className="join-choice__label">Come vuoi segnarti?</p>
+              <button
+                className="join-option join-option--starter"
+                type="button"
+                onClick={() => join('starter')}
+                disabled={busy || starters.length >= MAX_STARTERS}
+                aria-label="Segnati come titolare"
+              >
+                <span className="join-option__icon" aria-hidden="true"><UserRoundPlus size={17} /></span>
+                <span>
+                  <strong>Titolare</strong>
+                  <small>{starters.length >= MAX_STARTERS ? '4/4 completi' : `${starters.length}/4 occupati`}</small>
+                </span>
+              </button>
+              <button
+                className="join-option join-option--reserve"
+                type="button"
+                onClick={() => join('reserve')}
+                disabled={busy}
+                aria-label="Segnati come riserva"
+              >
+                <span className="join-option__icon" aria-hidden="true"><Clock3 size={17} /></span>
+                <span>
+                  <strong>Riserva</strong>
+                  <small>In lista d’attesa</small>
+                </span>
+              </button>
+            </div>
           )
         )}
 

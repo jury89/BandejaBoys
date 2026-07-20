@@ -113,11 +113,15 @@ describe('azioni dello slot', () => {
     expect(onNotify).toHaveBeenCalledWith('Data e ora dello slot aggiornate.')
   })
 
-  it('aggiorna subito nome e pulsante dopo Ci sono senza attendere il listener realtime', async () => {
+  it('permette di scegliere il ruolo e aggiorna subito la formazione da titolare', async () => {
     const emptySlot = { ...slot, signups: [] }
     const initialPoll: PadelPoll = { ...poll, slots: [emptySlot] }
-    const updatedPoll: PadelPoll = { ...poll, slots: [slot] }
-    vi.spyOn(repository, 'joinSlot').mockResolvedValue(updatedPoll)
+    const starterSlot: PadelSlot = {
+      ...slot,
+      signups: [{ ...slot.signups[0], role: 'starter' }],
+    }
+    const updatedPoll: PadelPoll = { ...poll, slots: [starterSlot] }
+    const joinSlot = vi.spyOn(repository, 'joinSlot').mockResolvedValue(updatedPoll)
 
     function Harness() {
       const [current, setCurrent] = useState(initialPoll)
@@ -135,9 +139,78 @@ describe('azioni dello slot', () => {
     }
 
     render(<Harness />)
-    fireEvent.click(screen.getByRole('button', { name: 'Ci sono' }))
+    expect(screen.getByRole('group', { name: 'Scegli come partecipare' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Segnati come titolare' }))
 
     expect(await screen.findByRole('button', { name: 'Ritirati' })).toBeInTheDocument()
+    expect(joinSlot).toHaveBeenCalledWith(poll.id, slot.id, user, 'starter')
     expect(screen.getByText('Jury')).toBeInTheDocument()
+  })
+
+  it('permette di segnarsi direttamente come riserva anche con il campo vuoto', async () => {
+    const emptySlot = { ...slot, signups: [] }
+    const reserveSlot: PadelSlot = {
+      ...slot,
+      signups: [{ ...slot.signups[0], role: 'reserve' }],
+    }
+    const initialPoll: PadelPoll = { ...poll, slots: [emptySlot] }
+    const updatedPoll: PadelPoll = { ...poll, slots: [reserveSlot] }
+    const joinSlot = vi.spyOn(repository, 'joinSlot').mockResolvedValue(updatedPoll)
+
+    function Harness() {
+      const [current, setCurrent] = useState(initialPoll)
+      return (
+        <SlotCard
+          poll={current}
+          slot={current.slots[0]}
+          user={user}
+          members={[user]}
+          onPollChange={setCurrent}
+          onNotify={vi.fn()}
+          onError={vi.fn()}
+        />
+      )
+    }
+
+    render(<Harness />)
+    fireEvent.click(screen.getByRole('button', { name: 'Segnati come riserva' }))
+
+    expect(await screen.findByRole('button', { name: 'Lascia la riserva' })).toBeInTheDocument()
+    expect(joinSlot).toHaveBeenCalledWith(poll.id, slot.id, user, 'reserve')
+    expect(screen.getByLabelText('Lista d’attesa')).toHaveTextContent('Jury')
+  })
+
+  it('lascia disponibile solo la riserva quando i quattro titolari sono completi', () => {
+    const guest: SessionUser = {
+      id: 'guest',
+      displayName: 'Guest',
+      email: 'guest@example.test',
+      createdAt: 2,
+    }
+    const fullSlot: PadelSlot = {
+      ...slot,
+      signups: ['a', 'b', 'c', 'd'].map((id, index) => ({
+        id: `signup-${id}`,
+        userId: id,
+        displayName: id.toUpperCase(),
+        joinedAt: index,
+        role: 'starter',
+      })),
+    }
+
+    render(
+      <SlotCard
+        poll={{ ...poll, slots: [fullSlot] }}
+        slot={fullSlot}
+        user={guest}
+        members={[guest]}
+        onPollChange={vi.fn()}
+        onNotify={vi.fn()}
+        onError={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByRole('button', { name: 'Segnati come titolare' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Segnati come riserva' })).toBeEnabled()
   })
 })

@@ -11,7 +11,7 @@ import {
   setSlotBooking,
   substituteStarter,
 } from './domain'
-import type { MemberProfile, PadelPoll, PadelSlot, SessionUser, Signup } from '../types'
+import type { MemberProfile, PadelPoll, PadelSlot, SessionUser, Signup, SignupRole } from '../types'
 
 const member = (id: string, displayName = id): MemberProfile => ({
   id,
@@ -20,11 +20,12 @@ const member = (id: string, displayName = id): MemberProfile => ({
   createdAt: 1,
 })
 
-const signup = (id: string, joinedAt: number): Signup => ({
+const signup = (id: string, joinedAt: number, role?: SignupRole): Signup => ({
   id: `signup-${id}`,
   userId: id,
   displayName: id.toUpperCase(),
   joinedAt,
+  role,
 })
 
 const slot = (signups: Signup[] = []): PadelSlot => ({
@@ -60,6 +61,50 @@ describe('ordine adesioni', () => {
   it('ignora una doppia adesione dello stesso giocatore', () => {
     const current = slot([signup('a', 1)])
     expect(addSignup(current, member('a'), 2)).toBe(current)
+  })
+
+  it('permette di scegliere la riserva anche quando ci sono posti da titolare', () => {
+    const current = addSignup(slot(), member('a'), 1, 'reserve')
+
+    expect(getStarters(current)).toHaveLength(0)
+    expect(getReserves(current).map((item) => item.userId)).toEqual(['a'])
+    expect(getSlotPhase(current)).toBe('collecting')
+  })
+
+  it('assegna un posto da titolare dopo una riserva volontaria senza cambiarne il ruolo', () => {
+    let current = addSignup(slot(), member('a'), 1, 'reserve')
+    current = addSignup(current, member('b'), 2, 'starter')
+
+    expect(getStarters(current).map((item) => item.userId)).toEqual(['b'])
+    expect(getReserves(current).map((item) => item.userId)).toEqual(['a'])
+  })
+
+  it('mantiene in riserva una scelta volontaria finché la formazione non era completa', () => {
+    const current = slot([signup('a', 1, 'starter'), signup('b', 2, 'reserve')])
+    const updated = removeSignup(current, 'a')
+
+    expect(getStarters(updated)).toHaveLength(0)
+    expect(getReserves(updated).map((item) => item.userId)).toEqual(['b'])
+  })
+
+  it('promuove la prima riserva esplicita se si ritira un titolare dalla formazione completa', () => {
+    const current = slot([
+      signup('a', 1, 'starter'),
+      signup('b', 2, 'starter'),
+      signup('c', 3, 'starter'),
+      signup('d', 4, 'starter'),
+      signup('e', 5, 'reserve'),
+    ])
+    const updated = removeSignup(current, 'b')
+
+    expect(getStarters(updated).map((item) => item.userId)).toEqual(['a', 'c', 'd', 'e'])
+    expect(getReserves(updated)).toHaveLength(0)
+  })
+
+  it('rifiuta una quinta adesione richiesta esplicitamente da titolare', () => {
+    const current = slot(['a', 'b', 'c', 'd'].map((id, index) => signup(id, index, 'starter')))
+
+    expect(() => addSignup(current, member('e'), 5, 'starter')).toThrow('quattro posti da titolare')
   })
 })
 

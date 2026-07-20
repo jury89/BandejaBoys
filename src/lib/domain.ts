@@ -5,10 +5,11 @@ import type {
   PadelSlot,
   SessionUser,
   Signup,
+  SignupRole,
   SlotPhase,
 } from '../types'
 
-const STARTER_COUNT = 4
+export const MAX_STARTERS = 4
 export const DEFAULT_VENUE = 'Oasi Boschetto'
 
 export function makeId(prefix = 'id'): string {
@@ -23,11 +24,14 @@ export function sortSignups(signups: Signup[]): Signup[] {
 }
 
 export function getStarters(slot: PadelSlot): Signup[] {
-  return sortSignups(slot.signups).slice(0, STARTER_COUNT)
+  return sortSignups(slot.signups)
+    .filter((signup) => signup.role !== 'reserve')
+    .slice(0, MAX_STARTERS)
 }
 
 export function getReserves(slot: PadelSlot): Signup[] {
-  return sortSignups(slot.signups).slice(STARTER_COUNT)
+  const starterIds = new Set(getStarters(slot).map((signup) => signup.id))
+  return sortSignups(slot.signups).filter((signup) => !starterIds.has(signup.id))
 }
 
 export function getSignupPosition(slot: PadelSlot, userId: string): number {
@@ -35,13 +39,12 @@ export function getSignupPosition(slot: PadelSlot, userId: string): number {
 }
 
 export function isStarter(slot: PadelSlot, userId: string): boolean {
-  const position = getSignupPosition(slot, userId)
-  return position >= 0 && position < STARTER_COUNT
+  return getStarters(slot).some((signup) => signup.userId === userId)
 }
 
 export function getSlotPhase(slot: PadelSlot): SlotPhase {
   if (slot.bookedAt) return 'booked'
-  return slot.signups.length >= STARTER_COUNT ? 'ready' : 'collecting'
+  return getStarters(slot).length >= MAX_STARTERS ? 'ready' : 'collecting'
 }
 
 export function setSlotBooking(
@@ -72,8 +75,14 @@ export function addSignup(
   slot: PadelSlot,
   member: Pick<MemberProfile, 'id' | 'displayName'>,
   joinedAt = Date.now(),
+  role?: SignupRole,
 ): PadelSlot {
   if (slot.signups.some((signup) => signup.userId === member.id)) return slot
+
+  const selectedRole = role ?? (getStarters(slot).length < MAX_STARTERS ? 'starter' : 'reserve')
+  if (selectedRole === 'starter' && getStarters(slot).length >= MAX_STARTERS) {
+    throw new Error('I quattro posti da titolare sono già occupati. Segnati come riserva.')
+  }
 
   return {
     ...slot,
@@ -84,15 +93,25 @@ export function addSignup(
         userId: member.id,
         displayName: member.displayName,
         joinedAt,
+        role: selectedRole,
       },
     ]),
   }
 }
 
 export function removeSignup(slot: PadelSlot, userId: string): PadelSlot {
+  const starters = getStarters(slot)
+  const reserves = getReserves(slot)
+  const shouldPromote = starters.length === MAX_STARTERS
+    && starters.some((signup) => signup.userId === userId)
+    && reserves.length > 0
+  const promotedId = shouldPromote ? reserves[0].id : null
+
   return {
     ...slot,
-    signups: slot.signups.filter((signup) => signup.userId !== userId),
+    signups: sortSignups(slot.signups
+      .filter((signup) => signup.userId !== userId)
+      .map((signup) => signup.id === promotedId ? { ...signup, role: 'starter' as const } : signup)),
   }
 }
 
@@ -103,26 +122,27 @@ export function substituteStarter(
   at = Date.now(),
 ): PadelSlot {
   const ordered = sortSignups(slot.signups)
-  const outgoingIndex = ordered.findIndex((signup) => signup.userId === outgoingUserId)
-  const replacementIndex = ordered.findIndex((signup) => signup.userId === replacement.id)
+  const starters = getStarters(slot)
+  const outgoing = starters.find((signup) => signup.userId === outgoingUserId)
+  const replacementIsStarter = starters.some((signup) => signup.userId === replacement.id)
 
-  if (outgoingIndex < 0 || outgoingIndex >= STARTER_COUNT) {
+  if (!outgoing) {
     throw new Error('Solo un titolare può passare il proprio posto.')
   }
   if (replacement.id === outgoingUserId) {
     throw new Error('Scegli una persona diversa.')
   }
-  if (replacementIndex >= 0 && replacementIndex < STARTER_COUNT) {
+  if (replacementIsStarter) {
     throw new Error('La persona scelta è già tra i titolari.')
   }
 
-  const outgoing = ordered[outgoingIndex]
   const withoutReplacement = ordered.filter((signup) => signup.userId !== replacement.id)
   const adjustedOutgoingIndex = withoutReplacement.findIndex((signup) => signup.id === outgoing.id)
   withoutReplacement[adjustedOutgoingIndex] = {
     ...outgoing,
     userId: replacement.id,
     displayName: replacement.displayName,
+    role: 'starter',
     substitutedFor: {
       userId: outgoing.userId,
       displayName: outgoing.displayName,

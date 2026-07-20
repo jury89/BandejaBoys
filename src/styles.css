@@ -1288,6 +1288,124 @@ p {
   font-size: 0.72rem;
 }
 
+.join-choice {
+  display: grid;
+  flex: 1 1 100%;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.join-choice__label {
+  margin: 0 0 1px;
+  grid-column: 1 / -1;
+  color: #59727d;
+  font-size: 0.58rem;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.join-option {
+  display: grid;
+  min-width: 0;
+  min-height: 52px;
+  align-items: center;
+  padding: 7px 9px;
+  grid-template-columns: 31px minmax(0, 1fr);
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.join-option:not(:disabled):hover {
+  transform: translateY(-1px);
+}
+
+.join-option:focus-visible {
+  outline: 3px solid rgba(23, 153, 205, 0.25);
+  outline-offset: 2px;
+}
+
+.join-option:disabled {
+  cursor: not-allowed;
+  opacity: 0.52;
+}
+
+.join-option__icon {
+  display: grid;
+  width: 31px;
+  height: 31px;
+  place-items: center;
+  border-radius: 50%;
+}
+
+.join-option > span:last-child {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.join-option strong {
+  font-size: 0.72rem;
+  font-weight: 850;
+}
+
+.join-option small {
+  overflow: hidden;
+  margin-top: 1px;
+  font-size: 0.52rem;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.join-option--starter {
+  border-color: var(--deep);
+  background: var(--deep);
+  color: var(--white);
+  box-shadow: 0 7px 18px rgba(7, 89, 133, 0.14);
+}
+
+.join-option--starter:not(:disabled):hover {
+  border-color: #064e74;
+  background: #064e74;
+  box-shadow: 0 9px 21px rgba(7, 89, 133, 0.2);
+}
+
+.join-option--starter .join-option__icon {
+  background: var(--lime);
+  color: var(--ink);
+}
+
+.join-option--starter small {
+  color: #b9d4df;
+}
+
+.join-option--reserve {
+  border-style: dashed;
+  border-color: #91adb8;
+  background: #f3f8fa;
+  color: var(--ink);
+}
+
+.join-option--reserve:not(:disabled):hover {
+  border-color: var(--court);
+  background: #eaf3f6;
+  box-shadow: 0 7px 16px rgba(6, 105, 145, 0.1);
+}
+
+.join-option--reserve .join-option__icon {
+  background: #deebef;
+  color: var(--court);
+}
+
+.join-option--reserve small {
+  color: #718891;
+}
+
 .booking-action {
   display: grid;
   min-height: 58px;
@@ -2034,6 +2152,10 @@ p {
 
   .slot-card__actions .substitution-action {
     flex: 1 1 100%;
+  }
+
+  .join-option {
+    padding-inline: 8px;
   }
 
   .modal__actions {

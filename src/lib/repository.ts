@@ -15,6 +15,7 @@ import type {
   PadelPoll,
   PollStatus,
   SessionUser,
+  SignupRole,
 } from '../types'
 import {
   addSignup,
@@ -32,7 +33,7 @@ export interface PadelRepository {
   subscribePolls(listener: (polls: PadelPoll[]) => void, onError: (error: Error) => void): Unsubscribe
   subscribeMembers(listener: (members: MemberProfile[]) => void, onError: (error: Error) => void): Unsubscribe
   createPoll(input: CreatePollInput, creator: SessionUser): Promise<void>
-  joinSlot(pollId: string, slotId: string, member: SessionUser): Promise<PadelPoll>
+  joinSlot(pollId: string, slotId: string, member: SessionUser, role: SignupRole): Promise<PadelPoll>
   leaveSlot(pollId: string, slotId: string, userId: string): Promise<PadelPoll>
   rescheduleSlot(pollId: string, slotId: string, startsAt: string): Promise<PadelPoll>
   substitute(
@@ -89,8 +90,8 @@ function remoteRepository(): PadelRepository {
     async createPoll(input, creator) {
       await addDoc(collection(db, 'polls'), makePoll(input, creator))
     },
-    async joinSlot(pollId, slotId, member) {
-      return mutatePoll(pollId, (poll) => updateSlot(poll, slotId, (slot) => addSignup(slot, member)))
+    async joinSlot(pollId, slotId, member, role) {
+      return mutatePoll(pollId, (poll) => updateSlot(poll, slotId, (slot) => addSignup(slot, member, Date.now(), role)))
     },
     async leaveSlot(pollId, slotId, userId) {
       return mutatePoll(pollId, (poll) => updateSlot(poll, slotId, (slot) => removeSignup(slot, userId)))
@@ -220,8 +221,8 @@ function localRepository(): PadelRepository {
       const poll = makePoll(input, creator)
       writeLocalPolls([{ id: `poll-${Date.now()}`, ...poll }, ...readLocalPolls()])
     },
-    async joinSlot(pollId, slotId, member) {
-      return mutate(pollId, (poll) => updateSlot(poll, slotId, (slot) => addSignup(slot, member)))
+    async joinSlot(pollId, slotId, member, role) {
+      return mutate(pollId, (poll) => updateSlot(poll, slotId, (slot) => addSignup(slot, member, Date.now(), role)))
     },
     async leaveSlot(pollId, slotId, userId) {
       return mutate(pollId, (poll) => updateSlot(poll, slotId, (slot) => removeSignup(slot, userId)))

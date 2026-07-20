@@ -15,11 +15,14 @@ export interface SubstitutionNote {
   at: number
 }
 
+export type SignupRole = 'starter' | 'reserve'
+
 export interface Signup {
   id: string
   userId: string
   displayName: string
   joinedAt: number
+  role?: SignupRole
   substitutedFor?: SubstitutionNote
 }
 
