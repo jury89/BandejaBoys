@@ -16,11 +16,12 @@ Run `npm run check` before every commit or push. It must complete lint, all test
 ## Project structure
 
 - Pure rules belong in `src/lib/domain.ts` and need unit tests.
+- Notification audience and timing rules belong in `src/lib/notificationSchedule.ts`; keep them pure and cover new polls, starters, reserves, 24-hour reminders and 2-hour reminders with unit tests.
 - Remote and demo persistence implement the same interface in `src/lib/repository.ts`.
 - Firebase credentials stay in local environment files. Never commit tokens, service accounts or admin keys.
+- Never commit the Web Push VAPID private key or notifier password. They belong only in GitHub Actions secrets; the VAPID public key may be part of the Vite environment.
 - Update `README.md` and `docs/architecture.md` when setup, workflow or data rules change.
 
 ## Product constraints
 
 This is a single-group, private tool designed to stay on Firebase's no-cost Spark plan. Do not introduce Cloud Functions, paid infrastructure, analytics or public-discovery features without an explicit product decision.
-

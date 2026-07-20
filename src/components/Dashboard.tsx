@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
-import { BellRing, CalendarCheck2, CalendarDays, CalendarPlus, CheckCircle2, ChevronDown, LogOut, UsersRound } from 'lucide-react'
+import { Bell, BellRing, CalendarCheck2, CalendarDays, CalendarPlus, CheckCircle2, ChevronDown, LogOut, UsersRound } from 'lucide-react'
 import { useAuth } from '../AuthContext'
 import type { MemberProfile, PadelPoll } from '../types'
 import { getSlotPhase } from '../lib/domain'
 import { firstName, slotDateParts } from '../lib/format'
 import { hasRemoteBackend } from '../lib/firebase'
+import { notificationStateLabel, usePushNotifications } from '../lib/notifications'
 import { repository } from '../lib/repository'
 import { Brand } from './Brand'
 import { CreatePollModal } from './CreatePollModal'
+import { NotificationCallup } from './NotificationCallup'
 import { PollCard } from './PollCard'
 
 type FeedFilter = 'all' | 'booked'
@@ -21,6 +23,8 @@ export function Dashboard() {
   const [createOpen, setCreateOpen] = useState(false)
   const [toast, setToast] = useState<{ message: string; tone: 'success' | 'error' } | null>(null)
   const [accountOpen, setAccountOpen] = useState(false)
+  const [notificationPanelOpen, setNotificationPanelOpen] = useState(false)
+  const notifications = usePushNotifications(user)
 
   useEffect(() => {
     const onError = (error: Error) => {
@@ -83,6 +87,15 @@ export function Dashboard() {
           {accountOpen && (
             <div className="account-menu__popover">
               <span>{user.email}</span>
+              {hasRemoteBackend && (
+                <button type="button" onClick={() => {
+                  setAccountOpen(false)
+                  setNotificationPanelOpen(true)
+                }}>
+                  <Bell size={16} />
+                  <span>Notifiche <small>{notificationStateLabel(notifications.state)}</small></span>
+                </button>
+              )}
               <button type="button" onClick={() => signOut()}><LogOut size={16} /> Esci</button>
             </div>
           )}
@@ -190,6 +203,32 @@ export function Dashboard() {
 
       {createOpen && (
         <CreatePollModal user={user} onClose={() => setCreateOpen(false)} onCreate={repository.createPoll} onDone={notify} />
+      )}
+      {(notifications.shouldPrompt || notificationPanelOpen) && (
+        <NotificationCallup
+          state={notifications.state}
+          busy={notifications.busy}
+          onEnable={() => {
+            void notifications.enable()
+              .then(() => {
+                setNotificationPanelOpen(false)
+                notify('Notifiche attivate su questo dispositivo.')
+              })
+              .catch((error) => reportError(error instanceof Error ? error.message : 'Attivazione non riuscita.'))
+          }}
+          onDisable={() => {
+            void notifications.disable()
+              .then(() => {
+                setNotificationPanelOpen(false)
+                notify('Notifiche disattivate su questo dispositivo.')
+              })
+              .catch((error) => reportError(error instanceof Error ? error.message : 'Disattivazione non riuscita.'))
+          }}
+          onClose={() => {
+            if (notifications.shouldPrompt) notifications.dismiss()
+            setNotificationPanelOpen(false)
+          }}
+        />
       )}
       {toast && (
         <div className={`toast toast--${toast.tone}`} role={toast.tone === 'error' ? 'alert' : 'status'}>

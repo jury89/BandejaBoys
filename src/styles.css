@@ -757,6 +757,20 @@ p {
   background: #f3f7f8;
 }
 
+.account-menu__popover button > span {
+  display: flex;
+  flex: 1;
+  align-items: flex-start;
+  flex-direction: column;
+}
+
+.account-menu__popover button small {
+  margin-top: 1px;
+  color: var(--muted);
+  font-size: 0.56rem;
+  font-weight: 650;
+}
+
 .demo-banner {
   display: flex;
   min-height: 36px;
@@ -1946,6 +1960,161 @@ p {
   background: #962c3d;
 }
 
+/* Notification call-up */
+.notification-callup__backdrop {
+  position: fixed;
+  z-index: 180;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  padding: 24px;
+  background: rgba(4, 31, 44, 0.32);
+  inset: 0;
+  backdrop-filter: blur(4px);
+  animation: fade-in 180ms ease-out;
+}
+
+.notification-callup {
+  position: relative;
+  width: min(430px, 100%);
+  padding: 25px;
+  overflow: hidden;
+  border: 1px solid #a9cbd2;
+  border-top: 4px solid var(--ball);
+  border-radius: 16px;
+  background: var(--white);
+  box-shadow: 0 26px 90px rgba(3, 31, 45, 0.3);
+  animation: notification-callup-in 220ms ease-out;
+}
+
+.notification-callup::before {
+  position: absolute;
+  top: -36px;
+  right: 68px;
+  width: 86px;
+  height: 86px;
+  border: 15px solid rgba(14, 116, 144, 0.06);
+  border-radius: 50%;
+  content: '';
+}
+
+.notification-callup__close {
+  position: absolute;
+  z-index: 1;
+  top: 15px;
+  right: 15px;
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--white);
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.notification-callup__close:hover {
+  border-color: #9ebbc5;
+  color: var(--ink);
+}
+
+.notification-callup__mark {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  place-items: center;
+  margin-bottom: 18px;
+  border-radius: 12px;
+  background: var(--deep);
+  color: var(--ball);
+  box-shadow: 8px 8px 0 var(--aqua);
+}
+
+.notification-callup .eyebrow {
+  margin-bottom: 6px;
+}
+
+.notification-callup h2 {
+  margin-bottom: 11px;
+  font-family: var(--display);
+  font-size: 2.35rem;
+  letter-spacing: -0.015em;
+  line-height: 0.95;
+  text-transform: uppercase;
+}
+
+.notification-callup__lead {
+  margin-bottom: 18px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.6;
+}
+
+.notification-callup__lead strong {
+  color: var(--ink);
+}
+
+.notification-callup__timeline {
+  display: flex;
+  flex-direction: column;
+  margin: 0 0 20px;
+  padding: 0;
+  border: 1px solid #cfe0e5;
+  border-radius: 11px;
+  list-style: none;
+  background: #f6fafb;
+}
+
+.notification-callup__timeline li {
+  display: grid;
+  min-height: 48px;
+  align-items: center;
+  padding: 8px 12px;
+  grid-template-columns: 58px minmax(0, 1fr) auto;
+  gap: 9px;
+  color: #52707d;
+}
+
+.notification-callup__timeline li + li {
+  border-top: 1px dashed #c4d8df;
+}
+
+.notification-callup__timeline li > span {
+  color: var(--court);
+  font-family: var(--display);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+.notification-callup__timeline strong {
+  color: var(--ink);
+  font-size: 0.7rem;
+}
+
+.notification-callup__timeline svg {
+  color: #8aa2ac;
+}
+
+.notification-callup__actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 18px;
+  border-top: 1px solid #e1eaed;
+}
+
+.notification-callup__actions > .button {
+  flex: 1;
+}
+
+@keyframes notification-callup-in {
+  from { opacity: 0; transform: translateY(16px); }
+}
+
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
@@ -2183,6 +2352,26 @@ p {
     align-self: center;
     flex-direction: column;
   }
+
+  .notification-callup__backdrop {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .notification-callup {
+    width: 100%;
+    max-height: min(92vh, 720px);
+    padding: 24px 20px calc(20px + env(safe-area-inset-bottom));
+    overflow-y: auto;
+    border-right: 0;
+    border-bottom: 0;
+    border-left: 0;
+    border-radius: 18px 18px 0 0;
+  }
+
+  .notification-callup h2 {
+    font-size: 2.15rem;
+  }
 }
 
 @media (max-width: 420px) {
@@ -2267,6 +2456,17 @@ p {
     bottom: 80px;
     left: 12px;
     max-width: none;
+  }
+
+  .notification-callup__actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .notification-callup__actions .button,
+  .notification-callup__actions .text-button {
+    width: 100%;
+    justify-content: center;
   }
 }
 

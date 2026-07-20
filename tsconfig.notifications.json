@@ -1,0 +1,7 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["node"]
+  },
+  "include": ["scripts", "src/lib/notificationSchedule.ts", "src/lib/domain.ts", "src/types.ts"]
+}

@@ -1,0 +1,33 @@
+name: Padel notifications
+
+on:
+  schedule:
+    - cron: '7,37 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: padel-notifications
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run notifications:send
+        env:
+          FIREBASE_PROJECT_ID: bandeja-boys
+          FIREBASE_API_KEY: AIzaSyBg2g4X3u0rkPLBRisuWte8Jiie8skcCA4
+          FIREBASE_NOTIFIER_EMAIL: ${{ secrets.FIREBASE_NOTIFIER_EMAIL }}
+          FIREBASE_NOTIFIER_PASSWORD: ${{ secrets.FIREBASE_NOTIFIER_PASSWORD }}
+          WEB_PUSH_VAPID_PUBLIC_KEY: ${{ vars.WEB_PUSH_VAPID_PUBLIC_KEY }}
+          WEB_PUSH_VAPID_PRIVATE_KEY: ${{ secrets.WEB_PUSH_VAPID_PRIVATE_KEY }}

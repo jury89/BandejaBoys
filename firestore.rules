@@ -6,9 +6,19 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function isNotifier() {
+      return signedIn()
+        && request.auth.token.email == 'codex@kirivoraup.resend.app'
+        && request.auth.token.email_verified == true;
+    }
+
+    function isMember() {
+      return signedIn() && !isNotifier();
+    }
+
     match /users/{userId} {
-      allow read: if signedIn();
-      allow create, update: if signedIn()
+      allow read: if isMember();
+      allow create, update: if isMember()
         && request.auth.uid == userId
         && request.resource.data.id == userId
         && request.resource.data.displayName is string
@@ -17,19 +27,38 @@ service cloud.firestore {
     }
 
     match /polls/{pollId} {
-      allow read: if signedIn();
-      allow create: if signedIn()
+      allow read: if isMember() || isNotifier();
+      allow create: if isMember()
         && request.resource.data.createdBy == request.auth.uid
         && request.resource.data.title is string
         && request.resource.data.slots is list
         && request.resource.data.slots.size() > 0
         && request.resource.data.slots.size() <= 14;
-      allow update: if signedIn()
+      allow update: if isMember()
         && request.resource.data.createdBy == resource.data.createdBy
         && request.resource.data.createdAt == resource.data.createdAt
         && request.resource.data.diff(resource.data).affectedKeys()
           .hasOnly(['slots', 'status', 'updatedAt']);
-      allow delete: if signedIn() && resource.data.createdBy == request.auth.uid;
+      allow delete: if isMember() && resource.data.createdBy == request.auth.uid;
+    }
+
+    match /pushSubscriptions/{subscriptionId} {
+      allow get: if isNotifier() || (isMember() && resource.data.userId == request.auth.uid);
+      allow list: if isNotifier();
+      allow create: if isMember()
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.endpoint is string
+        && request.resource.data.keys is map;
+      allow update: if isMember()
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.endpoint == resource.data.endpoint
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['userId', 'keys', 'expirationTime', 'createdAt', 'updatedAt']);
+      allow delete: if isNotifier() || (isMember() && resource.data.userId == request.auth.uid);
+    }
+
+    match /notificationDeliveries/{deliveryId} {
+      allow read, write: if isNotifier();
     }
   }
 }
