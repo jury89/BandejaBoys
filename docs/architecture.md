@@ -1,5 +1,14 @@
 # Architettura e regole di dominio
 
+## Produzione
+
+- URL: [bandeja-boys.web.app](https://bandeja-boys.web.app)
+- Progetto Firebase: `bandeja-boys`
+- Piano: Spark, senza fatturazione collegata
+- Database: Cloud Firestore `(default)`, regione `europe-west8` (Milano)
+- Accesso: Firebase Authentication con email e password
+- Hosting: Firebase Hosting con HTTPS
+
 ## Flusso settimanale
 
 1. Un membro crea un sondaggio, di solito il lunedì, indicando la settimana successiva.
@@ -53,4 +62,3 @@ Ogni adesione, ritiro, sostituzione o conferma del campo usa `runTransaction`. S
 ## Modalità demo
 
 Se manca la configurazione Firebase, lo stesso contratto `PadelRepository` usa `localStorage`. Il seed contiene due slot e cinque membri fittizi per mostrare subito titolari e riserve. La modalità è dichiarata chiaramente nell'interfaccia e non deve essere usata come backend condiviso.
-

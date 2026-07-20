@@ -2,6 +2,10 @@
 
 Mini sito privato per organizzare le partite di padel del gruppo: sondaggi settimanali, quattro titolari in ordine di adesione, riserve, sostituzioni e conferma del campo.
 
+## Online
+
+Il sito è disponibile su [bandeja-boys.web.app](https://bandeja-boys.web.app). L'istanza usa il progetto Firebase `bandeja-boys` sul piano gratuito Spark, senza account di fatturazione collegato.
+
 ## Cosa fa
 
 - Registrazione e accesso con email e password.
@@ -35,11 +39,13 @@ Senza variabili Firebase, l'app parte in **modalità demo locale**. Account e so
 
 ## Configurazione Firebase
 
+L'istanza di produzione è già configurata; i passaggi seguenti servono soltanto per creare un ambiente Firebase alternativo.
+
 1. Crea un progetto dal [pannello Firebase](https://console.firebase.google.com/) scegliendo il piano Spark.
 2. Registra una Web App nel progetto e copia la configurazione proposta.
 3. In Authentication abilita il provider **Email/Password**.
 4. Crea un database Cloud Firestore in modalità produzione, preferibilmente in una regione europea.
-5. Copia `.env.example` in `.env.local` e compila i valori `VITE_FIREBASE_*`.
+5. Copia `.env.example` in `.env.local` e compila i valori `VITE_FIREBASE_*`. Il repository include già `.env.production` con la configurazione Web pubblica dell'istanza di produzione.
 6. Collega la CLI al progetto e pubblica regole e sito:
 
 ```bash
@@ -78,4 +84,3 @@ La struttura e gli invarianti completi sono descritti in [docs/architecture.md](
 - Non esistono ruoli amministrativi o gruppi multipli: l'istanza è pensata per un'unica cerchia di amici.
 - Non vengono inviate notifiche push o email automatiche; il sito è la fonte condivisa dello stato.
 - Il codice non usa Cloud Functions, così resta compatibile con il piano gratuito senza collegare un account di fatturazione.
-
