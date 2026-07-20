@@ -13,7 +13,6 @@ import type {
   CreatePollInput,
   MemberProfile,
   PadelPoll,
-  PadelSlot,
   PollStatus,
   SessionUser,
 } from '../types'
@@ -22,6 +21,7 @@ import {
   makePoll,
   removeSignup,
   rescheduleSlot,
+  setSlotBooking,
   substituteStarter,
   updateSlot,
 } from './domain'
@@ -44,7 +44,7 @@ export interface PadelRepository {
   setBooking(
     pollId: string,
     slotId: string,
-    booking: { venue: string; bookedBy: SessionUser } | null,
+    booking: { bookedBy: SessionUser } | null,
   ): Promise<PadelPoll>
   setPollStatus(pollId: string, status: PollStatus): Promise<PadelPoll>
   deletePoll(pollId: string): Promise<void>
@@ -105,23 +105,7 @@ function remoteRepository(): PadelRepository {
     },
     async setBooking(pollId, slotId, booking) {
       return mutatePoll(pollId, (poll) =>
-        updateSlot(poll, slotId, (slot): PadelSlot =>
-          booking
-            ? {
-                ...slot,
-                venue: booking.venue.trim(),
-                bookedAt: Date.now(),
-                bookedBy: booking.bookedBy.id,
-                bookedByName: booking.bookedBy.displayName,
-              }
-            : {
-                id: slot.id,
-                startsAt: slot.startsAt,
-                durationMinutes: slot.durationMinutes,
-                venue: '',
-                signups: slot.signups,
-              },
-        ),
+        updateSlot(poll, slotId, (slot) => setSlotBooking(slot, booking?.bookedBy ?? null)),
       )
     },
     async setPollStatus(pollId, status) {
@@ -252,23 +236,7 @@ function localRepository(): PadelRepository {
     },
     async setBooking(pollId, slotId, booking) {
       return mutate(pollId, (poll) =>
-        updateSlot(poll, slotId, (slot) =>
-          booking
-            ? {
-                ...slot,
-                venue: booking.venue.trim(),
-                bookedAt: Date.now(),
-                bookedBy: booking.bookedBy.id,
-                bookedByName: booking.bookedBy.displayName,
-              }
-            : {
-                id: slot.id,
-                startsAt: slot.startsAt,
-                durationMinutes: slot.durationMinutes,
-                venue: '',
-                signups: slot.signups,
-              },
-        ),
+        updateSlot(poll, slotId, (slot) => setSlotBooking(slot, booking?.bookedBy ?? null)),
       )
     },
     async setPollStatus(pollId, status) {

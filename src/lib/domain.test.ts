@@ -1,4 +1,5 @@
 import {
+  DEFAULT_VENUE,
   addSignup,
   getReserves,
   getSlotPhase,
@@ -7,6 +8,7 @@ import {
   nextMondayDate,
   removeSignup,
   rescheduleSlot,
+  setSlotBooking,
   substituteStarter,
 } from './domain'
 import type { MemberProfile, PadelPoll, PadelSlot, SessionUser, Signup } from '../types'
@@ -90,6 +92,20 @@ describe('stato slot e creazione sondaggio', () => {
     const ready = slot(['a', 'b', 'c', 'd'].map((id, index) => signup(id, index)))
     expect(getSlotPhase(ready)).toBe('ready')
     expect(getSlotPhase({ ...ready, bookedAt: 12 })).toBe('booked')
+  })
+
+  it('registra sempre la prenotazione all’Oasi Boschetto senza richiedere quattro giocatori', () => {
+    const current = slot([signup('a', 1)])
+    const booked = setSlotBooking(current, member('jury', 'Jury'), 12)
+
+    expect(booked.signups).toEqual(current.signups)
+    expect(booked).toMatchObject({
+      venue: DEFAULT_VENUE,
+      bookedAt: 12,
+      bookedBy: 'jury',
+      bookedByName: 'Jury',
+    })
+    expect(getSlotPhase(booked)).toBe('booked')
   })
 
   it('ordina gli slot e rifiuta due proposte identiche', () => {

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { SlotCard } from './SlotCard'
 import type { PadelPoll, PadelSlot, SessionUser } from '../types'
+import { DEFAULT_VENUE, setSlotBooking } from '../lib/domain'
 import { repository } from '../lib/repository'
 
 const user: SessionUser = {
@@ -57,21 +58,31 @@ describe('azioni dello slot', () => {
     expect(tooltip).toHaveTextContent('Se era in riserva')
   })
 
-  it('permette di segnare il campo come prenotato anche con meno di quattro giocatori', () => {
+  it('prenota con un tocco all’Oasi Boschetto anche con meno di quattro giocatori', async () => {
+    const updatedPoll: PadelPoll = { ...poll, slots: [setSlotBooking(slot, user, 20)] }
+    const setBooking = vi.spyOn(repository, 'setBooking').mockResolvedValue(updatedPoll)
+    const onPollChange = vi.fn()
+    const onNotify = vi.fn()
     render(
       <SlotCard
         poll={poll}
         slot={slot}
         user={user}
         members={[user]}
-        onPollChange={vi.fn()}
-        onNotify={vi.fn()}
+        onPollChange={onPollChange}
+        onNotify={onNotify}
         onError={vi.fn()}
       />,
     )
 
     expect(slot.signups).toHaveLength(1)
-    expect(screen.getByRole('button', { name: 'Campo prenotato' })).toBeInTheDocument()
+    expect(screen.getByText(DEFAULT_VENUE)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: `Conferma prenotazione all’Oasi Boschetto` }))
+
+    await waitFor(() => expect(setBooking).toHaveBeenCalledWith(poll.id, slot.id, { bookedBy: user }))
+    expect(onPollChange).toHaveBeenCalledWith(updatedPoll)
+    expect(onNotify).toHaveBeenCalledWith('Campo prenotato all’Oasi Boschetto. Si gioca!')
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
   it('modifica data e ora di uno slot esistente', async () => {

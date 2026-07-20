@@ -9,6 +9,7 @@ import type {
 } from '../types'
 
 const STARTER_COUNT = 4
+export const DEFAULT_VENUE = 'Oasi Boschetto'
 
 export function makeId(prefix = 'id'): string {
   const random = globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2)
@@ -41,6 +42,30 @@ export function isStarter(slot: PadelSlot, userId: string): boolean {
 export function getSlotPhase(slot: PadelSlot): SlotPhase {
   if (slot.bookedAt) return 'booked'
   return slot.signups.length >= STARTER_COUNT ? 'ready' : 'collecting'
+}
+
+export function setSlotBooking(
+  slot: PadelSlot,
+  bookedBy: Pick<SessionUser, 'id' | 'displayName'> | null,
+  bookedAt = Date.now(),
+): PadelSlot {
+  if (bookedBy) {
+    return {
+      ...slot,
+      venue: DEFAULT_VENUE,
+      bookedAt,
+      bookedBy: bookedBy.id,
+      bookedByName: bookedBy.displayName,
+    }
+  }
+
+  return {
+    id: slot.id,
+    startsAt: slot.startsAt,
+    durationMinutes: slot.durationMinutes,
+    venue: '',
+    signups: slot.signups,
+  }
 }
 
 export function addSignup(

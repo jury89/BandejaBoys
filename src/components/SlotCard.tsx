@@ -1,5 +1,6 @@
 import { useId, useState } from 'react'
 import {
+  ArrowRight,
   ArrowLeftRight,
   CalendarCheck2,
   Check,
@@ -13,6 +14,7 @@ import {
 } from 'lucide-react'
 import type { MemberProfile, PadelPoll, PadelSlot, SessionUser } from '../types'
 import {
+  DEFAULT_VENUE,
   getReserves,
   getSignupPosition,
   getSlotPhase,
@@ -21,7 +23,6 @@ import {
 } from '../lib/domain'
 import { slotDateParts } from '../lib/format'
 import { repository } from '../lib/repository'
-import { BookingModal } from './BookingModal'
 import { EditSlotModal } from './EditSlotModal'
 import { SubstitutionModal } from './SubstitutionModal'
 
@@ -44,7 +45,6 @@ const phaseCopy = {
 
 export function SlotCard({ poll, slot, user, members, disabled, onPollChange, onNotify, onError }: SlotCardProps) {
   const substitutionTooltipId = useId()
-  const [bookingOpen, setBookingOpen] = useState(false)
   const [scheduleOpen, setScheduleOpen] = useState(false)
   const [substitutionOpen, setSubstitutionOpen] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -88,6 +88,11 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
     await run(() => repository.setBooking(poll.id, slot.id, null), 'Lo slot è tornato da prenotare.')
   }
 
+  const book = () => run(
+    () => repository.setBooking(poll.id, slot.id, { bookedBy: user }),
+    `Campo prenotato all’Oasi Boschetto. Si gioca!`,
+  )
+
   return (
     <article className={`slot-card slot-card--${phase}`}>
       <header className="slot-card__header">
@@ -120,9 +125,12 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
 
       {phase === 'booked' && (
         <div className="booking-strip">
-          <MapPin size={17} />
-          <span><strong>{slot.venue}</strong><small>Segnato da {slot.bookedByName}</small></span>
-          <button className="text-button" type="button" onClick={() => setBookingOpen(true)}>Modifica</button>
+          <span className="booking-strip__pin" aria-hidden="true"><MapPin size={16} /></span>
+          <span className="booking-strip__copy">
+            <strong>{DEFAULT_VENUE}</strong>
+            <small>Prenotazione confermata da {slot.bookedByName}</small>
+          </span>
+          <span className="booking-strip__stamp"><Check size={13} /> Confermato</span>
         </div>
       )}
 
@@ -214,8 +222,19 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
         )}
 
         {!disabled && phase !== 'booked' && (
-          <button className="button button--booking" type="button" onClick={() => setBookingOpen(true)} disabled={busy}>
-            <Check size={17} /> Campo prenotato
+          <button
+            className="booking-action"
+            type="button"
+            onClick={book}
+            disabled={busy}
+            aria-label={`Conferma prenotazione all’Oasi Boschetto`}
+          >
+            <span className="booking-action__icon" aria-hidden="true"><CalendarCheck2 size={19} /></span>
+            <span className="booking-action__copy">
+              <small>{DEFAULT_VENUE}</small>
+              <strong>{busy ? 'Conferma in corso…' : 'Conferma prenotazione'}</strong>
+            </span>
+            <ArrowRight className="booking-action__arrow" size={18} aria-hidden="true" />
           </button>
         )}
 
@@ -226,15 +245,6 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
         )}
       </footer>
 
-      {bookingOpen && (
-        <BookingModal
-          slot={slot}
-          user={user}
-          onClose={() => setBookingOpen(false)}
-          onSave={(booking) => syncPoll(() => repository.setBooking(poll.id, slot.id, booking))}
-          onDone={onNotify}
-        />
-      )}
       {scheduleOpen && (
         <EditSlotModal
           slot={slot}

@@ -14,8 +14,8 @@ Il sito è disponibile su [bandeja-boys.web.app](https://bandeja-boys.web.app). 
 - Adesioni ordinate in modo atomico: i primi quattro sono titolari, gli altri entrano in lista d'attesa.
 - Promozione automatica della prima riserva quando un titolare si ritira.
 - Sostituzione diretta: un titolare passa la propria posizione a un altro membro; se il sostituto era in riserva, il suo vecchio posto viene rimosso. Un tooltip accessibile chiarisce l’effetto prima dell’azione.
-- Stato dello slot immediatamente leggibile: raccolta adesioni, da prenotare, campo prenotato. Il campo può essere confermato anche prima di raggiungere quattro giocatori.
-- Nome del circolo, autore della conferma e archivio dei sondaggi chiusi.
+- Stato dello slot immediatamente leggibile: raccolta adesioni, da prenotare, campo prenotato. La prenotazione all’**Oasi Boschetto** si conferma con un solo tocco, anche prima di raggiungere quattro giocatori.
+- Autore della conferma e archivio dei sondaggi chiusi.
 - Aggiornamenti in tempo reale su tutti i dispositivi quando Firebase è configurato.
 
 ## Stack e costo

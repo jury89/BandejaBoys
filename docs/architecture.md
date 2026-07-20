@@ -16,7 +16,7 @@
 3. Ogni adesione riceve un timestamp e viene ordinata cronologicamente.
 4. Le posizioni 1–4 sono titolari; dalla posizione 5 in poi si è riserve.
 5. Quando lo slot raggiunge quattro adesioni passa automaticamente a **Da prenotare**; è un suggerimento operativo, non un requisito per la prenotazione.
-6. Qualunque membro autenticato può segnare il campo come prenotato e indicare il circolo, anche se i quattro giocatori non sono ancora completi.
+6. Qualunque membro autenticato può segnare il campo come prenotato all’**Oasi Boschetto** con un solo tocco, anche se i quattro giocatori non sono ancora completi. Il circolo è una costante di dominio e non viene richiesto nell’interfaccia.
 7. L'autore può archiviare il sondaggio quando non serve più raccogliere modifiche.
 
 Data e ora di uno slot già pubblicato possono essere corrette da qualunque membro autenticato. La modifica conserva adesioni, riserve e dati del campo, impedisce duplicati e riordina gli slot cronologicamente.
