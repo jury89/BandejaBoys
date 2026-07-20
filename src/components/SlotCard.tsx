@@ -7,6 +7,7 @@ import {
   Clock3,
   LogOut,
   MapPin,
+  PencilLine,
   PhoneCall,
   UserRoundPlus,
 } from 'lucide-react'
@@ -21,6 +22,7 @@ import {
 import { slotDateParts } from '../lib/format'
 import { repository } from '../lib/repository'
 import { BookingModal } from './BookingModal'
+import { EditSlotModal } from './EditSlotModal'
 import { SubstitutionModal } from './SubstitutionModal'
 
 interface SlotCardProps {
@@ -29,6 +31,7 @@ interface SlotCardProps {
   user: SessionUser
   members: MemberProfile[]
   disabled?: boolean
+  onPollChange: (poll: PadelPoll) => void
   onNotify: (message: string) => void
   onError: (message: string) => void
 }
@@ -39,9 +42,10 @@ const phaseCopy = {
   booked: { label: 'Campo prenotato', icon: CalendarCheck2 },
 }
 
-export function SlotCard({ poll, slot, user, members, disabled, onNotify, onError }: SlotCardProps) {
+export function SlotCard({ poll, slot, user, members, disabled, onPollChange, onNotify, onError }: SlotCardProps) {
   const substitutionTooltipId = useId()
   const [bookingOpen, setBookingOpen] = useState(false)
+  const [scheduleOpen, setScheduleOpen] = useState(false)
   const [substitutionOpen, setSubstitutionOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const date = slotDateParts(slot.startsAt)
@@ -53,10 +57,15 @@ export function SlotCard({ poll, slot, user, members, disabled, onNotify, onErro
   const joined = position >= 0
   const userIsStarter = isStarter(slot, user.id)
 
-  const run = async (work: () => Promise<void>, success?: string) => {
+  const syncPoll = async (work: () => Promise<PadelPoll>) => {
+    const updated = await work()
+    onPollChange(updated)
+  }
+
+  const run = async (work: () => Promise<PadelPoll>, success?: string) => {
     setBusy(true)
     try {
-      await work()
+      await syncPoll(work)
       if (success) onNotify(success)
     } catch (error) {
       onError(error instanceof Error ? error.message : 'Operazione non riuscita.')
@@ -91,9 +100,21 @@ export function SlotCard({ poll, slot, user, members, disabled, onNotify, onErro
           <strong>{date.time}</strong>
           <span>{slot.durationMinutes} min</span>
         </div>
-        <div className={`status-pill status-pill--${phase}`}>
-          <PhaseIcon size={14} />
-          {phaseCopy[phase].label}
+        <div className="slot-card__status">
+          <div className={`status-pill status-pill--${phase}`}>
+            <PhaseIcon size={14} />
+            {phaseCopy[phase].label}
+          </div>
+          {!disabled && (
+            <button
+              className="slot-card__edit-time"
+              type="button"
+              onClick={() => setScheduleOpen(true)}
+              aria-label="Modifica data e ora dello slot"
+            >
+              <PencilLine size={12} /> Modifica
+            </button>
+          )}
         </div>
       </header>
 
@@ -192,7 +213,7 @@ export function SlotCard({ poll, slot, user, members, disabled, onNotify, onErro
           </div>
         )}
 
-        {!disabled && phase !== 'booked' && slot.signups.length >= 4 && (
+        {!disabled && phase !== 'booked' && (
           <button className="button button--booking" type="button" onClick={() => setBookingOpen(true)} disabled={busy}>
             <Check size={17} /> Campo prenotato
           </button>
@@ -210,7 +231,15 @@ export function SlotCard({ poll, slot, user, members, disabled, onNotify, onErro
           slot={slot}
           user={user}
           onClose={() => setBookingOpen(false)}
-          onSave={(booking) => repository.setBooking(poll.id, slot.id, booking)}
+          onSave={(booking) => syncPoll(() => repository.setBooking(poll.id, slot.id, booking))}
+          onDone={onNotify}
+        />
+      )}
+      {scheduleOpen && (
+        <EditSlotModal
+          slot={slot}
+          onClose={() => setScheduleOpen(false)}
+          onSave={(startsAt) => syncPoll(() => repository.rescheduleSlot(poll.id, slot.id, startsAt))}
           onDone={onNotify}
         />
       )}
@@ -220,7 +249,7 @@ export function SlotCard({ poll, slot, user, members, disabled, onNotify, onErro
           user={user}
           members={members}
           onClose={() => setSubstitutionOpen(false)}
-          onSubstitute={(replacement) => repository.substitute(poll.id, slot.id, user.id, replacement)}
+          onSubstitute={(replacement) => syncPoll(() => repository.substitute(poll.id, slot.id, user.id, replacement))}
           onDone={onNotify}
         />
       )}

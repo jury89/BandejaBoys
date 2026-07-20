@@ -15,9 +15,11 @@
 2. Il sondaggio contiene uno o più slot con data, ora e durata.
 3. Ogni adesione riceve un timestamp e viene ordinata cronologicamente.
 4. Le posizioni 1–4 sono titolari; dalla posizione 5 in poi si è riserve.
-5. Quando lo slot raggiunge quattro adesioni passa automaticamente a **Da prenotare**.
-6. Qualunque membro autenticato può segnare il campo come prenotato e indicare il circolo.
+5. Quando lo slot raggiunge quattro adesioni passa automaticamente a **Da prenotare**; è un suggerimento operativo, non un requisito per la prenotazione.
+6. Qualunque membro autenticato può segnare il campo come prenotato e indicare il circolo, anche se i quattro giocatori non sono ancora completi.
 7. L'autore può archiviare il sondaggio quando non serve più raccogliere modifiche.
+
+Data e ora di uno slot già pubblicato possono essere corrette da qualunque membro autenticato. La modifica conserva adesioni, riserve e dati del campo, impedisce duplicati e riordina gli slot cronologicamente.
 
 Lo stato `ready` non viene salvato: è derivato dal numero di adesioni. Lo stato `booked` dipende dalla presenza di `bookedAt`. In questo modo non possono esistere stati incoerenti.
 
@@ -57,7 +59,9 @@ Un sondaggio e i suoi slot stanno in un solo documento. È una scelta adatta all
 
 ## Concorrenza
 
-Ogni adesione, ritiro, sostituzione o conferma del campo usa `runTransaction`. Se due membri aggiornano lo stesso sondaggio contemporaneamente, Firestore rilegge la versione più recente e ripete l'operazione, evitando il classico aggiornamento perso.
+Ogni adesione, ritiro, sostituzione, modifica dell’orario o conferma del campo usa `runTransaction`. Se due membri aggiornano lo stesso sondaggio contemporaneamente, Firestore rilegge la versione più recente e ripete l'operazione, evitando il classico aggiornamento perso.
+
+Al termine della transazione il repository restituisce anche il sondaggio aggiornato: la bacheca lo applica immediatamente, senza attendere il successivo evento realtime. Il listener Firestore resta attivo per confermare lo stato e sincronizzare gli altri dispositivi; questo evita interfacce ferme su connessioni mobili lente o sospese.
 
 ## Modalità demo
 

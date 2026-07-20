@@ -8,17 +8,19 @@ interface PollCardProps {
   poll: PadelPoll
   user: SessionUser
   members: MemberProfile[]
+  onPollChange: (poll: PadelPoll) => void
   onNotify: (message: string) => void
   onError: (message: string) => void
 }
 
-export function PollCard({ poll, user, members, onNotify, onError }: PollCardProps) {
+export function PollCard({ poll, user, members, onPollChange, onNotify, onError }: PollCardProps) {
   const canManage = poll.createdBy === user.id
 
   const toggleStatus = async () => {
     try {
       const next = poll.status === 'open' ? 'closed' : 'open'
-      await repository.setPollStatus(poll.id, next)
+      const updated = await repository.setPollStatus(poll.id, next)
+      onPollChange(updated)
       onNotify(next === 'closed' ? 'Sondaggio archiviato.' : 'Sondaggio riaperto.')
     } catch (error) {
       onError(error instanceof Error ? error.message : 'Non è stato possibile aggiornare il sondaggio.')
@@ -50,6 +52,7 @@ export function PollCard({ poll, user, members, onNotify, onError }: PollCardPro
             user={user}
             members={members}
             disabled={poll.status === 'closed'}
+            onPollChange={onPollChange}
             onNotify={onNotify}
             onError={onError}
           />
@@ -58,4 +61,3 @@ export function PollCard({ poll, user, members, onNotify, onError }: PollCardPro
     </section>
   )
 }
-

@@ -21,6 +21,7 @@ import {
   addSignup,
   makePoll,
   removeSignup,
+  rescheduleSlot,
   substituteStarter,
   updateSlot,
 } from './domain'
@@ -31,20 +32,21 @@ export interface PadelRepository {
   subscribePolls(listener: (polls: PadelPoll[]) => void, onError: (error: Error) => void): Unsubscribe
   subscribeMembers(listener: (members: MemberProfile[]) => void, onError: (error: Error) => void): Unsubscribe
   createPoll(input: CreatePollInput, creator: SessionUser): Promise<void>
-  joinSlot(pollId: string, slotId: string, member: SessionUser): Promise<void>
-  leaveSlot(pollId: string, slotId: string, userId: string): Promise<void>
+  joinSlot(pollId: string, slotId: string, member: SessionUser): Promise<PadelPoll>
+  leaveSlot(pollId: string, slotId: string, userId: string): Promise<PadelPoll>
+  rescheduleSlot(pollId: string, slotId: string, startsAt: string): Promise<PadelPoll>
   substitute(
     pollId: string,
     slotId: string,
     outgoingUserId: string,
     replacement: MemberProfile,
-  ): Promise<void>
+  ): Promise<PadelPoll>
   setBooking(
     pollId: string,
     slotId: string,
     booking: { venue: string; bookedBy: SessionUser } | null,
-  ): Promise<void>
-  setPollStatus(pollId: string, status: PollStatus): Promise<void>
+  ): Promise<PadelPoll>
+  setPollStatus(pollId: string, status: PollStatus): Promise<PadelPoll>
   deletePoll(pollId: string): Promise<void>
 }
 
@@ -54,7 +56,7 @@ function remoteRepository(): PadelRepository {
 
   const mutatePoll = async (pollId: string, mutate: (poll: PadelPoll) => PadelPoll) => {
     const reference = doc(db, 'polls', pollId)
-    await runTransaction(db, async (transaction) => {
+    return runTransaction(db, async (transaction) => {
       const snapshot = await transaction.get(reference)
       if (!snapshot.exists()) throw new Error('Sondaggio non trovato.')
       const poll = { id: snapshot.id, ...snapshot.data() } as PadelPoll
@@ -64,6 +66,7 @@ function remoteRepository(): PadelRepository {
         status: updated.status,
         updatedAt: updated.updatedAt,
       })
+      return updated
     })
   }
 
@@ -87,18 +90,21 @@ function remoteRepository(): PadelRepository {
       await addDoc(collection(db, 'polls'), makePoll(input, creator))
     },
     async joinSlot(pollId, slotId, member) {
-      await mutatePoll(pollId, (poll) => updateSlot(poll, slotId, (slot) => addSignup(slot, member)))
+      return mutatePoll(pollId, (poll) => updateSlot(poll, slotId, (slot) => addSignup(slot, member)))
     },
     async leaveSlot(pollId, slotId, userId) {
-      await mutatePoll(pollId, (poll) => updateSlot(poll, slotId, (slot) => removeSignup(slot, userId)))
+      return mutatePoll(pollId, (poll) => updateSlot(poll, slotId, (slot) => removeSignup(slot, userId)))
+    },
+    async rescheduleSlot(pollId, slotId, startsAt) {
+      return mutatePoll(pollId, (poll) => rescheduleSlot(poll, slotId, startsAt))
     },
     async substitute(pollId, slotId, outgoingUserId, replacement) {
-      await mutatePoll(pollId, (poll) =>
+      return mutatePoll(pollId, (poll) =>
         updateSlot(poll, slotId, (slot) => substituteStarter(slot, outgoingUserId, replacement)),
       )
     },
     async setBooking(pollId, slotId, booking) {
-      await mutatePoll(pollId, (poll) =>
+      return mutatePoll(pollId, (poll) =>
         updateSlot(poll, slotId, (slot): PadelSlot =>
           booking
             ? {
@@ -119,7 +125,7 @@ function remoteRepository(): PadelRepository {
       )
     },
     async setPollStatus(pollId, status) {
-      await mutatePoll(pollId, (poll) => ({ ...poll, status, updatedAt: Date.now() }))
+      return mutatePoll(pollId, (poll) => ({ ...poll, status, updatedAt: Date.now() }))
     },
     async deletePoll(pollId) {
       await deleteDoc(doc(db, 'polls', pollId))
@@ -204,8 +210,10 @@ function localRepository(): PadelRepository {
     const polls = readLocalPolls()
     const index = polls.findIndex((poll) => poll.id === pollId)
     if (index < 0) throw new Error('Sondaggio non trovato.')
-    polls[index] = updater(polls[index])
+    const updated = updater(polls[index])
+    polls[index] = updated
     writeLocalPolls(polls)
+    return updated
   }
 
   return {
@@ -229,18 +237,21 @@ function localRepository(): PadelRepository {
       writeLocalPolls([{ id: `poll-${Date.now()}`, ...poll }, ...readLocalPolls()])
     },
     async joinSlot(pollId, slotId, member) {
-      await mutate(pollId, (poll) => updateSlot(poll, slotId, (slot) => addSignup(slot, member)))
+      return mutate(pollId, (poll) => updateSlot(poll, slotId, (slot) => addSignup(slot, member)))
     },
     async leaveSlot(pollId, slotId, userId) {
-      await mutate(pollId, (poll) => updateSlot(poll, slotId, (slot) => removeSignup(slot, userId)))
+      return mutate(pollId, (poll) => updateSlot(poll, slotId, (slot) => removeSignup(slot, userId)))
+    },
+    async rescheduleSlot(pollId, slotId, startsAt) {
+      return mutate(pollId, (poll) => rescheduleSlot(poll, slotId, startsAt))
     },
     async substitute(pollId, slotId, outgoingUserId, replacement) {
-      await mutate(pollId, (poll) =>
+      return mutate(pollId, (poll) =>
         updateSlot(poll, slotId, (slot) => substituteStarter(slot, outgoingUserId, replacement)),
       )
     },
     async setBooking(pollId, slotId, booking) {
-      await mutate(pollId, (poll) =>
+      return mutate(pollId, (poll) =>
         updateSlot(poll, slotId, (slot) =>
           booking
             ? {
@@ -261,7 +272,7 @@ function localRepository(): PadelRepository {
       )
     },
     async setPollStatus(pollId, status) {
-      await mutate(pollId, (poll) => ({ ...poll, status, updatedAt: Date.now() }))
+      return mutate(pollId, (poll) => ({ ...poll, status, updatedAt: Date.now() }))
     },
     async deletePoll(pollId) {
       writeLocalPolls(readLocalPolls().filter((poll) => poll.id !== pollId))
@@ -270,4 +281,3 @@ function localRepository(): PadelRepository {
 }
 
 export const repository: PadelRepository = hasRemoteBackend ? remoteRepository() : localRepository()
-

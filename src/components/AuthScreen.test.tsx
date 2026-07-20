@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { AuthProvider } from '../AuthContext'
 import { App } from '../App'
@@ -23,6 +23,30 @@ describe('accesso locale', () => {
     expect(await screen.findByText(/Mettiamo in campo/)).toBeInTheDocument()
     expect(screen.getByText('Jury')).toBeInTheDocument()
     expect(screen.getByText(/Demo locale/)).toBeInTheDocument()
-  })
-})
+  }, 15_000)
 
+  it('aggiorna la bacheca dopo la modifica di data e ora di uno slot', async () => {
+    const user = userEvent.setup()
+    render(
+      <AuthProvider>
+        <App />
+      </AuthProvider>,
+    )
+
+    await user.click(await screen.findByRole('button', { name: 'Crea account' }))
+    await user.type(screen.getByLabelText('Nome visibile'), 'Jury')
+    await user.type(screen.getByLabelText('Email'), 'jury@example.test')
+    await user.type(screen.getByLabelText('Password'), 'segreto123')
+    await user.click(screen.getByRole('button', { name: /Crea il mio account/ }))
+
+    const editButtons = await screen.findAllByRole('button', { name: 'Modifica data e ora dello slot' })
+    fireEvent.click(editButtons[0])
+    fireEvent.change(screen.getByLabelText('Nuova data e ora'), {
+      target: { value: '2026-08-15T18:45' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Salva data e ora' }))
+
+    expect(await screen.findByText('18:45')).toBeInTheDocument()
+    expect(screen.getByText('Data e ora dello slot aggiornate.')).toBeInTheDocument()
+  }, 15_000)
+})

@@ -58,6 +58,9 @@ export function Dashboard() {
   const visiblePolls = polls.filter((poll) => poll.status === view)
   const notify = (message: string) => setToast({ message, tone: 'success' })
   const reportError = (message: string) => setToast({ message, tone: 'error' })
+  const updatePoll = (updatedPoll: PadelPoll) => {
+    setPolls((current) => current.map((poll) => poll.id === updatedPoll.id ? updatedPoll : poll))
+  }
 
   return (
     <div className="app-shell">
@@ -131,7 +134,15 @@ export function Dashboard() {
         ) : visiblePolls.length > 0 ? (
           <div className="poll-feed">
             {visiblePolls.map((poll) => (
-              <PollCard key={poll.id} poll={poll} user={user} members={members} onNotify={notify} onError={reportError} />
+              <PollCard
+                key={poll.id}
+                poll={poll}
+                user={user}
+                members={members}
+                onPollChange={updatePoll}
+                onNotify={notify}
+                onError={reportError}
+              />
             ))}
           </div>
         ) : (
@@ -158,4 +169,3 @@ export function Dashboard() {
     </div>
   )
 }
-

@@ -124,6 +124,32 @@ export function updateSlot(
   return { ...poll, slots, updatedAt }
 }
 
+export function rescheduleSlot(
+  poll: PadelPoll,
+  slotId: string,
+  startsAt: string,
+  updatedAt = Date.now(),
+): PadelPoll {
+  const date = new Date(startsAt)
+  if (Number.isNaN(date.getTime())) throw new Error('Scegli una data e un orario validi.')
+
+  const normalizedStartsAt = date.toISOString()
+  if (poll.slots.some((slot) => slot.id !== slotId && slot.startsAt === normalizedStartsAt)) {
+    throw new Error('Esiste già uno slot con questa data e questo orario.')
+  }
+
+  const updated = updateSlot(
+    poll,
+    slotId,
+    (slot) => ({ ...slot, startsAt: normalizedStartsAt }),
+    updatedAt,
+  )
+  return {
+    ...updated,
+    slots: [...updated.slots].sort((left, right) => left.startsAt.localeCompare(right.startsAt)),
+  }
+}
+
 export function makePoll(
   input: CreatePollInput,
   creator: SessionUser,
@@ -188,4 +214,3 @@ export function defaultSlotForWeek(weekStart: string, dayOffset = 1): string {
   date.setDate(date.getDate() + dayOffset)
   return toDateTimeInput(date)
 }
-

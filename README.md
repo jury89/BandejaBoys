@@ -10,10 +10,11 @@ Il sito è disponibile su [bandeja-boys.web.app](https://bandeja-boys.web.app). 
 
 - Registrazione e accesso con email e password.
 - Creazione di un sondaggio per la settimana successiva con uno o più slot, duplicabili al giorno seguente mantenendo ora e durata.
+- Modifica di data e ora degli slot già pubblicati senza perdere adesioni, riserve o prenotazione.
 - Adesioni ordinate in modo atomico: i primi quattro sono titolari, gli altri entrano in lista d'attesa.
 - Promozione automatica della prima riserva quando un titolare si ritira.
 - Sostituzione diretta: un titolare passa la propria posizione a un altro membro; se il sostituto era in riserva, il suo vecchio posto viene rimosso. Un tooltip accessibile chiarisce l’effetto prima dell’azione.
-- Stato dello slot immediatamente leggibile: raccolta adesioni, da prenotare, campo prenotato.
+- Stato dello slot immediatamente leggibile: raccolta adesioni, da prenotare, campo prenotato. Il campo può essere confermato anche prima di raggiungere quattro giocatori.
 - Nome del circolo, autore della conferma e archivio dei sondaggi chiusi.
 - Aggiornamenti in tempo reale su tutti i dispositivi quando Firebase è configurato.
 

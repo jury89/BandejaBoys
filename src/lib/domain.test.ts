@@ -6,9 +6,10 @@ import {
   makePoll,
   nextMondayDate,
   removeSignup,
+  rescheduleSlot,
   substituteStarter,
 } from './domain'
-import type { MemberProfile, PadelSlot, SessionUser, Signup } from '../types'
+import type { MemberProfile, PadelPoll, PadelSlot, SessionUser, Signup } from '../types'
 
 const member = (id: string, displayName = id): MemberProfile => ({
   id,
@@ -125,5 +126,38 @@ describe('stato slot e creazione sondaggio', () => {
     expect(nextMondayDate(new Date('2026-07-20T12:00:00'))).toBe('2026-07-27')
     expect(nextMondayDate(new Date('2026-07-22T12:00:00'))).toBe('2026-07-27')
   })
-})
 
+  it('sposta uno slot conservando adesioni e prenotazione e riordina il sondaggio', () => {
+    const booked = {
+      ...slot([signup('a', 1)]),
+      venue: 'Bandeja Club',
+      bookedAt: 10,
+      bookedBy: 'jury',
+      bookedByName: 'Jury',
+    }
+    const later = { ...slot(), id: 'slot-2', startsAt: '2026-07-30T19:30:00.000Z' }
+    const current: PadelPoll = {
+      id: 'poll-1',
+      title: 'Test',
+      targetWeekStart: '2026-07-27',
+      createdBy: 'jury',
+      createdByName: 'Jury',
+      createdAt: 1,
+      updatedAt: 1,
+      status: 'open',
+      slots: [booked, later],
+    }
+
+    const updated = rescheduleSlot(current, booked.id, '2026-07-31T20:00', 99)
+
+    expect(updated.updatedAt).toBe(99)
+    expect(updated.slots.map((item) => item.id)).toEqual(['slot-2', 'slot-1'])
+    expect(updated.slots[1]).toMatchObject({
+      startsAt: new Date('2026-07-31T20:00').toISOString(),
+      venue: 'Bandeja Club',
+      bookedAt: 10,
+      signups: booked.signups,
+    })
+    expect(() => rescheduleSlot(current, booked.id, later.startsAt)).toThrow('Esiste già uno slot')
+  })
+})
