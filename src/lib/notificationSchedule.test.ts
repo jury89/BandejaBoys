@@ -1,5 +1,7 @@
 import type { PadelPoll, PadelSlot, Signup } from '../types'
 import {
+  BOOKING_REMINDER_LEAD_MS,
+  BOOKING_REMINDER_WINDOW_MS,
   MATCH_RATING_NOTIFICATION_WINDOW_MS,
   NEW_SLOT_QUIET_PERIOD_MS,
   SLOT_READY_NOTIFICATION_WINDOW_MS,
@@ -172,7 +174,7 @@ describe('pianificazione notifiche', () => {
   })
 
   it('avvisa i quattro titolari quando lo slot diventa completo e il campo è da prenotare', () => {
-    const future = new Date(NOW + 7 * 24 * 60 * 60 * 1000).toISOString()
+    const future = new Date(NOW + 8 * 24 * 60 * 60 * 1000).toISOString()
     const players = [
       signup('d', NOW - 60 * 1000),
       signup('b', NOW - 3 * 60 * 1000),
@@ -197,7 +199,7 @@ describe('pianificazione notifiche', () => {
   })
 
   it('non avvisa se il campo è già prenotato o manca il quarto titolare', () => {
-    const future = new Date(NOW + 7 * 24 * 60 * 60 * 1000).toISOString()
+    const future = new Date(NOW + 8 * 24 * 60 * 60 * 1000).toISOString()
     const players = ['a', 'b', 'c', 'd'].map((id, index) => signup(
       id,
       NOW - (4 - index) * 60 * 1000,
@@ -214,7 +216,7 @@ describe('pianificazione notifiche', () => {
   })
 
   it('non invia notifiche retroattive oltre la finestra e cambia identità alla nuova formazione', () => {
-    const future = new Date(NOW + 7 * 24 * 60 * 60 * 1000).toISOString()
+    const future = new Date(NOW + 8 * 24 * 60 * 60 * 1000).toISOString()
     const oldPlayers = ['a', 'b', 'c', 'd'].map((id, index) => signup(
       id,
       NOW - SLOT_READY_NOTIFICATION_WINDOW_MS - (4 - index) * 60 * 1000,
@@ -232,6 +234,86 @@ describe('pianificazione notifiche', () => {
 
     expect(first[0].id).toBe(`slot-ready:poll-1:slot-1:${NOW - 60 * 1000}`)
     expect(second[0].id).toBe(first[0].id)
+  })
+
+  it('a sette giorni ricorda ai quattro titolari di prenotare il campo', () => {
+    const startsAt = new Date(NOW + BOOKING_REMINDER_LEAD_MS).toISOString()
+    const players = [
+      signup('d', NOW - SLOT_READY_NOTIFICATION_WINDOW_MS - 60 * 1000),
+      signup('b', NOW - SLOT_READY_NOTIFICATION_WINDOW_MS - 3 * 60 * 1000),
+      signup('a', NOW - SLOT_READY_NOTIFICATION_WINDOW_MS - 4 * 60 * 1000),
+      signup('c', NOW - SLOT_READY_NOTIFICATION_WINDOW_MS - 2 * 60 * 1000),
+      { ...signup('reserve', NOW - 30 * 60 * 1000), role: 'reserve' as const },
+    ]
+    const notifications = collectScheduledNotifications([
+      poll([slot(startsAt, players, false)]),
+    ], NOW)
+
+    expect(notifications).toHaveLength(1)
+    expect(notifications[0]).toMatchObject({
+      id: `booking-reminder-7d:poll-1:slot-1:${startsAt}`,
+      kind: 'booking-reminder-7d',
+      title: 'Manca solo una settimana!',
+      body: expect.stringContaining('Ricordatevi di prenotare il campo'),
+      recipientUserIds: ['a', 'b', 'c', 'd'],
+      excludedUserIds: [],
+      url: '/?poll=poll-1',
+    })
+  })
+
+  it('non ricorda la prenotazione se il campo è prenotato o la formazione è tardiva o incompleta', () => {
+    const startsAt = new Date(NOW + BOOKING_REMINDER_LEAD_MS).toISOString()
+    const earlyPlayers = ['a', 'b', 'c', 'd'].map((id, index) => signup(
+      id,
+      NOW - SLOT_READY_NOTIFICATION_WINDOW_MS - (4 - index) * 60 * 1000,
+    ))
+    const latePlayers = [
+      ...earlyPlayers.slice(0, 3),
+      signup('e', NOW),
+    ]
+
+    const notifications = collectScheduledNotifications([
+      poll([
+        slot(startsAt, earlyPlayers),
+        { ...slot(startsAt, latePlayers, false), id: 'slot-2' },
+        { ...slot(startsAt, earlyPlayers.slice(0, 3), false), id: 'slot-3' },
+      ]),
+    ], NOW)
+
+    expect(notifications.filter((item) => item.kind === 'booking-reminder-7d')).toHaveLength(0)
+  })
+
+  it('emette il reminder soltanto nella finestra dopo la soglia dei sette giorni', () => {
+    const startsAt = new Date(NOW + BOOKING_REMINDER_LEAD_MS).toISOString()
+    const players = ['a', 'b', 'c', 'd'].map((id, index) => signup(
+      id,
+      NOW - SLOT_READY_NOTIFICATION_WINDOW_MS - (4 - index) * 60 * 1000,
+    ))
+    const game = poll([slot(startsAt, players, false)])
+
+    expect(collectScheduledNotifications([game], NOW - 1)
+      .filter((item) => item.kind === 'booking-reminder-7d')).toHaveLength(0)
+    expect(collectScheduledNotifications([game], NOW + BOOKING_REMINDER_WINDOW_MS)
+      .filter((item) => item.kind === 'booking-reminder-7d')).toHaveLength(0)
+  })
+
+  it('crea una nuova identità del reminder prenotazione quando lo slot viene spostato', () => {
+    const firstStartsAt = new Date(NOW + BOOKING_REMINDER_LEAD_MS).toISOString()
+    const movedStartsAt = new Date(NOW + BOOKING_REMINDER_LEAD_MS + 24 * 60 * 60 * 1000).toISOString()
+    const players = ['a', 'b', 'c', 'd'].map((id, index) => signup(
+      id,
+      NOW - SLOT_READY_NOTIFICATION_WINDOW_MS - (4 - index) * 60 * 1000,
+    ))
+    const first = collectScheduledNotifications([
+      poll([slot(firstStartsAt, players, false)]),
+    ], NOW).find((item) => item.kind === 'booking-reminder-7d')
+    const moved = collectScheduledNotifications([
+      poll([slot(movedStartsAt, players, false)]),
+    ], NOW + 24 * 60 * 60 * 1000).find((item) => item.kind === 'booking-reminder-7d')
+
+    expect(first?.id).toBe(`booking-reminder-7d:poll-1:slot-1:${firstStartsAt}`)
+    expect(moved?.id).toBe(`booking-reminder-7d:poll-1:slot-1:${movedStartsAt}`)
+    expect(moved?.id).not.toBe(first?.id)
   })
 
   it('manda il reminder 24h soltanto ai primi quattro del campo prenotato', () => {

@@ -21,7 +21,7 @@ Il sito è disponibile su [bandeja-boys.web.app](https://bandeja-boys.web.app). 
 - Autore della conferma e archivio dei sondaggi chiusi.
 - Pagelle post partita: dieci minuti dopo la fine di un campo prenotato, ciascuno dei quattro titolari riceve una notifica e trova nell’app una scheda per assegnare da 1 a 10 agli altri tre. Il salvataggio conserva partita, autore, destinatario e timestamp; chi chiude la scheda la elimina definitivamente soltanto per sé. Per ora i voti restano nello storico e non vengono mostrati o aggregati nell’interfaccia.
 - Aggiornamenti in tempo reale su tutti i dispositivi quando Firebase è configurato.
-- Notifiche Web Push opzionali per i nuovi slot disponibili e, per chi è tra i quattro titolari, l’avviso che la formazione è completa e il campo è da prenotare, i reminder a 24 ore e 2 ore dalla partita e la richiesta delle pagelle a fine sessione. L’avviso di formazione completa non parte se il campo è già prenotato; gli slot inseriti entro 10 minuti l’uno dall’altro vengono riuniti in un solo avviso.
+- Notifiche Web Push opzionali per i nuovi slot disponibili e, per chi è tra i quattro titolari, l’avviso che la formazione è completa, un secondo promemoria a una settimana dalla partita se il campo è ancora da prenotare, i reminder a 24 ore e 2 ore dalla partita prenotata e la richiesta delle pagelle a fine sessione. Gli avvisi di prenotazione non partono se il campo è già confermato; gli slot inseriti entro 10 minuti l’uno dall’altro vengono riuniti in un solo avviso.
 - Installazione come web app su Android, iPhone, iPad e desktop tramite manifest PWA.
 
 ## Stack e costo

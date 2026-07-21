@@ -10,12 +10,15 @@ import {
 } from './domain'
 
 const HOUR_MS = 60 * 60 * 1000
-const NEW_SLOT_WINDOW_MS = 24 * HOUR_MS
+const DAY_MS = 24 * HOUR_MS
+const NEW_SLOT_WINDOW_MS = DAY_MS
 export const NEW_SLOT_QUIET_PERIOD_MS = 10 * 60 * 1000
-export const SLOT_READY_NOTIFICATION_WINDOW_MS = 24 * HOUR_MS
+export const SLOT_READY_NOTIFICATION_WINDOW_MS = DAY_MS
+export const BOOKING_REMINDER_LEAD_MS = 7 * DAY_MS
+export const BOOKING_REMINDER_WINDOW_MS = DAY_MS
 export const MATCH_RATING_NOTIFICATION_WINDOW_MS = 30 * 60 * 1000
 
-export type NotificationKind = 'new-slots' | 'slot-ready' | 'reminder-24h' | 'reminder-2h' | 'match-rating' | 'test'
+export type NotificationKind = 'new-slots' | 'slot-ready' | 'booking-reminder-7d' | 'reminder-24h' | 'reminder-2h' | 'match-rating' | 'test'
 export type TestNotificationMode = 'standard' | 'match-rating'
 
 export interface ScheduledNotification {
@@ -146,18 +149,19 @@ export function collectScheduledNotifications(
       const startsAt = padelDateTimeToTimestamp(slot.startsAt)
       const starters = getStarters(slot)
       const recipientUserIds = Array.from(new Set(starters.map((signup) => signup.userId)))
+      const completedAt = starters.length === MAX_STARTERS && recipientUserIds.length === MAX_STARTERS
+        ? starters[MAX_STARTERS - 1].joinedAt
+        : undefined
 
       if (
         !slot.bookedAt
         && Number.isFinite(startsAt)
         && startsAt > now
-        && starters.length === MAX_STARTERS
-        && recipientUserIds.length === MAX_STARTERS
+        && typeof completedAt === 'number'
+        && Number.isFinite(completedAt)
       ) {
-        const completedAt = starters[MAX_STARTERS - 1].joinedAt
         if (
-          Number.isFinite(completedAt)
-          && completedAt <= now
+          completedAt <= now
           && now < completedAt + SLOT_READY_NOTIFICATION_WINDOW_MS
         ) {
           notifications.push({
@@ -169,6 +173,27 @@ export function collectScheduledNotifications(
             tag: `slot-ready-${poll.id}-${slot.id}`,
             ttlSeconds: Math.max(60, Math.floor(
               (completedAt + SLOT_READY_NOTIFICATION_WINDOW_MS - now) / 1000,
+            )),
+            recipientUserIds,
+            excludedUserIds: [],
+          })
+        }
+
+        const bookingReminderAt = startsAt - BOOKING_REMINDER_LEAD_MS
+        if (
+          completedAt < bookingReminderAt
+          && now >= bookingReminderAt
+          && now < bookingReminderAt + BOOKING_REMINDER_WINDOW_MS
+        ) {
+          notifications.push({
+            id: `booking-reminder-7d:${poll.id}:${slot.id}:${slot.startsAt}`,
+            kind: 'booking-reminder-7d',
+            title: 'Manca solo una settimana!',
+            body: `Siete in quattro per ${formatSession(slot.startsAt)}. Ricordatevi di prenotare il campo.`,
+            url: `/?poll=${encodeURIComponent(poll.id)}`,
+            tag: `booking-reminder-7d-${poll.id}-${slot.id}`,
+            ttlSeconds: Math.max(60, Math.floor(
+              (bookingReminderAt + BOOKING_REMINDER_WINDOW_MS - now) / 1000,
             )),
             recipientUserIds,
             excludedUserIds: [],
