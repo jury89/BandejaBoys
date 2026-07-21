@@ -10,7 +10,7 @@ interface NotificationCallupProps {
 }
 
 const steps = [
-  { time: 'NUOVO', label: 'Sondaggio pubblicato' },
+  { time: 'NUOVO', label: 'Nuovi slot disponibili' },
   { time: '−24H', label: 'Promemoria partita' },
   { time: '−2H', label: 'Ultimo richiamo' },
 ]
@@ -46,7 +46,7 @@ export function NotificationCallup({ state, busy, onEnable, onDisable, onClose }
           <p className="notification-callup__lead">Questo browser non supporta Web Push. Puoi continuare a usare normalmente tutti i sondaggi.</p>
         ) : (
           <p className="notification-callup__lead">
-            Riceverai un avviso per i nuovi sondaggi e, se sei titolare, due promemoria prima della partita.
+            Riceverai un avviso raggruppato per i nuovi slot e, se sei titolare, due promemoria prima della partita.
           </p>
         )}
 

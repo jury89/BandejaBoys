@@ -16,7 +16,7 @@ describe('scelta notifiche', () => {
     )
 
     expect(screen.getByRole('dialog', { name: 'Ti avvisiamo noi.' })).toBeInTheDocument()
-    expect(screen.getByText('Sondaggio pubblicato')).toBeInTheDocument()
+    expect(screen.getByText('Nuovi slot disponibili')).toBeInTheDocument()
     expect(screen.getByText('Promemoria partita')).toBeInTheDocument()
     expect(screen.getByText('Ultimo richiamo')).toBeInTheDocument()
 

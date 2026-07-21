@@ -1,5 +1,9 @@
 import type { PadelPoll, PadelSlot, Signup } from '../types'
-import { collectScheduledNotifications, createTestNotification } from './notificationSchedule'
+import {
+  NEW_SLOT_QUIET_PERIOD_MS,
+  collectScheduledNotifications,
+  createTestNotification,
+} from './notificationSchedule'
 
 const NOW = Date.parse('2026-07-20T18:00:00.000Z')
 
@@ -10,10 +14,18 @@ const signup = (userId: string, joinedAt: number): Signup => ({
   joinedAt,
 })
 
-const slot = (startsAt: string, signups: Signup[], booked = true): PadelSlot => ({
+const slot = (
+  startsAt: string,
+  signups: Signup[],
+  booked = true,
+  creation?: { at: number; by: string },
+): PadelSlot => ({
   id: 'slot-1',
   startsAt,
   durationMinutes: 90,
+  createdAt: creation?.at,
+  createdBy: creation?.by,
+  createdByName: creation?.by.toUpperCase(),
   venue: booked ? 'Oasi Boschetto' : '',
   bookedAt: booked ? NOW - 1000 : undefined,
   bookedBy: booked ? 'jury' : undefined,
@@ -58,17 +70,83 @@ describe('pianificazione notifiche', () => {
       .toThrow('Il messaggio di test supera i 240 caratteri.')
   })
 
-  it('avvisa tutti tranne il creatore quando nasce un sondaggio', () => {
-    const notifications = collectScheduledNotifications([poll([], NOW - 60 * 60 * 1000)], NOW)
+  it('raggruppa cinque slot creati insieme in una sola notifica', () => {
+    const createdAt = NOW - 15 * 60 * 1000
+    const slots = Array.from({ length: 5 }, (_, index) => ({
+      ...slot(
+        new Date(NOW + (index + 1) * 24 * 60 * 60 * 1000).toISOString(),
+        [],
+        false,
+        { at: createdAt, by: 'jury' },
+      ),
+      id: `slot-${index + 1}`,
+    }))
+    const notifications = collectScheduledNotifications([poll(slots, createdAt)], NOW)
 
     expect(notifications).toHaveLength(1)
     expect(notifications[0]).toMatchObject({
-      kind: 'new-poll',
+      id: 'new-slots:poll-1:slot-1',
+      kind: 'new-slots',
       recipientUserIds: null,
       excludedUserIds: ['jury'],
       title: 'Sveglia fagianotto!',
-      body: 'È uscito un nuovo sondaggio: “Padel · prossima settimana”, pubblicato da Jury. Segna quando ci sei.',
+      body: 'Ci sono 5 nuovi slot disponibili per “Padel · prossima settimana”. Segna quando ci sei.',
     })
+  })
+
+  it('attende dieci minuti di quiete e raggruppa aggiunte ravvicinate', () => {
+    const future = new Date(NOW + 7 * 24 * 60 * 60 * 1000).toISOString()
+    const first = slot(future, [], false, { at: NOW - 18 * 60 * 1000, by: 'jury' })
+    const second = {
+      ...slot(future, [], false, { at: NOW - 9 * 60 * 1000, by: 'ale' }),
+      id: 'slot-2',
+      startsAt: new Date(NOW + 8 * 24 * 60 * 60 * 1000).toISOString(),
+    }
+
+    expect(collectScheduledNotifications([poll([first, second])], NOW)).toHaveLength(0)
+
+    const notifications = collectScheduledNotifications(
+      [poll([first, second])],
+      NOW + 2 * 60 * 1000,
+    )
+    expect(notifications).toHaveLength(1)
+    expect(notifications[0]).toMatchObject({
+      id: 'new-slots:poll-1:slot-1',
+      excludedUserIds: ['jury', 'ale'],
+    })
+  })
+
+  it('crea una nuova notifica per uno slot aggiunto dopo la finestra di raggruppamento', () => {
+    const first = slot(
+      new Date(NOW + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      [],
+      false,
+      { at: NOW - 40 * 60 * 1000, by: 'jury' },
+    )
+    const second = {
+      ...slot(
+        new Date(NOW + 8 * 24 * 60 * 60 * 1000).toISOString(),
+        [],
+        false,
+        { at: NOW - 15 * 60 * 1000, by: 'ale' },
+      ),
+      id: 'slot-2',
+    }
+    const notifications = collectScheduledNotifications([poll([first, second])], NOW)
+
+    expect(notifications).toHaveLength(2)
+    expect(notifications.map((item) => item.id)).toEqual([
+      'new-slots:poll-1:slot-1',
+      'new-slots:poll-1:slot-2',
+    ])
+    expect(notifications[1].body).toContain('C’è un nuovo slot disponibile')
+  })
+
+  it('non notifica gli slot storici privi dei metadati di creazione', () => {
+    const future = new Date(NOW + 7 * 24 * 60 * 60 * 1000).toISOString()
+    const legacySlot = slot(future, [], false)
+
+    expect(collectScheduledNotifications([poll([legacySlot])], NOW)).toHaveLength(0)
   })
 
   it('manda il reminder 24h soltanto ai primi quattro del campo prenotato', () => {
@@ -133,5 +211,15 @@ describe('pianificazione notifiche', () => {
       kind: 'reminder-24h',
       recipientUserIds: ['a', 'b', 'c', 'd'],
     })
+  })
+
+  it('non annuncia nuovi slot di un sondaggio archiviato', () => {
+    const createdAt = NOW - NEW_SLOT_QUIET_PERIOD_MS - 1
+    const future = new Date(NOW + 7 * 24 * 60 * 60 * 1000).toISOString()
+    const notifications = collectScheduledNotifications([
+      poll([slot(future, [], false, { at: createdAt, by: 'jury' })], createdAt, 'closed'),
+    ], NOW)
+
+    expect(notifications).toHaveLength(0)
   })
 })

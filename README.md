@@ -9,7 +9,7 @@ Il sito è disponibile su [bandeja-boys.web.app](https://bandeja-boys.web.app). 
 ## Cosa fa
 
 - Registrazione e accesso con email e password; il nome inserito nel profilo resta l’unico nome mostrato nell’interfaccia e non viene mai ricavato dall’indirizzo email.
-- Creazione di un sondaggio per la settimana successiva con uno o più slot, duplicabili al giorno seguente mantenendo ora e durata.
+- Creazione di un sondaggio per la settimana successiva con uno o più slot, duplicabili al giorno seguente mantenendo ora e durata. Qualunque membro può aggiungere in seguito un nuovo slot a un sondaggio ancora aperto; la proposta parte dal giorno successivo all’ultimo slot.
 - Modifica di data e ora degli slot già pubblicati senza perdere adesioni, riserve o prenotazione.
 - Scelta esplicita al momento dell’adesione: ogni giocatore può segnarsi come **Titolare** oppure direttamente come **Riserva**. I quattro posti da titolare e la lista d’attesa mantengono l’ordine cronologico.
 - Promozione automatica della prima riserva quando un titolare si ritira da una formazione completa.
@@ -18,7 +18,7 @@ Il sito è disponibile su [bandeja-boys.web.app](https://bandeja-boys.web.app). 
 - Filtro della bacheca sempre disponibile sotto l’header: **Tutti** mostra gli slot dei sondaggi aperti e archiviati, mentre **Slot prenotati** raccoglie soltanto le partite con campo confermato.
 - Autore della conferma e archivio dei sondaggi chiusi.
 - Aggiornamenti in tempo reale su tutti i dispositivi quando Firebase è configurato.
-- Notifiche Web Push opzionali dal tono informale **“Sveglia fagianotto!”** per nuovi sondaggi e, per chi è tra i quattro titolari, reminder a 24 ore e 2 ore dalla partita anche quando il sondaggio è già archiviato.
+- Notifiche Web Push opzionali dal tono informale **“Sveglia fagianotto!”** per i nuovi slot disponibili e, per chi è tra i quattro titolari, reminder a 24 ore e 2 ore dalla partita anche quando il sondaggio è già archiviato. Gli slot inseriti entro 10 minuti l’uno dall’altro vengono riuniti in un solo avviso.
 - Installazione come web app su Android, iPhone, iPad e desktop tramite manifest PWA.
 
 ## Stack e costo
@@ -76,7 +76,7 @@ Configurazione GitHub del repository:
 - secret `FIREBASE_NOTIFIER_EMAIL`;
 - secret `FIREBASE_NOTIFIER_PASSWORD`.
 
-Il workflow [`.github/workflows/notifications.yml`](.github/workflows/notifications.yml) parte ai minuti `07` e `37` di ogni ora. L’avvio manuale senza parametri elabora la coda ordinaria; specificando `test_user_id` invia invece un’unica notifica ai dispositivi di quell’utente. Il campo facoltativo `test_message` permette di personalizzarne il testo fino a 240 caratteri; senza testo viene usato il messaggio di collaudo standard. Non inserire mai le chiavi private in file locali versionati o nei log.
+Il workflow [`.github/workflows/notifications.yml`](.github/workflows/notifications.yml) parte ai minuti `07` e `37` di ogni ora. Un nuovo slot resta in attesa per 10 minuti dall’ultima aggiunta ravvicinata: così la creazione iniziale di cinque slot genera un solo avviso, mentre uno slot aggiunto il giorno seguente genera un nuovo avviso. Con la cadenza del workflow la consegna avviene normalmente tra 10 e 40 minuti dall’ultima aggiunta. L’avvio manuale senza parametri elabora la coda ordinaria; specificando `test_user_id` invia invece un’unica notifica ai dispositivi di quell’utente. Il campo facoltativo `test_message` permette di personalizzarne il testo fino a 240 caratteri; senza testo viene usato il messaggio di collaudo standard. Non inserire mai le chiavi private in file locali versionati o nei log.
 
 Su Android e desktop l’attivazione avviene direttamente dal pannello mostrato al primo accesso. Su iPhone e iPad Web Push è disponibile per le web app aggiunte alla schermata Home: il sito mostra prima le istruzioni di installazione, poi richiede il permesso quando viene aperto dalla nuova icona.
 
@@ -101,7 +101,7 @@ Prima di ogni commit o deploy deve passare `npm run check`.
 
 - Solo gli utenti autenticati possono leggere membri e sondaggi.
 - Ogni utente può creare o aggiornare soltanto il proprio profilo.
-- Qualunque membro autenticato può aderire, ritirarsi, fare una sostituzione o segnare una prenotazione: è una scelta intenzionale per un piccolo gruppo fidato.
+- Qualunque membro autenticato può aggiungere uno slot a un sondaggio aperto, aderire, ritirarsi, fare una sostituzione o segnare una prenotazione: è una scelta intenzionale per un piccolo gruppo fidato.
 - Ogni membro può creare, sostituire o eliminare soltanto la sottoscrizione push del proprio dispositivo.
 - L’account tecnico verificato non può modificare utenti, sondaggi o partite; le sue letture e scritture sono limitate al recapito delle notifiche.
 - Soltanto chi ha creato un sondaggio può eliminarlo; nell'interfaccia l'autore può archiviarlo o riaprirlo.

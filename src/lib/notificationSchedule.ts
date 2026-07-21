@@ -1,10 +1,11 @@
-import type { PadelPoll } from '../types'
+import type { PadelPoll, PadelSlot } from '../types'
 import { DEFAULT_VENUE, getStarters } from './domain'
 
 const HOUR_MS = 60 * 60 * 1000
-const NEW_POLL_WINDOW_MS = 24 * HOUR_MS
+const NEW_SLOT_WINDOW_MS = 24 * HOUR_MS
+export const NEW_SLOT_QUIET_PERIOD_MS = 10 * 60 * 1000
 
-export type NotificationKind = 'new-poll' | 'reminder-24h' | 'reminder-2h' | 'test'
+export type NotificationKind = 'new-slots' | 'reminder-24h' | 'reminder-2h' | 'test'
 
 export interface ScheduledNotification {
   id: string
@@ -28,6 +29,64 @@ function formatSession(startsAt: string): string {
     timeZone: 'Europe/Rome',
   }).format(new Date(startsAt))
   return formatted.charAt(0).toUpperCase() + formatted.slice(1)
+}
+
+function groupNewSlots(slots: PadelSlot[]): PadelSlot[][] {
+  const ordered = [...slots].sort((left, right) => {
+    const timeDifference = (left.createdAt ?? 0) - (right.createdAt ?? 0)
+    return timeDifference || left.id.localeCompare(right.id)
+  })
+
+  return ordered.reduce<PadelSlot[][]>((groups, slot) => {
+    const current = groups.at(-1)
+    const previous = current?.at(-1)
+    if (!current || !previous || (slot.createdAt ?? 0) - (previous.createdAt ?? 0) > NEW_SLOT_QUIET_PERIOD_MS) {
+      groups.push([slot])
+    } else {
+      current.push(slot)
+    }
+    return groups
+  }, [])
+}
+
+function collectNewSlotNotifications(poll: PadelPoll, now: number): ScheduledNotification[] {
+  if (poll.status !== 'open') return []
+
+  const candidates = poll.slots.filter((slot) => {
+    const createdAt = slot.createdAt
+    const startsAt = new Date(slot.startsAt).getTime()
+    return typeof createdAt === 'number'
+      && Number.isFinite(createdAt)
+      && createdAt <= now
+      && createdAt >= now - NEW_SLOT_WINDOW_MS
+      && Number.isFinite(startsAt)
+      && startsAt > now
+  })
+
+  return groupNewSlots(candidates).flatMap((group) => {
+    const latestCreatedAt = Math.max(...group.map((slot) => slot.createdAt ?? 0))
+    if (now - latestCreatedAt < NEW_SLOT_QUIET_PERIOD_MS) return []
+
+    const first = group[0]
+    const excludedUserIds = Array.from(new Set(
+      group.map((slot) => slot.createdBy).filter((userId): userId is string => Boolean(userId)),
+    ))
+    const body = group.length === 1
+      ? `C’è un nuovo slot disponibile: ${formatSession(first.startsAt)}. Segna se ci sei.`
+      : `Ci sono ${group.length} nuovi slot disponibili per “${poll.title}”. Segna quando ci sei.`
+
+    return [{
+      id: `new-slots:${poll.id}:${first.id}`,
+      kind: 'new-slots' as const,
+      title: 'Sveglia fagianotto!',
+      body,
+      url: `/?poll=${encodeURIComponent(poll.id)}`,
+      tag: `new-slots-${poll.id}-${first.id}`,
+      ttlSeconds: 24 * 60 * 60,
+      recipientUserIds: null,
+      excludedUserIds,
+    }]
+  })
 }
 
 export function createTestNotification(
@@ -61,19 +120,7 @@ export function collectScheduledNotifications(
   const notifications: ScheduledNotification[] = []
 
   for (const poll of polls) {
-    if (poll.status === 'open' && poll.createdAt <= now && poll.createdAt >= now - NEW_POLL_WINDOW_MS) {
-      notifications.push({
-        id: `new-poll:${poll.id}:${poll.createdAt}`,
-        kind: 'new-poll',
-        title: 'Sveglia fagianotto!',
-        body: `È uscito un nuovo sondaggio: “${poll.title}”, pubblicato da ${poll.createdByName}. Segna quando ci sei.`,
-        url: `/?poll=${encodeURIComponent(poll.id)}`,
-        tag: `new-poll-${poll.id}`,
-        ttlSeconds: 24 * 60 * 60,
-        recipientUserIds: null,
-        excludedUserIds: [poll.createdBy],
-      })
-    }
+    notifications.push(...collectNewSlotNotifications(poll, now))
 
     for (const slot of poll.slots) {
       if (!slot.bookedAt) continue

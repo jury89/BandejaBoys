@@ -30,6 +30,9 @@ export interface PadelSlot {
   id: string
   startsAt: string
   durationMinutes: number
+  createdAt?: number
+  createdBy?: string
+  createdByName?: string
   venue: string
   bookedAt?: number
   bookedBy?: string

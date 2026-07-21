@@ -16,8 +16,10 @@ import type {
   PollStatus,
   SessionUser,
   SignupRole,
+  SlotInput,
 } from '../types'
 import {
+  addSlotToPoll,
   addSignup,
   makePoll,
   removeSignup,
@@ -33,6 +35,7 @@ export interface PadelRepository {
   subscribePolls(listener: (polls: PadelPoll[]) => void, onError: (error: Error) => void): Unsubscribe
   subscribeMembers(listener: (members: MemberProfile[]) => void, onError: (error: Error) => void): Unsubscribe
   createPoll(input: CreatePollInput, creator: SessionUser): Promise<void>
+  addSlot(pollId: string, input: SlotInput, creator: SessionUser): Promise<PadelPoll>
   joinSlot(pollId: string, slotId: string, member: SessionUser, role: SignupRole): Promise<PadelPoll>
   leaveSlot(pollId: string, slotId: string, userId: string): Promise<PadelPoll>
   rescheduleSlot(pollId: string, slotId: string, startsAt: string): Promise<PadelPoll>
@@ -89,6 +92,9 @@ function remoteRepository(): PadelRepository {
     },
     async createPoll(input, creator) {
       await addDoc(collection(db, 'polls'), makePoll(input, creator))
+    },
+    async addSlot(pollId, input, creator) {
+      return mutatePoll(pollId, (poll) => addSlotToPoll(poll, input, creator))
     },
     async joinSlot(pollId, slotId, member, role) {
       return mutatePoll(pollId, (poll) => updateSlot(poll, slotId, (slot) => addSignup(slot, member, Date.now(), role)))
@@ -220,6 +226,9 @@ function localRepository(): PadelRepository {
     async createPoll(input, creator) {
       const poll = makePoll(input, creator)
       writeLocalPolls([{ id: `poll-${Date.now()}`, ...poll }, ...readLocalPolls()])
+    },
+    async addSlot(pollId, input, creator) {
+      return mutate(pollId, (poll) => addSlotToPoll(poll, input, creator))
     },
     async joinSlot(pollId, slotId, member, role) {
       return mutate(pollId, (poll) => updateSlot(poll, slotId, (slot) => addSignup(slot, member, Date.now(), role)))

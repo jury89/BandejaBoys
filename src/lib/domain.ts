@@ -6,10 +6,12 @@ import type {
   SessionUser,
   Signup,
   SignupRole,
+  SlotInput,
   SlotPhase,
 } from '../types'
 
 export const MAX_STARTERS = 4
+export const MAX_SLOTS = 14
 export const DEFAULT_VENUE = 'Oasi Boschetto'
 
 export function makeId(prefix = 'id'): string {
@@ -62,13 +64,11 @@ export function setSlotBooking(
     }
   }
 
-  return {
-    id: slot.id,
-    startsAt: slot.startsAt,
-    durationMinutes: slot.durationMinutes,
-    venue: '',
-    signups: slot.signups,
-  }
+  const unbooked = { ...slot, venue: '' }
+  delete unbooked.bookedAt
+  delete unbooked.bookedBy
+  delete unbooked.bookedByName
+  return unbooked
 }
 
 export function addSignup(
@@ -195,6 +195,46 @@ export function rescheduleSlot(
   }
 }
 
+function normalizeSlotInput(input: SlotInput) {
+  const date = new Date(input.startsAt)
+  if (Number.isNaN(date.getTime())) throw new Error('Scegli una data e un orario validi.')
+  if (![60, 90, 120].includes(input.durationMinutes)) {
+    throw new Error('Scegli una durata valida per lo slot.')
+  }
+  return { startsAt: date.toISOString(), durationMinutes: input.durationMinutes }
+}
+
+export function addSlotToPoll(
+  poll: PadelPoll,
+  input: SlotInput,
+  creator: Pick<SessionUser, 'id' | 'displayName'>,
+  now = Date.now(),
+): PadelPoll {
+  if (poll.status !== 'open') throw new Error('Riapri il sondaggio prima di aggiungere uno slot.')
+  if (poll.slots.length >= MAX_SLOTS) throw new Error(`Puoi inserire al massimo ${MAX_SLOTS} slot.`)
+
+  const normalized = normalizeSlotInput(input)
+  if (poll.slots.some((slot) => slot.startsAt === normalized.startsAt)) {
+    throw new Error('Esiste già uno slot con questa data e questo orario.')
+  }
+
+  const newSlot: PadelSlot = {
+    id: makeId('slot'),
+    ...normalized,
+    createdAt: now,
+    createdBy: creator.id,
+    createdByName: creator.displayName,
+    venue: '',
+    signups: [],
+  }
+
+  return {
+    ...poll,
+    slots: [...poll.slots, newSlot].sort((left, right) => left.startsAt.localeCompare(right.startsAt)),
+    updatedAt: now,
+  }
+}
+
 export function makePoll(
   input: CreatePollInput,
   creator: SessionUser,
@@ -204,12 +244,10 @@ export function makePoll(
   if (!title) throw new Error('Dai un nome al sondaggio.')
   if (!input.targetWeekStart) throw new Error('Scegli la settimana di gioco.')
   if (input.slots.length === 0) throw new Error('Aggiungi almeno uno slot.')
+  if (input.slots.length > MAX_SLOTS) throw new Error(`Puoi inserire al massimo ${MAX_SLOTS} slot.`)
 
-  const starts = input.slots.map((slot) => new Date(slot.startsAt))
-  if (starts.some((date) => Number.isNaN(date.getTime()))) {
-    throw new Error('Controlla data e ora degli slot.')
-  }
-  if (new Set(starts.map((date) => date.toISOString())).size !== starts.length) {
+  const normalizedSlots = input.slots.map(normalizeSlotInput)
+  if (new Set(normalizedSlots.map((slot) => slot.startsAt)).size !== normalizedSlots.length) {
     throw new Error('Hai inserito due slot uguali.')
   }
 
@@ -221,11 +259,14 @@ export function makePoll(
     createdAt: now,
     updatedAt: now,
     status: 'open',
-    slots: input.slots
+    slots: normalizedSlots
       .map((slot, index) => ({
         id: makeId(`slot${index + 1}`),
-        startsAt: new Date(slot.startsAt).toISOString(),
+        startsAt: slot.startsAt,
         durationMinutes: slot.durationMinutes,
+        createdAt: now,
+        createdBy: creator.id,
+        createdByName: creator.displayName,
         venue: '',
         signups: [],
       }))

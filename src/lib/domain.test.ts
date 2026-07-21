@@ -1,5 +1,6 @@
 import {
   DEFAULT_VENUE,
+  addSlotToPoll,
   addSignup,
   getReserves,
   getSlotPhase,
@@ -169,6 +170,11 @@ describe('stato slot e creazione sondaggio', () => {
     )
     expect(poll.title).toBe('Prossima settimana')
     expect(poll.slots[0].startsAt < poll.slots[1].startsAt).toBe(true)
+    expect(poll.slots[0]).toMatchObject({
+      createdAt: 100,
+      createdBy: 'jury',
+      createdByName: 'Jury',
+    })
 
     expect(() => makePoll(
       {
@@ -220,5 +226,61 @@ describe('stato slot e creazione sondaggio', () => {
       signups: booked.signups,
     })
     expect(() => rescheduleSlot(current, booked.id, later.startsAt)).toThrow('Esiste già uno slot')
+  })
+
+  it('aggiunge uno slot a un sondaggio aperto con autore e istante di creazione', () => {
+    const current: PadelPoll = {
+      id: 'poll-1',
+      title: 'Test',
+      targetWeekStart: '2026-07-27',
+      createdBy: 'jury',
+      createdByName: 'Jury',
+      createdAt: 1,
+      updatedAt: 1,
+      status: 'open',
+      slots: [slot()],
+    }
+
+    const updated = addSlotToPoll(
+      current,
+      { startsAt: '2026-07-27T18:30', durationMinutes: 90 },
+      member('ale', 'Ale'),
+      99,
+    )
+
+    expect(updated.updatedAt).toBe(99)
+    expect(updated.slots).toHaveLength(2)
+    expect(updated.slots[0]).toMatchObject({
+      startsAt: new Date('2026-07-27T18:30').toISOString(),
+      createdAt: 99,
+      createdBy: 'ale',
+      createdByName: 'Ale',
+      signups: [],
+    })
+  })
+
+  it('non aggiunge duplicati o nuovi slot a un sondaggio chiuso', () => {
+    const current: PadelPoll = {
+      id: 'poll-1',
+      title: 'Test',
+      targetWeekStart: '2026-07-27',
+      createdBy: 'jury',
+      createdByName: 'Jury',
+      createdAt: 1,
+      updatedAt: 1,
+      status: 'open',
+      slots: [slot()],
+    }
+
+    expect(() => addSlotToPoll(
+      current,
+      { startsAt: current.slots[0].startsAt, durationMinutes: 90 },
+      member('ale'),
+    )).toThrow('Esiste già uno slot')
+    expect(() => addSlotToPoll(
+      { ...current, status: 'closed' },
+      { startsAt: '2026-07-30T18:30', durationMinutes: 90 },
+      member('ale'),
+    )).toThrow('Riapri il sondaggio')
   })
 })

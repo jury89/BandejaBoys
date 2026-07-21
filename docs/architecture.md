@@ -15,6 +15,7 @@
 
 1. Un membro crea un sondaggio, di solito il lunedì, indicando la settimana successiva.
 2. Il sondaggio contiene uno o più slot con data, ora e durata.
+   Qualunque membro può aggiungere altri slot finché il sondaggio resta aperto; l’operazione è transazionale e non modifica quelli esistenti.
 3. Al momento dell’adesione il giocatore sceglie esplicitamente **Titolare** o **Riserva**; ogni adesione conserva anche il timestamp per mantenere la precedenza cronologica.
 4. I titolari sono al massimo quattro. Una riserva volontaria non occupa un posto libero; quando una formazione di quattro perde un titolare, la prima riserva viene promossa automaticamente.
 5. Quando lo slot raggiunge quattro titolari passa automaticamente a **Da prenotare**; è un suggerimento operativo, non un requisito per la prenotazione.
@@ -41,15 +42,15 @@ Il service worker `public/sw.js` riceve il payload, mostra sempre una notifica v
 
 Il workflow GitHub legge lo stato corrente ogni 30 minuti e genera eventi idempotenti:
 
-- **Nuovo sondaggio**: a tutti i dispositivi registrati tranne quelli del creatore, finché il sondaggio ha meno di 24 ore.
+- **Nuovi slot**: a tutti i dispositivi registrati tranne quelli di chi li ha aggiunti. Gli slot creati nello stesso sondaggio a non più di 10 minuti di distanza vengono raggruppati; l’evento viene emesso soltanto dopo 10 minuti senza altre aggiunte. Cinque proposte iniziali producono quindi un avviso, mentre un’altra proposta inserita il giorno seguente ne produce uno nuovo. Sono considerate soltanto aggiunte avvenute nelle ultime 24 ore e relative a partite future.
 - **Reminder 24h**: quando una partita prenotata entra nella finestra delle 24 ore, soltanto ai primi quattro iscritti in quel momento; l’archiviazione del sondaggio non disattiva il promemoria.
 - **Reminder 2h**: quando la stessa partita entra nella finestra delle 2 ore, ricalcolando nuovamente i quattro titolari anche se il sondaggio è già archiviato.
 
-I tre avvisi ordinari condividono il titolo informale **“Sveglia fagianotto!”**. Il corpo specifica rispettivamente che è uscito un nuovo sondaggio, che il titolare gioca domani oppure che gioca tra due ore; i reminder conservano sempre giorno, ora e circolo.
+I tre avvisi ordinari condividono il titolo informale **“Sveglia fagianotto!”**. Il corpo specifica rispettivamente che sono disponibili uno o più nuovi slot, che il titolare gioca domani oppure che gioca tra due ore; i reminder conservano sempre giorno, ora e circolo.
 
-Ritiri, promozioni dalla riserva, sostituzioni, annullamenti e cambi di orario non richiedono una coda da correggere: i destinatari vengono sempre derivati dal documento più recente. L’identità dell’evento include data e ora, perciò uno slot spostato genera i reminder per il nuovo orario. `notificationDeliveries/{deliveryId}` registra ogni coppia evento/dispositivo e impedisce duplicati tra esecuzioni successive.
+Ogni slot nuovo conserva `createdAt`, `createdBy` e `createdByName`; un cambio di data e ora lascia invariati questi dati e quindi non viene interpretato come una nuova aggiunta. Gli slot storici privi dei metadati non generano avvisi retroattivi. Ritiri, promozioni dalla riserva, sostituzioni, annullamenti e cambi di orario non richiedono una coda da correggere: i destinatari vengono sempre derivati dal documento più recente. L’identità del reminder include data e ora, perciò uno slot spostato genera i reminder per il nuovo orario. `notificationDeliveries/{deliveryId}` registra ogni coppia evento/dispositivo e impedisce duplicati tra esecuzioni successive.
 
-L’elaborazione parte ai minuti `07` e `37`; normalmente l’avviso arriva nella prima esecuzione dopo il superamento della soglia, quindi entro circa 30 minuti. GitHub documenta che i workflow pianificati possono subire ritardi occasionali: in tal caso il reminder 24h resta valido fino all’ingresso nella finestra 2h, mentre quello 2h resta valido fino all’inizio della partita.
+L’elaborazione parte ai minuti `07` e `37`. Per i nuovi slot si aggiungono i 10 minuti di quiete, quindi l’avviso arriva normalmente tra 10 e 40 minuti dall’ultima aggiunta; i reminder arrivano invece nella prima esecuzione dopo il superamento della soglia, entro circa 30 minuti. GitHub documenta che i workflow pianificati possono subire ritardi occasionali: in tal caso il reminder 24h resta valido fino all’ingresso nella finestra 2h, mentre quello 2h resta valido fino all’inizio della partita.
 
 L’avvio manuale può indirizzare una singola notifica a uno specifico UID e, facoltativamente, usare un corpo personalizzato di massimo 240 caratteri. L’identificativo univoco dell’esecuzione mantiene idempotente anche questo tipo di invio; il messaggio manuale non modifica la pianificazione ordinaria.
 
@@ -80,6 +81,7 @@ polls/{pollId}
   createdAt, updatedAt, status
   slots[]
     id, startsAt, durationMinutes, venue
+    createdAt?, createdBy?, createdByName?
     bookedAt?, bookedBy?, bookedByName?
     signups[]
       id, userId, displayName, joinedAt, role?, substitutedFor?
@@ -97,7 +99,7 @@ Un sondaggio e i suoi slot stanno in un solo documento. È una scelta adatta all
 
 ## Concorrenza
 
-Ogni adesione, ritiro, sostituzione, modifica dell’orario o conferma del campo usa `runTransaction`. Se due membri aggiornano lo stesso sondaggio contemporaneamente, Firestore rilegge la versione più recente e ripete l'operazione, evitando il classico aggiornamento perso.
+Ogni aggiunta di uno slot, adesione, ritiro, sostituzione, modifica dell’orario o conferma del campo usa `runTransaction`. Se due membri aggiornano lo stesso sondaggio contemporaneamente, Firestore rilegge la versione più recente e ripete l'operazione, evitando il classico aggiornamento perso.
 
 Al termine della transazione il repository restituisce anche il sondaggio aggiornato: la bacheca lo applica immediatamente, senza attendere il successivo evento realtime. Il listener Firestore resta attivo per confermare lo stato e sincronizzare gli altri dispositivi; questo evita interfacce ferme su connessioni mobili lente o sospese.
 
