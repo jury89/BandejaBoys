@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Bell, BellRing, CalendarCheck2, CalendarDays, CalendarPlus, CheckCircle2, ChevronDown, LogOut, UsersRound } from 'lucide-react'
 import { useAuth } from '../AuthContext'
 import type { MemberProfile, PadelPoll } from '../types'
-import { getSlotPhase } from '../lib/domain'
+import { getSlotPhase, getUpcomingPolls } from '../lib/domain'
 import { firstName, slotDateParts } from '../lib/format'
 import { hasRemoteBackend } from '../lib/firebase'
 import { notificationStateLabel, usePushNotifications } from '../lib/notifications'
@@ -24,6 +24,7 @@ export function Dashboard() {
   const [toast, setToast] = useState<{ message: string; tone: 'success' | 'error' } | null>(null)
   const [accountOpen, setAccountOpen] = useState(false)
   const [notificationPanelOpen, setNotificationPanelOpen] = useState(false)
+  const [now, setNow] = useState(() => Date.now())
   const notifications = usePushNotifications(user)
 
   useEffect(() => {
@@ -48,23 +49,38 @@ export function Dashboard() {
     return () => window.clearTimeout(timer)
   }, [toast])
 
+  useEffect(() => {
+    const nextStart = polls
+      .flatMap((poll) => poll.slots)
+      .map((slot) => new Date(slot.startsAt).getTime())
+      .filter((startsAt) => Number.isFinite(startsAt) && startsAt > now)
+      .sort((left, right) => left - right)[0]
+    if (!nextStart) return
+
+    const delay = Math.min(Math.max(nextStart - Date.now() + 50, 0), 2_147_483_647)
+    const timer = window.setTimeout(() => setNow(Date.now()), delay)
+    return () => window.clearTimeout(timer)
+  }, [now, polls])
+
+  const upcomingPolls = useMemo(() => getUpcomingPolls(polls, now), [now, polls])
+
   const stats = useMemo(() => {
-    const openPolls = polls.filter((poll) => poll.status === 'open')
+    const openPolls = upcomingPolls.filter((poll) => poll.status === 'open')
     const slots = openPolls.flatMap((poll) => poll.slots)
     const ready = slots.filter((slot) => getSlotPhase(slot) === 'ready').length
     const booked = slots.filter((slot) => getSlotPhase(slot) === 'booked')
     const nextBooked = booked.sort((left, right) => left.startsAt.localeCompare(right.startsAt))[0]
     return { open: openPolls.length, ready, nextBooked }
-  }, [polls])
+  }, [upcomingPolls])
 
   if (!user) return null
 
-  const totalSlotCount = polls.reduce((total, poll) => total + poll.slots.length, 0)
-  const bookedSlotCount = polls.reduce(
+  const totalSlotCount = upcomingPolls.reduce((total, poll) => total + poll.slots.length, 0)
+  const bookedSlotCount = upcomingPolls.reduce(
     (total, poll) => total + poll.slots.filter((slot) => getSlotPhase(slot) === 'booked').length,
     0,
   )
-  const visiblePolls = polls.filter(
+  const visiblePolls = upcomingPolls.filter(
     (poll) => feedFilter === 'all' || poll.slots.some((slot) => getSlotPhase(slot) === 'booked'),
   )
   const visibleSlotCount = feedFilter === 'all' ? totalSlotCount : bookedSlotCount

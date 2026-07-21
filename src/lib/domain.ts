@@ -49,6 +49,28 @@ export function getSlotPhase(slot: PadelSlot): SlotPhase {
   return getStarters(slot).length >= MAX_STARTERS ? 'ready' : 'collecting'
 }
 
+export function getUpcomingPolls(polls: PadelPoll[], now = Date.now()): PadelPoll[] {
+  return polls
+    .map((poll) => ({
+      ...poll,
+      slots: poll.slots
+        .filter((slot) => {
+          const startsAt = new Date(slot.startsAt).getTime()
+          return Number.isFinite(startsAt) && startsAt > now
+        })
+        .sort((left, right) => left.startsAt.localeCompare(right.startsAt)),
+    }))
+    .filter((poll) => poll.slots.length > 0)
+    .sort((left, right) => {
+      const firstSlotOrder = left.slots[0].startsAt.localeCompare(right.slots[0].startsAt)
+      if (firstSlotOrder !== 0) return firstSlotOrder
+
+      return left.targetWeekStart.localeCompare(right.targetWeekStart)
+        || left.createdAt - right.createdAt
+        || left.id.localeCompare(right.id)
+    })
+}
+
 export function setSlotBooking(
   slot: PadelSlot,
   bookedBy: Pick<SessionUser, 'id' | 'displayName'> | null,

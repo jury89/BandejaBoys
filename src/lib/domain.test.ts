@@ -5,6 +5,7 @@ import {
   getReserves,
   getSlotPhase,
   getStarters,
+  getUpcomingPolls,
   makePoll,
   nextMondayDate,
   removeSignup,
@@ -107,6 +108,67 @@ describe('ordine adesioni', () => {
     const current = slot(['a', 'b', 'c', 'd'].map((id, index) => signup(id, index, 'starter')))
 
     expect(() => addSignup(current, member('e'), 5, 'starter')).toThrow('quattro posti da titolare')
+  })
+})
+
+describe('ordine e visibilità dei sondaggi', () => {
+  it('mostra prima il sondaggio con lo slot futuro più vicino', () => {
+    const nearPoll: PadelPoll = {
+      id: 'poll-near',
+      title: 'Settimana vicina',
+      targetWeekStart: '2026-07-27',
+      createdBy: 'jury',
+      createdByName: 'Jury',
+      createdAt: 1,
+      updatedAt: 1,
+      status: 'open',
+      slots: [{ ...slot(), startsAt: '2026-07-28T19:30:00.000Z' }],
+    }
+    const laterPoll: PadelPoll = {
+      ...nearPoll,
+      id: 'poll-later',
+      title: 'Settimana successiva',
+      targetWeekStart: '2026-08-03',
+      createdAt: 2,
+      slots: [{ ...slot(), startsAt: '2026-08-05T18:30:00.000Z' }],
+    }
+
+    const result = getUpcomingPolls(
+      [laterPoll, nearPoll],
+      new Date('2026-07-21T12:00:00.000Z').getTime(),
+    )
+
+    expect(result.map((poll) => poll.id)).toEqual(['poll-near', 'poll-later'])
+  })
+
+  it('nasconde gli slot iniziati e i sondaggi senza slot futuri', () => {
+    const now = new Date('2026-07-28T19:30:00.000Z').getTime()
+    const current: PadelPoll = {
+      id: 'poll-mixed',
+      title: 'Settimana mista',
+      targetWeekStart: '2026-07-27',
+      createdBy: 'jury',
+      createdByName: 'Jury',
+      createdAt: 1,
+      updatedAt: 1,
+      status: 'open',
+      slots: [
+        { ...slot(), id: 'past', startsAt: '2026-07-27T19:30:00.000Z' },
+        { ...slot(), id: 'starting-now' },
+        { ...slot(), id: 'future', startsAt: '2026-07-30T19:30:00.000Z' },
+      ],
+    }
+    const pastOnly = {
+      ...current,
+      id: 'poll-past',
+      slots: [{ ...slot(), id: 'past-only', startsAt: '2026-07-27T18:30:00.000Z' }],
+    }
+
+    const result = getUpcomingPolls([pastOnly, current], now)
+
+    expect(result).toHaveLength(1)
+    expect(result[0].slots.map((item) => item.id)).toEqual(['future'])
+    expect(current.slots).toHaveLength(3)
   })
 })
 
