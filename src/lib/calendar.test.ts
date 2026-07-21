@@ -43,6 +43,18 @@ describe('file calendario dello slot', () => {
     expect(calendar).toMatch(/END:VCALENDAR\r\n$/)
   })
 
+  it('definisce Europe/Rome e mantiene le 09:00 come ora locale', () => {
+    const morningSlot = { ...slot, startsAt: '2026-07-28T09:00' }
+    const calendar = buildSlotCalendar(poll, morningSlot, Date.UTC(2026, 6, 21, 12, 0))
+
+    expect(calendar).toContain('X-WR-TIMEZONE:Europe/Rome')
+    expect(calendar).toContain('BEGIN:VTIMEZONE\r\nTZID:Europe/Rome')
+    expect(calendar).toContain('BEGIN:DAYLIGHT\r\nTZOFFSETFROM:+0100\r\nTZOFFSETTO:+0200')
+    expect(calendar).toContain('BEGIN:STANDARD\r\nTZOFFSETFROM:+0200\r\nTZOFFSETTO:+0100')
+    expect(calendar).toContain('DTSTART;TZID=Europe/Rome:20260728T090000')
+    expect(calendar).toContain('DTEND;TZID=Europe/Rome:20260728T103000')
+  })
+
   it('marca come confermato il calendario di un campo prenotato', () => {
     const calendar = buildSlotCalendar(poll, setSlotBooking(slot, user, 20), 1)
 

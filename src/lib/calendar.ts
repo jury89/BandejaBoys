@@ -3,6 +3,26 @@ import type { PadelPoll, PadelSlot } from '../types'
 
 const CALENDAR_TIME_ZONE = 'Europe/Rome'
 const APP_URL = 'https://bandeja-boys.web.app'
+const CALENDAR_TIME_ZONE_COMPONENT = [
+  'BEGIN:VTIMEZONE',
+  `TZID:${CALENDAR_TIME_ZONE}`,
+  `X-LIC-LOCATION:${CALENDAR_TIME_ZONE}`,
+  'BEGIN:DAYLIGHT',
+  'TZOFFSETFROM:+0100',
+  'TZOFFSETTO:+0200',
+  'TZNAME:CEST',
+  'DTSTART:19700329T020000',
+  'RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=-1SU',
+  'END:DAYLIGHT',
+  'BEGIN:STANDARD',
+  'TZOFFSETFROM:+0200',
+  'TZOFFSETTO:+0100',
+  'TZNAME:CET',
+  'DTSTART:19701025T030000',
+  'RRULE:FREQ=YEARLY;BYMONTH=10;BYDAY=-1SU',
+  'END:STANDARD',
+  'END:VTIMEZONE',
+] as const
 
 function normalizeLocalDateTime(value: string) {
   return `${value.slice(0, 16)}:00`
@@ -60,6 +80,8 @@ export function buildSlotCalendar(poll: PadelPoll, slot: PadelSlot, now = Date.n
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
     'PRODID:-//Bandeja Boys//Padel planner//IT',
+    `X-WR-TIMEZONE:${CALENDAR_TIME_ZONE}`,
+    ...CALENDAR_TIME_ZONE_COMPONENT,
     'BEGIN:VEVENT',
     `UID:${escapeCalendarText(`${poll.id}-${slot.id}@bandeja-boys.web.app`)}`,
     `DTSTAMP:${formatUtcCalendarDate(now)}`,
