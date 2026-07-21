@@ -105,7 +105,9 @@ for (const notification of notifications) {
         tag: notification.tag,
       }), {
         TTL: notification.ttlSeconds,
-        urgency: notification.kind === 'reminder-2h' || notification.kind === 'match-rating'
+        urgency: notification.kind === 'slot-ready'
+          || notification.kind === 'reminder-2h'
+          || notification.kind === 'match-rating'
           ? 'high'
           : 'normal',
       })

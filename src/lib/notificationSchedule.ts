@@ -12,9 +12,10 @@ import {
 const HOUR_MS = 60 * 60 * 1000
 const NEW_SLOT_WINDOW_MS = 24 * HOUR_MS
 export const NEW_SLOT_QUIET_PERIOD_MS = 10 * 60 * 1000
+export const SLOT_READY_NOTIFICATION_WINDOW_MS = 24 * HOUR_MS
 export const MATCH_RATING_NOTIFICATION_WINDOW_MS = 30 * 60 * 1000
 
-export type NotificationKind = 'new-slots' | 'reminder-24h' | 'reminder-2h' | 'match-rating' | 'test'
+export type NotificationKind = 'new-slots' | 'slot-ready' | 'reminder-24h' | 'reminder-2h' | 'match-rating' | 'test'
 export type TestNotificationMode = 'standard' | 'match-rating'
 
 export interface ScheduledNotification {
@@ -142,10 +143,40 @@ export function collectScheduledNotifications(
     notifications.push(...collectNewSlotNotifications(poll, now))
 
     for (const slot of poll.slots) {
-      if (!slot.bookedAt) continue
       const startsAt = padelDateTimeToTimestamp(slot.startsAt)
       const starters = getStarters(slot)
       const recipientUserIds = Array.from(new Set(starters.map((signup) => signup.userId)))
+
+      if (
+        !slot.bookedAt
+        && Number.isFinite(startsAt)
+        && startsAt > now
+        && starters.length === MAX_STARTERS
+        && recipientUserIds.length === MAX_STARTERS
+      ) {
+        const completedAt = starters[MAX_STARTERS - 1].joinedAt
+        if (
+          Number.isFinite(completedAt)
+          && completedAt <= now
+          && now < completedAt + SLOT_READY_NOTIFICATION_WINDOW_MS
+        ) {
+          notifications.push({
+            id: `slot-ready:${poll.id}:${slot.id}:${completedAt}`,
+            kind: 'slot-ready',
+            title: 'Slot completo!',
+            body: `Siete in quattro per ${formatSession(slot.startsAt)}. Il campo è ancora da prenotare: potete procedere.`,
+            url: `/?poll=${encodeURIComponent(poll.id)}`,
+            tag: `slot-ready-${poll.id}-${slot.id}`,
+            ttlSeconds: Math.max(60, Math.floor(
+              (completedAt + SLOT_READY_NOTIFICATION_WINDOW_MS - now) / 1000,
+            )),
+            recipientUserIds,
+            excludedUserIds: [],
+          })
+        }
+      }
+
+      if (!slot.bookedAt) continue
       const pendingRatingRecipientUserIds = recipientUserIds.filter((userId) => !closedRatingPromptIds.has(
         getMatchRatingResponseId(poll.id, slot.id, userId),
       ))

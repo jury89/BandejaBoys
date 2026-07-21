@@ -2,6 +2,7 @@ import type { PadelPoll, PadelSlot, Signup } from '../types'
 import {
   MATCH_RATING_NOTIFICATION_WINDOW_MS,
   NEW_SLOT_QUIET_PERIOD_MS,
+  SLOT_READY_NOTIFICATION_WINDOW_MS,
   collectScheduledNotifications,
   createTestNotification,
 } from './notificationSchedule'
@@ -168,6 +169,69 @@ describe('pianificazione notifiche', () => {
     const legacySlot = slot(future, [], false)
 
     expect(collectScheduledNotifications([poll([legacySlot])], NOW)).toHaveLength(0)
+  })
+
+  it('avvisa i quattro titolari quando lo slot diventa completo e il campo è da prenotare', () => {
+    const future = new Date(NOW + 7 * 24 * 60 * 60 * 1000).toISOString()
+    const players = [
+      signup('d', NOW - 60 * 1000),
+      signup('b', NOW - 3 * 60 * 1000),
+      signup('a', NOW - 4 * 60 * 1000),
+      signup('c', NOW - 2 * 60 * 1000),
+      { ...signup('reserve', NOW - 5 * 60 * 1000), role: 'reserve' as const },
+    ]
+    const notifications = collectScheduledNotifications([
+      poll([slot(future, players, false)]),
+    ], NOW)
+
+    expect(notifications).toHaveLength(1)
+    expect(notifications[0]).toMatchObject({
+      id: `slot-ready:poll-1:slot-1:${NOW - 60 * 1000}`,
+      kind: 'slot-ready',
+      title: 'Slot completo!',
+      recipientUserIds: ['a', 'b', 'c', 'd'],
+      excludedUserIds: [],
+      url: '/?poll=poll-1',
+    })
+    expect(notifications[0].body).toContain('Il campo è ancora da prenotare')
+  })
+
+  it('non avvisa se il campo è già prenotato o manca il quarto titolare', () => {
+    const future = new Date(NOW + 7 * 24 * 60 * 60 * 1000).toISOString()
+    const players = ['a', 'b', 'c', 'd'].map((id, index) => signup(
+      id,
+      NOW - (4 - index) * 60 * 1000,
+    ))
+    const incomplete = [
+      ...players.slice(0, 3),
+      { ...signup('reserve', NOW - 30 * 1000), role: 'reserve' as const },
+    ]
+
+    expect(collectScheduledNotifications([poll([slot(future, players)])], NOW)).toHaveLength(0)
+    expect(collectScheduledNotifications([
+      poll([slot(future, incomplete, false)]),
+    ], NOW)).toHaveLength(0)
+  })
+
+  it('non invia notifiche retroattive oltre la finestra e cambia identità alla nuova formazione', () => {
+    const future = new Date(NOW + 7 * 24 * 60 * 60 * 1000).toISOString()
+    const oldPlayers = ['a', 'b', 'c', 'd'].map((id, index) => signup(
+      id,
+      NOW - SLOT_READY_NOTIFICATION_WINDOW_MS - (4 - index) * 60 * 1000,
+    ))
+    expect(collectScheduledNotifications([
+      poll([slot(future, oldPlayers, false)]),
+    ], NOW)).toHaveLength(0)
+
+    const recentPlayers = [
+      ...oldPlayers.slice(0, 3),
+      signup('e', NOW - 60 * 1000),
+    ]
+    const first = collectScheduledNotifications([poll([slot(future, recentPlayers, false)])], NOW)
+    const second = collectScheduledNotifications([poll([slot(future, recentPlayers, false)])], NOW)
+
+    expect(first[0].id).toBe(`slot-ready:poll-1:slot-1:${NOW - 60 * 1000}`)
+    expect(second[0].id).toBe(first[0].id)
   })
 
   it('manda il reminder 24h soltanto ai primi quattro del campo prenotato', () => {
