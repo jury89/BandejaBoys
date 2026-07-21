@@ -1165,6 +1165,27 @@ p {
   text-transform: uppercase;
 }
 
+.booking-strip--pending {
+  border-bottom-color: #d8e4e8;
+  background: #f4f8f9;
+  color: #526b76;
+}
+
+.booking-strip--pending .booking-strip__pin {
+  background: #e2ecef;
+  color: #5e7883;
+}
+
+.booking-strip--pending .booking-strip__copy small {
+  color: #879ba4;
+}
+
+.booking-strip--pending .booking-strip__stamp {
+  border-color: #ccdce1;
+  background: rgba(255, 255, 255, 0.72);
+  color: #657d87;
+}
+
 .court-lineup {
   position: relative;
   display: grid;
@@ -2308,6 +2329,10 @@ p {
   .poll-card__slots {
     padding: 8px;
     gap: 12px;
+  }
+
+  .booking-strip--pending {
+    display: none;
   }
 
   .site-footer {

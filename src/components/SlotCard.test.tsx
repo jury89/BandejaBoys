@@ -109,6 +109,7 @@ describe('azioni dello slot', () => {
     )
 
     expect(slot.signups).toHaveLength(1)
+    expect(screen.getByLabelText('Prenotazione da segnare')).toHaveTextContent('Il campo non è ancora confermato')
     expect(screen.getByText(DEFAULT_VENUE)).toBeInTheDocument()
     expect(screen.getByText('Segna come prenotato')).toBeInTheDocument()
     fireEvent.click(
@@ -119,6 +120,26 @@ describe('azioni dello slot', () => {
     expect(onPollChange).toHaveBeenCalledWith(updatedPoll)
     expect(onNotify).toHaveBeenCalledWith('Campo prenotato all’Oasi Boschetto. Si gioca!')
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('mostra la conferma del campo al posto della fascia in attesa', () => {
+    const bookedSlot = setSlotBooking(slot, user, 20)
+
+    render(
+      <SlotCard
+        poll={{ ...poll, slots: [bookedSlot] }}
+        slot={bookedSlot}
+        user={user}
+        members={[user]}
+        onPollChange={vi.fn()}
+        onNotify={vi.fn()}
+        onError={vi.fn()}
+      />,
+    )
+
+    expect(screen.queryByLabelText('Prenotazione da segnare')).not.toBeInTheDocument()
+    expect(screen.getByText('Prenotazione confermata da Jury')).toBeInTheDocument()
+    expect(screen.getByText('Confermato')).toBeInTheDocument()
   })
 
   it('modifica data e ora di uno slot esistente', async () => {

@@ -143,6 +143,17 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
         </div>
       )}
 
+      {phase !== 'booked' && (
+        <div className="booking-strip booking-strip--pending" aria-label="Prenotazione da segnare">
+          <span className="booking-strip__pin" aria-hidden="true"><CalendarCheck2 size={16} /></span>
+          <span className="booking-strip__copy">
+            <strong>Prenotazione da segnare</strong>
+            <small>Il campo non è ancora confermato</small>
+          </span>
+          <span className="booking-strip__stamp"><Clock3 size={13} /> In attesa</span>
+        </div>
+      )}
+
       <section className="court-lineup" aria-label="Titolari">
         <div className="court-lineup__net" aria-hidden="true" />
         {Array.from({ length: 4 }, (_, index) => {
