@@ -27,18 +27,21 @@ describe('scelta notifiche', () => {
   })
 
   it('su iPhone spiega come aggiungere il sito alla schermata Home', () => {
+    const onClose = vi.fn()
     render(
       <NotificationCallup
         state="ios-install"
         busy={false}
         onEnable={vi.fn()}
         onDisable={vi.fn()}
-        onClose={vi.fn()}
+        onClose={onClose}
       />,
     )
 
     expect(screen.getByRole('dialog', { name: 'Prima mettila in Home.' })).toHaveTextContent('Aggiungi alla schermata Home')
     expect(screen.queryByRole('button', { name: 'Attiva notifiche' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Non mostrare più' }))
+    expect(onClose).toHaveBeenCalledOnce()
   })
 
   it('permette di disattivare un dispositivo già registrato', () => {

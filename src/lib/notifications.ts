@@ -201,10 +201,10 @@ export function usePushNotifications(user: SessionUser | null) {
 
   const dismiss = useCallback(() => {
     if (!user) return
-    const storage = state === 'ios-install' ? sessionStorage : localStorage
-    storage.setItem(dismissalKey(user.id), 'true')
+    localStorage.setItem(dismissalKey(user.id), 'true')
+    sessionStorage.removeItem(dismissalKey(user.id))
     setDismissalVersion((current) => current + 1)
-  }, [state, user])
+  }, [user])
 
   return useMemo(() => ({
     state,

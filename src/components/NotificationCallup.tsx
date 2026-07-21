@@ -74,7 +74,7 @@ export function NotificationCallup({ state, busy, onEnable, onDisable, onClose }
             </button>
           )}
           <button className="text-button" type="button" onClick={onClose}>
-            {enabled || denied || unsupported || iosInstall ? 'Chiudi' : 'Non ora'}
+            {iosInstall ? 'Non mostrare più' : enabled || denied || unsupported ? 'Chiudi' : 'Non ora'}
           </button>
         </footer>
       </section>

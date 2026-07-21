@@ -38,7 +38,7 @@ Lo stato `ready` non viene salvato: è derivato dal numero di titolari. Lo stato
 
 Al primo accesso da un browser compatibile, la bacheca mostra una chiamata chiara con due scelte: **Attiva notifiche** e **Non ora**. Il rifiuto non viene riproposto automaticamente; la voce **Notifiche** nel menu account permette di cambiare scelta in seguito. Ogni attivazione vale per il singolo browser o per la singola web app installata.
 
-Su iPhone e iPad Web Push richiede l’apertura come web app dalla schermata Home. Nel browser normale il pannello mostra `Condividi → Aggiungi alla schermata Home`; quando l’utente riapre Bandeja Boys dall’icona installata può concedere il permesso di sistema.
+Su iPhone e iPad Web Push richiede l’apertura come web app dalla schermata Home. Nel browser normale il pannello mostra `Condividi → Aggiungi alla schermata Home`; quando l’utente riapre Bandeja Boys dall’icona installata può concedere il permesso di sistema. Safari non espone al sito lo stato di installazione della stessa app: chi chiude le istruzioni con **Non mostrare più** salva quindi la scelta in `localStorage`, per account, e il pannello non viene riproposto nelle visite successive dello stesso browser.
 
 Il service worker `public/sw.js` riceve il payload, mostra sempre una notifica visibile e riapre la bacheca quando viene toccata. La sottoscrizione standard contiene endpoint e chiavi pubbliche del dispositivo e viene salvata in `pushSubscriptions/{subscriptionId}`; l’identificatore è l’hash SHA-256 dell’endpoint, quindi lo stesso dispositivo può essere reclamato dall’ultimo account che vi attiva gli avvisi.
 
