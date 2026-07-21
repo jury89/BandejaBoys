@@ -14,7 +14,7 @@ Il sito è disponibile su [bandeja-boys.web.app](https://bandeja-boys.web.app). 
 - Scelta esplicita al momento dell’adesione: ogni giocatore può segnarsi come **Titolare** oppure direttamente come **Riserva**. I quattro posti da titolare e la lista d’attesa mantengono l’ordine cronologico.
 - Promozione automatica della prima riserva quando un titolare si ritira da una formazione completa.
 - Sostituzione diretta: un titolare passa la propria posizione a un altro membro; se il sostituto era in riserva, il suo vecchio posto viene rimosso. Un tooltip accessibile chiarisce l’effetto prima dell’azione.
-- Stato dello slot immediatamente leggibile: raccolta adesioni, da prenotare, campo prenotato. Nella griglia desktop una fascia di prenotazione uniforme mantiene allineati campo, riserve e azioni anche quando convivono slot confermati e non confermati. L’azione **Segna come prenotato** registra con un solo tocco la prenotazione all’**Oasi Boschetto**, anche prima di raggiungere quattro giocatori.
+- Stato dello slot immediatamente leggibile: raccolta adesioni, da prenotare, campo prenotato. Nella griglia desktop una fascia uniforme mantiene allineati campo, riserve e azioni: verde pieno per **Campo prenotato**, ambra per **Campo da prenotare**. L’azione **Segna come prenotato** registra con un solo tocco la prenotazione all’**Oasi Boschetto**, anche prima di raggiungere quattro giocatori.
 - Filtro della bacheca sempre disponibile sotto l’header: **Tutti** mostra gli slot dei sondaggi aperti e archiviati, mentre **Slot prenotati** raccoglie soltanto le partite con campo confermato.
 - Autore della conferma e archivio dei sondaggi chiusi.
 - Aggiornamenti in tempo reale su tutti i dispositivi quando Firebase è configurato.

@@ -14,6 +14,11 @@
   --muted: #647985;
   --line: #d6e2e7;
   --danger: #c23d52;
+  --booked: #08796d;
+  --booked-deep: #065d55;
+  --pending: #e7a817;
+  --pending-soft: #fff1bd;
+  --pending-ink: #634200;
   --display: 'Barlow Condensed', Impact, sans-serif;
   --shadow: 0 18px 60px rgba(7, 58, 80, 0.09);
 }
@@ -994,13 +999,13 @@ p {
 }
 
 .slot-card--ready {
-  border-color: #c5df5c;
-  box-shadow: inset 0 3px 0 var(--ball);
+  border-color: #d5ae45;
+  box-shadow: inset 0 3px 0 var(--pending);
 }
 
 .slot-card--booked {
-  border-color: #79b7b4;
-  box-shadow: inset 0 3px 0 #30a699;
+  border-color: #50a69d;
+  box-shadow: inset 0 3px 0 var(--booked);
 }
 
 .slot-card__header {
@@ -1098,13 +1103,13 @@ p {
 }
 
 .status-pill--ready {
-  background: var(--ball);
-  color: #354613;
+  background: var(--pending-soft);
+  color: var(--pending-ink);
 }
 
 .status-pill--booked {
-  background: #daf3ec;
-  color: #176c5e;
+  background: var(--booked);
+  color: var(--white);
 }
 
 .booking-strip {
@@ -1113,9 +1118,9 @@ p {
   align-items: center;
   gap: 10px;
   padding: 11px 17px;
-  border-bottom: 1px solid #bcded8;
-  background: #e8f5f2;
-  color: #125f57;
+  border-bottom: 1px solid var(--booked-deep);
+  background: var(--booked);
+  color: var(--white);
 }
 
 .booking-strip__pin {
@@ -1125,7 +1130,7 @@ p {
   flex: 0 0 30px;
   place-items: center;
   border-radius: 50%;
-  background: #cbe9e2;
+  background: rgba(255, 255, 255, 0.16);
 }
 
 .booking-strip__copy {
@@ -1145,7 +1150,7 @@ p {
 
 .booking-strip__copy small {
   margin-top: 2px;
-  color: #65827c;
+  color: #ccebe6;
   font-size: 0.57rem;
 }
 
@@ -1154,9 +1159,10 @@ p {
   align-items: center;
   gap: 4px;
   padding: 5px 7px;
-  border: 1px solid #abd5cd;
+  border: 1px solid rgba(255, 255, 255, 0.52);
   border-radius: 5px;
-  color: #176c5e;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--white);
   font-family: var(--display);
   font-size: 0.63rem;
   font-weight: 700;
@@ -1166,24 +1172,24 @@ p {
 }
 
 .booking-strip--pending {
-  border-bottom-color: #d8e4e8;
-  background: #f4f8f9;
-  color: #526b76;
+  border-bottom-color: #e3b642;
+  background: var(--pending-soft);
+  color: var(--pending-ink);
 }
 
 .booking-strip--pending .booking-strip__pin {
-  background: #e2ecef;
-  color: #5e7883;
+  background: #f8d876;
+  color: #704900;
 }
 
 .booking-strip--pending .booking-strip__copy small {
-  color: #879ba4;
+  color: #8a681f;
 }
 
 .booking-strip--pending .booking-strip__stamp {
-  border-color: #ccdce1;
-  background: rgba(255, 255, 255, 0.72);
-  color: #657d87;
+  border-color: #d3a32e;
+  background: rgba(255, 255, 255, 0.48);
+  color: #674300;
 }
 
 .court-lineup {

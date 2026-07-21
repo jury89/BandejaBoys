@@ -144,11 +144,11 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
       )}
 
       {phase !== 'booked' && (
-        <div className="booking-strip booking-strip--pending" aria-label="Prenotazione da segnare">
+        <div className="booking-strip booking-strip--pending" aria-label="Campo da prenotare">
           <span className="booking-strip__pin" aria-hidden="true"><CalendarCheck2 size={16} /></span>
           <span className="booking-strip__copy">
-            <strong>Prenotazione da segnare</strong>
-            <small>Il campo non è ancora confermato</small>
+            <strong>Campo da prenotare</strong>
+            <small>Prenotazione non ancora confermata</small>
           </span>
           <span className="booking-strip__stamp"><Clock3 size={13} /> In attesa</span>
         </div>

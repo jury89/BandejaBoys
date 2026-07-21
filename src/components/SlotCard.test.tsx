@@ -109,7 +109,7 @@ describe('azioni dello slot', () => {
     )
 
     expect(slot.signups).toHaveLength(1)
-    expect(screen.getByLabelText('Prenotazione da segnare')).toHaveTextContent('Il campo non è ancora confermato')
+    expect(screen.getByLabelText('Campo da prenotare')).toHaveTextContent('Prenotazione non ancora confermata')
     expect(screen.getByText(DEFAULT_VENUE)).toBeInTheDocument()
     expect(screen.getByText('Segna come prenotato')).toBeInTheDocument()
     fireEvent.click(
@@ -137,7 +137,7 @@ describe('azioni dello slot', () => {
       />,
     )
 
-    expect(screen.queryByLabelText('Prenotazione da segnare')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Campo da prenotare')).not.toBeInTheDocument()
     expect(screen.getByText('Prenotazione confermata da Jury')).toBeInTheDocument()
     expect(screen.getByText('Confermato')).toBeInTheDocument()
   })
