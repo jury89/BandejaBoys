@@ -1,0 +1,39 @@
+name: Keep scheduled workflows active
+
+on:
+  schedule:
+    - cron: '23 8 1 * *'
+  workflow_dispatch:
+
+concurrency:
+  group: scheduled-workflows-keepalive
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  heartbeat:
+    if: github.repository == 'jury89/BandejaBoys'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run check
+      - name: Refresh repository activity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          printf '%s\n' "$(date -u +'%Y-%m-%dT%H:%M:%SZ')" > .github/keepalive.txt
+          git add .github/keepalive.txt
+          git diff --cached --quiet && exit 0
+          git commit -m "chore: keep scheduled workflows active"
+          git pull --rebase origin "$GITHUB_REF_NAME"
+          git push origin "HEAD:$GITHUB_REF_NAME"

@@ -28,11 +28,13 @@ Il sito è disponibile su [bandeja-boys.web.app](https://bandeja-boys.web.app). 
 - Cloud Firestore per la sincronizzazione in tempo reale.
 - Firebase Hosting per SSL e sottodominio gratuito `web.app`.
 - Web Push standard per il recapito delle notifiche, senza servizi a pagamento.
-- GitHub Actions ogni 30 minuti per elaborare gli avvisi anche quando il sito è chiuso.
+- GitHub Actions ogni 10 minuti per elaborare gli avvisi anche quando il sito è chiuso.
 
 Il progetto usa solo servizi disponibili nel piano Spark, che non richiede un metodo di pagamento. Per un gruppo ristretto, le quote gratuite di Firestore e Hosting sono molto superiori al traffico previsto. Riferimenti: [piani Firebase](https://firebase.google.com/docs/projects/billing/firebase-pricing-plans) e [Firebase Hosting](https://firebase.google.com/docs/hosting/quickstart).
 
-Il workflow notifiche esegue 48 controlli al giorno. Su un runner Linux ogni esecuzione dura normalmente meno di un minuto, rimanendo entro i minuti mensili inclusi per i repository privati GitHub Free. Il workflow ha comunque un limite rigido di 5 minuti per evitare consumi anomali.
+Il repository GitHub è pubblico per utilizzare gratuitamente i runner standard senza consumare il monte minuti dei repository privati. Il sito resta ad accesso riservato: codice e configurazione Firebase pubblica non contengono password, dati degli utenti o chiavi private, mentre Firebase Authentication e le Security Rules proteggono i dati condivisi. Il workflow notifiche esegue 144 controlli al giorno e mantiene un limite rigido di 5 minuti per evitare esecuzioni anomale.
+
+GitHub può disattivare i workflow pianificati di un repository pubblico dopo 60 giorni senza attività. [`.github/workflows/keepalive.yml`](.github/workflows/keepalive.yml) esegue il controllo completo del progetto e aggiorna mensilmente `.github/keepalive.txt` con un commit automatico, mantenendo attivi i controlli. Può essere avviato manualmente per verificarne il funzionamento; se fosse già disattivato, va prima riabilitato dalla scheda Actions o tramite API GitHub.
 
 ## Avvio locale
 
@@ -76,7 +78,7 @@ Configurazione GitHub del repository:
 - secret `FIREBASE_NOTIFIER_EMAIL`;
 - secret `FIREBASE_NOTIFIER_PASSWORD`.
 
-Il workflow [`.github/workflows/notifications.yml`](.github/workflows/notifications.yml) parte ai minuti `07` e `37` di ogni ora. Un nuovo slot resta in attesa per 10 minuti dall’ultima aggiunta ravvicinata: così la creazione iniziale di cinque slot genera un solo avviso, mentre uno slot aggiunto il giorno seguente genera un nuovo avviso. Con la cadenza del workflow la consegna avviene normalmente tra 10 e 40 minuti dall’ultima aggiunta. L’avvio manuale senza parametri elabora la coda ordinaria; specificando `test_user_id` invia invece un’unica notifica ai dispositivi di quell’utente. Il campo facoltativo `test_message` permette di personalizzarne il testo fino a 240 caratteri; senza testo viene usato il messaggio di collaudo standard. Non inserire mai le chiavi private in file locali versionati o nei log.
+Il workflow [`.github/workflows/notifications.yml`](.github/workflows/notifications.yml) parte ogni 10 minuti, ai minuti `03`, `13`, `23`, `33`, `43` e `53` di ogni ora. Un nuovo slot resta in attesa per 10 minuti dall’ultima aggiunta ravvicinata: così la creazione iniziale di cinque slot genera un solo avviso, mentre uno slot aggiunto il giorno seguente genera un nuovo avviso. Con la cadenza del workflow la consegna avviene normalmente tra 10 e 20 minuti dall’ultima aggiunta. L’avvio manuale senza parametri elabora la coda ordinaria; specificando `test_user_id` invia invece un’unica notifica ai dispositivi di quell’utente. Il campo facoltativo `test_message` permette di personalizzarne il testo fino a 240 caratteri; senza testo viene usato il messaggio di collaudo standard. Non inserire mai le chiavi private in file locali versionati o nei log.
 
 Su Android e desktop l’attivazione avviene direttamente dal pannello mostrato al primo accesso. Su iPhone e iPad Web Push è disponibile per le web app aggiunte alla schermata Home: il sito mostra prima le istruzioni di installazione, poi richiede il permesso quando viene aperto dalla nuova icona.
 
