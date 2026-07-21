@@ -62,8 +62,8 @@ export function collectScheduledNotifications(
       notifications.push({
         id: `new-poll:${poll.id}:${poll.createdAt}`,
         kind: 'new-poll',
-        title: 'Nuovo sondaggio in campo',
-        body: `${poll.createdByName} ha pubblicato “${poll.title}”. Segna quando ci sei.`,
+        title: 'Sveglia fagianotto!',
+        body: `È uscito un nuovo sondaggio: “${poll.title}”, pubblicato da ${poll.createdByName}. Segna quando ci sei.`,
         url: `/?poll=${encodeURIComponent(poll.id)}`,
         tag: `new-poll-${poll.id}`,
         ttlSeconds: 24 * 60 * 60,
@@ -87,8 +87,8 @@ export function collectScheduledNotifications(
       notifications.push({
         id: `${kind}:${poll.id}:${slot.id}:${slot.startsAt}`,
         kind,
-        title: isTwoHourReminder ? 'Padel tra 2 ore' : 'Padel domani',
-        body: `${formatSession(slot.startsAt)} · ${DEFAULT_VENUE}. Sei tra i titolari.`,
+        title: 'Sveglia fagianotto!',
+        body: `${isTwoHourReminder ? 'Guarda che tra 2 ore giochi' : 'Guarda che domani giochi'}: ${formatSession(slot.startsAt)} · ${DEFAULT_VENUE}.`,
         url: `/?poll=${encodeURIComponent(poll.id)}`,
         tag: `${timing}-${poll.id}-${slot.id}`,
         ttlSeconds: Math.max(60, Math.floor(remaining / 1000)),

@@ -43,6 +43,8 @@ Il workflow GitHub legge lo stato corrente ogni 30 minuti e genera eventi idempo
 - **Reminder 24h**: quando una partita prenotata entra nella finestra delle 24 ore, soltanto ai primi quattro iscritti in quel momento; l’archiviazione del sondaggio non disattiva il promemoria.
 - **Reminder 2h**: quando la stessa partita entra nella finestra delle 2 ore, ricalcolando nuovamente i quattro titolari anche se il sondaggio è già archiviato.
 
+I tre avvisi ordinari condividono il titolo informale **“Sveglia fagianotto!”**. Il corpo specifica rispettivamente che è uscito un nuovo sondaggio, che il titolare gioca domani oppure che gioca tra due ore; i reminder conservano sempre giorno, ora e circolo.
+
 Ritiri, promozioni dalla riserva, sostituzioni, annullamenti e cambi di orario non richiedono una coda da correggere: i destinatari vengono sempre derivati dal documento più recente. L’identità dell’evento include data e ora, perciò uno slot spostato genera i reminder per il nuovo orario. `notificationDeliveries/{deliveryId}` registra ogni coppia evento/dispositivo e impedisce duplicati tra esecuzioni successive.
 
 L’elaborazione parte ai minuti `07` e `37`; normalmente l’avviso arriva nella prima esecuzione dopo il superamento della soglia, quindi entro circa 30 minuti. GitHub documenta che i workflow pianificati possono subire ritardi occasionali: in tal caso il reminder 24h resta valido fino all’ingresso nella finestra 2h, mentre quello 2h resta valido fino all’inizio della partita.

@@ -18,7 +18,7 @@ Il sito è disponibile su [bandeja-boys.web.app](https://bandeja-boys.web.app). 
 - Filtro della bacheca sempre disponibile sotto l’header: **Tutti** mostra gli slot dei sondaggi aperti e archiviati, mentre **Slot prenotati** raccoglie soltanto le partite con campo confermato.
 - Autore della conferma e archivio dei sondaggi chiusi.
 - Aggiornamenti in tempo reale su tutti i dispositivi quando Firebase è configurato.
-- Notifiche Web Push opzionali per nuovi sondaggi e, per chi è tra i quattro titolari, reminder a 24 ore e 2 ore dalla partita anche quando il sondaggio è già archiviato.
+- Notifiche Web Push opzionali dal tono informale **“Sveglia fagianotto!”** per nuovi sondaggi e, per chi è tra i quattro titolari, reminder a 24 ore e 2 ore dalla partita anche quando il sondaggio è già archiviato.
 - Installazione come web app su Android, iPhone, iPad e desktop tramite manifest PWA.
 
 ## Stack e costo

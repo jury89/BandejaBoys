@@ -56,7 +56,8 @@ describe('pianificazione notifiche', () => {
       kind: 'new-poll',
       recipientUserIds: null,
       excludedUserIds: ['jury'],
-      title: 'Nuovo sondaggio in campo',
+      title: 'Sveglia fagianotto!',
+      body: 'È uscito un nuovo sondaggio: “Padel · prossima settimana”, pubblicato da Jury. Segna quando ci sei.',
     })
   })
 
@@ -75,8 +76,9 @@ describe('pianificazione notifiche', () => {
     expect(notifications[0]).toMatchObject({
       kind: 'reminder-24h',
       recipientUserIds: ['a', 'b', 'c', 'd'],
-      title: 'Padel domani',
+      title: 'Sveglia fagianotto!',
     })
+    expect(notifications[0].body).toContain('Guarda che domani giochi')
     expect(notifications[0].body).toContain('Oasi Boschetto')
   })
 
@@ -94,7 +96,8 @@ describe('pianificazione notifiche', () => {
 
     expect(notifications).toHaveLength(1)
     expect(notifications[0].kind).toBe('reminder-2h')
-    expect(notifications[0].title).toBe('Padel tra 2 ore')
+    expect(notifications[0].title).toBe('Sveglia fagianotto!')
+    expect(notifications[0].body).toContain('Guarda che tra 2 ore giochi')
   })
 
   it('crea una nuova identità del reminder quando lo slot viene spostato', () => {
