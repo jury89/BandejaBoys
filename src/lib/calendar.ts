@@ -2,21 +2,20 @@ import { DEFAULT_VENUE, getSlotPhase } from './domain'
 import type { PadelPoll, PadelSlot } from '../types'
 
 const CALENDAR_TIME_ZONE = 'Europe/Rome'
+const APP_URL = 'https://bandeja-boys.web.app'
 
-function pad(value: number) {
-  return String(value).padStart(2, '0')
+function normalizeLocalDateTime(value: string) {
+  return `${value.slice(0, 16)}:00`
 }
 
-function formatLocalCalendarDate(date: Date) {
-  return [
-    date.getFullYear(),
-    pad(date.getMonth() + 1),
-    pad(date.getDate()),
-    'T',
-    pad(date.getHours()),
-    pad(date.getMinutes()),
-    '00',
-  ].join('')
+function addMinutesToLocalDateTime(value: string, minutes: number) {
+  const date = new Date(`${normalizeLocalDateTime(value)}Z`)
+  date.setUTCMinutes(date.getUTCMinutes() + minutes)
+  return date.toISOString().slice(0, 19)
+}
+
+function formatLocalCalendarDate(value: string) {
+  return value.replace(/[-:]/g, '')
 }
 
 function formatUtcCalendarDate(timestamp: number) {
@@ -31,14 +30,29 @@ function escapeCalendarText(value: string) {
     .replace(/;/g, '\\;')
 }
 
-export function buildSlotCalendar(poll: PadelPoll, slot: PadelSlot, now = Date.now()) {
-  const startsAt = new Date(slot.startsAt)
-  const endsAt = new Date(startsAt)
-  endsAt.setMinutes(endsAt.getMinutes() + slot.durationMinutes)
-  const confirmed = getSlotPhase(slot) === 'booked'
-  const description = confirmed
+function calendarTitle(poll: PadelPoll) {
+  const title = poll.title.trim()
+  return /^padel\b/i.test(title) ? title : `Padel · ${title}`
+}
+
+function calendarDescription(slot: PadelSlot) {
+  return getSlotPhase(slot) === 'booked'
     ? 'Campo prenotato. Ritrovo per la partita di padel dei Bandeja Boys.'
     : 'Orario indicativo: verrà confermato quando il campo sarà prenotato.'
+}
+
+function calendarEventData(poll: PadelPoll, slot: PadelSlot) {
+  return {
+    title: calendarTitle(poll),
+    description: calendarDescription(slot),
+    startsAt: normalizeLocalDateTime(slot.startsAt),
+    endsAt: addMinutesToLocalDateTime(slot.startsAt, slot.durationMinutes),
+  }
+}
+
+export function buildSlotCalendar(poll: PadelPoll, slot: PadelSlot, now = Date.now()) {
+  const event = calendarEventData(poll, slot)
+  const confirmed = getSlotPhase(slot) === 'booked'
 
   return [
     'BEGIN:VCALENDAR',
@@ -49,17 +63,46 @@ export function buildSlotCalendar(poll: PadelPoll, slot: PadelSlot, now = Date.n
     'BEGIN:VEVENT',
     `UID:${escapeCalendarText(`${poll.id}-${slot.id}@bandeja-boys.web.app`)}`,
     `DTSTAMP:${formatUtcCalendarDate(now)}`,
-    `DTSTART;TZID=${CALENDAR_TIME_ZONE}:${formatLocalCalendarDate(startsAt)}`,
-    `DTEND;TZID=${CALENDAR_TIME_ZONE}:${formatLocalCalendarDate(endsAt)}`,
-    `SUMMARY:${escapeCalendarText(`Padel · ${poll.title}`)}`,
+    `DTSTART;TZID=${CALENDAR_TIME_ZONE}:${formatLocalCalendarDate(event.startsAt)}`,
+    `DTEND;TZID=${CALENDAR_TIME_ZONE}:${formatLocalCalendarDate(event.endsAt)}`,
+    `SUMMARY:${escapeCalendarText(event.title)}`,
     `LOCATION:${escapeCalendarText(DEFAULT_VENUE)}`,
-    `DESCRIPTION:${escapeCalendarText(description)}`,
+    `DESCRIPTION:${escapeCalendarText(event.description)}`,
     `STATUS:${confirmed ? 'CONFIRMED' : 'TENTATIVE'}`,
-    'URL:https://bandeja-boys.web.app',
+    `URL:${APP_URL}`,
     'END:VEVENT',
     'END:VCALENDAR',
     '',
   ].join('\r\n')
+}
+
+export function buildGoogleCalendarUrl(poll: PadelPoll, slot: PadelSlot) {
+  const event = calendarEventData(poll, slot)
+  const params = new URLSearchParams({
+    action: 'TEMPLATE',
+    text: event.title,
+    dates: `${formatLocalCalendarDate(event.startsAt)}/${formatLocalCalendarDate(event.endsAt)}`,
+    details: `${event.description}\n\n${APP_URL}`,
+    location: DEFAULT_VENUE,
+    ctz: CALENDAR_TIME_ZONE,
+  })
+
+  return `https://calendar.google.com/calendar/render?${params.toString()}`
+}
+
+export function buildOutlookCalendarUrl(poll: PadelPoll, slot: PadelSlot) {
+  const event = calendarEventData(poll, slot)
+  const params = new URLSearchParams({
+    path: '/calendar/action/compose',
+    rru: 'addevent',
+    subject: event.title,
+    startdt: event.startsAt,
+    enddt: event.endsAt,
+    body: `${event.description}\n\n${APP_URL}`,
+    location: DEFAULT_VENUE,
+  })
+
+  return `https://outlook.office.com/calendar/0/deeplink/compose?${params.toString()}`
 }
 
 export function slotCalendarFileName(slot: PadelSlot) {

@@ -24,9 +24,9 @@ import {
   MAX_STARTERS,
 } from '../lib/domain'
 import { slotDateParts } from '../lib/format'
-import { downloadSlotCalendar } from '../lib/calendar'
 import { resolveMemberName } from '../lib/memberNames'
 import { repository } from '../lib/repository'
+import { CalendarExportModal } from './CalendarExportModal'
 import { EditSlotModal } from './EditSlotModal'
 import { SubstitutionModal } from './SubstitutionModal'
 
@@ -49,6 +49,7 @@ const phaseCopy = {
 
 export function SlotCard({ poll, slot, user, members, disabled, onPollChange, onNotify, onError }: SlotCardProps) {
   const substitutionTooltipId = useId()
+  const [calendarOpen, setCalendarOpen] = useState(false)
   const [scheduleOpen, setScheduleOpen] = useState(false)
   const [substitutionOpen, setSubstitutionOpen] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -116,11 +117,6 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
     `Campo prenotato all’Oasi Boschetto. L’orario è confermato.`,
   )
 
-  const addToCalendar = () => {
-    downloadSlotCalendar(poll, slot)
-    onNotify('File calendario pronto: aprilo per aggiungere la partita.')
-  }
-
   return (
     <article className={`slot-card slot-card--${phase}`}>
       <header className="slot-card__header">
@@ -146,7 +142,7 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
             <button
               className="slot-card__icon-action slot-card__icon-action--calendar"
               type="button"
-              onClick={addToCalendar}
+              onClick={() => setCalendarOpen(true)}
               title="Aggiungi al calendario"
               aria-label={`Aggiungi lo slot di ${date.full} alle ${date.time} al calendario`}
             >
@@ -333,6 +329,14 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
         )}
       </footer>
 
+      {calendarOpen && (
+        <CalendarExportModal
+          poll={poll}
+          slot={slot}
+          onClose={() => setCalendarOpen(false)}
+          onDone={onNotify}
+        />
+      )}
       {scheduleOpen && (
         <EditSlotModal
           slot={slot}

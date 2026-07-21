@@ -1970,6 +1970,112 @@ p {
   border-top: 1px solid #e2eaee;
 }
 
+.calendar-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.calendar-picker__options {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.calendar-provider {
+  --provider: var(--court);
+  --provider-soft: #edf7fa;
+  position: relative;
+  display: grid;
+  width: 100%;
+  min-height: 76px;
+  overflow: hidden;
+  align-items: center;
+  padding: 12px 14px 12px 17px;
+  border: 1px solid #d7e3e8;
+  border-radius: 12px;
+  grid-template-columns: 43px minmax(0, 1fr) auto;
+  gap: 12px;
+  background: #fbfdfe;
+  color: var(--ink);
+  cursor: pointer;
+  text-align: left;
+  transition: 150ms ease;
+  transition-property: border-color, background, transform, box-shadow;
+}
+
+.calendar-provider::before {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 4px;
+  background: var(--provider);
+  content: '';
+}
+
+.calendar-provider:hover,
+.calendar-provider:focus-visible {
+  border-color: color-mix(in srgb, var(--provider) 52%, #d7e3e8);
+  background: var(--provider-soft);
+  box-shadow: 0 9px 24px color-mix(in srgb, var(--provider) 12%, transparent);
+  transform: translateY(-1px);
+}
+
+.calendar-provider--apple {
+  --provider: #25343b;
+  --provider-soft: #f1f5f6;
+}
+
+.calendar-provider--google {
+  --provider: #1a73e8;
+  --provider-soft: #eef5ff;
+}
+
+.calendar-provider--outlook {
+  --provider: #0078d4;
+  --provider-soft: #ebf7ff;
+}
+
+.calendar-provider__mark {
+  display: inline-grid;
+  width: 43px;
+  height: 43px;
+  place-items: center;
+  border-radius: 10px;
+  background: var(--provider);
+  color: #fff;
+}
+
+.calendar-provider__letter {
+  font-family: var(--display);
+  font-size: 1.55rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.calendar-provider__copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.calendar-provider__copy strong {
+  font-size: 0.9rem;
+  font-weight: 900;
+}
+
+.calendar-provider__copy small {
+  color: var(--muted);
+  font-size: 0.68rem;
+  line-height: 1.35;
+}
+
+.calendar-provider__action {
+  color: var(--provider);
+}
+
 .poll-form {
   display: flex;
   width: 100%;
