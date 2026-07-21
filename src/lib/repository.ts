@@ -7,10 +7,15 @@ import {
   orderBy,
   query,
   runTransaction,
+  where,
   type Unsubscribe,
 } from 'firebase/firestore'
 import type {
   CreatePollInput,
+  MatchRatingPrompt,
+  MatchRatingRecord,
+  MatchRatingResponse,
+  MatchRatingSubmission,
   MemberProfile,
   PadelPoll,
   PollStatus,
@@ -35,6 +40,11 @@ import { firestore, hasRemoteBackend } from './firebase'
 export interface PadelRepository {
   subscribePolls(listener: (polls: PadelPoll[]) => void, onError: (error: Error) => void): Unsubscribe
   subscribeMembers(listener: (members: MemberProfile[]) => void, onError: (error: Error) => void): Unsubscribe
+  subscribeMatchRatingResponses(
+    reviewerId: string,
+    listener: (responses: MatchRatingResponse[]) => void,
+    onError: (error: Error) => void,
+  ): Unsubscribe
   createPoll(input: CreatePollInput, creator: SessionUser): Promise<void>
   addSlot(pollId: string, input: SlotInput, creator: SessionUser): Promise<PadelPoll>
   joinSlot(pollId: string, slotId: string, member: SessionUser, role: SignupRole): Promise<PadelPoll>
@@ -58,6 +68,63 @@ export interface PadelRepository {
   ): Promise<PadelPoll>
   setPollStatus(pollId: string, status: PollStatus): Promise<PadelPoll>
   deletePoll(pollId: string): Promise<void>
+  dismissMatchRatingPrompt(prompt: MatchRatingPrompt): Promise<MatchRatingResponse>
+  submitMatchRatings(
+    prompt: MatchRatingPrompt,
+    reviewer: SessionUser,
+    submissions: MatchRatingSubmission[],
+  ): Promise<MatchRatingResponse>
+}
+
+function makeRatingResponse(
+  prompt: MatchRatingPrompt,
+  status: MatchRatingResponse['status'],
+  closedAt = Date.now(),
+): MatchRatingResponse {
+  return {
+    id: prompt.id,
+    pollId: prompt.pollId,
+    slotId: prompt.slotId,
+    reviewerId: prompt.reviewerId,
+    status,
+    closedAt,
+  }
+}
+
+function makeRatingRecords(
+  prompt: MatchRatingPrompt,
+  reviewer: SessionUser,
+  submissions: MatchRatingSubmission[],
+  createdAt = Date.now(),
+): MatchRatingRecord[] {
+  const expectedTeammates = new Set(prompt.teammates.map((teammate) => teammate.userId))
+  const submittedTeammates = new Set(submissions.map((submission) => submission.userId))
+  const isComplete = submissions.length === 3
+    && expectedTeammates.size === 3
+    && submittedTeammates.size === 3
+    && [...submittedTeammates].every((userId) => expectedTeammates.has(userId))
+  const scoresAreValid = submissions.every((submission) => (
+    Number.isInteger(submission.score) && submission.score >= 1 && submission.score <= 10
+  ))
+  if (!isComplete || !scoresAreValid || prompt.reviewerId !== reviewer.id) {
+    throw new Error('Assegna un voto da 1 a 10 a tutti e tre i compagni.')
+  }
+
+  return submissions.map((submission) => ({
+    id: `${prompt.id}__${submission.userId}`,
+    responseId: prompt.id,
+    pollId: prompt.pollId,
+    pollTitle: prompt.pollTitle,
+    slotId: prompt.slotId,
+    sessionStartsAt: prompt.sessionStartsAt,
+    sessionEndedAt: prompt.sessionEndedAt,
+    reviewerId: reviewer.id,
+    reviewerName: reviewer.displayName,
+    revieweeId: submission.userId,
+    revieweeName: submission.displayName,
+    score: submission.score,
+    createdAt,
+  }))
 }
 
 function remoteRepository(): PadelRepository {
@@ -96,6 +163,16 @@ function remoteRepository(): PadelRepository {
         onError,
       )
     },
+    subscribeMatchRatingResponses(reviewerId, listener, onError) {
+      return onSnapshot(
+        query(collection(db, 'matchRatingResponses'), where('reviewerId', '==', reviewerId)),
+        (snapshot) => listener(snapshot.docs.map((item) => ({
+          id: item.id,
+          ...item.data(),
+        }) as MatchRatingResponse)),
+        onError,
+      )
+    },
     async createPoll(input, creator) {
       await addDoc(collection(db, 'polls'), makePoll(input, creator))
     },
@@ -130,11 +207,42 @@ function remoteRepository(): PadelRepository {
     async deletePoll(pollId) {
       await deleteDoc(doc(db, 'polls', pollId))
     },
+    async dismissMatchRatingPrompt(prompt) {
+      const reference = doc(db, 'matchRatingResponses', prompt.id)
+      return runTransaction(db, async (transaction) => {
+        const snapshot = await transaction.get(reference)
+        if (snapshot.exists()) return { id: snapshot.id, ...snapshot.data() } as MatchRatingResponse
+        const response = makeRatingResponse(prompt, 'dismissed')
+        transaction.set(reference, response)
+        return response
+      })
+    },
+    async submitMatchRatings(prompt, reviewer, submissions) {
+      const records = makeRatingRecords(prompt, reviewer, submissions)
+      const responseReference = doc(db, 'matchRatingResponses', prompt.id)
+      return runTransaction(db, async (transaction) => {
+        const snapshot = await transaction.get(responseReference)
+        if (snapshot.exists()) throw new Error('Questa scheda è già stata chiusa.')
+        const response = makeRatingResponse(prompt, 'submitted', records[0].createdAt)
+        records.forEach((record) => {
+          transaction.set(doc(db, 'matchRatings', record.id), record)
+        })
+        transaction.set(responseReference, response)
+        return response
+      })
+    },
   }
 }
 
 const LOCAL_POLLS_KEY = 'bandeja-boys:polls'
 const POLLS_EVENT = 'bandeja-boys:polls-changed'
+const LOCAL_MATCH_RATINGS_KEY = 'bandeja-boys:match-ratings'
+const MATCH_RATINGS_EVENT = 'bandeja-boys:match-ratings-changed'
+
+interface LocalMatchRatingStore {
+  responses: MatchRatingResponse[]
+  ratings: MatchRatingRecord[]
+}
 
 const demoMembers: MemberProfile[] = [
   { id: 'demo-luca', displayName: 'Luca', email: 'luca@example.test', createdAt: 1 },
@@ -205,6 +313,21 @@ function writeLocalPolls(polls: PadelPoll[]) {
   window.dispatchEvent(new Event(POLLS_EVENT))
 }
 
+function readLocalMatchRatingStore(): LocalMatchRatingStore {
+  try {
+    const stored = localStorage.getItem(LOCAL_MATCH_RATINGS_KEY)
+    if (stored) return JSON.parse(stored) as LocalMatchRatingStore
+  } catch {
+    // Malformed demo data must not block the rating prompt.
+  }
+  return { responses: [], ratings: [] }
+}
+
+function writeLocalMatchRatingStore(store: LocalMatchRatingStore) {
+  localStorage.setItem(LOCAL_MATCH_RATINGS_KEY, JSON.stringify(store))
+  window.dispatchEvent(new Event(MATCH_RATINGS_EVENT))
+}
+
 function localRepository(): PadelRepository {
   const mutate = async (pollId: string, updater: (poll: PadelPoll) => PadelPoll) => {
     const polls = readLocalPolls()
@@ -231,6 +354,14 @@ function localRepository(): PadelRepository {
       window.addEventListener(USERS_EVENT, notify)
       notify()
       return () => window.removeEventListener(USERS_EVENT, notify)
+    },
+    subscribeMatchRatingResponses(reviewerId, listener) {
+      const notify = () => listener(
+        readLocalMatchRatingStore().responses.filter((response) => response.reviewerId === reviewerId),
+      )
+      window.addEventListener(MATCH_RATINGS_EVENT, notify)
+      notify()
+      return () => window.removeEventListener(MATCH_RATINGS_EVENT, notify)
     },
     async createPoll(input, creator) {
       const poll = makePoll(input, creator)
@@ -266,6 +397,27 @@ function localRepository(): PadelRepository {
     },
     async deletePoll(pollId) {
       writeLocalPolls(readLocalPolls().filter((poll) => poll.id !== pollId))
+    },
+    async dismissMatchRatingPrompt(prompt) {
+      const store = readLocalMatchRatingStore()
+      const existing = store.responses.find((response) => response.id === prompt.id)
+      if (existing) return existing
+      const response = makeRatingResponse(prompt, 'dismissed')
+      writeLocalMatchRatingStore({ ...store, responses: [...store.responses, response] })
+      return response
+    },
+    async submitMatchRatings(prompt, reviewer, submissions) {
+      const store = readLocalMatchRatingStore()
+      if (store.responses.some((response) => response.id === prompt.id)) {
+        throw new Error('Questa scheda è già stata chiusa.')
+      }
+      const records = makeRatingRecords(prompt, reviewer, submissions)
+      const response = makeRatingResponse(prompt, 'submitted', records[0].createdAt)
+      writeLocalMatchRatingStore({
+        responses: [...store.responses, response],
+        ratings: [...store.ratings, ...records],
+      })
+      return response
     },
   }
 }

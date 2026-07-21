@@ -1,5 +1,7 @@
 import type {
   CreatePollInput,
+  MatchRatingPrompt,
+  MatchRatingResponse,
   MemberProfile,
   PadelPoll,
   PadelSlot,
@@ -14,6 +16,56 @@ export const MAX_STARTERS = 4
 export const MAX_SLOTS = 14
 export const DEFAULT_VENUE = 'Oasi Boschetto'
 export const PROFILE_NAME_MAX_LENGTH = 40
+export const MATCH_RATING_DELAY_MS = 10 * 60 * 1000
+
+const LOCAL_DATE_TIME_PATTERN = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,3}))?)?$/
+const romeDateTimeFormatter = new Intl.DateTimeFormat('en-GB', {
+  timeZone: 'Europe/Rome',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit',
+  hourCycle: 'h23',
+})
+
+export function padelDateTimeToTimestamp(value: string): number {
+  const match = LOCAL_DATE_TIME_PATTERN.exec(value)
+  if (!match) return new Date(value).getTime()
+
+  const [, year, month, day, hour, minute, second = '0', milliseconds = '0'] = match
+  const wallClock = Date.UTC(
+    Number(year),
+    Number(month) - 1,
+    Number(day),
+    Number(hour),
+    Number(minute),
+    Number(second),
+    Number(milliseconds.padEnd(3, '0')),
+  )
+  let candidate = wallClock
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const parts = Object.fromEntries(
+      romeDateTimeFormatter.formatToParts(new Date(candidate)).map((part) => [part.type, part.value]),
+    )
+    const representedWallClock = Date.UTC(
+      Number(parts.year),
+      Number(parts.month) - 1,
+      Number(parts.day),
+      Number(parts.hour),
+      Number(parts.minute),
+      Number(parts.second),
+      Number(milliseconds.padEnd(3, '0')),
+    )
+    const correction = wallClock - representedWallClock
+    candidate += correction
+    if (correction === 0) break
+  }
+
+  return candidate
+}
 
 export function profileNameError(displayName: string): string | null {
   const cleanName = displayName.trim()
@@ -42,6 +94,79 @@ export function getStarters(slot: PadelSlot): Signup[] {
     .slice(0, MAX_STARTERS)
 }
 
+export function getMatchRatingResponseId(pollId: string, slotId: string, reviewerId: string): string {
+  return [pollId, slotId, reviewerId].join('__')
+}
+
+export function getMatchRatingDueAt(slot: PadelSlot): number {
+  const startsAt = padelDateTimeToTimestamp(slot.startsAt)
+  if (!Number.isFinite(startsAt) || !Number.isFinite(slot.durationMinutes)) return Number.NaN
+  return startsAt + slot.durationMinutes * 60 * 1000 + MATCH_RATING_DELAY_MS
+}
+
+function getRatingPromptForSlot(
+  poll: PadelPoll,
+  slot: PadelSlot,
+  reviewerId: string,
+): MatchRatingPrompt | null {
+  if (!slot.bookedAt) return null
+  const starters = getStarters(slot)
+  if (starters.length !== MAX_STARTERS || !starters.some((signup) => signup.userId === reviewerId)) {
+    return null
+  }
+
+  const dueAt = getMatchRatingDueAt(slot)
+  if (!Number.isFinite(dueAt)) return null
+
+  return {
+    id: getMatchRatingResponseId(poll.id, slot.id, reviewerId),
+    pollId: poll.id,
+    pollTitle: poll.title,
+    slotId: slot.id,
+    sessionStartsAt: slot.startsAt,
+    sessionEndedAt: dueAt - MATCH_RATING_DELAY_MS,
+    dueAt,
+    reviewerId,
+    teammates: starters
+      .filter((signup) => signup.userId !== reviewerId)
+      .map((signup) => ({ userId: signup.userId, displayName: signup.displayName })),
+  }
+}
+
+export function getPendingMatchRatingPrompts(
+  polls: PadelPoll[],
+  responses: MatchRatingResponse[],
+  reviewerId: string,
+  now = Date.now(),
+): MatchRatingPrompt[] {
+  const closedPromptIds = new Set(responses.map((response) => response.id))
+
+  return polls
+    .flatMap((poll) => poll.slots.map((slot) => getRatingPromptForSlot(poll, slot, reviewerId)))
+    .filter((prompt): prompt is MatchRatingPrompt => (
+      prompt !== null && prompt.dueAt <= now && !closedPromptIds.has(prompt.id)
+    ))
+    .sort((left, right) => left.dueAt - right.dueAt || left.id.localeCompare(right.id))
+}
+
+export function getNextMatchRatingPromptAt(
+  polls: PadelPoll[],
+  responses: MatchRatingResponse[],
+  reviewerId: string,
+  now = Date.now(),
+): number | null {
+  const closedPromptIds = new Set(responses.map((response) => response.id))
+  const nextDueAt = polls
+    .flatMap((poll) => poll.slots.map((slot) => getRatingPromptForSlot(poll, slot, reviewerId)))
+    .filter((prompt): prompt is MatchRatingPrompt => (
+      prompt !== null && prompt.dueAt > now && !closedPromptIds.has(prompt.id)
+    ))
+    .map((prompt) => prompt.dueAt)
+    .sort((left, right) => left - right)[0]
+
+  return nextDueAt ?? null
+}
+
 export function getReserves(slot: PadelSlot): Signup[] {
   const starterIds = new Set(getStarters(slot).map((signup) => signup.id))
   return sortSignups(slot.signups).filter((signup) => !starterIds.has(signup.id))
@@ -66,7 +191,7 @@ export function getUpcomingPolls(polls: PadelPoll[], now = Date.now()): PadelPol
       ...poll,
       slots: poll.slots
         .filter((slot) => {
-          const startsAt = new Date(slot.startsAt).getTime()
+          const startsAt = padelDateTimeToTimestamp(slot.startsAt)
           return Number.isFinite(startsAt) && startsAt > now
         })
         .sort((left, right) => left.startsAt.localeCompare(right.startsAt)),

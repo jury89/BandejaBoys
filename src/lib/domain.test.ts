@@ -2,12 +2,16 @@ import {
   DEFAULT_VENUE,
   addSlotToPoll,
   addSignup,
+  getMatchRatingResponseId,
+  getNextMatchRatingPromptAt,
+  getPendingMatchRatingPrompts,
   getReserves,
   getSlotPhase,
   getStarters,
   getUpcomingPolls,
   makePoll,
   nextMondayDate,
+  padelDateTimeToTimestamp,
   profileNameError,
   removeSignup,
   removeSlotFromPoll,
@@ -180,6 +184,74 @@ describe('ordine e visibilità dei sondaggi', () => {
     expect(result).toHaveLength(1)
     expect(result[0].slots.map((item) => item.id)).toEqual(['future'])
     expect(current.slots).toHaveLength(3)
+  })
+})
+
+describe('voti di fine partita', () => {
+  const ratingPoll = (): PadelPoll => ({
+    id: 'poll-rating',
+    title: 'Padel del martedì',
+    targetWeekStart: '2026-07-27',
+    createdBy: 'jury',
+    createdByName: 'Jury',
+    createdAt: 1,
+    updatedAt: 1,
+    status: 'closed',
+    slots: [{
+      ...slot(['jury', 'ale', 'luca', 'teo'].map((id, index) => signup(id, index))),
+      id: 'slot-rating',
+      startsAt: '2026-07-28T09:00',
+      durationMinutes: 90,
+      venue: DEFAULT_VENUE,
+      bookedAt: 1,
+    }],
+  })
+
+  it('interpreta gli orari senza offset come ora italiana anche nel processo notifiche', () => {
+    expect(padelDateTimeToTimestamp('2026-07-28T09:00'))
+      .toBe(Date.parse('2026-07-28T07:00:00.000Z'))
+    expect(padelDateTimeToTimestamp('2026-12-15T09:00'))
+      .toBe(Date.parse('2026-12-15T08:00:00.000Z'))
+    expect(padelDateTimeToTimestamp('2026-07-28T09:00:00.000Z'))
+      .toBe(Date.parse('2026-07-28T09:00:00.000Z'))
+  })
+
+  it('propone i tre compagni solo dieci minuti dopo la fine di un campo prenotato', () => {
+    const polls = [ratingPoll()]
+    const dueAt = Date.parse('2026-07-28T08:40:00.000Z')
+
+    expect(getPendingMatchRatingPrompts(polls, [], 'jury', dueAt - 1)).toHaveLength(0)
+    expect(getNextMatchRatingPromptAt(polls, [], 'jury', dueAt - 1)).toBe(dueAt)
+
+    const prompts = getPendingMatchRatingPrompts(polls, [], 'jury', dueAt)
+    expect(prompts).toHaveLength(1)
+    expect(prompts[0]).toMatchObject({
+      id: 'poll-rating__slot-rating__jury',
+      reviewerId: 'jury',
+      sessionEndedAt: Date.parse('2026-07-28T08:30:00.000Z'),
+      dueAt,
+    })
+    expect(prompts[0].teammates.map((teammate) => teammate.userId)).toEqual(['ale', 'luca', 'teo'])
+  })
+
+  it('non ripropone una scheda già chiusa e ignora riserve o formazioni incomplete', () => {
+    const current = ratingPoll()
+    const dueAt = Date.parse('2026-07-28T08:40:00.000Z')
+    const responseId = getMatchRatingResponseId(current.id, current.slots[0].id, 'jury')
+
+    expect(getPendingMatchRatingPrompts([current], [{
+      id: responseId,
+      pollId: current.id,
+      slotId: current.slots[0].id,
+      reviewerId: 'jury',
+      status: 'dismissed',
+      closedAt: dueAt,
+    }], 'jury', dueAt)).toHaveLength(0)
+    expect(getPendingMatchRatingPrompts([current], [], 'reserve', dueAt)).toHaveLength(0)
+    expect(getPendingMatchRatingPrompts([{
+      ...current,
+      slots: [{ ...current.slots[0], signups: current.slots[0].signups.slice(0, 3) }],
+    }], [], 'jury', dueAt)).toHaveLength(0)
   })
 })
 

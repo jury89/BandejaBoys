@@ -13,7 +13,7 @@ import {
   terminate,
 } from 'firebase/firestore'
 import webpush, { type PushSubscription } from 'web-push'
-import type { PadelPoll } from '../src/types'
+import type { MatchRatingResponse, PadelPoll } from '../src/types'
 import { collectScheduledNotifications, createTestNotification } from '../src/lib/notificationSchedule'
 
 interface StoredPushSubscription extends PushSubscription {
@@ -42,9 +42,10 @@ await signInWithEmailAndPassword(getAuth(app), notifierEmail, notifierPassword)
 const db = getFirestore(app)
 webpush.setVapidDetails(origin, publicKey, privateKey)
 
-const [pollSnapshot, subscriptionSnapshot] = await Promise.all([
+const [pollSnapshot, subscriptionSnapshot, ratingResponseSnapshot] = await Promise.all([
   getDocs(collection(db, 'polls')),
   getDocs(collection(db, 'pushSubscriptions')),
+  getDocs(collection(db, 'matchRatingResponses')),
 ])
 
 const polls = pollSnapshot.docs.map((item) => ({ id: item.id, ...item.data() }) as PadelPoll)
@@ -53,9 +54,13 @@ const subscriptions = subscriptionSnapshot.docs.map((item) => ({
   reference: item.ref,
   data: item.data() as StoredPushSubscription,
 }))
+const ratingResponses = ratingResponseSnapshot.docs.map((item) => ({
+  id: item.id,
+  ...item.data(),
+}) as MatchRatingResponse)
 const notifications = testUserId
   ? [createTestNotification(testUserId, testNotificationId || String(Date.now()), testNotificationMessage)]
-  : collectScheduledNotifications(polls)
+  : collectScheduledNotifications(polls, Date.now(), ratingResponses)
 
 let sent = 0
 let skipped = 0
@@ -89,7 +94,9 @@ for (const notification of notifications) {
         tag: notification.tag,
       }), {
         TTL: notification.ttlSeconds,
-        urgency: notification.kind === 'reminder-2h' ? 'high' : 'normal',
+        urgency: notification.kind === 'reminder-2h' || notification.kind === 'match-rating'
+          ? 'high'
+          : 'normal',
       })
       await setDoc(deliveryReference, {
         eventId: notification.id,

@@ -1,14 +1,22 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Bell, BellRing, CalendarCheck2, CalendarDays, CalendarPlus, CheckCircle2, ChevronDown, CircleUserRound, LogOut, UsersRound } from 'lucide-react'
 import { useAuth } from '../AuthContext'
-import type { MemberProfile, PadelPoll } from '../types'
-import { getSlotPhase, getUpcomingPolls } from '../lib/domain'
+import type { MatchRatingResponse, MatchRatingSubmission, MemberProfile, PadelPoll } from '../types'
+import {
+  getNextMatchRatingPromptAt,
+  getPendingMatchRatingPrompts,
+  getSlotPhase,
+  getUpcomingPolls,
+  padelDateTimeToTimestamp,
+} from '../lib/domain'
 import { firstName, slotDateParts } from '../lib/format'
 import { hasRemoteBackend } from '../lib/firebase'
+import { resolveMemberName } from '../lib/memberNames'
 import { notificationStateLabel, usePushNotifications } from '../lib/notifications'
 import { repository } from '../lib/repository'
 import { Brand } from './Brand'
 import { CreatePollModal } from './CreatePollModal'
+import { MatchRatingModal } from './MatchRatingModal'
 import { NotificationCallup } from './NotificationCallup'
 import { PollCard } from './PollCard'
 import { ProfileAvatar } from './ProfileAvatar'
@@ -28,7 +36,16 @@ export function Dashboard() {
   const [notificationPanelOpen, setNotificationPanelOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
   const [now, setNow] = useState(() => Date.now())
+  const [ratingResponses, setRatingResponses] = useState<MatchRatingResponse[]>([])
+  const [ratingResponsesLoaded, setRatingResponsesLoaded] = useState(false)
+  const [requestedRating] = useState(() => {
+    const parameters = new URLSearchParams(window.location.search)
+    const pollId = parameters.get('ratePoll')
+    const slotId = parameters.get('rateSlot')
+    return pollId && slotId ? { pollId, slotId } : null
+  })
   const notifications = usePushNotifications(user)
+  const ratingReviewerId = user?.id
 
   useEffect(() => {
     const onError = (error: Error) => {
@@ -47,6 +64,17 @@ export function Dashboard() {
   }, [])
 
   useEffect(() => {
+    if (!ratingReviewerId) return
+    return repository.subscribeMatchRatingResponses(ratingReviewerId, (responses) => {
+      setRatingResponses(responses)
+      setRatingResponsesLoaded(true)
+    }, (error) => {
+      setToast({ message: error.message, tone: 'error' })
+      setRatingResponsesLoaded(true)
+    })
+  }, [ratingReviewerId])
+
+  useEffect(() => {
     if (!toast) return
     const timer = window.setTimeout(() => setToast(null), 4200)
     return () => window.clearTimeout(timer)
@@ -55,17 +83,52 @@ export function Dashboard() {
   useEffect(() => {
     const nextStart = polls
       .flatMap((poll) => poll.slots)
-      .map((slot) => new Date(slot.startsAt).getTime())
+      .map((slot) => padelDateTimeToTimestamp(slot.startsAt))
       .filter((startsAt) => Number.isFinite(startsAt) && startsAt > now)
       .sort((left, right) => left - right)[0]
-    if (!nextStart) return
+    const nextRatingPrompt = user
+      ? getNextMatchRatingPromptAt(polls, ratingResponses, user.id, now)
+      : null
+    const nextWakeAt = [nextStart, nextRatingPrompt]
+      .filter((timestamp): timestamp is number => typeof timestamp === 'number')
+      .sort((left, right) => left - right)[0]
+    if (!nextWakeAt) return
 
-    const delay = Math.min(Math.max(nextStart - Date.now() + 50, 0), 2_147_483_647)
+    const delay = Math.min(Math.max(nextWakeAt - Date.now() + 50, 0), 2_147_483_647)
     const timer = window.setTimeout(() => setNow(Date.now()), delay)
     return () => window.clearTimeout(timer)
-  }, [now, polls])
+  }, [now, polls, ratingResponses, user])
 
   const upcomingPolls = useMemo(() => getUpcomingPolls(polls, now), [now, polls])
+  const ratingPrompts = useMemo(() => (
+    user && ratingResponsesLoaded
+      ? getPendingMatchRatingPrompts(polls, ratingResponses, user.id, now)
+        .map((prompt) => ({
+          ...prompt,
+          teammates: prompt.teammates.map((teammate) => ({
+            ...teammate,
+            displayName: resolveMemberName(members, teammate.userId, teammate.displayName),
+          })),
+        }))
+      : []
+  ), [members, now, polls, ratingResponses, ratingResponsesLoaded, user])
+  const activeRatingPrompt = useMemo(() => {
+    if (requestedRating) {
+      const requested = ratingPrompts.find((prompt) => (
+        prompt.pollId === requestedRating.pollId && prompt.slotId === requestedRating.slotId
+      ))
+      if (requested) return requested
+    }
+    return ratingPrompts[0] ?? null
+  }, [ratingPrompts, requestedRating])
+
+  useEffect(() => {
+    if (!requestedRating || !ratingResponsesLoaded || loading) return
+    const url = new URL(window.location.href)
+    url.searchParams.delete('ratePoll')
+    url.searchParams.delete('rateSlot')
+    window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`)
+  }, [loading, ratingResponsesLoaded, requestedRating])
 
   const stats = useMemo(() => {
     const openPolls = upcomingPolls.filter((poll) => poll.status === 'open')
@@ -91,6 +154,23 @@ export function Dashboard() {
   const reportError = (message: string) => setToast({ message, tone: 'error' })
   const updatePoll = (updatedPoll: PadelPoll) => {
     setPolls((current) => current.map((poll) => poll.id === updatedPoll.id ? updatedPoll : poll))
+  }
+  const rememberRatingResponse = (response: MatchRatingResponse) => {
+    setRatingResponses((current) => [
+      ...current.filter((item) => item.id !== response.id),
+      response,
+    ])
+  }
+  const dismissRatingPrompt = async () => {
+    if (!activeRatingPrompt) return
+    const response = await repository.dismissMatchRatingPrompt(activeRatingPrompt)
+    rememberRatingResponse(response)
+  }
+  const submitRatings = async (submissions: MatchRatingSubmission[]) => {
+    if (!activeRatingPrompt) return
+    const response = await repository.submitMatchRatings(activeRatingPrompt, user, submissions)
+    rememberRatingResponse(response)
+    notify('Voti salvati nello storico della partita.')
   }
 
   return (
@@ -244,7 +324,15 @@ export function Dashboard() {
           onDone={notify}
         />
       )}
-      {(notifications.shouldPrompt || notificationPanelOpen) && (
+      {activeRatingPrompt && (
+        <MatchRatingModal
+          key={activeRatingPrompt.id}
+          prompt={activeRatingPrompt}
+          onDismiss={dismissRatingPrompt}
+          onSubmit={submitRatings}
+        />
+      )}
+      {!activeRatingPrompt && (notifications.shouldPrompt || notificationPanelOpen) && (
         <NotificationCallup
           state={notifications.state}
           busy={notifications.busy}

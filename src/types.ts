@@ -65,3 +65,51 @@ export interface CreatePollInput {
 }
 
 export type SlotPhase = 'collecting' | 'ready' | 'booked'
+
+export type MatchRatingResponseStatus = 'dismissed' | 'submitted'
+
+export interface MatchRatingTeammate {
+  userId: string
+  displayName: string
+}
+
+export interface MatchRatingPrompt {
+  id: string
+  pollId: string
+  pollTitle: string
+  slotId: string
+  sessionStartsAt: string
+  sessionEndedAt: number
+  dueAt: number
+  reviewerId: string
+  teammates: MatchRatingTeammate[]
+}
+
+export interface MatchRatingResponse {
+  id: string
+  pollId: string
+  slotId: string
+  reviewerId: string
+  status: MatchRatingResponseStatus
+  closedAt: number
+}
+
+export interface MatchRatingSubmission extends MatchRatingTeammate {
+  score: number
+}
+
+export interface MatchRatingRecord {
+  id: string
+  responseId: string
+  pollId: string
+  pollTitle: string
+  slotId: string
+  sessionStartsAt: string
+  sessionEndedAt: number
+  reviewerId: string
+  reviewerName: string
+  revieweeId: string
+  revieweeName: string
+  score: number
+  createdAt: number
+}

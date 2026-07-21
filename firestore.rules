@@ -37,6 +37,48 @@ service cloud.firestore {
         && validAvatar();
     }
 
+    function validMatchRatingResponse(responseId) {
+      return request.resource.data.keys().hasOnly([
+          'id', 'pollId', 'slotId', 'reviewerId', 'status', 'closedAt'
+        ])
+        && request.resource.data.id == responseId
+        && responseId == request.resource.data.pollId + '__' + request.resource.data.slotId + '__' + request.auth.uid
+        && request.resource.data.pollId is string
+        && request.resource.data.slotId is string
+        && request.resource.data.reviewerId == request.auth.uid
+        && request.resource.data.status in ['dismissed', 'submitted']
+        && request.resource.data.closedAt is number;
+    }
+
+    function validMatchRating(ratingId) {
+      return request.resource.data.keys().hasOnly([
+          'id', 'responseId', 'pollId', 'pollTitle', 'slotId',
+          'sessionStartsAt', 'sessionEndedAt', 'reviewerId', 'reviewerName',
+          'revieweeId', 'revieweeName', 'score', 'createdAt'
+        ])
+        && request.resource.data.id == ratingId
+        && ratingId == request.resource.data.responseId + '__' + request.resource.data.revieweeId
+        && request.resource.data.responseId is string
+        && request.resource.data.pollId is string
+        && request.resource.data.pollTitle is string
+        && request.resource.data.slotId is string
+        && request.resource.data.sessionStartsAt is string
+        && request.resource.data.sessionEndedAt is number
+        && request.resource.data.reviewerId == request.auth.uid
+        && request.resource.data.reviewerName is string
+        && request.resource.data.revieweeId is string
+        && request.resource.data.revieweeId != request.auth.uid
+        && request.resource.data.revieweeName is string
+        && request.resource.data.score is int
+        && request.resource.data.score >= 1
+        && request.resource.data.score <= 10
+        && request.resource.data.createdAt is number
+        && existsAfter(/databases/$(database)/documents/matchRatingResponses/$(request.resource.data.responseId))
+        && getAfter(/databases/$(database)/documents/matchRatingResponses/$(request.resource.data.responseId)).data.status == 'submitted'
+        && getAfter(/databases/$(database)/documents/matchRatingResponses/$(request.resource.data.responseId)).data.reviewerId == request.auth.uid
+        && getAfter(/databases/$(database)/documents/matchRatingResponses/$(request.resource.data.responseId)).data.closedAt == request.resource.data.createdAt;
+    }
+
     match /users/{userId} {
       allow read: if isMember();
       allow create: if isMember()
@@ -85,6 +127,18 @@ service cloud.firestore {
 
     match /notificationDeliveries/{deliveryId} {
       allow read, write: if isNotifier();
+    }
+
+    match /matchRatingResponses/{responseId} {
+      allow read: if isNotifier() || (isMember() && resource.data.reviewerId == request.auth.uid);
+      allow create: if isMember() && validMatchRatingResponse(responseId);
+      allow update, delete: if false;
+    }
+
+    match /matchRatings/{ratingId} {
+      allow read: if isMember() && resource.data.reviewerId == request.auth.uid;
+      allow create: if isMember() && validMatchRating(ratingId);
+      allow update, delete: if false;
     }
   }
 }

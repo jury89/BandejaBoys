@@ -40,6 +40,8 @@ La sezione **Profilo** permette di modificare soltanto `displayName` e `avatarDa
 
 Per restare sul piano Spark senza fatturazione, gli avatar non usano Cloud Storage. Il browser ritaglia al centro la foto, la converte in JPEG `160×160` e la limita a 100.000 caratteri prima di salvarla nel documento `users/{uid}`; le Security Rules verificano tipo, prefisso Data URL e dimensione. Questa scelta è intenzionale per il singolo gruppo e resta ampiamente sotto il limite di 1 MiB per documento e la quota gratuita di 1 GiB di Firestore. Un prodotto pubblico dovrebbe invece usare uno storage a oggetti dedicato.
 
+Dieci minuti dopo la fine di una partita prenotata con quattro titolari, ciascun titolare vede una pagella one-shot per gli altri tre. La scadenza è derivata da `startsAt + durationMinutes + 10 minuti` usando sempre il fuso `Europe/Rome`, anche nel runner GitHub configurato in UTC. Un deep link della notifica dà precedenza alla partita indicata; aprendo normalmente l’app dopo la scadenza viene proposta comunque la pagella più vecchia ancora in sospeso. La chiusura crea una risposta `dismissed`, il salvataggio crea una risposta `submitted` e tre voti in un’unica transazione. Entrambi gli esiti impediscono per sempre che la stessa scheda venga riproposta allo stesso giocatore.
+
 Lo stato `ready` non viene salvato: è derivato dal numero di titolari. Lo stato `booked` dipende dalla presenza di `bookedAt`. In questo modo non possono esistere stati incoerenti. Le adesioni precedenti all’introduzione del campo `role` restano compatibili e vengono interpretate secondo il vecchio ordine cronologico.
 
 ## Notifiche
@@ -55,8 +57,9 @@ Il Worker Cloudflare richiama tramite `workflow_dispatch` il workflow GitHub, ch
 - **Nuovi slot**: a tutti i dispositivi registrati tranne quelli di chi li ha aggiunti. Gli slot creati nello stesso sondaggio a non più di 10 minuti di distanza vengono raggruppati; l’evento viene emesso soltanto dopo 10 minuti senza altre aggiunte. Cinque proposte iniziali producono quindi un avviso, mentre un’altra proposta inserita il giorno seguente ne produce uno nuovo. Sono considerate soltanto aggiunte avvenute nelle ultime 24 ore e relative a partite future.
 - **Reminder 24h**: quando una partita prenotata entra nella finestra delle 24 ore, soltanto ai primi quattro iscritti in quel momento; l’archiviazione del sondaggio non disattiva il promemoria.
 - **Reminder 2h**: quando la stessa partita entra nella finestra delle 2 ore, ricalcolando nuovamente i quattro titolari anche se il sondaggio è già archiviato.
+- **Pagelle post partita**: da 10 a 40 minuti dopo la fine di una partita prenotata completa, ai quattro titolari. Il link apre direttamente la pagella di quella partita; l’app la mostra anche senza notifica se viene aperta in qualunque momento successivo.
 
-I tre avvisi ordinari condividono il titolo informale **“Sveglia fagianotto!”**. Il corpo specifica rispettivamente che sono disponibili uno o più nuovi slot, che il titolare gioca domani oppure che gioca tra due ore; i reminder conservano sempre giorno, ora e circolo.
+Nuovi slot e reminder condividono il titolo informale **“Sveglia fagianotto!”**; la richiesta delle pagelle usa invece **“È ora di dare i voti”**. I reminder conservano sempre giorno, ora e circolo.
 
 Ogni slot nuovo conserva `createdAt`, `createdBy` e `createdByName`; un cambio di data e ora lascia invariati questi dati e quindi non viene interpretato come una nuova aggiunta. Gli slot storici privi dei metadati non generano avvisi retroattivi. Ritiri, promozioni dalla riserva, sostituzioni, annullamenti, eliminazioni e cambi di orario non richiedono una coda da correggere: i destinatari vengono sempre derivati dal documento più recente. Uno slot eliminato non produce quindi notifiche ancora in attesa né reminder futuri. L’identità del reminder include data e ora, perciò uno slot spostato genera i reminder per il nuovo orario. `notificationDeliveries/{deliveryId}` registra ogni coppia evento/dispositivo e impedisce duplicati tra esecuzioni successive.
 
@@ -107,22 +110,35 @@ pushSubscriptions/{subscriptionId}
 
 notificationDeliveries/{deliveryId}
   eventId, kind, userId, subscriptionId, sentAt
+
+matchRatingResponses/{pollId__slotId__reviewerId}
+  id, pollId, slotId, reviewerId, status, closedAt
+
+matchRatings/{pollId__slotId__reviewerId__revieweeId}
+  id, responseId, pollId, pollTitle, slotId
+  sessionStartsAt, sessionEndedAt
+  reviewerId, reviewerName, revieweeId, revieweeName
+  score, createdAt
 ```
 
 Un sondaggio e i suoi slot stanno in un solo documento. È una scelta adatta alle dimensioni del gruppo: permette una transazione singola, aggiornamenti in tempo reale semplici e nessun indice composto. Il limite Firestore di 1 MiB resta molto lontano con poche persone e un massimo di 14 slot imposto dalle regole.
+
+Le risposte e i voti sono documenti immutabili. L’identificatore deterministico rende idempotente ogni coppia partita/revisore/destinatario; le copie dei nomi fotografano lo storico mentre gli UID permettono di risalire sempre alle persone coinvolte. Le regole consentono a un giocatore di creare e leggere soltanto i propri voti come autore, vietando aggiornamenti e cancellazioni. Non esiste ancora una query o una vista prodotto che mostri i punteggi.
 
 ## Concorrenza
 
 Ogni aggiunta o eliminazione di uno slot, adesione, ritiro, sostituzione, modifica dell’orario o conferma del campo usa `runTransaction`. Se due membri aggiornano lo stesso sondaggio contemporaneamente, Firestore rilegge la versione più recente e ripete l'operazione, evitando il classico aggiornamento perso.
 
+Anche l’invio di una pagella è transazionale: prima verifica che non esista già una risposta, poi crea insieme i tre voti immutabili e la risposta `submitted`. La chiusura crea soltanto la risposta `dismissed`. Una gara tra due dispositivi dello stesso utente produce quindi un solo esito definitivo.
+
 Al termine della transazione il repository restituisce anche il sondaggio aggiornato: la bacheca lo applica immediatamente, senza attendere il successivo evento realtime. Il listener Firestore resta attivo per confermare lo stato e sincronizzare gli altri dispositivi; questo evita interfacce ferme su connessioni mobili lente o sospese.
 
 ## Sicurezza delle notifiche
 
-I membri leggono e gestiscono soltanto la propria sottoscrizione push. L’account tecnico `codex@kirivoraup.resend.app` deve avere l’email verificata: le Firestore Security Rules gli consentono di leggere sondaggi e sottoscrizioni, scrivere le sole ricevute di consegna ed eliminare endpoint scaduti. Non può leggere i profili, creare sondaggi o aggiornare slot.
+I membri leggono e gestiscono soltanto la propria sottoscrizione push. L’account tecnico `codex@kirivoraup.resend.app` deve avere l’email verificata: le Firestore Security Rules gli consentono di leggere sondaggi, sottoscrizioni ed esiti delle pagelle, scrivere le sole ricevute di consegna ed eliminare endpoint scaduti. Gli esiti servono esclusivamente a non notificare chi ha già chiuso o inviato; l’account tecnico non può leggere i punteggi, i profili, creare sondaggi o aggiornare slot.
 
 La password tecnica e la chiave VAPID privata vivono esclusivamente nei GitHub Actions secrets e non fanno parte della cronologia pubblica. Il token di dispatch vive esclusivamente nei secret cifrati Cloudflare ed è ristretto a un repository e a un solo permesso; Wrangler non ne restituisce il valore dopo il salvataggio. La chiave VAPID pubblica e la configurazione Web Firebase sono invece parte della configurazione del client. Prima del passaggio a repository pubblico, tutti i blob raggiungibili dalla cronologia Git sono stati controllati per escludere token, chiavi private, service account e file di credenziali. Il progetto non usa service account Google, Cloud Functions, Cloud Scheduler, Pub/Sub o altri servizi che richiedono il piano Blaze.
 
 ## Modalità demo
 
-Se manca la configurazione Firebase, lo stesso contratto `PadelRepository` usa `localStorage`. Il seed contiene due slot e cinque membri fittizi per mostrare subito titolari e riserve. La modalità è dichiarata chiaramente nell'interfaccia e non deve essere usata come backend condiviso.
+Se manca la configurazione Firebase, lo stesso contratto `PadelRepository` usa `localStorage`. Il seed contiene due slot e cinque membri fittizi per mostrare subito titolari e riserve; risposte e voti delle pagelle vengono conservati insieme in un secondo record locale. La modalità è dichiarata chiaramente nell'interfaccia e non deve essere usata come backend condiviso.

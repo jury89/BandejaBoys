@@ -1,5 +1,6 @@
 import type { PadelPoll, PadelSlot, Signup } from '../types'
 import {
+  MATCH_RATING_NOTIFICATION_WINDOW_MS,
   NEW_SLOT_QUIET_PERIOD_MS,
   collectScheduledNotifications,
   createTestNotification,
@@ -186,6 +187,49 @@ describe('pianificazione notifiche', () => {
     expect(notifications[0].kind).toBe('reminder-2h')
     expect(notifications[0].title).toBe('Sveglia fagianotto!')
     expect(notifications[0].body).toContain('Guarda che tra 2 ore giochi')
+  })
+
+  it('dieci minuti dopo la fine invita tutti e quattro i titolari a dare i voti', () => {
+    const players = ['a', 'b', 'c', 'd'].map((id, index) => signup(id, index))
+    const finishedSlot = slot('2026-07-20T18:20', players)
+    const notifications = collectScheduledNotifications([poll([finishedSlot])], NOW)
+
+    expect(notifications).toHaveLength(1)
+    expect(notifications[0]).toMatchObject({
+      kind: 'match-rating',
+      title: 'È ora di dare i voti',
+      recipientUserIds: ['a', 'b', 'c', 'd'],
+      url: '/?ratePoll=poll-1&rateSlot=slot-1',
+    })
+  })
+
+  it('non invia la richiesta voti prima della scadenza, a formazione incompleta o troppo tardi', () => {
+    const players = ['a', 'b', 'c', 'd'].map((id, index) => signup(id, index))
+    const finishedSlot = slot('2026-07-20T18:20', players)
+
+    expect(collectScheduledNotifications([poll([finishedSlot])], NOW - 1)).toHaveLength(0)
+    expect(collectScheduledNotifications([
+      poll([{ ...finishedSlot, signups: players.slice(0, 3) }]),
+    ], NOW)).toHaveLength(0)
+    expect(collectScheduledNotifications(
+      [poll([finishedSlot])],
+      NOW + MATCH_RATING_NOTIFICATION_WINDOW_MS,
+    )).toHaveLength(0)
+  })
+
+  it('esclude dalla notifica chi ha già salvato o chiuso la propria pagella', () => {
+    const players = ['a', 'b', 'c', 'd'].map((id, index) => signup(id, index))
+    const finishedSlot = slot('2026-07-20T18:20', players)
+    const notifications = collectScheduledNotifications([poll([finishedSlot])], NOW, [{
+      id: 'poll-1__slot-1__a',
+      pollId: 'poll-1',
+      slotId: 'slot-1',
+      reviewerId: 'a',
+      status: 'dismissed',
+      closedAt: NOW,
+    }])
+
+    expect(notifications[0].recipientUserIds).toEqual(['b', 'c', 'd'])
   })
 
   it('crea una nuova identità del reminder quando lo slot viene spostato', () => {

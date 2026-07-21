@@ -19,8 +19,9 @@ Il sito è disponibile su [bandeja-boys.web.app](https://bandeja-boys.web.app). 
 - Stato dello slot immediatamente leggibile: raccolta adesioni, da prenotare, campo prenotato. Nella griglia desktop una fascia uniforme mantiene allineati campo, riserve e azioni: verde pieno per **Campo prenotato**, ambra per **Campo da prenotare**. L’azione **Segna come prenotato** registra con un solo tocco la prenotazione all’**Oasi Boschetto**, anche prima di raggiungere quattro giocatori.
 - Filtro della bacheca sempre disponibile sotto l’header: **Tutti** mostra gli slot futuri dei sondaggi aperti e archiviati, ordinando i sondaggi dal primo slot più vicino, mentre **Slot prenotati** raccoglie soltanto le partite future con campo confermato. Uno slot scompare dalla bacheca quando raggiunge il proprio orario di inizio, senza essere eliminato da Firestore.
 - Autore della conferma e archivio dei sondaggi chiusi.
+- Pagelle post partita: dieci minuti dopo la fine di un campo prenotato, ciascuno dei quattro titolari riceve una notifica e trova nell’app una scheda per assegnare da 1 a 10 agli altri tre. Il salvataggio conserva partita, autore, destinatario e timestamp; chi chiude la scheda la elimina definitivamente soltanto per sé. Per ora i voti restano nello storico e non vengono mostrati o aggregati nell’interfaccia.
 - Aggiornamenti in tempo reale su tutti i dispositivi quando Firebase è configurato.
-- Notifiche Web Push opzionali dal tono informale **“Sveglia fagianotto!”** per i nuovi slot disponibili e, per chi è tra i quattro titolari, reminder a 24 ore e 2 ore dalla partita anche quando il sondaggio è già archiviato. Gli slot inseriti entro 10 minuti l’uno dall’altro vengono riuniti in un solo avviso.
+- Notifiche Web Push opzionali dal tono informale **“Sveglia fagianotto!”** per i nuovi slot disponibili e, per chi è tra i quattro titolari, reminder a 24 ore e 2 ore dalla partita più la richiesta delle pagelle a fine sessione. Gli slot inseriti entro 10 minuti l’uno dall’altro vengono riuniti in un solo avviso.
 - Installazione come web app su Android, iPhone, iPad e desktop tramite manifest PWA.
 
 ## Stack e costo
@@ -71,7 +72,7 @@ La configurazione Web Firebase non è un segreto: l'accesso ai dati è protetto 
 
 ## Configurazione notifiche
 
-Le notifiche richiedono una coppia VAPID Web Push e un account Firebase Authentication tecnico verificato. L’account tecnico è riconosciuto dalle Security Rules tramite email verificata e può soltanto leggere sondaggi e sottoscrizioni, scrivere le ricevute di consegna ed eliminare dispositivi scaduti; non può creare o modificare partite.
+Le notifiche richiedono una coppia VAPID Web Push e un account Firebase Authentication tecnico verificato. L’account tecnico è riconosciuto dalle Security Rules tramite email verificata e può soltanto leggere sondaggi, sottoscrizioni ed esiti chiuso/inviato delle pagelle, scrivere le ricevute di consegna ed eliminare dispositivi scaduti; non può leggere i voti, creare o modificare partite.
 
 Configurazione GitHub del repository:
 
