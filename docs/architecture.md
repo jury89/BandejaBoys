@@ -51,6 +51,8 @@ Ritiri, promozioni dalla riserva, sostituzioni, annullamenti e cambi di orario n
 
 L’elaborazione parte ai minuti `07` e `37`; normalmente l’avviso arriva nella prima esecuzione dopo il superamento della soglia, quindi entro circa 30 minuti. GitHub documenta che i workflow pianificati possono subire ritardi occasionali: in tal caso il reminder 24h resta valido fino all’ingresso nella finestra 2h, mentre quello 2h resta valido fino all’inizio della partita.
 
+L’avvio manuale può indirizzare una singola notifica a uno specifico UID e, facoltativamente, usare un corpo personalizzato di massimo 240 caratteri. L’identificativo univoco dell’esecuzione mantiene idempotente anche questo tipo di invio; il messaggio manuale non modifica la pianificazione ordinaria.
+
 ## Precedenza e ritiri
 
 Le adesioni sono sempre ordinate da `joinedAt`, con l'identificatore dell'adesione come spareggio deterministico. La UI mostra sul campo fino a quattro adesioni da titolare e nella lista d’attesa quelle da riserva.

@@ -33,16 +33,19 @@ function formatSession(startsAt: string): string {
 export function createTestNotification(
   userId: string,
   eventId: string,
+  message?: string,
 ): ScheduledNotification {
   const recipient = userId.trim()
   const identifier = eventId.trim()
+  const customBody = message?.trim()
   if (!recipient || !identifier) throw new Error('Destinatario o identificativo del test mancante.')
+  if (customBody && customBody.length > 240) throw new Error('Il messaggio di test supera i 240 caratteri.')
 
   return {
     id: `test:${identifier}`,
     kind: 'test',
-    title: 'Test notifiche Bandeja Boys',
-    body: 'Se leggi questo messaggio, le notifiche funzionano correttamente.',
+    title: customBody ? 'Bandeja Boys' : 'Test notifiche Bandeja Boys',
+    body: customBody || 'Se leggi questo messaggio, le notifiche funzionano correttamente.',
     url: '/',
     tag: `test-${identifier}`,
     ttlSeconds: 10 * 60,

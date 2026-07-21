@@ -48,6 +48,16 @@ describe('pianificazione notifiche', () => {
     })
   })
 
+  it('accetta un messaggio manuale personalizzato e ne limita la lunghezza', () => {
+    expect(createTestNotification('michele', 'run-43', '  Sveglia fagianotto  ')).toMatchObject({
+      recipientUserIds: ['michele'],
+      title: 'Bandeja Boys',
+      body: 'Sveglia fagianotto',
+    })
+    expect(() => createTestNotification('michele', 'run-44', 'x'.repeat(241)))
+      .toThrow('Il messaggio di test supera i 240 caratteri.')
+  })
+
   it('avvisa tutti tranne il creatore quando nasce un sondaggio', () => {
     const notifications = collectScheduledNotifications([poll([], NOW - 60 * 60 * 1000)], NOW)
 

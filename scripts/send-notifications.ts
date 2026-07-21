@@ -30,10 +30,12 @@ const publicKey = process.env.WEB_PUSH_VAPID_PUBLIC_KEY
 const privateKey = process.env.WEB_PUSH_VAPID_PRIVATE_KEY
 const testUserId = process.env.TEST_NOTIFICATION_USER_ID?.trim()
 const testNotificationId = process.env.TEST_NOTIFICATION_ID?.trim()
+const testNotificationMessage = process.env.TEST_NOTIFICATION_MESSAGE?.trim()
 const origin = 'https://bandeja-boys.web.app'
 
 if (!apiKey || !notifierEmail || !notifierPassword) throw new Error('Credenziali Firebase notifier mancanti.')
 if (!publicKey || !privateKey) throw new Error('VAPID keys mancanti.')
+if (testNotificationMessage && !testUserId) throw new Error('Un messaggio manuale richiede il destinatario.')
 
 const app = initializeApp({ apiKey, authDomain: `${projectId}.firebaseapp.com`, projectId })
 await signInWithEmailAndPassword(getAuth(app), notifierEmail, notifierPassword)
@@ -52,7 +54,7 @@ const subscriptions = subscriptionSnapshot.docs.map((item) => ({
   data: item.data() as StoredPushSubscription,
 }))
 const notifications = testUserId
-  ? [createTestNotification(testUserId, testNotificationId || String(Date.now()))]
+  ? [createTestNotification(testUserId, testNotificationId || String(Date.now()), testNotificationMessage)]
   : collectScheduledNotifications(polls)
 
 let sent = 0
