@@ -14,7 +14,7 @@ import {
 } from 'firebase/firestore'
 import webpush, { type PushSubscription } from 'web-push'
 import type { PadelPoll } from '../src/types'
-import { collectScheduledNotifications } from '../src/lib/notificationSchedule'
+import { collectScheduledNotifications, createTestNotification } from '../src/lib/notificationSchedule'
 
 interface StoredPushSubscription extends PushSubscription {
   userId: string
@@ -28,6 +28,8 @@ const notifierEmail = process.env.FIREBASE_NOTIFIER_EMAIL
 const notifierPassword = process.env.FIREBASE_NOTIFIER_PASSWORD
 const publicKey = process.env.WEB_PUSH_VAPID_PUBLIC_KEY
 const privateKey = process.env.WEB_PUSH_VAPID_PRIVATE_KEY
+const testUserId = process.env.TEST_NOTIFICATION_USER_ID?.trim()
+const testNotificationId = process.env.TEST_NOTIFICATION_ID?.trim()
 const origin = 'https://bandeja-boys.web.app'
 
 if (!apiKey || !notifierEmail || !notifierPassword) throw new Error('Credenziali Firebase notifier mancanti.')
@@ -49,7 +51,9 @@ const subscriptions = subscriptionSnapshot.docs.map((item) => ({
   reference: item.ref,
   data: item.data() as StoredPushSubscription,
 }))
-const notifications = collectScheduledNotifications(polls)
+const notifications = testUserId
+  ? [createTestNotification(testUserId, testNotificationId || String(Date.now()))]
+  : collectScheduledNotifications(polls)
 
 let sent = 0
 let skipped = 0

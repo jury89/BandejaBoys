@@ -1,5 +1,5 @@
 import type { PadelPoll, PadelSlot, Signup } from '../types'
-import { collectScheduledNotifications } from './notificationSchedule'
+import { collectScheduledNotifications, createTestNotification } from './notificationSchedule'
 
 const NOW = Date.parse('2026-07-20T18:00:00.000Z')
 
@@ -38,6 +38,16 @@ const poll = (
 })
 
 describe('pianificazione notifiche', () => {
+  it('crea una notifica di test destinata a un solo utente', () => {
+    expect(createTestNotification(' jury ', 'run-42')).toMatchObject({
+      id: 'test:run-42',
+      kind: 'test',
+      recipientUserIds: ['jury'],
+      excludedUserIds: [],
+      title: 'Test notifiche Bandeja Boys',
+    })
+  })
+
   it('avvisa tutti tranne il creatore quando nasce un sondaggio', () => {
     const notifications = collectScheduledNotifications([poll([], NOW - 60 * 60 * 1000)], NOW)
 

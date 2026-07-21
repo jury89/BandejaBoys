@@ -4,6 +4,11 @@ on:
   schedule:
     - cron: '7,37 * * * *'
   workflow_dispatch:
+    inputs:
+      test_user_id:
+        description: 'UID Firebase destinatario; vuoto per elaborare soltanto la coda ordinaria'
+        required: false
+        type: string
 
 concurrency:
   group: padel-notifications
@@ -31,3 +36,5 @@ jobs:
           FIREBASE_NOTIFIER_PASSWORD: ${{ secrets.FIREBASE_NOTIFIER_PASSWORD }}
           WEB_PUSH_VAPID_PUBLIC_KEY: ${{ vars.WEB_PUSH_VAPID_PUBLIC_KEY }}
           WEB_PUSH_VAPID_PRIVATE_KEY: ${{ secrets.WEB_PUSH_VAPID_PRIVATE_KEY }}
+          TEST_NOTIFICATION_USER_ID: ${{ inputs.test_user_id }}
+          TEST_NOTIFICATION_ID: ${{ github.run_id }}-${{ github.run_attempt }}

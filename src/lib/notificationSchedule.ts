@@ -4,7 +4,7 @@ import { DEFAULT_VENUE, getStarters } from './domain'
 const HOUR_MS = 60 * 60 * 1000
 const NEW_POLL_WINDOW_MS = 24 * HOUR_MS
 
-export type NotificationKind = 'new-poll' | 'reminder-24h' | 'reminder-2h'
+export type NotificationKind = 'new-poll' | 'reminder-24h' | 'reminder-2h' | 'test'
 
 export interface ScheduledNotification {
   id: string
@@ -28,6 +28,27 @@ function formatSession(startsAt: string): string {
     timeZone: 'Europe/Rome',
   }).format(new Date(startsAt))
   return formatted.charAt(0).toUpperCase() + formatted.slice(1)
+}
+
+export function createTestNotification(
+  userId: string,
+  eventId: string,
+): ScheduledNotification {
+  const recipient = userId.trim()
+  const identifier = eventId.trim()
+  if (!recipient || !identifier) throw new Error('Destinatario o identificativo del test mancante.')
+
+  return {
+    id: `test:${identifier}`,
+    kind: 'test',
+    title: 'Test notifiche Bandeja Boys',
+    body: 'Se leggi questo messaggio, le notifiche funzionano correttamente.',
+    url: '/',
+    tag: `test-${identifier}`,
+    ttlSeconds: 10 * 60,
+    recipientUserIds: [recipient],
+    excludedUserIds: [],
+  }
 }
 
 export function collectScheduledNotifications(

@@ -76,7 +76,7 @@ Configurazione GitHub del repository:
 - secret `FIREBASE_NOTIFIER_EMAIL`;
 - secret `FIREBASE_NOTIFIER_PASSWORD`.
 
-Il workflow [`.github/workflows/notifications.yml`](.github/workflows/notifications.yml) parte ai minuti `07` e `37` di ogni ora e può essere avviato manualmente per il collaudo. Non inserire mai le chiavi private in file locali versionati o nei log.
+Il workflow [`.github/workflows/notifications.yml`](.github/workflows/notifications.yml) parte ai minuti `07` e `37` di ogni ora. L’avvio manuale senza parametri elabora la coda ordinaria; specificando `test_user_id` invia invece un’unica notifica di collaudo ai dispositivi di quell’utente. Non inserire mai le chiavi private in file locali versionati o nei log.
 
 Su Android e desktop l’attivazione avviene direttamente dal pannello mostrato al primo accesso. Su iPhone e iPad Web Push è disponibile per le web app aggiunte alla schermata Home: il sito mostra prima le istruzioni di installazione, poi richiede il permesso quando viene aperto dalla nuova icona.
 
