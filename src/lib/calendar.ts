@@ -76,35 +76,6 @@ export function buildSlotCalendar(poll: PadelPoll, slot: PadelSlot, now = Date.n
   ].join('\r\n')
 }
 
-export function buildGoogleCalendarUrl(poll: PadelPoll, slot: PadelSlot) {
-  const event = calendarEventData(poll, slot)
-  const params = new URLSearchParams({
-    action: 'TEMPLATE',
-    text: event.title,
-    dates: `${formatLocalCalendarDate(event.startsAt)}/${formatLocalCalendarDate(event.endsAt)}`,
-    details: `${event.description}\n\n${APP_URL}`,
-    location: DEFAULT_VENUE,
-    ctz: CALENDAR_TIME_ZONE,
-  })
-
-  return `https://calendar.google.com/calendar/render?${params.toString()}`
-}
-
-export function buildOutlookCalendarUrl(poll: PadelPoll, slot: PadelSlot) {
-  const event = calendarEventData(poll, slot)
-  const params = new URLSearchParams({
-    path: '/calendar/action/compose',
-    rru: 'addevent',
-    subject: event.title,
-    startdt: event.startsAt,
-    enddt: event.endsAt,
-    body: `${event.description}\n\n${APP_URL}`,
-    location: DEFAULT_VENUE,
-  })
-
-  return `https://outlook.office.com/calendar/0/deeplink/compose?${params.toString()}`
-}
-
 export function slotCalendarFileName(slot: PadelSlot) {
   return `padel-${slot.startsAt.slice(0, 16).replace('T', '-').replace(':', '')}.ics`
 }

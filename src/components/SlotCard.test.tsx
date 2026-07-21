@@ -214,7 +214,13 @@ describe('azioni dello slot', () => {
     expect(onNotify).toHaveBeenCalledWith('Data e ora dello slot aggiornate.')
   })
 
-  it('apre il selettore calendario dal pulsante a icona', () => {
+  it('apre direttamente lo slot come evento calendario dal pulsante a icona', () => {
+    vi.useFakeTimers()
+    const createObjectURL = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:padel-calendar')
+    const revokeObjectURL = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    const onNotify = vi.fn()
+
     render(
       <SlotCard
         poll={poll}
@@ -222,7 +228,7 @@ describe('azioni dello slot', () => {
         user={user}
         members={[user]}
         onPollChange={vi.fn()}
-        onNotify={vi.fn()}
+        onNotify={onNotify}
         onError={vi.fn()}
       />,
     )
@@ -237,10 +243,14 @@ describe('azioni dello slot', () => {
     expect(remove).toHaveTextContent('')
     fireEvent.click(calendar)
 
-    expect(screen.getByRole('dialog', { name: 'Dove vuoi salvarlo?' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Apple Calendar/ })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Google Calendar/ })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Outlook/ })).toBeInTheDocument()
+    expect(createObjectURL).toHaveBeenCalledWith(expect.any(Blob))
+    expect(click).toHaveBeenCalledOnce()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(onNotify).toHaveBeenCalledWith(
+      'Evento calendario pronto: aprilo per aggiungere la partita.',
+    )
+    vi.advanceTimersByTime(1_000)
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:padel-calendar')
   })
 
   it('elimina uno slot dopo conferma e aggiorna subito la bacheca', async () => {
