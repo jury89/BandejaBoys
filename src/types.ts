@@ -30,7 +30,6 @@ export interface PadelSlot {
   id: string
   startsAt: string
   durationMinutes: number
-  timeIsTentative?: boolean
   createdAt?: number
   createdBy?: string
   createdByName?: string
@@ -56,7 +55,6 @@ export interface PadelPoll {
 export interface SlotInput {
   startsAt: string
   durationMinutes: number
-  timeIsTentative?: boolean
 }
 
 export interface CreatePollInput {

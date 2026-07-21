@@ -191,7 +191,6 @@ export function rescheduleSlot(
   slotId: string,
   startsAt: string,
   updatedAt = Date.now(),
-  timeIsTentative?: boolean,
 ): PadelPoll {
   const normalizedStartsAt = normalizeStartsAt(startsAt)
   if (poll.slots.some((slot) => slot.id !== slotId && slot.startsAt === normalizedStartsAt)) {
@@ -201,11 +200,7 @@ export function rescheduleSlot(
   const updated = updateSlot(
     poll,
     slotId,
-    (slot) => ({
-      ...slot,
-      startsAt: normalizedStartsAt,
-      ...(timeIsTentative === undefined ? {} : { timeIsTentative }),
-    }),
+    (slot) => ({ ...slot, startsAt: normalizedStartsAt }),
     updatedAt,
   )
   return {
@@ -230,7 +225,6 @@ function normalizeSlotInput(input: SlotInput) {
   return {
     startsAt: normalizeStartsAt(input.startsAt),
     durationMinutes: input.durationMinutes,
-    timeIsTentative: Boolean(input.timeIsTentative),
   }
 }
 
@@ -294,7 +288,6 @@ export function makePoll(
         id: makeId(`slot${index + 1}`),
         startsAt: slot.startsAt,
         durationMinutes: slot.durationMinutes,
-        timeIsTentative: slot.timeIsTentative,
         createdAt: now,
         createdBy: creator.id,
         createdByName: creator.displayName,

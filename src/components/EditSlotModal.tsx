@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { CalendarClock, Clock3 } from 'lucide-react'
+import { CalendarClock } from 'lucide-react'
 import type { PadelSlot } from '../types'
 import { toDateTimeInput } from '../lib/domain'
 import { slotDateParts } from '../lib/format'
@@ -8,13 +8,12 @@ import { Modal } from './Modal'
 interface EditSlotModalProps {
   slot: PadelSlot
   onClose: () => void
-  onSave: (startsAt: string, timeIsTentative: boolean) => Promise<void>
+  onSave: (startsAt: string) => Promise<void>
   onDone: (message: string) => void
 }
 
 export function EditSlotModal({ slot, onClose, onSave, onDone }: EditSlotModalProps) {
   const [startsAt, setStartsAt] = useState(toDateTimeInput(new Date(slot.startsAt)))
-  const [timeIsTentative, setTimeIsTentative] = useState(Boolean(slot.timeIsTentative))
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const current = slotDateParts(slot.startsAt)
@@ -29,7 +28,7 @@ export function EditSlotModal({ slot, onClose, onSave, onDone }: EditSlotModalPr
     setBusy(true)
     setError('')
     try {
-      await onSave(startsAt, timeIsTentative)
+      await onSave(startsAt)
       onDone('Data e ora dello slot aggiornate.')
       onClose()
     } catch (caught) {
@@ -53,19 +52,6 @@ export function EditSlotModal({ slot, onClose, onSave, onDone }: EditSlotModalPr
             autoFocus
             required
           />
-        </label>
-        <label className="time-certainty-option">
-          <input
-            type="checkbox"
-            checked={timeIsTentative}
-            onChange={(event) => setTimeIsTentative(event.target.checked)}
-            aria-label="Orario indicativo"
-          />
-          <span className="time-certainty-option__icon" aria-hidden="true"><Clock3 size={18} /></span>
-          <span className="time-certainty-option__copy">
-            <strong>Orario indicativo</strong>
-            <small>Resterà provvisorio finché il campo non viene segnato come prenotato.</small>
-          </span>
         </label>
         {error && <p className="form-message form-message--error" role="alert">{error}</p>}
         <footer className="modal__actions">

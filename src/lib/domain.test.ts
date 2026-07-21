@@ -229,7 +229,7 @@ describe('stato slot e creazione sondaggio', () => {
       slots: [booked, later],
     }
 
-    const updated = rescheduleSlot(current, booked.id, '2026-07-31T20:00', 99, true)
+    const updated = rescheduleSlot(current, booked.id, '2026-07-31T20:00', 99)
 
     expect(updated.updatedAt).toBe(99)
     expect(updated.slots.map((item) => item.id)).toEqual(['slot-2', 'slot-1'])
@@ -237,7 +237,6 @@ describe('stato slot e creazione sondaggio', () => {
       startsAt: new Date('2026-07-31T20:00').toISOString(),
       venue: 'Bandeja Club',
       bookedAt: 10,
-      timeIsTentative: true,
       signups: booked.signups,
     })
     expect(() => rescheduleSlot(current, booked.id, later.startsAt)).toThrow('Esiste già uno slot')
@@ -282,7 +281,7 @@ describe('stato slot e creazione sondaggio', () => {
 
     const updated = addSlotToPoll(
       current,
-      { startsAt: '2026-07-27T18:30', durationMinutes: 90, timeIsTentative: true },
+      { startsAt: '2026-07-27T18:30', durationMinutes: 90 },
       member('ale', 'Ale'),
       99,
     )
@@ -294,7 +293,6 @@ describe('stato slot e creazione sondaggio', () => {
       createdAt: 99,
       createdBy: 'ale',
       createdByName: 'Ale',
-      timeIsTentative: true,
       signups: [],
     })
   })

@@ -54,8 +54,7 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
   const starters = getStarters(slot)
   const reserves = getReserves(slot)
   const phase = getSlotPhase(slot)
-  const hasIndicativeTime = Boolean(slot.timeIsTentative)
-  const timeIsConfirmed = hasIndicativeTime && phase === 'booked'
+  const timeIsConfirmed = phase === 'booked'
   const PhaseIcon = phaseCopy[phase].icon
   const joined = slot.signups.some((signup) => signup.userId === user.id)
   const userIsStarter = isStarter(slot, user.id)
@@ -112,9 +111,7 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
 
   const book = () => run(
     () => repository.setBooking(poll.id, slot.id, { bookedBy: user }),
-    hasIndicativeTime
-      ? `Campo prenotato all’Oasi Boschetto. L’orario è confermato.`
-      : `Campo prenotato all’Oasi Boschetto. Si gioca!`,
+    `Campo prenotato all’Oasi Boschetto. L’orario è confermato.`,
   )
 
   return (
@@ -128,12 +125,10 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
         <div className="slot-time">
           <strong>{date.time}</strong>
           <span>{slot.durationMinutes} min</span>
-          {hasIndicativeTime && (
-            <span className={`slot-time__certainty slot-time__certainty--${timeIsConfirmed ? 'confirmed' : 'tentative'}`}>
-              {timeIsConfirmed ? <Check size={11} /> : <Clock3 size={11} />}
-              {timeIsConfirmed ? 'Orario confermato' : 'Orario indicativo'}
-            </span>
-          )}
+          <span className={`slot-time__certainty slot-time__certainty--${timeIsConfirmed ? 'confirmed' : 'tentative'}`}>
+            {timeIsConfirmed ? <Check size={11} /> : <Clock3 size={11} />}
+            {timeIsConfirmed ? 'Orario confermato' : 'Orario indicativo'}
+          </span>
         </div>
         <div className="slot-card__status">
           <div className={`status-pill status-pill--${phase}`}>
@@ -323,9 +318,7 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
         <EditSlotModal
           slot={slot}
           onClose={() => setScheduleOpen(false)}
-          onSave={(startsAt, timeIsTentative) =>
-            syncPoll(() => repository.rescheduleSlot(poll.id, slot.id, startsAt, timeIsTentative))
-          }
+          onSave={(startsAt) => syncPoll(() => repository.rescheduleSlot(poll.id, slot.id, startsAt))}
           onDone={onNotify}
         />
       )}

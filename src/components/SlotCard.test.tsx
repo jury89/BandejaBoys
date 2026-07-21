@@ -118,7 +118,9 @@ describe('azioni dello slot', () => {
 
     await waitFor(() => expect(setBooking).toHaveBeenCalledWith(poll.id, slot.id, { bookedBy: user }))
     expect(onPollChange).toHaveBeenCalledWith(updatedPoll)
-    expect(onNotify).toHaveBeenCalledWith('Campo prenotato all’Oasi Boschetto. Si gioca!')
+    expect(onNotify).toHaveBeenCalledWith(
+      'Campo prenotato all’Oasi Boschetto. L’orario è confermato.',
+    )
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
@@ -142,12 +144,11 @@ describe('azioni dello slot', () => {
     expect(screen.getByText('Confermato')).toBeInTheDocument()
   })
 
-  it('distingue un orario indicativo e lo mostra confermato dopo la prenotazione', () => {
-    const tentativeSlot = { ...slot, timeIsTentative: true }
+  it('mostra ogni orario come indicativo e lo conferma automaticamente con la prenotazione', () => {
     const { rerender } = render(
       <SlotCard
-        poll={{ ...poll, slots: [tentativeSlot] }}
-        slot={tentativeSlot}
+        poll={poll}
+        slot={slot}
         user={user}
         members={[user]}
         onPollChange={vi.fn()}
@@ -158,11 +159,11 @@ describe('azioni dello slot', () => {
 
     expect(screen.getByText('Orario indicativo')).toBeInTheDocument()
 
-    const bookedTentativeSlot = setSlotBooking(tentativeSlot, user, 20)
+    const bookedSlot = setSlotBooking(slot, user, 20)
     rerender(
       <SlotCard
-        poll={{ ...poll, slots: [bookedTentativeSlot] }}
-        slot={bookedTentativeSlot}
+        poll={{ ...poll, slots: [bookedSlot] }}
+        slot={bookedSlot}
         user={user}
         members={[user]}
         onPollChange={vi.fn()}
@@ -195,14 +196,13 @@ describe('azioni dello slot', () => {
     fireEvent.change(screen.getByLabelText('Nuova data e ora'), {
       target: { value: '2026-07-29T20:30' },
     })
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Orario indicativo' }))
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Salva data e ora' }))
 
     await waitFor(() => expect(reschedule).toHaveBeenCalledWith(
       poll.id,
       slot.id,
       '2026-07-29T20:30',
-      true,
     ))
     expect(onNotify).toHaveBeenCalledWith('Data e ora dello slot aggiornate.')
   })

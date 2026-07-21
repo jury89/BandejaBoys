@@ -30,7 +30,7 @@ describe('editor degli slot', () => {
     expect(originalInput).toHaveFocus()
   })
 
-  it('duplica uno slot al giorno successivo mantenendo ora, durata e indicazione provvisoria', () => {
+  it('duplica uno slot al giorno successivo mantenendo ora e durata', () => {
     render(
       <CreatePollModal
         user={user}
@@ -44,12 +44,11 @@ describe('editor degli slot', () => {
       target: { value: '2026-07-28T19:00' },
     })
     fireEvent.change(screen.getAllByLabelText('Durata')[0], { target: { value: '120' } })
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Orario indicativo per slot 1' }))
     fireEvent.click(screen.getByRole('button', { name: 'Duplica slot 1 al giorno successivo' }))
 
     expect(screen.getAllByLabelText('Data e ora')).toHaveLength(3)
     expect(screen.getAllByLabelText('Data e ora')[1]).toHaveValue('2026-07-29T19:00')
     expect(screen.getAllByLabelText('Durata')[1]).toHaveValue('120')
-    expect(screen.getByRole('checkbox', { name: 'Orario indicativo per slot 2' })).toBeChecked()
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
   })
 })
