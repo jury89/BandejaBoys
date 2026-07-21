@@ -16,7 +16,7 @@
 
 1. Un membro crea un sondaggio, di solito il lunedì, indicando la settimana successiva.
 2. Il sondaggio contiene uno o più slot con data, ora e durata. I minuti ammessi sono soltanto `00` e `30`; uno slot può inoltre conservare `timeIsTentative` per comunicare che l’orario è ancora indicativo.
-   Qualunque membro può aggiungere altri slot finché il sondaggio resta aperto; l’operazione è transazionale e non modifica quelli esistenti.
+   Qualunque membro può aggiungere o eliminare slot finché il sondaggio resta aperto; entrambe le operazioni sono transazionali. L’ultimo slot non può essere eliminato, così il sondaggio mantiene sempre almeno una proposta. La conferma di eliminazione esplicita la perdita di adesioni e riserve e, se il campo risulta prenotato, ricorda che va annullato direttamente con l’Oasi Boschetto.
 3. Al momento dell’adesione il giocatore sceglie esplicitamente **Titolare** o **Riserva**; ogni adesione conserva anche il timestamp per mantenere la precedenza cronologica.
 4. I titolari sono al massimo quattro. Una riserva volontaria non occupa un posto libero; quando una formazione di quattro perde un titolare, la prima riserva viene promossa automaticamente.
 5. Quando lo slot raggiunge quattro titolari passa automaticamente a **Da prenotare**; è un suggerimento operativo, non un requisito per la prenotazione.
@@ -50,7 +50,7 @@ Il workflow GitHub legge lo stato corrente ogni 10 minuti e genera eventi idempo
 
 I tre avvisi ordinari condividono il titolo informale **“Sveglia fagianotto!”**. Il corpo specifica rispettivamente che sono disponibili uno o più nuovi slot, che il titolare gioca domani oppure che gioca tra due ore; i reminder conservano sempre giorno, ora e circolo.
 
-Ogni slot nuovo conserva `createdAt`, `createdBy` e `createdByName`; un cambio di data e ora lascia invariati questi dati e quindi non viene interpretato come una nuova aggiunta. Gli slot storici privi dei metadati non generano avvisi retroattivi. Ritiri, promozioni dalla riserva, sostituzioni, annullamenti e cambi di orario non richiedono una coda da correggere: i destinatari vengono sempre derivati dal documento più recente. L’identità del reminder include data e ora, perciò uno slot spostato genera i reminder per il nuovo orario. `notificationDeliveries/{deliveryId}` registra ogni coppia evento/dispositivo e impedisce duplicati tra esecuzioni successive.
+Ogni slot nuovo conserva `createdAt`, `createdBy` e `createdByName`; un cambio di data e ora lascia invariati questi dati e quindi non viene interpretato come una nuova aggiunta. Gli slot storici privi dei metadati non generano avvisi retroattivi. Ritiri, promozioni dalla riserva, sostituzioni, annullamenti, eliminazioni e cambi di orario non richiedono una coda da correggere: i destinatari vengono sempre derivati dal documento più recente. Uno slot eliminato non produce quindi notifiche ancora in attesa né reminder futuri. L’identità del reminder include data e ora, perciò uno slot spostato genera i reminder per il nuovo orario. `notificationDeliveries/{deliveryId}` registra ogni coppia evento/dispositivo e impedisce duplicati tra esecuzioni successive.
 
 L’elaborazione parte ai minuti `03`, `13`, `23`, `33`, `43` e `53`. Per i nuovi slot si aggiungono i 10 minuti di quiete, quindi l’avviso arriva normalmente tra 10 e 20 minuti dall’ultima aggiunta; i reminder arrivano invece nella prima esecuzione dopo il superamento della soglia, entro circa 10 minuti. GitHub documenta che i workflow pianificati possono subire ritardi occasionali: in tal caso il reminder 24h resta valido fino all’ingresso nella finestra 2h, mentre quello 2h resta valido fino all’inizio della partita.
 
@@ -103,7 +103,7 @@ Un sondaggio e i suoi slot stanno in un solo documento. È una scelta adatta all
 
 ## Concorrenza
 
-Ogni aggiunta di uno slot, adesione, ritiro, sostituzione, modifica dell’orario o conferma del campo usa `runTransaction`. Se due membri aggiornano lo stesso sondaggio contemporaneamente, Firestore rilegge la versione più recente e ripete l'operazione, evitando il classico aggiornamento perso.
+Ogni aggiunta o eliminazione di uno slot, adesione, ritiro, sostituzione, modifica dell’orario o conferma del campo usa `runTransaction`. Se due membri aggiornano lo stesso sondaggio contemporaneamente, Firestore rilegge la versione più recente e ripete l'operazione, evitando il classico aggiornamento perso.
 
 Al termine della transazione il repository restituisce anche il sondaggio aggiornato: la bacheca lo applica immediatamente, senza attendere il successivo evento realtime. Il listener Firestore resta attivo per confermare lo stato e sincronizzare gli altri dispositivi; questo evita interfacce ferme su connessioni mobili lente o sospese.
 

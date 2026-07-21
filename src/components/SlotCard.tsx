@@ -10,6 +10,7 @@ import {
   MapPin,
   PencilLine,
   PhoneCall,
+  Trash2,
   UserRoundPlus,
 } from 'lucide-react'
 import type { MemberProfile, PadelPoll, PadelSlot, SessionUser, SignupRole } from '../types'
@@ -99,6 +100,16 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
     await run(() => repository.setBooking(poll.id, slot.id, null), 'Lo slot è tornato da prenotare.')
   }
 
+  const deleteSlot = async () => {
+    const bookingWarning = phase === 'booked'
+      ? ` Il campo risulta prenotato: dovrai annullarlo direttamente con l’Oasi Boschetto.`
+      : ''
+    if (!window.confirm(
+      `Eliminare lo slot di ${date.full} alle ${date.time}? Verranno rimosse tutte le adesioni e le riserve.${bookingWarning}`,
+    )) return
+    await run(() => repository.deleteSlot(poll.id, slot.id), 'Slot eliminato.')
+  }
+
   const book = () => run(
     () => repository.setBooking(poll.id, slot.id, { bookedBy: user }),
     hasIndicativeTime
@@ -130,14 +141,27 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
             {phaseCopy[phase].label}
           </div>
           {!disabled && (
-            <button
-              className="slot-card__edit-time"
-              type="button"
-              onClick={() => setScheduleOpen(true)}
-              aria-label="Modifica data e ora dello slot"
-            >
-              <PencilLine size={12} /> Modifica
-            </button>
+            <div className="slot-card__management">
+              <button
+                className="slot-card__edit-time"
+                type="button"
+                onClick={() => setScheduleOpen(true)}
+                disabled={busy}
+                aria-label="Modifica data e ora dello slot"
+              >
+                <PencilLine size={12} /> Modifica
+              </button>
+              <button
+                className="slot-card__delete"
+                type="button"
+                onClick={deleteSlot}
+                disabled={busy || poll.slots.length === 1}
+                title={poll.slots.length === 1 ? 'Aggiungi un altro slot prima di eliminare questo.' : undefined}
+                aria-label={`Elimina lo slot di ${date.full} alle ${date.time}`}
+              >
+                <Trash2 size={12} /> Elimina
+              </button>
+            </div>
           )}
         </div>
       </header>

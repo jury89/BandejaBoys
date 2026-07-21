@@ -1176,7 +1176,15 @@ p {
   gap: 7px;
 }
 
-.slot-card__edit-time {
+.slot-card__management {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 9px;
+}
+
+.slot-card__edit-time,
+.slot-card__delete {
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -1194,6 +1202,24 @@ p {
   color: var(--deep);
   text-decoration: underline;
   text-underline-offset: 3px;
+}
+
+.slot-card__delete {
+  color: #bd3b51;
+}
+
+.slot-card__delete:hover,
+.slot-card__delete:focus-visible {
+  color: #8f2438;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.slot-card__edit-time:disabled,
+.slot-card__delete:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+  text-decoration: none;
 }
 
 .status-pill {

@@ -207,6 +207,78 @@ describe('azioni dello slot', () => {
     expect(onNotify).toHaveBeenCalledWith('Data e ora dello slot aggiornate.')
   })
 
+  it('elimina uno slot dopo conferma e aggiorna subito la bacheca', async () => {
+    const otherSlot: PadelSlot = {
+      ...slot,
+      id: 'slot-2',
+      startsAt: '2026-07-30T19:30',
+      signups: [],
+    }
+    const currentPoll = { ...poll, slots: [slot, otherSlot] }
+    const updatedPoll = { ...poll, updatedAt: 20, slots: [otherSlot] }
+    const deleteSlot = vi.spyOn(repository, 'deleteSlot').mockResolvedValue(updatedPoll)
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
+    const onPollChange = vi.fn()
+    const onNotify = vi.fn()
+
+    render(
+      <SlotCard
+        poll={currentPoll}
+        slot={slot}
+        user={user}
+        members={[user]}
+        onPollChange={onPollChange}
+        onNotify={onNotify}
+        onError={vi.fn()}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /Elimina lo slot/ }))
+
+    expect(confirm).toHaveBeenCalledWith(expect.stringContaining('Verranno rimosse tutte le adesioni e le riserve'))
+    await waitFor(() => expect(deleteSlot).toHaveBeenCalledWith(poll.id, slot.id))
+    expect(onPollChange).toHaveBeenCalledWith(updatedPoll)
+    expect(onNotify).toHaveBeenCalledWith('Slot eliminato.')
+  })
+
+  it('avvisa che un campo prenotato va annullato anche presso il circolo', () => {
+    const bookedSlot = setSlotBooking(slot, user, 20)
+    const otherSlot = { ...slot, id: 'slot-2', startsAt: '2026-07-30T19:30' }
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+
+    render(
+      <SlotCard
+        poll={{ ...poll, slots: [bookedSlot, otherSlot] }}
+        slot={bookedSlot}
+        user={user}
+        members={[user]}
+        onPollChange={vi.fn()}
+        onNotify={vi.fn()}
+        onError={vi.fn()}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /Elimina lo slot/ }))
+
+    expect(confirm).toHaveBeenCalledWith(expect.stringContaining('annullarlo direttamente con l’Oasi Boschetto'))
+  })
+
+  it('protegge l’unico slot rimasto nel sondaggio', () => {
+    render(
+      <SlotCard
+        poll={poll}
+        slot={slot}
+        user={user}
+        members={[user]}
+        onPollChange={vi.fn()}
+        onNotify={vi.fn()}
+        onError={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByRole('button', { name: /Elimina lo slot/ })).toBeDisabled()
+  })
+
   it('permette di scegliere il ruolo e aggiorna subito la formazione da titolare', async () => {
     const emptySlot = { ...slot, signups: [] }
     const initialPoll: PadelPoll = { ...poll, slots: [emptySlot] }

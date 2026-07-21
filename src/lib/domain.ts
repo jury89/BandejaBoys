@@ -169,6 +169,23 @@ export function updateSlot(
   return { ...poll, slots, updatedAt }
 }
 
+export function removeSlotFromPoll(
+  poll: PadelPoll,
+  slotId: string,
+  updatedAt = Date.now(),
+): PadelPoll {
+  if (!poll.slots.some((slot) => slot.id === slotId)) throw new Error('Slot non trovato.')
+  if (poll.slots.length === 1) {
+    throw new Error('Un sondaggio deve avere almeno uno slot.')
+  }
+
+  return {
+    ...poll,
+    slots: poll.slots.filter((slot) => slot.id !== slotId),
+    updatedAt,
+  }
+}
+
 export function rescheduleSlot(
   poll: PadelPoll,
   slotId: string,

@@ -8,6 +8,7 @@ import {
   makePoll,
   nextMondayDate,
   removeSignup,
+  removeSlotFromPoll,
   rescheduleSlot,
   setSlotBooking,
   substituteStarter,
@@ -240,6 +241,30 @@ describe('stato slot e creazione sondaggio', () => {
       signups: booked.signups,
     })
     expect(() => rescheduleSlot(current, booked.id, later.startsAt)).toThrow('Esiste già uno slot')
+  })
+
+  it('elimina uno slot preservando gli altri e impedisce di lasciare un sondaggio vuoto', () => {
+    const first = slot([signup('a', 1)])
+    const second = { ...slot(), id: 'slot-2', startsAt: '2026-07-30T19:30:00.000Z' }
+    const current: PadelPoll = {
+      id: 'poll-1',
+      title: 'Test',
+      targetWeekStart: '2026-07-27',
+      createdBy: 'jury',
+      createdByName: 'Jury',
+      createdAt: 1,
+      updatedAt: 1,
+      status: 'open',
+      slots: [first, second],
+    }
+
+    const updated = removeSlotFromPoll(current, first.id, 99)
+
+    expect(updated.updatedAt).toBe(99)
+    expect(updated.slots).toEqual([second])
+    expect(current.slots).toHaveLength(2)
+    expect(() => removeSlotFromPoll(updated, second.id)).toThrow('almeno uno slot')
+    expect(() => removeSlotFromPoll(current, 'slot-assente')).toThrow('Slot non trovato')
   })
 
   it('aggiunge uno slot a un sondaggio aperto con autore e istante di creazione', () => {

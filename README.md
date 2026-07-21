@@ -10,7 +10,7 @@ Il sito è disponibile su [bandeja-boys.web.app](https://bandeja-boys.web.app). 
 
 - Registrazione e accesso con email e password; il nome inserito nel profilo resta l’unico nome mostrato nell’interfaccia e non viene mai ricavato dall’indirizzo email.
 - Creazione di un sondaggio per la settimana successiva con uno o più slot, duplicabili al giorno seguente mantenendo ora e durata. Gli orari si scelgono all’ora esatta o alla mezz’ora; ogni proposta può essere marcata **Orario indicativo** e diventa visivamente **Orario confermato** quando il campo viene prenotato. Qualunque membro può aggiungere in seguito un nuovo slot a un sondaggio ancora aperto; la proposta parte dal giorno successivo all’ultimo slot.
-- Modifica di data, ora e indicazione provvisoria degli slot già pubblicati senza perdere adesioni, riserve o prenotazione.
+- Modifica di data, ora e indicazione provvisoria degli slot già pubblicati senza perdere adesioni, riserve o prenotazione. Ogni slot può anche essere eliminato, finché ne resta almeno uno nel sondaggio: la conferma chiarisce che adesioni e riserve verranno rimosse e, per un campo prenotato, ricorda di annullare anche presso l’Oasi Boschetto.
 - Scelta esplicita al momento dell’adesione: ogni giocatore può segnarsi come **Titolare** oppure direttamente come **Riserva**. I quattro posti da titolare e la lista d’attesa mantengono l’ordine cronologico.
 - Promozione automatica della prima riserva quando un titolare si ritira da una formazione completa.
 - Sostituzione diretta: un titolare passa la propria posizione a un altro membro; se il sostituto era in riserva, il suo vecchio posto viene rimosso. Un tooltip accessibile chiarisce l’effetto prima dell’azione.
@@ -103,7 +103,7 @@ Prima di ogni commit o deploy deve passare `npm run check`.
 
 - Solo gli utenti autenticati possono leggere membri e sondaggi.
 - Ogni utente può creare o aggiornare soltanto il proprio profilo.
-- Qualunque membro autenticato può aggiungere uno slot a un sondaggio aperto, aderire, ritirarsi, fare una sostituzione o segnare una prenotazione: è una scelta intenzionale per un piccolo gruppo fidato.
+- Qualunque membro autenticato può aggiungere o eliminare uno slot da un sondaggio aperto, aderire, ritirarsi, fare una sostituzione o segnare una prenotazione: è una scelta intenzionale per un piccolo gruppo fidato.
 - Ogni membro può creare, sostituire o eliminare soltanto la sottoscrizione push del proprio dispositivo.
 - L’account tecnico verificato non può modificare utenti, sondaggi o partite; le sue letture e scritture sono limitate al recapito delle notifiche.
 - Soltanto chi ha creato un sondaggio può eliminarlo; nell'interfaccia l'autore può archiviarlo o riaprirlo.
