@@ -121,15 +121,28 @@ matchRatings/{pollId__slotId__reviewerId__revieweeId}
   sessionStartsAt, sessionEndedAt
   reviewerId, reviewerName, revieweeId, revieweeName
   score, createdAt
+
+activityEvents/{eventId}
+  type, actorId, actorName, pollId, pollTitle
+  slotId?, slotStartsAt?, details, occurredAt
+
+slotViews/{pollId__slotId__viewerId}
+  pollId, pollTitle, slotId, slotStartsAt
+  viewerId, viewerName
+  firstViewedAt, lastViewedAt, viewCount
 ```
 
 Un sondaggio e i suoi slot stanno in un solo documento. È una scelta adatta alle dimensioni del gruppo: permette una transazione singola, aggiornamenti in tempo reale semplici e nessun indice composto. Il limite Firestore di 1 MiB resta molto lontano con poche persone e un massimo di 14 slot imposto dalle regole.
 
 Le risposte e i voti sono documenti immutabili. L’identificatore deterministico rende idempotente ogni coppia partita/revisore/destinatario; le copie dei nomi fotografano lo storico mentre gli UID permettono di risalire sempre alle persone coinvolte. Le regole consentono a un giocatore di creare e leggere soltanto i propri voti come autore, vietando aggiornamenti e cancellazioni. Non esiste ancora una query o una vista prodotto che mostri i punteggi.
 
+`activityEvents` è un audit log append-only delle azioni organizzative, non un log di ogni clic: registra creazione e gestione di sondaggi e slot, adesioni, ritiri, sostituzioni e prenotazioni. `occurredAt` usa `serverTimestamp()`, quindi l’orario non dipende dall’orologio del telefono. L’evento viene scritto nella stessa transazione Firestore della modifica a cui si riferisce; la creazione iniziale usa un unico batch per sondaggio ed eventi. Le Security Rules consentono la creazione soltanto all’attore autenticato e vietano aggiornamento e cancellazione.
+
+Le visualizzazioni sono aggregate separatamente per evitare un documento per apertura. Un `IntersectionObserver` considera visto uno slot quando almeno il 50% della scheda resta visibile per un secondo; `sessionStorage` evita più conteggi dello stesso slot nella medesima sessione del browser. La prima visita resta immutabile, mentre ultima visita e conteggio vengono aggiornati in transazione con timestamp del server. Nome e UID rendono l’informazione leggibile al gruppo; il dato non viene condiviso fuori dagli utenti autenticati. Il tracciamento parte dal rilascio della funzione e non prova a ricostruire visite o ritiri precedenti.
+
 ## Concorrenza
 
-Ogni aggiunta o eliminazione di uno slot, adesione, ritiro, sostituzione, modifica dell’orario o conferma del campo usa `runTransaction`. Se due membri aggiornano lo stesso sondaggio contemporaneamente, Firestore rilegge la versione più recente e ripete l'operazione, evitando il classico aggiornamento perso.
+Ogni aggiunta o eliminazione di uno slot, adesione, ritiro, sostituzione, modifica dell’orario o conferma del campo usa `runTransaction`; il relativo evento di audit fa parte della stessa operazione atomica. Se due membri aggiornano lo stesso sondaggio contemporaneamente, Firestore rilegge la versione più recente e ripete l'operazione, evitando il classico aggiornamento perso.
 
 Anche l’invio di una pagella è transazionale: prima verifica che non esista già una risposta, poi crea insieme i tre voti immutabili e la risposta `submitted`. La chiusura crea soltanto la risposta `dismissed`. Una gara tra due dispositivi dello stesso utente produce quindi un solo esito definitivo.
 

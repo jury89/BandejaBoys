@@ -1,4 +1,4 @@
-import { useId, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import {
   ArrowRight,
   ArrowLeftRight,
@@ -27,6 +27,7 @@ import { downloadSlotCalendar } from '../lib/calendar'
 import { slotDateParts } from '../lib/format'
 import { resolveMemberName } from '../lib/memberNames'
 import { repository } from '../lib/repository'
+import { slotViewSessionKey, trackSustainedSlotView } from '../lib/slotViewTracking'
 import { EditSlotModal } from './EditSlotModal'
 import { ProfileAvatar } from './ProfileAvatar'
 import { SubstitutionModal } from './SubstitutionModal'
@@ -50,6 +51,7 @@ const phaseCopy = {
 
 export function SlotCard({ poll, slot, user, members, disabled, onPollChange, onNotify, onError }: SlotCardProps) {
   const substitutionTooltipId = useId()
+  const cardRef = useRef<HTMLElement>(null)
   const [scheduleOpen, setScheduleOpen] = useState(false)
   const [substitutionOpen, setSubstitutionOpen] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -65,6 +67,16 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
     members.find((member) => member.id === userId) ?? (userId === user.id ? user : undefined)
   const memberName = (userId: string | undefined, savedName: string | undefined) =>
     memberProfile(userId)?.displayName ?? resolveMemberName(members, userId, savedName)
+
+  useEffect(() => {
+    const element = cardRef.current
+    if (!element) return
+    return trackSustainedSlotView(
+      element,
+      slotViewSessionKey(poll.id, slot.id, user.id),
+      () => repository.recordSlotView(poll, slot, user),
+    )
+  }, [poll, slot, user])
 
   const syncPoll = async (work: () => Promise<PadelPoll>) => {
     const updated = await work()
@@ -87,7 +99,7 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
     const losesPriority = userIsStarter && reserves.length > 0
     if (losesPriority && !window.confirm('Se ti ritiri, la prima riserva entra tra i titolari. Continuare?')) return
     await run(
-      () => repository.leaveSlot(poll.id, slot.id, user.id),
+      () => repository.leaveSlot(poll.id, slot.id, user),
       losesPriority ? `${memberName(reserves[0].userId, reserves[0].displayName)} è stato promosso tra i titolari.` : 'Adesione rimossa.',
     )
   }
@@ -101,7 +113,7 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
 
   const unbook = async () => {
     if (!window.confirm('Segnare questo campo come non più prenotato?')) return
-    await run(() => repository.setBooking(poll.id, slot.id, null), 'Lo slot è tornato da prenotare.')
+    await run(() => repository.setBooking(poll.id, slot.id, null, user), 'Lo slot è tornato da prenotare.')
   }
 
   const deleteSlot = async () => {
@@ -111,11 +123,11 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
     if (!window.confirm(
       `Eliminare lo slot di ${date.full} alle ${date.time}? Verranno rimosse tutte le adesioni e le riserve.${bookingWarning}`,
     )) return
-    await run(() => repository.deleteSlot(poll.id, slot.id), 'Slot eliminato.')
+    await run(() => repository.deleteSlot(poll.id, slot.id, user), 'Slot eliminato.')
   }
 
   const book = () => run(
-    () => repository.setBooking(poll.id, slot.id, { bookedBy: user }),
+    () => repository.setBooking(poll.id, slot.id, { bookedBy: user }, user),
     `Campo prenotato all’Oasi Boschetto. L’orario è confermato.`,
   )
 
@@ -125,7 +137,7 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
   }
 
   return (
-    <article className={`slot-card slot-card--${phase}`}>
+    <article ref={cardRef} className={`slot-card slot-card--${phase}`}>
       <header className="slot-card__header">
         <div className="slot-date" aria-label={`${date.full} alle ${date.time}`}>
           <span>{date.weekday}</span>
@@ -356,7 +368,7 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
         <EditSlotModal
           slot={slot}
           onClose={() => setScheduleOpen(false)}
-          onSave={(startsAt) => syncPoll(() => repository.rescheduleSlot(poll.id, slot.id, startsAt))}
+          onSave={(startsAt) => syncPoll(() => repository.rescheduleSlot(poll.id, slot.id, startsAt, user))}
           onDone={onNotify}
         />
       )}
@@ -366,7 +378,7 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
           user={user}
           members={members}
           onClose={() => setSubstitutionOpen(false)}
-          onSubstitute={(replacement) => syncPoll(() => repository.substitute(poll.id, slot.id, user.id, replacement))}
+          onSubstitute={(replacement) => syncPoll(() => repository.substitute(poll.id, slot.id, user, replacement))}
           onDone={onNotify}
         />
       )}

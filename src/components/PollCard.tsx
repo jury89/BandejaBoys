@@ -29,7 +29,7 @@ export function PollCard({ poll, user, members, bookedOnly = false, onPollChange
   const toggleStatus = async () => {
     try {
       const next = poll.status === 'open' ? 'closed' : 'open'
-      const updated = await repository.setPollStatus(poll.id, next)
+      const updated = await repository.setPollStatus(poll.id, next, user)
       onPollChange(updated)
       onNotify(next === 'closed' ? 'Sondaggio archiviato.' : 'Sondaggio riaperto.')
     } catch (error) {

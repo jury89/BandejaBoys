@@ -138,7 +138,12 @@ describe('azioni dello slot', () => {
       screen.getByRole('button', { name: 'Segna il campo come prenotato all’Oasi Boschetto' }),
     )
 
-    await waitFor(() => expect(setBooking).toHaveBeenCalledWith(poll.id, slot.id, { bookedBy: user }))
+    await waitFor(() => expect(setBooking).toHaveBeenCalledWith(
+      poll.id,
+      slot.id,
+      { bookedBy: user },
+      user,
+    ))
     expect(onPollChange).toHaveBeenCalledWith(updatedPoll)
     expect(onNotify).toHaveBeenCalledWith(
       'Campo prenotato all’Oasi Boschetto. L’orario è confermato.',
@@ -229,6 +234,7 @@ describe('azioni dello slot', () => {
       poll.id,
       slot.id,
       '2026-07-29T20:30',
+      user,
     ))
     expect(onNotify).toHaveBeenCalledWith('Data e ora dello slot aggiornate.')
   })
@@ -301,7 +307,7 @@ describe('azioni dello slot', () => {
     fireEvent.click(screen.getByRole('button', { name: /Elimina lo slot/ }))
 
     expect(confirm).toHaveBeenCalledWith(expect.stringContaining('Verranno rimosse tutte le adesioni e le riserve'))
-    await waitFor(() => expect(deleteSlot).toHaveBeenCalledWith(poll.id, slot.id))
+    await waitFor(() => expect(deleteSlot).toHaveBeenCalledWith(poll.id, slot.id, user))
     expect(onPollChange).toHaveBeenCalledWith(updatedPoll)
     expect(onNotify).toHaveBeenCalledWith('Slot eliminato.')
   })

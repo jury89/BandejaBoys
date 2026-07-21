@@ -1,13 +1,14 @@
 import {
-  addDoc,
   collection,
-  deleteDoc,
   doc,
   onSnapshot,
   orderBy,
   query,
   runTransaction,
+  serverTimestamp,
   where,
+  writeBatch,
+  type Transaction,
   type Unsubscribe,
 } from 'firebase/firestore'
 import type {
@@ -18,14 +19,24 @@ import type {
   MatchRatingSubmission,
   MemberProfile,
   PadelPoll,
+  PadelSlot,
   PollStatus,
   SessionUser,
   SignupRole,
   SlotInput,
 } from '../types'
 import {
+  makeActivityEvent,
+  slotViewDocumentId,
+  type ActivityEventInput,
+  type LocalActivityEvent,
+  type LocalSlotView,
+} from './activity'
+import {
   addSlotToPoll,
   addSignup,
+  getStarters,
+  makeId,
   makePoll,
   removeSignup,
   removeSlotFromPoll,
@@ -48,32 +59,69 @@ export interface PadelRepository {
   createPoll(input: CreatePollInput, creator: SessionUser): Promise<void>
   addSlot(pollId: string, input: SlotInput, creator: SessionUser): Promise<PadelPoll>
   joinSlot(pollId: string, slotId: string, member: SessionUser, role: SignupRole): Promise<PadelPoll>
-  leaveSlot(pollId: string, slotId: string, userId: string): Promise<PadelPoll>
-  deleteSlot(pollId: string, slotId: string): Promise<PadelPoll>
+  leaveSlot(pollId: string, slotId: string, member: SessionUser): Promise<PadelPoll>
+  deleteSlot(pollId: string, slotId: string, actor: SessionUser): Promise<PadelPoll>
   rescheduleSlot(
     pollId: string,
     slotId: string,
     startsAt: string,
+    actor: SessionUser,
   ): Promise<PadelPoll>
   substitute(
     pollId: string,
     slotId: string,
-    outgoingUserId: string,
+    actor: SessionUser,
     replacement: MemberProfile,
   ): Promise<PadelPoll>
   setBooking(
     pollId: string,
     slotId: string,
     booking: { bookedBy: SessionUser } | null,
+    actor: SessionUser,
   ): Promise<PadelPoll>
-  setPollStatus(pollId: string, status: PollStatus): Promise<PadelPoll>
-  deletePoll(pollId: string): Promise<void>
+  setPollStatus(pollId: string, status: PollStatus, actor: SessionUser): Promise<PadelPoll>
+  deletePoll(pollId: string, actor: SessionUser): Promise<void>
+  recordSlotView(poll: PadelPoll, slot: PadelSlot, viewer: SessionUser): Promise<void>
   dismissMatchRatingPrompt(prompt: MatchRatingPrompt): Promise<MatchRatingResponse>
   submitMatchRatings(
     prompt: MatchRatingPrompt,
     reviewer: SessionUser,
     submissions: MatchRatingSubmission[],
   ): Promise<MatchRatingResponse>
+}
+
+type ActivityFactory = (before: PadelPoll, after: PadelPoll) => ActivityEventInput | null
+
+function slotById(poll: PadelPoll, slotId: string): PadelSlot | undefined {
+  return poll.slots.find((slot) => slot.id === slotId)
+}
+
+function signupRole(slot: PadelSlot, userId: string): SignupRole {
+  return getStarters(slot).some((signup) => signup.userId === userId) ? 'starter' : 'reserve'
+}
+
+function pollCreationEvents(poll: PadelPoll, creator: SessionUser): ActivityEventInput[] {
+  return [
+    makeActivityEvent('poll_created', creator, poll, undefined, { slotCount: poll.slots.length }),
+    ...poll.slots.map((slot) => makeActivityEvent(
+      'slot_created',
+      creator,
+      poll,
+      slot,
+      { durationMinutes: slot.durationMinutes },
+    )),
+  ]
+}
+
+function setRemoteActivity(
+  db: NonNullable<typeof firestore>,
+  transaction: Transaction,
+  activity: ActivityEventInput,
+) {
+  transaction.set(doc(collection(db, 'activityEvents')), {
+    ...activity,
+    occurredAt: serverTimestamp(),
+  })
 }
 
 function makeRatingResponse(
@@ -131,7 +179,11 @@ function remoteRepository(): PadelRepository {
   if (!firestore) throw new Error('Firebase non è configurato.')
   const db = firestore
 
-  const mutatePoll = async (pollId: string, mutate: (poll: PadelPoll) => PadelPoll) => {
+  const mutatePoll = async (
+    pollId: string,
+    mutate: (poll: PadelPoll) => PadelPoll,
+    activityFactory: ActivityFactory,
+  ) => {
     const reference = doc(db, 'polls', pollId)
     return runTransaction(db, async (transaction) => {
       const snapshot = await transaction.get(reference)
@@ -143,6 +195,8 @@ function remoteRepository(): PadelRepository {
         status: updated.status,
         updatedAt: updated.updatedAt,
       })
+      const activity = activityFactory(poll, updated)
+      if (activity) setRemoteActivity(db, transaction, activity)
       return updated
     })
   }
@@ -174,38 +228,177 @@ function remoteRepository(): PadelRepository {
       )
     },
     async createPoll(input, creator) {
-      await addDoc(collection(db, 'polls'), makePoll(input, creator))
+      const data = makePoll(input, creator)
+      const reference = doc(collection(db, 'polls'))
+      const poll = { id: reference.id, ...data }
+      const batch = writeBatch(db)
+      batch.set(reference, data)
+      pollCreationEvents(poll, creator).forEach((activity) => {
+        batch.set(doc(collection(db, 'activityEvents')), {
+          ...activity,
+          occurredAt: serverTimestamp(),
+        })
+      })
+      await batch.commit()
     },
     async addSlot(pollId, input, creator) {
-      return mutatePoll(pollId, (poll) => addSlotToPoll(poll, input, creator))
+      return mutatePoll(
+        pollId,
+        (poll) => addSlotToPoll(poll, input, creator),
+        (before, after) => {
+          const previousIds = new Set(before.slots.map((slot) => slot.id))
+          const added = after.slots.find((slot) => !previousIds.has(slot.id))
+          return added
+            ? makeActivityEvent('slot_created', creator, after, added, {
+              durationMinutes: added.durationMinutes,
+            })
+            : null
+        },
+      )
     },
     async joinSlot(pollId, slotId, member, role) {
-      return mutatePoll(pollId, (poll) => updateSlot(poll, slotId, (slot) => addSignup(slot, member, Date.now(), role)))
-    },
-    async leaveSlot(pollId, slotId, userId) {
-      return mutatePoll(pollId, (poll) => updateSlot(poll, slotId, (slot) => removeSignup(slot, userId)))
-    },
-    async deleteSlot(pollId, slotId) {
-      return mutatePoll(pollId, (poll) => removeSlotFromPoll(poll, slotId))
-    },
-    async rescheduleSlot(pollId, slotId, startsAt) {
-      return mutatePoll(pollId, (poll) => rescheduleSlot(poll, slotId, startsAt))
-    },
-    async substitute(pollId, slotId, outgoingUserId, replacement) {
-      return mutatePoll(pollId, (poll) =>
-        updateSlot(poll, slotId, (slot) => substituteStarter(slot, outgoingUserId, replacement)),
+      return mutatePoll(
+        pollId,
+        (poll) => updateSlot(poll, slotId, (slot) => addSignup(slot, member, Date.now(), role)),
+        (before, after) => {
+          const previous = slotById(before, slotId)
+          const updated = slotById(after, slotId)
+          const wasJoined = previous?.signups.some((signup) => signup.userId === member.id)
+          return updated && !wasJoined
+            ? makeActivityEvent('signup_joined', member, after, updated, { role })
+            : null
+        },
       )
     },
-    async setBooking(pollId, slotId, booking) {
-      return mutatePoll(pollId, (poll) =>
-        updateSlot(poll, slotId, (slot) => setSlotBooking(slot, booking?.bookedBy ?? null)),
+    async leaveSlot(pollId, slotId, member) {
+      return mutatePoll(
+        pollId,
+        (poll) => updateSlot(poll, slotId, (slot) => removeSignup(slot, member.id)),
+        (before) => {
+          const previous = slotById(before, slotId)
+          const signup = previous?.signups.find((item) => item.userId === member.id)
+          return previous && signup
+            ? makeActivityEvent('signup_left', member, before, previous, {
+              role: signupRole(previous, member.id),
+              joinedAt: signup.joinedAt,
+            })
+            : null
+        },
       )
     },
-    async setPollStatus(pollId, status) {
-      return mutatePoll(pollId, (poll) => ({ ...poll, status, updatedAt: Date.now() }))
+    async deleteSlot(pollId, slotId, actor) {
+      return mutatePoll(
+        pollId,
+        (poll) => removeSlotFromPoll(poll, slotId),
+        (before) => {
+          const removed = slotById(before, slotId)
+          return removed
+            ? makeActivityEvent('slot_deleted', actor, before, removed, {
+              signupCount: removed.signups.length,
+              wasBooked: Boolean(removed.bookedAt),
+            })
+            : null
+        },
+      )
     },
-    async deletePoll(pollId) {
-      await deleteDoc(doc(db, 'polls', pollId))
+    async rescheduleSlot(pollId, slotId, startsAt, actor) {
+      return mutatePoll(
+        pollId,
+        (poll) => rescheduleSlot(poll, slotId, startsAt),
+        (before, after) => {
+          const previous = slotById(before, slotId)
+          const updated = slotById(after, slotId)
+          return previous && updated && previous.startsAt !== updated.startsAt
+            ? makeActivityEvent('slot_rescheduled', actor, after, updated, {
+              previousStartsAt: previous.startsAt,
+            })
+            : null
+        },
+      )
+    },
+    async substitute(pollId, slotId, actor, replacement) {
+      return mutatePoll(
+        pollId,
+        (poll) => updateSlot(poll, slotId, (slot) => substituteStarter(slot, actor.id, replacement)),
+        (_before, after) => {
+          const updated = slotById(after, slotId)
+          return updated
+            ? makeActivityEvent('starter_substituted', actor, after, updated, {
+              outgoingUserId: actor.id,
+              outgoingName: actor.displayName,
+              replacementUserId: replacement.id,
+              replacementName: replacement.displayName,
+            })
+            : null
+        },
+      )
+    },
+    async setBooking(pollId, slotId, booking, actor) {
+      return mutatePoll(
+        pollId,
+        (poll) => updateSlot(poll, slotId, (slot) => setSlotBooking(slot, booking?.bookedBy ?? null)),
+        (before, after) => {
+          const previous = slotById(before, slotId)
+          const updated = slotById(after, slotId)
+          if (!previous || !updated || Boolean(previous.bookedAt) === Boolean(updated.bookedAt)) return null
+          return makeActivityEvent(
+            booking ? 'slot_booked' : 'slot_unbooked',
+            actor,
+            after,
+            updated,
+            { venue: updated.venue || previous.venue || '' },
+          )
+        },
+      )
+    },
+    async setPollStatus(pollId, status, actor) {
+      return mutatePoll(
+        pollId,
+        (poll) => ({ ...poll, status, updatedAt: Date.now() }),
+        (before, after) => before.status === after.status
+          ? null
+          : makeActivityEvent(status === 'closed' ? 'poll_archived' : 'poll_reopened', actor, after),
+      )
+    },
+    async deletePoll(pollId, actor) {
+      const reference = doc(db, 'polls', pollId)
+      await runTransaction(db, async (transaction) => {
+        const snapshot = await transaction.get(reference)
+        if (!snapshot.exists()) throw new Error('Sondaggio non trovato.')
+        const poll = { id: snapshot.id, ...snapshot.data() } as PadelPoll
+        transaction.delete(reference)
+        setRemoteActivity(db, transaction, makeActivityEvent('poll_deleted', actor, poll, undefined, {
+          slotCount: poll.slots.length,
+        }))
+      })
+    },
+    async recordSlotView(poll, slot, viewer) {
+      const reference = doc(db, 'slotViews', slotViewDocumentId(poll.id, slot.id, viewer.id))
+      await runTransaction(db, async (transaction) => {
+        const snapshot = await transaction.get(reference)
+        if (snapshot.exists()) {
+          const current = snapshot.data() as { viewCount?: number }
+          transaction.update(reference, {
+            pollTitle: poll.title,
+            slotStartsAt: slot.startsAt,
+            viewerName: viewer.displayName,
+            lastViewedAt: serverTimestamp(),
+            viewCount: (current.viewCount ?? 0) + 1,
+          })
+          return
+        }
+        transaction.set(reference, {
+          pollId: poll.id,
+          pollTitle: poll.title,
+          slotId: slot.id,
+          slotStartsAt: slot.startsAt,
+          viewerId: viewer.id,
+          viewerName: viewer.displayName,
+          firstViewedAt: serverTimestamp(),
+          lastViewedAt: serverTimestamp(),
+          viewCount: 1,
+        })
+      })
     },
     async dismissMatchRatingPrompt(prompt) {
       const reference = doc(db, 'matchRatingResponses', prompt.id)
@@ -238,10 +431,16 @@ const LOCAL_POLLS_KEY = 'bandeja-boys:polls'
 const POLLS_EVENT = 'bandeja-boys:polls-changed'
 const LOCAL_MATCH_RATINGS_KEY = 'bandeja-boys:match-ratings'
 const MATCH_RATINGS_EVENT = 'bandeja-boys:match-ratings-changed'
+const LOCAL_ACTIVITY_KEY = 'bandeja-boys:activity'
 
 interface LocalMatchRatingStore {
   responses: MatchRatingResponse[]
   ratings: MatchRatingRecord[]
+}
+
+interface LocalActivityStore {
+  events: LocalActivityEvent[]
+  views: LocalSlotView[]
 }
 
 const demoMembers: MemberProfile[] = [
@@ -328,14 +527,45 @@ function writeLocalMatchRatingStore(store: LocalMatchRatingStore) {
   window.dispatchEvent(new Event(MATCH_RATINGS_EVENT))
 }
 
+function readLocalActivityStore(): LocalActivityStore {
+  try {
+    const stored = localStorage.getItem(LOCAL_ACTIVITY_KEY)
+    if (stored) return JSON.parse(stored) as LocalActivityStore
+  } catch {
+    // Malformed demo activity must not block the dashboard.
+  }
+  return { events: [], views: [] }
+}
+
+function writeLocalActivity(activity: ActivityEventInput, occurredAt = Date.now()) {
+  const store = readLocalActivityStore()
+  store.events.push({
+    ...activity,
+    id: makeId('activity'),
+    occurredAt,
+  })
+  localStorage.setItem(LOCAL_ACTIVITY_KEY, JSON.stringify(store))
+}
+
+function writeLocalActivities(activities: ActivityEventInput[], occurredAt = Date.now()) {
+  activities.forEach((activity) => writeLocalActivity(activity, occurredAt))
+}
+
 function localRepository(): PadelRepository {
-  const mutate = async (pollId: string, updater: (poll: PadelPoll) => PadelPoll) => {
+  const mutate = async (
+    pollId: string,
+    updater: (poll: PadelPoll) => PadelPoll,
+    activityFactory: ActivityFactory,
+  ) => {
     const polls = readLocalPolls()
     const index = polls.findIndex((poll) => poll.id === pollId)
     if (index < 0) throw new Error('Sondaggio non trovato.')
-    const updated = updater(polls[index])
+    const before = polls[index]
+    const updated = updater(before)
     polls[index] = updated
     writeLocalPolls(polls)
+    const activity = activityFactory(before, updated)
+    if (activity) writeLocalActivity(activity)
     return updated
   }
 
@@ -364,39 +594,168 @@ function localRepository(): PadelRepository {
       return () => window.removeEventListener(MATCH_RATINGS_EVENT, notify)
     },
     async createPoll(input, creator) {
-      const poll = makePoll(input, creator)
-      writeLocalPolls([{ id: `poll-${Date.now()}`, ...poll }, ...readLocalPolls()])
+      const data = makePoll(input, creator)
+      const poll = { id: `poll-${Date.now()}`, ...data }
+      writeLocalPolls([poll, ...readLocalPolls()])
+      writeLocalActivities(pollCreationEvents(poll, creator), poll.createdAt)
     },
     async addSlot(pollId, input, creator) {
-      return mutate(pollId, (poll) => addSlotToPoll(poll, input, creator))
+      return mutate(
+        pollId,
+        (poll) => addSlotToPoll(poll, input, creator),
+        (before, after) => {
+          const previousIds = new Set(before.slots.map((slot) => slot.id))
+          const added = after.slots.find((slot) => !previousIds.has(slot.id))
+          return added
+            ? makeActivityEvent('slot_created', creator, after, added, {
+              durationMinutes: added.durationMinutes,
+            })
+            : null
+        },
+      )
     },
     async joinSlot(pollId, slotId, member, role) {
-      return mutate(pollId, (poll) => updateSlot(poll, slotId, (slot) => addSignup(slot, member, Date.now(), role)))
-    },
-    async leaveSlot(pollId, slotId, userId) {
-      return mutate(pollId, (poll) => updateSlot(poll, slotId, (slot) => removeSignup(slot, userId)))
-    },
-    async deleteSlot(pollId, slotId) {
-      return mutate(pollId, (poll) => removeSlotFromPoll(poll, slotId))
-    },
-    async rescheduleSlot(pollId, slotId, startsAt) {
-      return mutate(pollId, (poll) => rescheduleSlot(poll, slotId, startsAt))
-    },
-    async substitute(pollId, slotId, outgoingUserId, replacement) {
-      return mutate(pollId, (poll) =>
-        updateSlot(poll, slotId, (slot) => substituteStarter(slot, outgoingUserId, replacement)),
+      return mutate(
+        pollId,
+        (poll) => updateSlot(poll, slotId, (slot) => addSignup(slot, member, Date.now(), role)),
+        (before, after) => {
+          const previous = slotById(before, slotId)
+          const updated = slotById(after, slotId)
+          const wasJoined = previous?.signups.some((signup) => signup.userId === member.id)
+          return updated && !wasJoined
+            ? makeActivityEvent('signup_joined', member, after, updated, { role })
+            : null
+        },
       )
     },
-    async setBooking(pollId, slotId, booking) {
-      return mutate(pollId, (poll) =>
-        updateSlot(poll, slotId, (slot) => setSlotBooking(slot, booking?.bookedBy ?? null)),
+    async leaveSlot(pollId, slotId, member) {
+      return mutate(
+        pollId,
+        (poll) => updateSlot(poll, slotId, (slot) => removeSignup(slot, member.id)),
+        (before) => {
+          const previous = slotById(before, slotId)
+          const signup = previous?.signups.find((item) => item.userId === member.id)
+          return previous && signup
+            ? makeActivityEvent('signup_left', member, before, previous, {
+              role: signupRole(previous, member.id),
+              joinedAt: signup.joinedAt,
+            })
+            : null
+        },
       )
     },
-    async setPollStatus(pollId, status) {
-      return mutate(pollId, (poll) => ({ ...poll, status, updatedAt: Date.now() }))
+    async deleteSlot(pollId, slotId, actor) {
+      return mutate(
+        pollId,
+        (poll) => removeSlotFromPoll(poll, slotId),
+        (before) => {
+          const removed = slotById(before, slotId)
+          return removed
+            ? makeActivityEvent('slot_deleted', actor, before, removed, {
+              signupCount: removed.signups.length,
+              wasBooked: Boolean(removed.bookedAt),
+            })
+            : null
+        },
+      )
     },
-    async deletePoll(pollId) {
-      writeLocalPolls(readLocalPolls().filter((poll) => poll.id !== pollId))
+    async rescheduleSlot(pollId, slotId, startsAt, actor) {
+      return mutate(
+        pollId,
+        (poll) => rescheduleSlot(poll, slotId, startsAt),
+        (before, after) => {
+          const previous = slotById(before, slotId)
+          const updated = slotById(after, slotId)
+          return previous && updated && previous.startsAt !== updated.startsAt
+            ? makeActivityEvent('slot_rescheduled', actor, after, updated, {
+              previousStartsAt: previous.startsAt,
+            })
+            : null
+        },
+      )
+    },
+    async substitute(pollId, slotId, actor, replacement) {
+      return mutate(
+        pollId,
+        (poll) => updateSlot(poll, slotId, (slot) => substituteStarter(slot, actor.id, replacement)),
+        (_before, after) => {
+          const updated = slotById(after, slotId)
+          return updated
+            ? makeActivityEvent('starter_substituted', actor, after, updated, {
+              outgoingUserId: actor.id,
+              outgoingName: actor.displayName,
+              replacementUserId: replacement.id,
+              replacementName: replacement.displayName,
+            })
+            : null
+        },
+      )
+    },
+    async setBooking(pollId, slotId, booking, actor) {
+      return mutate(
+        pollId,
+        (poll) => updateSlot(poll, slotId, (slot) => setSlotBooking(slot, booking?.bookedBy ?? null)),
+        (before, after) => {
+          const previous = slotById(before, slotId)
+          const updated = slotById(after, slotId)
+          if (!previous || !updated || Boolean(previous.bookedAt) === Boolean(updated.bookedAt)) return null
+          return makeActivityEvent(
+            booking ? 'slot_booked' : 'slot_unbooked',
+            actor,
+            after,
+            updated,
+            { venue: updated.venue || previous.venue || '' },
+          )
+        },
+      )
+    },
+    async setPollStatus(pollId, status, actor) {
+      return mutate(
+        pollId,
+        (poll) => ({ ...poll, status, updatedAt: Date.now() }),
+        (before, after) => before.status === after.status
+          ? null
+          : makeActivityEvent(status === 'closed' ? 'poll_archived' : 'poll_reopened', actor, after),
+      )
+    },
+    async deletePoll(pollId, actor) {
+      const polls = readLocalPolls()
+      const poll = polls.find((item) => item.id === pollId)
+      if (!poll) throw new Error('Sondaggio non trovato.')
+      writeLocalPolls(polls.filter((item) => item.id !== pollId))
+      writeLocalActivity(makeActivityEvent('poll_deleted', actor, poll, undefined, {
+        slotCount: poll.slots.length,
+      }))
+    },
+    async recordSlotView(poll, slot, viewer) {
+      const store = readLocalActivityStore()
+      const id = slotViewDocumentId(poll.id, slot.id, viewer.id)
+      const index = store.views.findIndex((view) => view.id === id)
+      const now = Date.now()
+      if (index >= 0) {
+        store.views[index] = {
+          ...store.views[index],
+          pollTitle: poll.title,
+          slotStartsAt: slot.startsAt,
+          viewerName: viewer.displayName,
+          lastViewedAt: now,
+          viewCount: store.views[index].viewCount + 1,
+        }
+      } else {
+        store.views.push({
+          id,
+          pollId: poll.id,
+          pollTitle: poll.title,
+          slotId: slot.id,
+          slotStartsAt: slot.startsAt,
+          viewerId: viewer.id,
+          viewerName: viewer.displayName,
+          firstViewedAt: now,
+          lastViewedAt: now,
+          viewCount: 1,
+        })
+      }
+      localStorage.setItem(LOCAL_ACTIVITY_KEY, JSON.stringify(store))
     },
     async dismissMatchRatingPrompt(prompt) {
       const store = readLocalMatchRatingStore()

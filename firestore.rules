@@ -79,6 +79,50 @@ service cloud.firestore {
         && getAfter(/databases/$(database)/documents/matchRatingResponses/$(request.resource.data.responseId)).data.closedAt == request.resource.data.createdAt;
     }
 
+    function validActivityEvent() {
+      return request.resource.data.keys().hasOnly([
+          'type', 'actorId', 'actorName', 'pollId', 'pollTitle',
+          'slotId', 'slotStartsAt', 'details', 'occurredAt'
+        ])
+        && request.resource.data.type in [
+          'poll_created', 'poll_archived', 'poll_reopened', 'poll_deleted',
+          'slot_created', 'slot_rescheduled', 'slot_deleted',
+          'signup_joined', 'signup_left', 'starter_substituted',
+          'slot_booked', 'slot_unbooked'
+        ]
+        && request.resource.data.actorId == request.auth.uid
+        && request.resource.data.actorName is string
+        && request.resource.data.actorName.size() >= 2
+        && request.resource.data.actorName.size() <= 40
+        && request.resource.data.pollId is string
+        && request.resource.data.pollTitle is string
+        && (!request.resource.data.keys().hasAny(['slotId'])
+          || request.resource.data.slotId is string)
+        && (!request.resource.data.keys().hasAny(['slotStartsAt'])
+          || request.resource.data.slotStartsAt is string)
+        && request.resource.data.details is map
+        && request.resource.data.occurredAt == request.time;
+    }
+
+    function validSlotView() {
+      return request.resource.data.keys().hasOnly([
+          'pollId', 'pollTitle', 'slotId', 'slotStartsAt',
+          'viewerId', 'viewerName', 'firstViewedAt', 'lastViewedAt', 'viewCount'
+        ])
+        && request.resource.data.pollId is string
+        && request.resource.data.pollTitle is string
+        && request.resource.data.slotId is string
+        && request.resource.data.slotStartsAt is string
+        && request.resource.data.viewerId == request.auth.uid
+        && request.resource.data.viewerName is string
+        && request.resource.data.viewerName.size() >= 2
+        && request.resource.data.viewerName.size() <= 40
+        && request.resource.data.firstViewedAt is timestamp
+        && request.resource.data.lastViewedAt is timestamp
+        && request.resource.data.viewCount is int
+        && request.resource.data.viewCount >= 1;
+    }
+
     match /users/{userId} {
       allow read: if isMember();
       allow create: if isMember()
@@ -127,6 +171,33 @@ service cloud.firestore {
 
     match /notificationDeliveries/{deliveryId} {
       allow read, write: if isNotifier();
+    }
+
+    match /activityEvents/{eventId} {
+      allow read: if isMember();
+      allow create: if isMember() && validActivityEvent();
+      allow update, delete: if false;
+    }
+
+    match /slotViews/{viewId} {
+      allow read: if isMember();
+      allow create: if isMember()
+        && validSlotView()
+        && request.resource.data.firstViewedAt == request.time
+        && request.resource.data.lastViewedAt == request.time
+        && request.resource.data.viewCount == 1;
+      allow update: if isMember()
+        && validSlotView()
+        && request.resource.data.pollId == resource.data.pollId
+        && request.resource.data.slotId == resource.data.slotId
+        && request.resource.data.viewerId == resource.data.viewerId
+        && request.resource.data.firstViewedAt == resource.data.firstViewedAt
+        && request.resource.data.lastViewedAt == request.time
+        && request.resource.data.viewCount == resource.data.viewCount + 1
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'pollTitle', 'slotStartsAt', 'viewerName', 'lastViewedAt', 'viewCount'
+        ]);
+      allow delete: if false;
     }
 
     match /matchRatingResponses/{responseId} {
