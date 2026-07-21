@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Archive, CalendarDays, CalendarPlus, RotateCcw } from 'lucide-react'
 import type { MemberProfile, PadelPoll, SessionUser, SlotInput } from '../types'
-import { getSlotPhase } from '../lib/domain'
+import { getSlotPhase, isBookingCandidate } from '../lib/domain'
 import { weekLabel } from '../lib/format'
 import { resolveMemberName } from '../lib/memberNames'
 import { repository } from '../lib/repository'
@@ -18,7 +18,7 @@ interface PollCardProps {
   onError: (message: string) => void
 }
 
-export type PollSlotFilter = 'all' | 'unbooked' | 'booked'
+export type PollSlotFilter = 'all' | 'booking' | 'booked'
 
 export function PollCard({ poll, user, members, slotFilter = 'all', onPollChange, onNotify, onError }: PollCardProps) {
   const [showAddSlot, setShowAddSlot] = useState(false)
@@ -27,7 +27,7 @@ export function PollCard({ poll, user, members, slotFilter = 'all', onPollChange
   const visibleSlots = poll.slots.filter((slot) => (
     slotFilter === 'all'
     || (slotFilter === 'booked' && getSlotPhase(slot) === 'booked')
-    || (slotFilter === 'unbooked' && getSlotPhase(slot) !== 'booked')
+    || (slotFilter === 'booking' && isBookingCandidate(slot))
   ))
 
   const toggleStatus = async () => {

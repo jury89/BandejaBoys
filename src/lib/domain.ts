@@ -185,6 +185,10 @@ export function getSlotPhase(slot: PadelSlot): SlotPhase {
   return getStarters(slot).length >= MAX_STARTERS ? 'ready' : 'collecting'
 }
 
+export function isBookingCandidate(slot: PadelSlot): boolean {
+  return !slot.bookedAt && getStarters(slot).length === 3
+}
+
 export function getUpcomingPolls(polls: PadelPoll[], now = Date.now()): PadelPoll[] {
   return polls
     .map((poll) => ({

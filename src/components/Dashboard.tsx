@@ -7,6 +7,7 @@ import {
   getPendingMatchRatingPrompts,
   getSlotPhase,
   getUpcomingPolls,
+  isBookingCandidate,
   padelDateTimeToTimestamp,
 } from '../lib/domain'
 import { firstName, slotDateParts } from '../lib/format'
@@ -37,11 +38,11 @@ const feedCopy: Record<FeedFilter, {
     emptyHeading: 'Ancora nessun sondaggio.',
     emptyBody: 'Proponi gli slot della prossima settimana e fai partire le adesioni.',
   },
-  unbooked: {
+  booking: {
     eyebrow: 'Campi da organizzare',
     heading: 'Slot da prenotare',
     emptyHeading: 'Nessuno slot da prenotare.',
-    emptyBody: 'Gli slot senza campo confermato compariranno qui.',
+    emptyBody: 'Gli slot con tre titolari e campo non confermato compariranno qui.',
   },
   booked: {
     eyebrow: 'Partite confermate',
@@ -187,17 +188,20 @@ export function Dashboard() {
     (total, poll) => total + poll.slots.filter((slot) => getSlotPhase(slot) === 'booked').length,
     0,
   )
-  const unbookedSlotCount = totalSlotCount - bookedSlotCount
+  const bookingCandidateSlotCount = upcomingPolls.reduce(
+    (total, poll) => total + poll.slots.filter(isBookingCandidate).length,
+    0,
+  )
   const visiblePolls = upcomingPolls.filter(
     (poll) => poll.slots.some((slot) => (
       feedFilter === 'all'
       || (feedFilter === 'booked' && getSlotPhase(slot) === 'booked')
-      || (feedFilter === 'unbooked' && getSlotPhase(slot) !== 'booked')
+      || (feedFilter === 'booking' && isBookingCandidate(slot))
     )),
   )
   const visibleSlotCount = feedFilter === 'all'
     ? totalSlotCount
-    : feedFilter === 'booked' ? bookedSlotCount : unbookedSlotCount
+    : feedFilter === 'booked' ? bookedSlotCount : bookingCandidateSlotCount
   const currentFeedCopy = feedCopy[feedFilter]
   const notify = (message: string) => setToast({ message, tone: 'success' })
   const reportError = (message: string) => setToast({ message, tone: 'error' })
@@ -284,15 +288,15 @@ export function Dashboard() {
             <strong>{totalSlotCount}</strong>
           </button>
           <button
-            className={feedFilter === 'unbooked' ? 'is-active' : ''}
+            className={feedFilter === 'booking' ? 'is-active' : ''}
             type="button"
-            aria-label={`Slot da prenotare, ${unbookedSlotCount}`}
-            aria-pressed={feedFilter === 'unbooked'}
-            onClick={() => setFeedFilter('unbooked')}
+            aria-label={`Slot da prenotare, ${bookingCandidateSlotCount}`}
+            aria-pressed={feedFilter === 'booking'}
+            onClick={() => setFeedFilter('booking')}
           >
             <CalendarClock size={17} />
             <span>Da prenotare</span>
-            <strong>{unbookedSlotCount}</strong>
+            <strong>{bookingCandidateSlotCount}</strong>
           </button>
           <button
             className={feedFilter === 'booked' ? 'is-active' : ''}

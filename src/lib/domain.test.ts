@@ -9,6 +9,7 @@ import {
   getSlotPhase,
   getStarters,
   getUpcomingPolls,
+  isBookingCandidate,
   makePoll,
   nextMondayDate,
   padelDateTimeToTimestamp,
@@ -284,6 +285,22 @@ describe('stato slot e creazione sondaggio', () => {
     const ready = slot(['a', 'b', 'c', 'd'].map((id, index) => signup(id, index)))
     expect(getSlotPhase(ready)).toBe('ready')
     expect(getSlotPhase({ ...ready, bookedAt: 12 })).toBe('booked')
+  })
+
+  it('considera da prenotare solo uno slot non confermato con tre titolari', () => {
+    const twoPlayers = slot(['a', 'b'].map((id, index) => signup(id, index)))
+    const threePlayers = slot(['a', 'b', 'c'].map((id, index) => signup(id, index)))
+    const threePlayersAndReserve = slot([
+      ...threePlayers.signups,
+      { ...signup('reserve', 4), role: 'reserve' },
+    ])
+    const fourPlayers = slot(['a', 'b', 'c', 'd'].map((id, index) => signup(id, index)))
+
+    expect(isBookingCandidate(twoPlayers)).toBe(false)
+    expect(isBookingCandidate(threePlayers)).toBe(true)
+    expect(isBookingCandidate(threePlayersAndReserve)).toBe(true)
+    expect(isBookingCandidate(fourPlayers)).toBe(false)
+    expect(isBookingCandidate({ ...threePlayers, bookedAt: 12 })).toBe(false)
   })
 
   it('registra sempre la prenotazione all’Oasi Boschetto senza richiedere quattro giocatori', () => {
