@@ -142,6 +142,39 @@ describe('azioni dello slot', () => {
     expect(screen.getByText('Confermato')).toBeInTheDocument()
   })
 
+  it('distingue un orario indicativo e lo mostra confermato dopo la prenotazione', () => {
+    const tentativeSlot = { ...slot, timeIsTentative: true }
+    const { rerender } = render(
+      <SlotCard
+        poll={{ ...poll, slots: [tentativeSlot] }}
+        slot={tentativeSlot}
+        user={user}
+        members={[user]}
+        onPollChange={vi.fn()}
+        onNotify={vi.fn()}
+        onError={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByText('Orario indicativo')).toBeInTheDocument()
+
+    const bookedTentativeSlot = setSlotBooking(tentativeSlot, user, 20)
+    rerender(
+      <SlotCard
+        poll={{ ...poll, slots: [bookedTentativeSlot] }}
+        slot={bookedTentativeSlot}
+        user={user}
+        members={[user]}
+        onPollChange={vi.fn()}
+        onNotify={vi.fn()}
+        onError={vi.fn()}
+      />,
+    )
+
+    expect(screen.queryByText('Orario indicativo')).not.toBeInTheDocument()
+    expect(screen.getByText('Orario confermato')).toBeInTheDocument()
+  })
+
   it('modifica data e ora di uno slot esistente', async () => {
     const reschedule = vi.spyOn(repository, 'rescheduleSlot').mockResolvedValue(poll)
     const onNotify = vi.fn()
@@ -158,12 +191,19 @@ describe('azioni dello slot', () => {
     )
 
     fireEvent.click(screen.getByRole('button', { name: 'Modifica data e ora dello slot' }))
+    expect(screen.getByLabelText('Nuova data e ora')).toHaveAttribute('step', '1800')
     fireEvent.change(screen.getByLabelText('Nuova data e ora'), {
       target: { value: '2026-07-29T20:30' },
     })
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Orario indicativo' }))
     fireEvent.click(screen.getByRole('button', { name: 'Salva data e ora' }))
 
-    await waitFor(() => expect(reschedule).toHaveBeenCalledWith(poll.id, slot.id, '2026-07-29T20:30'))
+    await waitFor(() => expect(reschedule).toHaveBeenCalledWith(
+      poll.id,
+      slot.id,
+      '2026-07-29T20:30',
+      true,
+    ))
     expect(onNotify).toHaveBeenCalledWith('Data e ora dello slot aggiornate.')
   })
 

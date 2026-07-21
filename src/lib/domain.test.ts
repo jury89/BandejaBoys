@@ -189,6 +189,19 @@ describe('stato slot e creazione sondaggio', () => {
     )).toThrow('due slot uguali')
   })
 
+  it('accetta soltanto orari alla mezz’ora o all’ora esatta', () => {
+    const creator: SessionUser = member('jury', 'Jury')
+
+    expect(() => makePoll(
+      {
+        title: 'Orario non valido',
+        targetWeekStart: '2026-07-27',
+        slots: [{ startsAt: '2026-07-28T19:15', durationMinutes: 90 }],
+      },
+      creator,
+    )).toThrow('minuti 00 oppure 30')
+  })
+
   it('calcola sempre il lunedì della settimana successiva', () => {
     expect(nextMondayDate(new Date('2026-07-20T12:00:00'))).toBe('2026-07-27')
     expect(nextMondayDate(new Date('2026-07-22T12:00:00'))).toBe('2026-07-27')
@@ -215,7 +228,7 @@ describe('stato slot e creazione sondaggio', () => {
       slots: [booked, later],
     }
 
-    const updated = rescheduleSlot(current, booked.id, '2026-07-31T20:00', 99)
+    const updated = rescheduleSlot(current, booked.id, '2026-07-31T20:00', 99, true)
 
     expect(updated.updatedAt).toBe(99)
     expect(updated.slots.map((item) => item.id)).toEqual(['slot-2', 'slot-1'])
@@ -223,6 +236,7 @@ describe('stato slot e creazione sondaggio', () => {
       startsAt: new Date('2026-07-31T20:00').toISOString(),
       venue: 'Bandeja Club',
       bookedAt: 10,
+      timeIsTentative: true,
       signups: booked.signups,
     })
     expect(() => rescheduleSlot(current, booked.id, later.startsAt)).toThrow('Esiste già uno slot')
@@ -243,7 +257,7 @@ describe('stato slot e creazione sondaggio', () => {
 
     const updated = addSlotToPoll(
       current,
-      { startsAt: '2026-07-27T18:30', durationMinutes: 90 },
+      { startsAt: '2026-07-27T18:30', durationMinutes: 90, timeIsTentative: true },
       member('ale', 'Ale'),
       99,
     )
@@ -255,6 +269,7 @@ describe('stato slot e creazione sondaggio', () => {
       createdAt: 99,
       createdBy: 'ale',
       createdByName: 'Ale',
+      timeIsTentative: true,
       signups: [],
     })
   })

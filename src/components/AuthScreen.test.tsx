@@ -43,11 +43,11 @@ describe('accesso locale', () => {
     const editButtons = await screen.findAllByRole('button', { name: 'Modifica data e ora dello slot' })
     fireEvent.click(editButtons[0])
     fireEvent.change(screen.getByLabelText('Nuova data e ora'), {
-      target: { value: '2026-08-15T18:45' },
+      target: { value: '2026-08-15T18:30' },
     })
     fireEvent.click(screen.getByRole('button', { name: 'Salva data e ora' }))
 
-    expect(await screen.findByText('18:45')).toBeInTheDocument()
+    expect(await screen.findByText('18:30')).toBeInTheDocument()
     expect(screen.getByText('Data e ora dello slot aggiornate.')).toBeInTheDocument()
   }, 15_000)
 

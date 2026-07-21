@@ -15,19 +15,20 @@
 ## Flusso settimanale
 
 1. Un membro crea un sondaggio, di solito il lunedì, indicando la settimana successiva.
-2. Il sondaggio contiene uno o più slot con data, ora e durata.
+2. Il sondaggio contiene uno o più slot con data, ora e durata. I minuti ammessi sono soltanto `00` e `30`; uno slot può inoltre conservare `timeIsTentative` per comunicare che l’orario è ancora indicativo.
    Qualunque membro può aggiungere altri slot finché il sondaggio resta aperto; l’operazione è transazionale e non modifica quelli esistenti.
 3. Al momento dell’adesione il giocatore sceglie esplicitamente **Titolare** o **Riserva**; ogni adesione conserva anche il timestamp per mantenere la precedenza cronologica.
 4. I titolari sono al massimo quattro. Una riserva volontaria non occupa un posto libero; quando una formazione di quattro perde un titolare, la prima riserva viene promossa automaticamente.
 5. Quando lo slot raggiunge quattro titolari passa automaticamente a **Da prenotare**; è un suggerimento operativo, non un requisito per la prenotazione.
 6. Qualunque membro autenticato può usare **Segna come prenotato** per registrare il campo all’**Oasi Boschetto** con un solo tocco, anche se i quattro giocatori non sono ancora completi. Il circolo è una costante di dominio e non viene richiesto nell’interfaccia.
+   Se lo slot era stato proposto con un orario indicativo, la presenza di `bookedAt` lo fa apparire come **Orario confermato**. Il flag resta memorizzato: annullando la prenotazione, l’interfaccia torna correttamente a mostrare l’orario come indicativo.
 7. L'autore può archiviare il sondaggio quando non serve più raccogliere modifiche.
 
 La bacheca non separa più i sondaggi in due viste aperti/archiviati. Il filtro sticky sotto l’header offre **Tutti**, che mantiene consultabile l’intera cronologia, e **Slot prenotati**, che include soltanto i sondaggi con almeno una prenotazione e mostra al loro interno esclusivamente gli slot prenotati. Le schede dei sondaggi archiviati restano riconoscibili e non consentono modifiche.
 
 Nella griglia desktop ogni scheda usa una fascia di prenotazione della stessa altezza: verde pieno con i dettagli della conferma oppure ambra e marcata **Campo da prenotare / In attesa**. Il contrasto cromatico rende distinguibili gli stati a colpo d’occhio e mantiene campo, riserve e footer allineati tra colonne miste. Su mobile la fascia ambra viene omessa per mantenere la scheda compatta, mentre il badge e la fascia verde della conferma restano visibili.
 
-Data e ora di uno slot già pubblicato possono essere corrette da qualunque membro autenticato. La modifica conserva adesioni, riserve e dati del campo, impedisce duplicati e riordina gli slot cronologicamente.
+Data, ora e indicazione provvisoria di uno slot già pubblicato possono essere corrette da qualunque membro autenticato. La modifica conserva adesioni, riserve e dati del campo, accetta soltanto orari all’ora o alla mezz’ora, impedisce duplicati e riordina gli slot cronologicamente.
 
 Il nome mostrato viene risolto sempre dal profilo `users/{uid}` più recente. Le copie presenti in adesioni, prenotazioni e sondaggi restano soltanto un fallback per profili non più disponibili; la parte locale dell’email non viene mai usata come nome. Al termine della registrazione l’`AuthContext` applica subito il profilo completo, evitando lo stato transitorio prodotto da Firebase prima dell’aggiornamento di `displayName`.
 
@@ -83,7 +84,7 @@ polls/{pollId}
   title, targetWeekStart, createdBy, createdByName
   createdAt, updatedAt, status
   slots[]
-    id, startsAt, durationMinutes, venue
+    id, startsAt, durationMinutes, timeIsTentative?, venue
     createdAt?, createdBy?, createdByName?
     bookedAt?, bookedBy?, bookedByName?
     signups[]

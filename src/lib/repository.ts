@@ -38,7 +38,12 @@ export interface PadelRepository {
   addSlot(pollId: string, input: SlotInput, creator: SessionUser): Promise<PadelPoll>
   joinSlot(pollId: string, slotId: string, member: SessionUser, role: SignupRole): Promise<PadelPoll>
   leaveSlot(pollId: string, slotId: string, userId: string): Promise<PadelPoll>
-  rescheduleSlot(pollId: string, slotId: string, startsAt: string): Promise<PadelPoll>
+  rescheduleSlot(
+    pollId: string,
+    slotId: string,
+    startsAt: string,
+    timeIsTentative: boolean,
+  ): Promise<PadelPoll>
   substitute(
     pollId: string,
     slotId: string,
@@ -102,8 +107,10 @@ function remoteRepository(): PadelRepository {
     async leaveSlot(pollId, slotId, userId) {
       return mutatePoll(pollId, (poll) => updateSlot(poll, slotId, (slot) => removeSignup(slot, userId)))
     },
-    async rescheduleSlot(pollId, slotId, startsAt) {
-      return mutatePoll(pollId, (poll) => rescheduleSlot(poll, slotId, startsAt))
+    async rescheduleSlot(pollId, slotId, startsAt, timeIsTentative) {
+      return mutatePoll(pollId, (poll) =>
+        rescheduleSlot(poll, slotId, startsAt, Date.now(), timeIsTentative),
+      )
     },
     async substitute(pollId, slotId, outgoingUserId, replacement) {
       return mutatePoll(pollId, (poll) =>
@@ -236,8 +243,10 @@ function localRepository(): PadelRepository {
     async leaveSlot(pollId, slotId, userId) {
       return mutate(pollId, (poll) => updateSlot(poll, slotId, (slot) => removeSignup(slot, userId)))
     },
-    async rescheduleSlot(pollId, slotId, startsAt) {
-      return mutate(pollId, (poll) => rescheduleSlot(poll, slotId, startsAt))
+    async rescheduleSlot(pollId, slotId, startsAt, timeIsTentative) {
+      return mutate(pollId, (poll) =>
+        rescheduleSlot(poll, slotId, startsAt, Date.now(), timeIsTentative),
+      )
     },
     async substitute(pollId, slotId, outgoingUserId, replacement) {
       return mutate(pollId, (poll) =>

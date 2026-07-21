@@ -1,5 +1,5 @@
 import { useMemo, useState, type FormEvent } from 'react'
-import { CalendarPlus } from 'lucide-react'
+import { CalendarPlus, Clock3 } from 'lucide-react'
 import type { PadelPoll, SlotInput } from '../types'
 import { defaultSlotForWeek, toDateTimeInput } from '../lib/domain'
 import { Modal } from './Modal'
@@ -14,7 +14,11 @@ interface AddSlotModalProps {
 function initialSlot(poll: PadelPoll): SlotInput {
   const latest = [...poll.slots].sort((left, right) => right.startsAt.localeCompare(left.startsAt))[0]
   if (!latest) {
-    return { startsAt: defaultSlotForWeek(poll.targetWeekStart, 1), durationMinutes: 90 }
+    return {
+      startsAt: defaultSlotForWeek(poll.targetWeekStart, 1),
+      durationMinutes: 90,
+      timeIsTentative: false,
+    }
   }
 
   const nextDay = new Date(latest.startsAt)
@@ -22,6 +26,7 @@ function initialSlot(poll: PadelPoll): SlotInput {
   return {
     startsAt: toDateTimeInput(nextDay),
     durationMinutes: latest.durationMinutes,
+    timeIsTentative: false,
   }
 }
 
@@ -29,6 +34,7 @@ export function AddSlotModal({ poll, onClose, onSave, onDone }: AddSlotModalProp
   const initial = useMemo(() => initialSlot(poll), [poll])
   const [startsAt, setStartsAt] = useState(initial.startsAt)
   const [durationMinutes, setDurationMinutes] = useState(initial.durationMinutes)
+  const [timeIsTentative, setTimeIsTentative] = useState(Boolean(initial.timeIsTentative))
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
@@ -42,7 +48,7 @@ export function AddSlotModal({ poll, onClose, onSave, onDone }: AddSlotModalProp
     setBusy(true)
     setError('')
     try {
-      await onSave({ startsAt, durationMinutes })
+      await onSave({ startsAt, durationMinutes, timeIsTentative })
       onDone('Slot aggiunto. Gli altri riceveranno un unico avviso raggruppato.')
       onClose()
     } catch (caught) {
@@ -62,6 +68,7 @@ export function AddSlotModal({ poll, onClose, onSave, onDone }: AddSlotModalProp
           <span>Data e ora</span>
           <input
             type="datetime-local"
+            step={1800}
             value={startsAt}
             onChange={(event) => setStartsAt(event.target.value)}
             autoFocus
@@ -78,6 +85,19 @@ export function AddSlotModal({ poll, onClose, onSave, onDone }: AddSlotModalProp
             <option value={90}>90 min</option>
             <option value={120}>120 min</option>
           </select>
+        </label>
+        <label className="time-certainty-option">
+          <input
+            type="checkbox"
+            checked={timeIsTentative}
+            onChange={(event) => setTimeIsTentative(event.target.checked)}
+            aria-label="Orario indicativo"
+          />
+          <span className="time-certainty-option__icon" aria-hidden="true"><Clock3 size={18} /></span>
+          <span className="time-certainty-option__copy">
+            <strong>Orario indicativo</strong>
+            <small>Mostreremo che l’ora è provvisoria finché il campo non viene prenotato.</small>
+          </span>
         </label>
         {error && <p className="form-message form-message--error" role="alert">{error}</p>}
         <footer className="modal__actions">

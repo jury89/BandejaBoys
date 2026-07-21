@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState, type FormEvent } from 'react'
-import { CalendarPlus, CopyPlus, Plus, Trash2 } from 'lucide-react'
+import { CalendarPlus, Clock3, CopyPlus, Plus, Trash2 } from 'lucide-react'
 import type { CreatePollInput, SessionUser, SlotInput } from '../types'
 import { defaultSlotForWeek, nextMondayDate } from '../lib/domain'
 import { Modal } from './Modal'
@@ -30,8 +30,8 @@ export function CreatePollModal({ user, onClose, onCreate, onDone }: CreatePollM
   const [title, setTitle] = useState('Padel · prossima settimana')
   const [weekStart, setWeekStart] = useState(initialWeek)
   const [slots, setSlots] = useState<EditableSlot[]>([
-    { editorId: 'slot-1', startsAt: defaultSlotForWeek(initialWeek, 1), durationMinutes: 90 },
-    { editorId: 'slot-2', startsAt: defaultSlotForWeek(initialWeek, 3), durationMinutes: 90 },
+    { editorId: 'slot-1', startsAt: defaultSlotForWeek(initialWeek, 1), durationMinutes: 90, timeIsTentative: false },
+    { editorId: 'slot-2', startsAt: defaultSlotForWeek(initialWeek, 3), durationMinutes: 90, timeIsTentative: false },
   ])
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -67,7 +67,11 @@ export function CreatePollModal({ user, onClose, onCreate, onDone }: CreatePollM
     setBusy(true)
     setError('')
     try {
-      const slotInputs = slots.map(({ startsAt, durationMinutes }) => ({ startsAt, durationMinutes }))
+      const slotInputs = slots.map(({ startsAt, durationMinutes, timeIsTentative }) => ({
+        startsAt,
+        durationMinutes,
+        timeIsTentative,
+      }))
       await onCreate({ title, targetWeekStart: weekStart, slots: slotInputs }, user)
       onDone('Sondaggio creato. È ora di raccogliere le adesioni.')
       onClose()
@@ -107,6 +111,7 @@ export function CreatePollModal({ user, onClose, onCreate, onDone }: CreatePollM
                   editorId: `slot-${nextEditorId.current++}`,
                   startsAt: defaultSlotForWeek(weekStart, current.length * 2 + 1),
                   durationMinutes: 90,
+                  timeIsTentative: false,
                 },
               ])}
             >
@@ -123,6 +128,7 @@ export function CreatePollModal({ user, onClose, onCreate, onDone }: CreatePollM
                   <span>Data e ora</span>
                   <input
                     type="datetime-local"
+                    step={1800}
                     value={slot.startsAt}
                     onChange={(event) => updateSlotInput(index, { startsAt: event.target.value })}
                     required
@@ -138,6 +144,19 @@ export function CreatePollModal({ user, onClose, onCreate, onDone }: CreatePollM
                     <option value={90}>90 min</option>
                     <option value={120}>120 min</option>
                   </select>
+                </label>
+                <label className="time-certainty-option time-certainty-option--compact">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(slot.timeIsTentative)}
+                    onChange={(event) => updateSlotInput(index, { timeIsTentative: event.target.checked })}
+                    aria-label={`Orario indicativo per slot ${index + 1}`}
+                  />
+                  <span className="time-certainty-option__icon" aria-hidden="true"><Clock3 size={15} /></span>
+                  <span className="time-certainty-option__copy">
+                    <strong>Orario indicativo</strong>
+                    <small>Si conferma quando prenoti il campo</small>
+                  </span>
                 </label>
                 <div className="slot-editor__actions">
                   <button

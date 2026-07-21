@@ -26,7 +26,9 @@ describe('aggiunta di uno slot', () => {
     render(<AddSlotModal poll={poll} onClose={vi.fn()} onSave={vi.fn()} onDone={vi.fn()} />)
 
     expect(screen.getByLabelText('Data e ora')).toHaveValue('2026-07-29T18:30')
+    expect(screen.getByLabelText('Data e ora')).toHaveAttribute('step', '1800')
     expect(screen.getByLabelText('Durata')).toHaveValue('120')
+    expect(screen.getByRole('checkbox', { name: 'Orario indicativo' })).not.toBeChecked()
   })
 
   it('salva il nuovo slot e spiega che la notifica sarà raggruppata', async () => {
@@ -39,9 +41,24 @@ describe('aggiunta di uno slot', () => {
     await waitFor(() => expect(onSave).toHaveBeenCalledWith({
       startsAt: '2026-07-29T18:30',
       durationMinutes: 120,
+      timeIsTentative: false,
     }))
     expect(onDone).toHaveBeenCalledWith(
       'Slot aggiunto. Gli altri riceveranno un unico avviso raggruppato.',
     )
+  })
+
+  it('salva la scelta di mostrare l’orario come indicativo', async () => {
+    const onSave = vi.fn().mockResolvedValue(undefined)
+    render(<AddSlotModal poll={poll} onClose={vi.fn()} onSave={onSave} onDone={vi.fn()} />)
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Orario indicativo' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Aggiungi slot' }))
+
+    await waitFor(() => expect(onSave).toHaveBeenCalledWith({
+      startsAt: '2026-07-29T18:30',
+      durationMinutes: 120,
+      timeIsTentative: true,
+    }))
   })
 })

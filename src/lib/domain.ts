@@ -174,11 +174,9 @@ export function rescheduleSlot(
   slotId: string,
   startsAt: string,
   updatedAt = Date.now(),
+  timeIsTentative?: boolean,
 ): PadelPoll {
-  const date = new Date(startsAt)
-  if (Number.isNaN(date.getTime())) throw new Error('Scegli una data e un orario validi.')
-
-  const normalizedStartsAt = date.toISOString()
+  const normalizedStartsAt = normalizeStartsAt(startsAt)
   if (poll.slots.some((slot) => slot.id !== slotId && slot.startsAt === normalizedStartsAt)) {
     throw new Error('Esiste già uno slot con questa data e questo orario.')
   }
@@ -186,7 +184,11 @@ export function rescheduleSlot(
   const updated = updateSlot(
     poll,
     slotId,
-    (slot) => ({ ...slot, startsAt: normalizedStartsAt }),
+    (slot) => ({
+      ...slot,
+      startsAt: normalizedStartsAt,
+      ...(timeIsTentative === undefined ? {} : { timeIsTentative }),
+    }),
     updatedAt,
   )
   return {
@@ -195,13 +197,24 @@ export function rescheduleSlot(
   }
 }
 
-function normalizeSlotInput(input: SlotInput) {
-  const date = new Date(input.startsAt)
+function normalizeStartsAt(startsAt: string) {
+  const date = new Date(startsAt)
   if (Number.isNaN(date.getTime())) throw new Error('Scegli una data e un orario validi.')
+  if (![0, 30].includes(date.getMinutes()) || date.getSeconds() !== 0 || date.getMilliseconds() !== 0) {
+    throw new Error('Scegli un orario con minuti 00 oppure 30.')
+  }
+  return date.toISOString()
+}
+
+function normalizeSlotInput(input: SlotInput) {
   if (![60, 90, 120].includes(input.durationMinutes)) {
     throw new Error('Scegli una durata valida per lo slot.')
   }
-  return { startsAt: date.toISOString(), durationMinutes: input.durationMinutes }
+  return {
+    startsAt: normalizeStartsAt(input.startsAt),
+    durationMinutes: input.durationMinutes,
+    timeIsTentative: Boolean(input.timeIsTentative),
+  }
 }
 
 export function addSlotToPoll(
@@ -264,6 +277,7 @@ export function makePoll(
         id: makeId(`slot${index + 1}`),
         startsAt: slot.startsAt,
         durationMinutes: slot.durationMinutes,
+        timeIsTentative: slot.timeIsTentative,
         createdAt: now,
         createdBy: creator.id,
         createdByName: creator.displayName,
