@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Bell, BellRing, CalendarCheck2, CalendarDays, CalendarPlus, CheckCircle2, ChevronDown, CircleUserRound, LogOut, UsersRound } from 'lucide-react'
+import { Bell, BellRing, CalendarCheck2, CalendarClock, CalendarDays, CalendarPlus, CheckCircle2, ChevronDown, CircleUserRound, LogOut, UsersRound } from 'lucide-react'
 import { useAuth } from '../AuthContext'
 import type { MatchRatingResponse, MatchRatingSubmission, MemberProfile, PadelPoll } from '../types'
 import {
@@ -19,11 +19,37 @@ import { Brand } from './Brand'
 import { CreatePollModal } from './CreatePollModal'
 import { MatchRatingModal } from './MatchRatingModal'
 import { NotificationCallup } from './NotificationCallup'
-import { PollCard } from './PollCard'
+import { PollCard, type PollSlotFilter } from './PollCard'
 import { ProfileAvatar } from './ProfileAvatar'
 import { ProfileModal } from './ProfileModal'
 
-type FeedFilter = 'all' | 'booked'
+type FeedFilter = PollSlotFilter
+
+const feedCopy: Record<FeedFilter, {
+  eyebrow: string
+  heading: string
+  emptyHeading: string
+  emptyBody: string
+}> = {
+  all: {
+    eyebrow: 'Bacheca completa',
+    heading: 'Tutti gli slot',
+    emptyHeading: 'Ancora nessun sondaggio.',
+    emptyBody: 'Proponi gli slot della prossima settimana e fai partire le adesioni.',
+  },
+  unbooked: {
+    eyebrow: 'Campi da organizzare',
+    heading: 'Slot da prenotare',
+    emptyHeading: 'Nessuno slot da prenotare.',
+    emptyBody: 'Gli slot senza campo confermato compariranno qui.',
+  },
+  booked: {
+    eyebrow: 'Partite confermate',
+    heading: 'Slot prenotati',
+    emptyHeading: 'Nessuno slot prenotato.',
+    emptyBody: 'Quando un campo viene confermato, lo slot comparirà qui.',
+  },
+}
 
 export function Dashboard() {
   const { user, signOut, updateProfile } = useAuth()
@@ -161,10 +187,18 @@ export function Dashboard() {
     (total, poll) => total + poll.slots.filter((slot) => getSlotPhase(slot) === 'booked').length,
     0,
   )
+  const unbookedSlotCount = totalSlotCount - bookedSlotCount
   const visiblePolls = upcomingPolls.filter(
-    (poll) => feedFilter === 'all' || poll.slots.some((slot) => getSlotPhase(slot) === 'booked'),
+    (poll) => poll.slots.some((slot) => (
+      feedFilter === 'all'
+      || (feedFilter === 'booked' && getSlotPhase(slot) === 'booked')
+      || (feedFilter === 'unbooked' && getSlotPhase(slot) !== 'booked')
+    )),
   )
-  const visibleSlotCount = feedFilter === 'all' ? totalSlotCount : bookedSlotCount
+  const visibleSlotCount = feedFilter === 'all'
+    ? totalSlotCount
+    : feedFilter === 'booked' ? bookedSlotCount : unbookedSlotCount
+  const currentFeedCopy = feedCopy[feedFilter]
   const notify = (message: string) => setToast({ message, tone: 'success' })
   const reportError = (message: string) => setToast({ message, tone: 'error' })
   const updatePoll = (updatedPoll: PadelPoll) => {
@@ -241,6 +275,7 @@ export function Dashboard() {
           <button
             className={feedFilter === 'all' ? 'is-active' : ''}
             type="button"
+            aria-label={`Tutti, ${totalSlotCount} slot`}
             aria-pressed={feedFilter === 'all'}
             onClick={() => setFeedFilter('all')}
           >
@@ -249,13 +284,25 @@ export function Dashboard() {
             <strong>{totalSlotCount}</strong>
           </button>
           <button
+            className={feedFilter === 'unbooked' ? 'is-active' : ''}
+            type="button"
+            aria-label={`Slot da prenotare, ${unbookedSlotCount}`}
+            aria-pressed={feedFilter === 'unbooked'}
+            onClick={() => setFeedFilter('unbooked')}
+          >
+            <CalendarClock size={17} />
+            <span>Da prenotare</span>
+            <strong>{unbookedSlotCount}</strong>
+          </button>
+          <button
             className={feedFilter === 'booked' ? 'is-active' : ''}
             type="button"
+            aria-label={`Slot prenotati, ${bookedSlotCount}`}
             aria-pressed={feedFilter === 'booked'}
             onClick={() => setFeedFilter('booked')}
           >
             <CalendarCheck2 size={17} />
-            <span>Slot prenotati</span>
+            <span>Prenotati</span>
             <strong>{bookedSlotCount}</strong>
           </button>
         </div>
@@ -285,7 +332,7 @@ export function Dashboard() {
           </div>
           <div className={stats.ready > 0 ? 'scoreboard__urgent' : ''}>
             <span className="scoreboard__icon"><BellRing size={20} /></span>
-            <p><strong>{stats.ready}</strong><span>Slot da<br />prenotare</span></p>
+            <p><strong>{stats.ready}</strong><span>Pronti da<br />prenotare</span></p>
           </div>
           <div className="scoreboard__next">
             <span className="scoreboard__icon"><CheckCircle2 size={20} /></span>
@@ -299,8 +346,8 @@ export function Dashboard() {
 
         <section className="feed-heading">
           <div>
-            <p className="eyebrow">{feedFilter === 'all' ? 'Bacheca completa' : 'Partite confermate'}</p>
-            <h2>{feedFilter === 'all' ? 'Tutti gli slot' : 'Slot prenotati'}</h2>
+            <p className="eyebrow">{currentFeedCopy.eyebrow}</p>
+            <h2>{currentFeedCopy.heading}</h2>
           </div>
           <span>{visibleSlotCount} slot</span>
         </section>
@@ -315,7 +362,7 @@ export function Dashboard() {
                 poll={poll}
                 user={user}
                 members={members}
-                bookedOnly={feedFilter === 'booked'}
+                slotFilter={feedFilter}
                 onPollChange={updatePoll}
                 onNotify={notify}
                 onError={reportError}
@@ -326,8 +373,8 @@ export function Dashboard() {
           <section className="empty-state">
             <div className="empty-state__court" aria-hidden="true"><span /><i /><i /><i /><i /></div>
             <p className="eyebrow">Campo libero</p>
-            <h2>{feedFilter === 'all' ? 'Ancora nessun sondaggio.' : 'Nessuno slot prenotato.'}</h2>
-            <p>{feedFilter === 'all' ? 'Proponi gli slot della prossima settimana e fai partire le adesioni.' : 'Quando un campo viene confermato, lo slot comparirà qui.'}</p>
+            <h2>{currentFeedCopy.emptyHeading}</h2>
+            <p>{currentFeedCopy.emptyBody}</p>
             {feedFilter === 'all' && <button className="button button--primary" type="button" onClick={() => setCreateOpen(true)}><CalendarPlus size={18} /> Crea il primo sondaggio</button>}
           </section>
         )}

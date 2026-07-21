@@ -708,7 +708,7 @@ p {
 
 .feed-filter__inner {
   display: flex;
-  width: min(460px, 100%);
+  width: min(620px, 100%);
   align-items: center;
   margin: 0 auto;
   gap: 5px;
@@ -2805,6 +2805,10 @@ p {
   .feed-filter button {
     min-height: 42px;
     padding-inline: 8px;
+  }
+
+  .feed-filter button > svg {
+    display: none;
   }
 
   .account-menu__trigger > span:nth-child(2),

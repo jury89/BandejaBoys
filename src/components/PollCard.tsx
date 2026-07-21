@@ -12,19 +12,23 @@ interface PollCardProps {
   poll: PadelPoll
   user: SessionUser
   members: MemberProfile[]
-  bookedOnly?: boolean
+  slotFilter?: PollSlotFilter
   onPollChange: (poll: PadelPoll) => void
   onNotify: (message: string) => void
   onError: (message: string) => void
 }
 
-export function PollCard({ poll, user, members, bookedOnly = false, onPollChange, onNotify, onError }: PollCardProps) {
+export type PollSlotFilter = 'all' | 'unbooked' | 'booked'
+
+export function PollCard({ poll, user, members, slotFilter = 'all', onPollChange, onNotify, onError }: PollCardProps) {
   const [showAddSlot, setShowAddSlot] = useState(false)
   const canManage = poll.createdBy === user.id
   const creatorName = resolveMemberName(members, poll.createdBy, poll.createdByName)
-  const visibleSlots = bookedOnly
-    ? poll.slots.filter((slot) => getSlotPhase(slot) === 'booked')
-    : poll.slots
+  const visibleSlots = poll.slots.filter((slot) => (
+    slotFilter === 'all'
+    || (slotFilter === 'booked' && getSlotPhase(slot) === 'booked')
+    || (slotFilter === 'unbooked' && getSlotPhase(slot) !== 'booked')
+  ))
 
   const toggleStatus = async () => {
     try {
@@ -52,7 +56,7 @@ export function PollCard({ poll, user, members, bookedOnly = false, onPollChange
             <p className="poll-card__meta"><span>Creato da {creatorName}</span><span aria-hidden="true">·</span><strong>{visibleSlots.length} slot</strong></p>
           </div>
           <div className="poll-card__actions">
-            {poll.status === 'open' && !bookedOnly && (
+            {poll.status === 'open' && slotFilter !== 'booked' && (
               <button
                 className="button button--secondary button--small poll-card__action"
                 type="button"
