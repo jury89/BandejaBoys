@@ -526,6 +526,7 @@ p {
 .field {
   position: relative;
   display: flex;
+  min-width: 0;
   flex-direction: column;
   gap: 7px;
   color: #415b68;
@@ -536,6 +537,8 @@ p {
 .field input,
 .field select {
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
   min-height: 48px;
   padding: 11px 13px;
   border: 1px solid #c9d9df;
@@ -580,6 +583,8 @@ p {
 
 .slot-date-time__controls {
   display: grid;
+  width: 100%;
+  min-width: 0;
   grid-template-columns: minmax(0, 1fr) 64px 72px;
   gap: 7px;
 }
@@ -1950,17 +1955,23 @@ p {
 
 .poll-form {
   display: flex;
+  width: 100%;
+  min-width: 0;
   flex-direction: column;
   gap: 24px;
 }
 
 .poll-form__basics {
   display: grid;
+  width: 100%;
+  min-width: 0;
   grid-template-columns: 1.4fr 0.8fr;
   gap: 14px;
 }
 
 .slot-editor {
+  width: 100%;
+  min-width: 0;
   padding: 18px;
   border: 1px solid #d8e4e8;
   border-radius: 11px;
@@ -1988,12 +1999,15 @@ p {
 
 .slot-editor__list {
   display: flex;
+  min-width: 0;
   flex-direction: column;
   gap: 9px;
 }
 
 .slot-editor__row {
   display: grid;
+  width: 100%;
+  min-width: 0;
   align-items: end;
   padding: 12px;
   grid-template-columns: auto 1fr 105px auto;
@@ -2488,6 +2502,22 @@ p {
 
   .slot-date-time__part--date {
     grid-column: 1 / -1;
+  }
+
+  .field input[type='date'],
+  .slot-date-time__part input[type='date'] {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow: hidden;
+    appearance: none;
+    -webkit-appearance: none;
+  }
+
+  .field input[type='date']::-webkit-date-and-time-value,
+  .slot-date-time__part input[type='date']::-webkit-date-and-time-value {
+    min-width: 0;
+    text-align: left;
   }
 
   .booking-strip--pending {
