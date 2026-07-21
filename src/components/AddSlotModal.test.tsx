@@ -26,6 +26,7 @@ describe('aggiunta di uno slot', () => {
     render(<AddSlotModal poll={poll} onClose={vi.fn()} onSave={vi.fn()} onDone={vi.fn()} />)
 
     expect(screen.getByLabelText('Data')).toHaveValue('2026-07-29')
+    expect(screen.getByLabelText('Data')).not.toHaveFocus()
     expect(screen.getByLabelText('Ora')).toHaveValue('18')
     expect(screen.getByLabelText('Minuti')).toHaveValue('30')
     expect(Array.from(

@@ -30,6 +30,7 @@
 html {
   min-width: 320px;
   background: #eef5f7;
+  touch-action: pan-x pan-y;
 }
 
 body {
@@ -2322,6 +2323,12 @@ p {
 }
 
 @media (max-width: 760px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+
   .auth-layout {
     display: block;
   }

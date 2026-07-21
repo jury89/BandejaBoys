@@ -30,6 +30,8 @@ Nella griglia desktop ogni scheda usa una fascia di prenotazione della stessa al
 
 Data e ora di uno slot già pubblicato possono essere corrette da qualunque membro autenticato. La modifica conserva adesioni, riserve e dati del campo, accetta soltanto orari all’ora o alla mezz’ora, impedisce duplicati e riordina gli slot cronologicamente.
 
+Su mobile i campi `input`, `select` e `textarea` usano almeno `16px`, soglia che impedisce a Safari di ingrandire automaticamente la pagina al focus. I modal di aggiunta e modifica non applicano `autofocus`; il viewport limita inoltre la scala a `1`, come richiesto per l’interfaccia installabile.
+
 Il nome mostrato viene risolto sempre dal profilo `users/{uid}` più recente. Le copie presenti in adesioni, prenotazioni e sondaggi restano soltanto un fallback per profili non più disponibili; la parte locale dell’email non viene mai usata come nome. Al termine della registrazione l’`AuthContext` applica subito il profilo completo, evitando lo stato transitorio prodotto da Firebase prima dell’aggiornamento di `displayName`.
 
 Lo stato `ready` non viene salvato: è derivato dal numero di titolari. Lo stato `booked` dipende dalla presenza di `bookedAt`. In questo modo non possono esistere stati incoerenti. Le adesioni precedenti all’introduzione del campo `role` restano compatibili e vengono interpretate secondo il vecchio ordine cronologico.

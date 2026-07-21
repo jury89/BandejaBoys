@@ -192,6 +192,7 @@ describe('azioni dello slot', () => {
     )
 
     fireEvent.click(screen.getByRole('button', { name: 'Modifica data e ora dello slot' }))
+    expect(screen.getByLabelText('Data')).not.toHaveFocus()
     fireEvent.change(screen.getByLabelText('Data'), { target: { value: '2026-07-29' } })
     fireEvent.change(screen.getByLabelText('Ora'), { target: { value: '20' } })
     fireEvent.change(screen.getByLabelText('Minuti'), { target: { value: '30' } })

@@ -4,7 +4,6 @@ interface SlotDateTimeFieldProps {
   value: string
   onChange: (value: string) => void
   label?: string
-  autoFocus?: boolean
 }
 
 const hourOptions = Array.from({ length: 24 }, (_, hour) => String(hour).padStart(2, '0'))
@@ -23,7 +22,6 @@ export function SlotDateTimeField({
   value,
   onChange,
   label = 'Data e ora',
-  autoFocus = false,
 }: SlotDateTimeFieldProps) {
   const fieldId = useId()
   const { date, hour, minute } = dateTimeParts(value)
@@ -42,7 +40,6 @@ export function SlotDateTimeField({
             type="date"
             value={date}
             onChange={(event) => update(event.target.value, hour, minute)}
-            autoFocus={autoFocus}
             required
           />
         </label>

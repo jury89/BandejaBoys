@@ -47,7 +47,6 @@ export function EditSlotModal({ slot, onClose, onSave, onDone }: EditSlotModalPr
           label="Nuova data e ora"
           value={startsAt}
           onChange={setStartsAt}
-          autoFocus
         />
         {error && <p className="form-message form-message--error" role="alert">{error}</p>}
         <footer className="modal__actions">

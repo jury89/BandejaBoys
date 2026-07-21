@@ -62,7 +62,7 @@ export function AddSlotModal({ poll, onClose, onSave, onDone }: AddSlotModalProp
         <p className="modal__lead">
           Se aggiungi più slot entro pochi minuti, gli amici riceveranno una sola notifica.
         </p>
-        <SlotDateTimeField value={startsAt} onChange={setStartsAt} autoFocus />
+        <SlotDateTimeField value={startsAt} onChange={setStartsAt} />
         <label className="field">
           <span>Durata</span>
           <select
