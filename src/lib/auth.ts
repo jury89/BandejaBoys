@@ -6,10 +6,10 @@ import {
   signOut as firebaseSignOut,
   updateProfile,
 } from 'firebase/auth'
-import { doc, setDoc } from 'firebase/firestore'
+import { deleteField, doc, onSnapshot, setDoc, updateDoc } from 'firebase/firestore'
 import type { MemberProfile, SessionUser } from '../types'
 import { firebaseAuth, firestore, hasRemoteBackend } from './firebase'
-import { makeId } from './domain'
+import { makeId, profileNameError } from './domain'
 
 interface LocalAccount extends MemberProfile {
   passwordHash: string
@@ -39,6 +39,7 @@ function accountProfile(account: LocalAccount): MemberProfile {
     displayName: account.displayName,
     email: account.email,
     createdAt: account.createdAt,
+    avatarDataUrl: account.avatarDataUrl,
   }
 }
 
@@ -64,19 +65,47 @@ export function getLocalProfiles(): MemberProfile[] {
 }
 
 export function subscribeToSession(listener: (user: SessionUser | null) => void): () => void {
-  if (hasRemoteBackend && firebaseAuth) {
-    return onAuthStateChanged(firebaseAuth, (user) => {
-      listener(
-        user
-          ? {
-              id: user.uid,
-              displayName: user.displayName?.trim() || 'Giocatore',
-              email: user.email ?? '',
-              createdAt: Number(user.metadata.creationTime ? new Date(user.metadata.creationTime) : Date.now()),
-            }
-          : null,
+  if (hasRemoteBackend && firebaseAuth && firestore) {
+    const db = firestore
+    let stopProfile: (() => void) | null = null
+    const stopAuth = onAuthStateChanged(firebaseAuth, (user) => {
+      stopProfile?.()
+      stopProfile = null
+      if (!user) {
+        listener(null)
+        return
+      }
+
+      const fallback: SessionUser = {
+        id: user.uid,
+        displayName: user.displayName?.trim() || 'Giocatore',
+        email: user.email ?? '',
+        createdAt: Number(user.metadata.creationTime ? new Date(user.metadata.creationTime) : Date.now()),
+      }
+
+      stopProfile = onSnapshot(
+        doc(db, 'users', user.uid),
+        (snapshot) => {
+          if (!snapshot.exists()) {
+            listener(fallback)
+            return
+          }
+          const profile = snapshot.data() as Partial<MemberProfile>
+          listener({
+            ...fallback,
+            ...profile,
+            id: user.uid,
+            displayName: profile.displayName?.trim() || fallback.displayName,
+            email: profile.email ?? fallback.email,
+          })
+        },
+        () => listener(fallback),
       )
     })
+    return () => {
+      stopProfile?.()
+      stopAuth()
+    }
   }
 
   const notify = () => listener(currentLocalUser())
@@ -123,6 +152,44 @@ export async function registerAccount(
   localStorage.setItem(SESSION_KEY, account.id)
   emitAuthChange()
   return accountProfile(account)
+}
+
+export async function updateAccountProfile(
+  current: SessionUser,
+  displayName: string,
+  avatarDataUrl?: string,
+): Promise<SessionUser> {
+  const cleanName = displayName.trim()
+  const error = profileNameError(cleanName)
+  if (error) throw new Error(error)
+
+  const nextProfile: SessionUser = {
+    ...current,
+    displayName: cleanName,
+    avatarDataUrl: avatarDataUrl || undefined,
+  }
+
+  if (hasRemoteBackend && firebaseAuth?.currentUser && firestore) {
+    if (firebaseAuth.currentUser.uid !== current.id) throw new Error('Profilo non disponibile.')
+    await updateDoc(doc(firestore, 'users', current.id), {
+      displayName: cleanName,
+      avatarDataUrl: avatarDataUrl || deleteField(),
+    })
+    await updateProfile(firebaseAuth.currentUser, { displayName: cleanName })
+    return nextProfile
+  }
+
+  const accounts = readAccounts()
+  const accountIndex = accounts.findIndex((account) => account.id === current.id)
+  if (accountIndex < 0) throw new Error('Profilo non trovato.')
+  accounts[accountIndex] = {
+    ...accounts[accountIndex],
+    displayName: cleanName,
+    avatarDataUrl: avatarDataUrl || undefined,
+  }
+  writeAccounts(accounts)
+  emitAuthChange()
+  return nextProfile
 }
 
 export async function signIn(email: string, password: string): Promise<void> {

@@ -71,6 +71,25 @@ describe('azioni dello slot', () => {
     expect(screen.queryByText('mattia.baruffaldi')).not.toBeInTheDocument()
   })
 
+  it('mostra la foto del profilo accanto al nome del giocatore', () => {
+    const avatarUser = { ...user, avatarDataUrl: 'data:image/jpeg;base64,avatar' }
+    render(
+      <SlotCard
+        poll={poll}
+        slot={slot}
+        user={avatarUser}
+        members={[avatarUser]}
+        onPollChange={vi.fn()}
+        onNotify={vi.fn()}
+        onError={vi.fn()}
+      />,
+    )
+
+    const avatar = screen.getByRole('img', { name: 'Foto profilo di Jury' })
+    expect(avatar).toHaveClass('court-player__avatar')
+    expect(avatar).toHaveAttribute('src', avatarUser.avatarDataUrl)
+  })
+
   it('spiega in modo accessibile cosa fa Passo il posto', () => {
     render(
       <SlotCard

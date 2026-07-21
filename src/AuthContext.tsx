@@ -6,6 +6,7 @@ import {
   signIn,
   signOut,
   subscribeToSession,
+  updateAccountProfile,
 } from './lib/auth'
 
 interface AuthContextValue {
@@ -15,6 +16,7 @@ interface AuthContextValue {
   register: (displayName: string, email: string, password: string) => Promise<void>
   signOut: typeof signOut
   resetPassword: typeof resetPassword
+  updateProfile: (displayName: string, avatarDataUrl?: string) => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -37,9 +39,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(profile)
   }, [])
 
+  const updateProfile = useCallback(async (displayName: string, avatarDataUrl?: string) => {
+    if (!user) throw new Error('Devi accedere per modificare il profilo.')
+    const profile = await updateAccountProfile(user, displayName, avatarDataUrl)
+    setUser(profile)
+  }, [user])
+
   const value = useMemo(
-    () => ({ user, loading, signIn, register, signOut, resetPassword }),
-    [user, loading, register],
+    () => ({ user, loading, signIn, register, signOut, resetPassword, updateProfile }),
+    [user, loading, register, updateProfile],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

@@ -16,13 +16,39 @@ service cloud.firestore {
       return signedIn() && !isNotifier();
     }
 
-    match /users/{userId} {
-      allow read: if isMember();
-      allow create, update: if isMember()
-        && request.auth.uid == userId
+    function validAvatar() {
+      return !request.resource.data.keys().hasAny(['avatarDataUrl'])
+        || (request.resource.data.avatarDataUrl is string
+          && request.resource.data.avatarDataUrl.size() <= 100000
+          && request.resource.data.avatarDataUrl.matches(
+            '^data:image/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$'
+          ));
+    }
+
+    function validUserProfile(userId) {
+      return request.resource.data.keys()
+          .hasOnly(['id', 'displayName', 'email', 'createdAt', 'avatarDataUrl'])
         && request.resource.data.id == userId
         && request.resource.data.displayName is string
-        && request.resource.data.email is string;
+        && request.resource.data.displayName.size() >= 2
+        && request.resource.data.displayName.size() <= 40
+        && request.resource.data.email is string
+        && request.resource.data.createdAt is number
+        && validAvatar();
+    }
+
+    match /users/{userId} {
+      allow read: if isMember();
+      allow create: if isMember()
+        && request.auth.uid == userId
+        && validUserProfile(userId);
+      allow update: if isMember()
+        && request.auth.uid == userId
+        && validUserProfile(userId)
+        && request.resource.data.email == resource.data.email
+        && request.resource.data.createdAt == resource.data.createdAt
+        && (request.resource.data.displayName == resource.data.displayName
+          || !request.resource.data.displayName.matches('.*[Ee][Vv][Ii].*'));
       allow delete: if false;
     }
 

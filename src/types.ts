@@ -5,6 +5,7 @@ export interface MemberProfile {
   displayName: string
   email: string
   createdAt: number
+  avatarDataUrl?: string
 }
 
 export type SessionUser = MemberProfile

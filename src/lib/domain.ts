@@ -13,6 +13,17 @@ import type {
 export const MAX_STARTERS = 4
 export const MAX_SLOTS = 14
 export const DEFAULT_VENUE = 'Oasi Boschetto'
+export const PROFILE_NAME_MAX_LENGTH = 40
+
+export function profileNameError(displayName: string): string | null {
+  const cleanName = displayName.trim()
+  if (/evi/i.test(cleanName)) return 'sei un asino'
+  if (cleanName.length < 2) return 'Inserisci il nome che vedranno gli amici.'
+  if (cleanName.length > PROFILE_NAME_MAX_LENGTH) {
+    return `Il nome può avere al massimo ${PROFILE_NAME_MAX_LENGTH} caratteri.`
+  }
+  return null
+}
 
 export function makeId(prefix = 'id'): string {
   const random = globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2)

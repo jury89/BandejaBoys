@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Bell, BellRing, CalendarCheck2, CalendarDays, CalendarPlus, CheckCircle2, ChevronDown, LogOut, UsersRound } from 'lucide-react'
+import { Bell, BellRing, CalendarCheck2, CalendarDays, CalendarPlus, CheckCircle2, ChevronDown, CircleUserRound, LogOut, UsersRound } from 'lucide-react'
 import { useAuth } from '../AuthContext'
 import type { MemberProfile, PadelPoll } from '../types'
 import { getSlotPhase, getUpcomingPolls } from '../lib/domain'
@@ -11,11 +11,13 @@ import { Brand } from './Brand'
 import { CreatePollModal } from './CreatePollModal'
 import { NotificationCallup } from './NotificationCallup'
 import { PollCard } from './PollCard'
+import { ProfileAvatar } from './ProfileAvatar'
+import { ProfileModal } from './ProfileModal'
 
 type FeedFilter = 'all' | 'booked'
 
 export function Dashboard() {
-  const { user, signOut } = useAuth()
+  const { user, signOut, updateProfile } = useAuth()
   const [polls, setPolls] = useState<PadelPoll[]>([])
   const [members, setMembers] = useState<MemberProfile[]>([])
   const [loading, setLoading] = useState(true)
@@ -24,6 +26,7 @@ export function Dashboard() {
   const [toast, setToast] = useState<{ message: string; tone: 'success' | 'error' } | null>(null)
   const [accountOpen, setAccountOpen] = useState(false)
   const [notificationPanelOpen, setNotificationPanelOpen] = useState(false)
+  const [profileOpen, setProfileOpen] = useState(false)
   const [now, setNow] = useState(() => Date.now())
   const notifications = usePushNotifications(user)
 
@@ -95,14 +98,27 @@ export function Dashboard() {
       <header className="topbar">
         <Brand compact />
         <div className="account-menu">
-          <button className="account-menu__trigger" type="button" onClick={() => setAccountOpen((open) => !open)} aria-expanded={accountOpen}>
-            <span className="avatar">{user.displayName.charAt(0).toUpperCase()}</span>
+          <button
+            className="account-menu__trigger"
+            type="button"
+            onClick={() => setAccountOpen((open) => !open)}
+            aria-expanded={accountOpen}
+            aria-label={`Apri menu account di ${user.displayName}`}
+          >
+            <ProfileAvatar displayName={user.displayName} avatarDataUrl={user.avatarDataUrl} decorative />
             <span><strong>{user.displayName}</strong><small>Giocatore</small></span>
             <ChevronDown size={16} />
           </button>
           {accountOpen && (
             <div className="account-menu__popover">
               <span>{user.email}</span>
+              <button type="button" onClick={() => {
+                setAccountOpen(false)
+                setProfileOpen(true)
+              }}>
+                <CircleUserRound size={16} />
+                <span>Profilo <small>Nome e foto giocatore</small></span>
+              </button>
               {hasRemoteBackend && (
                 <button type="button" onClick={() => {
                   setAccountOpen(false)
@@ -219,6 +235,14 @@ export function Dashboard() {
 
       {createOpen && (
         <CreatePollModal user={user} onClose={() => setCreateOpen(false)} onCreate={repository.createPoll} onDone={notify} />
+      )}
+      {profileOpen && (
+        <ProfileModal
+          user={user}
+          onClose={() => setProfileOpen(false)}
+          onSave={updateProfile}
+          onDone={notify}
+        />
       )}
       {(notifications.shouldPrompt || notificationPanelOpen) && (
         <NotificationCallup

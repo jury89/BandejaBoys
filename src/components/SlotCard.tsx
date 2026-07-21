@@ -28,6 +28,7 @@ import { slotDateParts } from '../lib/format'
 import { resolveMemberName } from '../lib/memberNames'
 import { repository } from '../lib/repository'
 import { EditSlotModal } from './EditSlotModal'
+import { ProfileAvatar } from './ProfileAvatar'
 import { SubstitutionModal } from './SubstitutionModal'
 
 interface SlotCardProps {
@@ -60,8 +61,10 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
   const PhaseIcon = phaseCopy[phase].icon
   const joined = slot.signups.some((signup) => signup.userId === user.id)
   const userIsStarter = isStarter(slot, user.id)
+  const memberProfile = (userId: string | undefined) =>
+    members.find((member) => member.id === userId) ?? (userId === user.id ? user : undefined)
   const memberName = (userId: string | undefined, savedName: string | undefined) =>
-    resolveMemberName(members, userId, savedName)
+    memberProfile(userId)?.displayName ?? resolveMemberName(members, userId, savedName)
 
   const syncPoll = async (work: () => Promise<PadelPoll>) => {
     const updated = await work()
@@ -210,13 +213,22 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
             <div className={`court-player court-player--${index + 1} ${signup?.userId === user.id ? 'is-you' : ''}`} key={signup?.id ?? `empty-${index}`}>
               <span className="court-player__marker">{index + 1}</span>
               {signup ? (
-                <span className="court-player__name">
-                  <strong>{memberName(signup.userId, signup.displayName)}</strong>
-                  {signup.userId === user.id && <small>Tu</small>}
-                  {signup.substitutedFor && (
-                    <small>per {memberName(signup.substitutedFor.userId, signup.substitutedFor.displayName)}</small>
+                <>
+                  {memberProfile(signup.userId)?.avatarDataUrl && (
+                    <ProfileAvatar
+                      displayName={memberName(signup.userId, signup.displayName)}
+                      avatarDataUrl={memberProfile(signup.userId)?.avatarDataUrl}
+                      className="court-player__avatar"
+                    />
                   )}
-                </span>
+                  <span className="court-player__name">
+                    <strong>{memberName(signup.userId, signup.displayName)}</strong>
+                    {signup.userId === user.id && <small>Tu</small>}
+                    {signup.substitutedFor && (
+                      <small>per {memberName(signup.substitutedFor.userId, signup.substitutedFor.displayName)}</small>
+                    )}
+                  </span>
+                </>
               ) : (
                 <span className="court-player__name court-player__name--empty">Posto libero</span>
               )}
@@ -235,6 +247,13 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
             {reserves.map((reserve, index) => (
               <li className={reserve.userId === user.id ? 'is-you' : ''} key={reserve.id}>
                 <span>{index + 1}</span>
+                {memberProfile(reserve.userId)?.avatarDataUrl && (
+                  <ProfileAvatar
+                    displayName={memberName(reserve.userId, reserve.displayName)}
+                    avatarDataUrl={memberProfile(reserve.userId)?.avatarDataUrl}
+                    className="reserve-list__avatar"
+                  />
+                )}
                 <strong>{memberName(reserve.userId, reserve.displayName)}</strong>
                 {reserve.userId === user.id && <small>Tu</small>}
               </li>

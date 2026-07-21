@@ -307,6 +307,7 @@ p {
   color: var(--white);
   font-size: 0.8rem;
   font-weight: 900;
+  object-fit: cover;
 }
 
 .avatar--small {
@@ -1410,6 +1411,16 @@ p {
   font-size: 0.92rem;
 }
 
+.court-player__avatar {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 4px 12px rgba(3, 42, 57, 0.28);
+}
+
 .court-player:has(.court-player__name:not(.court-player__name--empty)) .court-player__marker {
   border-color: var(--ball);
   background: var(--ball);
@@ -1504,6 +1515,15 @@ p {
   color: #59717c;
   font-size: 0.55rem;
   font-weight: 900;
+}
+
+.reserve-list__avatar {
+  width: 21px;
+  height: 21px;
+  flex: 0 0 21px;
+  border: 1px solid #c3d7de;
+  border-radius: 50%;
+  object-fit: cover;
 }
 
 .reserve-list li.is-you {
@@ -1968,6 +1988,192 @@ p {
   margin-top: 8px;
   padding-top: 19px;
   border-top: 1px solid #e2eaee;
+}
+
+.profile-form {
+  display: flex;
+  flex-direction: column;
+  gap: 19px;
+}
+
+.profile-photo {
+  position: relative;
+  display: grid;
+  overflow: hidden;
+  align-items: center;
+  padding: 20px;
+  border: 1px solid #cde0e5;
+  border-radius: 14px;
+  grid-template-columns: 106px minmax(0, 1fr);
+  gap: 20px;
+  background:
+    radial-gradient(circle at 92% -20%, rgba(217, 255, 67, 0.42) 0 23%, transparent 24%),
+    linear-gradient(135deg, #eff8f8 0%, #f9fcfd 62%);
+}
+
+.profile-photo::after {
+  position: absolute;
+  right: 18px;
+  bottom: -45px;
+  width: 95px;
+  height: 95px;
+  border: 12px solid rgba(14, 116, 144, 0.05);
+  border-radius: 50%;
+  content: '';
+  pointer-events: none;
+}
+
+.profile-photo__preview {
+  position: relative;
+  width: 104px;
+  height: 104px;
+}
+
+.profile-photo__avatar {
+  display: grid;
+  width: 104px;
+  height: 104px;
+  place-items: center;
+  border: 4px solid var(--white);
+  border-radius: 50%;
+  background: var(--deep);
+  color: var(--white);
+  font-family: var(--display);
+  font-size: 2.7rem;
+  font-weight: 800;
+  object-fit: cover;
+  box-shadow: 0 12px 28px rgba(7, 89, 133, 0.22);
+}
+
+.profile-photo__camera {
+  position: absolute;
+  right: -2px;
+  bottom: 2px;
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 3px solid var(--white);
+  border-radius: 50%;
+  background: var(--ball);
+  color: var(--deep);
+}
+
+.profile-photo__copy {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+}
+
+.profile-photo__copy > strong {
+  font-size: 0.95rem;
+  font-weight: 900;
+}
+
+.profile-photo__copy > p {
+  margin: 4px 0 13px;
+  color: var(--muted);
+  font-size: 0.7rem;
+  line-height: 1.5;
+}
+
+.profile-photo__actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.profile-photo__actions .button {
+  min-height: 38px;
+  padding: 8px 11px;
+  font-size: 0.72rem;
+}
+
+.profile-photo__remove {
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 8px;
+  border: 0;
+  background: transparent;
+  color: var(--danger);
+  cursor: pointer;
+  font-size: 0.67rem;
+  font-weight: 800;
+}
+
+.profile-photo__input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.profile-form .field > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.profile-form .field > small {
+  color: var(--muted);
+  font-size: 0.64rem;
+  font-weight: 600;
+}
+
+.profile-locked-field {
+  display: grid;
+  min-width: 0;
+  align-items: center;
+  padding: 12px 13px;
+  border: 1px dashed #cbd9de;
+  border-radius: 10px;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  gap: 10px;
+  background: #f7fafb;
+}
+
+.profile-locked-field__icon {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 50%;
+  background: #e6eef1;
+  color: #627984;
+}
+
+.profile-locked-field > span:nth-child(2) {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.profile-locked-field small {
+  color: var(--muted);
+  font-size: 0.59rem;
+  font-weight: 700;
+}
+
+.profile-locked-field strong {
+  overflow: hidden;
+  margin-top: 2px;
+  font-size: 0.72rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-locked-field em {
+  color: #80939b;
+  font-size: 0.58rem;
+  font-style: normal;
+  font-weight: 800;
+  text-transform: uppercase;
 }
 
 .poll-form {
@@ -2561,6 +2767,27 @@ p {
     border-radius: 18px 18px 0 0;
   }
 
+  .profile-photo {
+    grid-template-columns: 82px minmax(0, 1fr);
+    gap: 15px;
+    padding: 17px;
+  }
+
+  .profile-photo__preview,
+  .profile-photo__avatar {
+    width: 80px;
+    height: 80px;
+  }
+
+  .profile-photo__avatar {
+    font-size: 2.2rem;
+  }
+
+  .profile-photo__camera {
+    width: 30px;
+    height: 30px;
+  }
+
   .poll-form__basics {
     grid-template-columns: 1fr;
   }
@@ -2668,6 +2895,12 @@ p {
     height: 25px;
   }
 
+  .court-player__avatar {
+    width: 23px;
+    height: 23px;
+    flex-basis: 23px;
+  }
+
   .court-player__name {
     font-size: 0.62rem;
   }
@@ -2691,6 +2924,42 @@ p {
 
   .modal__actions .button {
     width: 100%;
+  }
+
+  .profile-photo {
+    align-items: start;
+    grid-template-columns: 70px minmax(0, 1fr);
+    gap: 13px;
+    padding: 15px;
+  }
+
+  .profile-photo__preview,
+  .profile-photo__avatar {
+    width: 68px;
+    height: 68px;
+  }
+
+  .profile-photo__avatar {
+    border-width: 3px;
+    font-size: 1.8rem;
+  }
+
+  .profile-photo__camera {
+    right: -3px;
+    width: 27px;
+    height: 27px;
+  }
+
+  .profile-photo__copy > p {
+    margin-bottom: 10px;
+  }
+
+  .profile-locked-field {
+    grid-template-columns: 34px minmax(0, 1fr);
+  }
+
+  .profile-locked-field em {
+    display: none;
   }
 
   .toast {

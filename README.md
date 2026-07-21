@@ -8,7 +8,7 @@ Il sito è disponibile su [bandeja-boys.web.app](https://bandeja-boys.web.app). 
 
 ## Cosa fa
 
-- Registrazione e accesso con email e password; il nome inserito nel profilo resta l’unico nome mostrato nell’interfaccia e non viene mai ricavato dall’indirizzo email.
+- Registrazione e accesso con email e password; dal menu account ogni giocatore può cambiare soltanto il nome visibile e aggiungere o rimuovere una foto profilo. Email e password non sono modificabili dalla sezione profilo. Il nome resta l’unico mostrato nell’interfaccia e non viene mai ricavato dall’indirizzo email; un cambio nome che contiene la sottostringa `Evi`, senza distinzione tra maiuscole e minuscole, viene rifiutato.
 - Creazione di un sondaggio per la settimana successiva con uno o più slot, duplicabili al giorno seguente mantenendo ora e durata. Data, ora e minuti hanno controlli separati anche su iPhone, e i minuti disponibili sono soltanto `00` e `30`: ogni slot resta automaticamente **Orario indicativo** finché il campo non viene prenotato, poi passa a **Orario confermato**. Qualunque membro può aggiungere in seguito un nuovo slot a un sondaggio ancora aperto; la proposta parte dal giorno successivo all’ultimo slot.
 - Modifica di data e ora degli slot già pubblicati senza perdere adesioni, riserve o prenotazione. Ogni slot può anche essere eliminato, finché ne resta almeno uno nel sondaggio: la conferma chiarisce che adesioni e riserve verranno rimosse e, per un campo prenotato, ricorda di annullare anche presso l’Oasi Boschetto.
 - Aggiunta diretta di ogni slot al calendario personale: un clic sull’icona apre l’anteprima di sistema su iPhone o scarica un evento `.ics`, con ora, durata, Oasi Boschetto e stato indicativo o confermato già compilati. Le azioni Calendario, Modifica ed Elimina usano icone compatte con etichette accessibili.
@@ -32,7 +32,7 @@ Il sito è disponibile su [bandeja-boys.web.app](https://bandeja-boys.web.app). 
 - Web Push standard per il recapito delle notifiche, senza servizi a pagamento.
 - Un Cron Trigger Cloudflare Workers ogni 10 minuti avvia il workflow GitHub Actions che elabora gli avvisi anche quando il sito è chiuso.
 
-Il progetto usa solo servizi gratuiti e non richiede un metodo di pagamento. Per un gruppo ristretto, le quote gratuite di Firestore e Hosting sono molto superiori al traffico previsto; lo scheduler usa 144 delle 100.000 richieste giornaliere incluse nel piano gratuito Cloudflare Workers. Riferimenti: [piani Firebase](https://firebase.google.com/docs/projects/billing/firebase-pricing-plans), [Firebase Hosting](https://firebase.google.com/docs/hosting/quickstart) e [limiti Cloudflare Workers](https://developers.cloudflare.com/workers/platform/limits/).
+Il progetto usa solo servizi gratuiti e non richiede un metodo di pagamento. Le foto profilo non usano Firebase Storage, che dal 2026 richiede il piano Blaze: vengono ritagliate e compresse nel browser a `160×160` pixel e salvate come piccolo Data URL nel documento Firestore del proprietario, con un limite di 100.000 caratteri applicato anche dalle Security Rules. Per un gruppo ristretto, le quote gratuite di Firestore e Hosting sono molto superiori al traffico previsto; lo scheduler usa 144 delle 100.000 richieste giornaliere incluse nel piano gratuito Cloudflare Workers. Riferimenti: [piani Firebase](https://firebase.google.com/docs/projects/billing/firebase-pricing-plans), [quote Firestore](https://firebase.google.com/docs/firestore/quotas), [modifiche ai requisiti di Cloud Storage](https://firebase.google.com/docs/storage/faqs-storage-changes-announced-sept-2024), [Firebase Hosting](https://firebase.google.com/docs/hosting/quickstart) e [limiti Cloudflare Workers](https://developers.cloudflare.com/workers/platform/limits/).
 
 Il repository GitHub è pubblico per utilizzare gratuitamente i runner standard senza consumare il monte minuti dei repository privati. Il sito resta ad accesso riservato: codice e configurazione Firebase pubblica non contengono password, dati degli utenti o chiavi private, mentre Firebase Authentication e le Security Rules proteggono i dati condivisi. Cloudflare effettua 144 risvegli al giorno; ogni run GitHub mantiene un limite rigido di 5 minuti per evitare esecuzioni anomale.
 
@@ -115,6 +115,7 @@ Prima di ogni commit o deploy deve passare `npm run check`.
 
 - Solo gli utenti autenticati possono leggere membri e sondaggi.
 - Ogni utente può creare o aggiornare soltanto il proprio profilo.
+- Le foto profilo accettate dalle regole sono esclusivamente Data URL immagine entro 100.000 caratteri; email e data di creazione del profilo restano immutabili.
 - Qualunque membro autenticato può aggiungere o eliminare uno slot da un sondaggio aperto, aderire, ritirarsi, fare una sostituzione o segnare una prenotazione: è una scelta intenzionale per un piccolo gruppo fidato.
 - Ogni membro può creare, sostituire o eliminare soltanto la sottoscrizione push del proprio dispositivo.
 - L’account tecnico verificato non può modificare utenti, sondaggi o partite; le sue letture e scritture sono limitate al recapito delle notifiche.

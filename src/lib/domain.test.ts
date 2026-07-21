@@ -8,6 +8,7 @@ import {
   getUpcomingPolls,
   makePoll,
   nextMondayDate,
+  profileNameError,
   removeSignup,
   removeSlotFromPoll,
   rescheduleSlot,
@@ -21,6 +22,16 @@ const member = (id: string, displayName = id): MemberProfile => ({
   displayName,
   email: `${id}@example.test`,
   createdAt: 1,
+})
+
+describe('nome del profilo', () => {
+  it.each(['Evi', 'evininja', 'BoccataEVIDaria', 'previsto'])('rifiuta %s quando contiene Evi', (name) => {
+    expect(profileNameError(name)).toBe('sei un asino')
+  })
+
+  it('accetta un nome che non contiene Evi', () => {
+    expect(profileNameError('Brescio')).toBeNull()
+  })
 })
 
 const signup = (id: string, joinedAt: number, role?: SignupRole): Signup => ({

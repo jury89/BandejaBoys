@@ -36,6 +36,10 @@ Su mobile i campi `input`, `select` e `textarea` usano almeno `16px`, soglia che
 
 Il nome mostrato viene risolto sempre dal profilo `users/{uid}` più recente. Le copie presenti in adesioni, prenotazioni e sondaggi restano soltanto un fallback per profili non più disponibili; la parte locale dell’email non viene mai usata come nome. Al termine della registrazione l’`AuthContext` applica subito il profilo completo, evitando lo stato transitorio prodotto da Firebase prima dell’aggiornamento di `displayName`.
 
+La sezione **Profilo** permette di modificare soltanto `displayName` e `avatarDataUrl`: email, password e data di creazione non sono modificabili. Il controllo puro `profileNameError` rifiuta ogni nuovo nome che contiene `Evi` senza distinzione tra maiuscole e minuscole e le Security Rules ripetono lo stesso vincolo sull’aggiornamento remoto. Il profilo corrente e la raccolta membri restano sotto listener realtime, quindi nome, avatar, header, campo e lista riserve si aggiornano senza ricaricare la pagina.
+
+Per restare sul piano Spark senza fatturazione, gli avatar non usano Cloud Storage. Il browser ritaglia al centro la foto, la converte in JPEG `160×160` e la limita a 100.000 caratteri prima di salvarla nel documento `users/{uid}`; le Security Rules verificano tipo, prefisso Data URL e dimensione. Questa scelta è intenzionale per il singolo gruppo e resta ampiamente sotto il limite di 1 MiB per documento e la quota gratuita di 1 GiB di Firestore. Un prodotto pubblico dovrebbe invece usare uno storage a oggetti dedicato.
+
 Lo stato `ready` non viene salvato: è derivato dal numero di titolari. Lo stato `booked` dipende dalla presenza di `bookedAt`. In questo modo non possono esistere stati incoerenti. Le adesioni precedenti all’introduzione del campo `role` restano compatibili e vengono interpretate secondo il vecchio ordine cronologico.
 
 ## Notifiche
@@ -84,7 +88,7 @@ Questa regola implementa l'accordo diretto tra due persone senza alterare la pre
 
 ```text
 users/{uid}
-  id, displayName, email, createdAt
+  id, displayName, email, createdAt, avatarDataUrl?
 
 polls/{pollId}
   title, targetWeekStart, createdBy, createdByName
