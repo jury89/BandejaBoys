@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { CalendarCheck2, Check, Trophy } from 'lucide-react'
+import { CalendarCheck2, Check, FlaskConical, Trophy } from 'lucide-react'
 import type { MatchRatingPrompt, MatchRatingSubmission } from '../types'
 import { padelDateTimeToTimestamp } from '../lib/domain'
 import { Modal } from './Modal'
@@ -7,6 +7,7 @@ import { ProfileAvatar } from './ProfileAvatar'
 
 interface MatchRatingModalProps {
   prompt: MatchRatingPrompt
+  testMode?: boolean
   onDismiss: () => Promise<void>
   onSubmit: (submissions: MatchRatingSubmission[]) => Promise<void>
 }
@@ -27,7 +28,7 @@ function sessionLabel(startsAt: string): string {
   return `${day.charAt(0).toUpperCase()}${day.slice(1)} · ${time}`
 }
 
-export function MatchRatingModal({ prompt, onDismiss, onSubmit }: MatchRatingModalProps) {
+export function MatchRatingModal({ prompt, testMode = false, onDismiss, onSubmit }: MatchRatingModalProps) {
   const [scores, setScores] = useState<Record<string, number>>({})
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -59,8 +60,18 @@ export function MatchRatingModal({ prompt, onDismiss, onSubmit }: MatchRatingMod
   }
 
   return (
-    <Modal title="Com’è andata in campo?" eyebrow="Pagelle post partita" size="wide" onClose={dismiss}>
+    <Modal
+      title="Com’è andata in campo?"
+      eyebrow={testMode ? 'Collaudo pagelle · TEST' : 'Pagelle post partita'}
+      size="wide"
+      onClose={dismiss}
+    >
       <form className="match-rating" onSubmit={submit}>
+        {testMode && (
+          <p className="match-rating__test-note">
+            <FlaskConical size={17} /> Modalità TEST: puoi provare tutti i controlli, ma nessun voto verrà salvato.
+          </p>
+        )}
         <div className="match-rating__intro">
           <span className="match-rating__trophy" aria-hidden="true"><Trophy size={24} /></span>
           <div>
@@ -99,12 +110,18 @@ export function MatchRatingModal({ prompt, onDismiss, onSubmit }: MatchRatingMod
           ))}
         </div>
 
-        <p className="match-rating__privacy">I voti vengono salvati nello storico della partita. Se chiudi, questa scheda non comparirà più.</p>
+        <p className="match-rating__privacy">
+          {testMode
+            ? 'La chiusura e i punteggi di questa prova non modificano partite, pagelle o storico.'
+            : 'I voti vengono salvati nello storico della partita. Se chiudi, questa scheda non comparirà più.'}
+        </p>
         {error && <p className="form-error" role="alert">{error}</p>}
         <div className="modal__actions match-rating__actions">
-          <button className="button button--ghost" type="button" disabled={busy} onClick={dismiss}>Salta definitivamente</button>
+          <button className="button button--ghost" type="button" disabled={busy} onClick={dismiss}>
+            {testMode ? 'Chiudi il test' : 'Salta definitivamente'}
+          </button>
           <button className="button button--primary" type="submit" disabled={!isComplete || busy}>
-            <Check size={18} /> {busy ? 'Salvataggio…' : 'Salva i voti'}
+            <Check size={18} /> {busy ? 'Salvataggio…' : testMode ? 'Completa il test' : 'Salva i voti'}
           </button>
         </div>
       </form>

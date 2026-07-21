@@ -71,6 +71,26 @@ describe('pianificazione notifiche', () => {
       .toThrow('Il messaggio di test supera i 240 caratteri.')
   })
 
+  it('crea una vera push di collaudo che apre la pagella senza dati partita', () => {
+    expect(createTestNotification('jury', 'run-45', undefined, 'match-rating')).toMatchObject({
+      id: 'test:run-45',
+      kind: 'test',
+      title: 'TEST · È ora di dare i voti',
+      body: 'Tocca per aprire la pagella di collaudo. Nessun voto verrà salvato.',
+      url: '/?ratingTest=1',
+      tag: 'test-rating-run-45',
+      recipientUserIds: ['jury'],
+    })
+  })
+
+  it('mantiene il deep link pagelle anche con un messaggio di test personalizzato', () => {
+    expect(createTestNotification('jury', 'run-46', 'Apri il test', 'match-rating')).toMatchObject({
+      title: 'TEST · È ora di dare i voti',
+      body: 'Apri il test',
+      url: '/?ratingTest=1',
+    })
+  })
+
   it('raggruppa cinque slot creati insieme in una sola notifica', () => {
     const createdAt = NOW - 15 * 60 * 1000
     const slots = Array.from({ length: 5 }, (_, index) => ({

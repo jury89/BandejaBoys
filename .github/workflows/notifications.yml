@@ -11,6 +11,14 @@ on:
         description: 'Testo facoltativo della notifica manuale (massimo 240 caratteri)'
         required: false
         type: string
+      test_mode:
+        description: 'Tipo di collaudo manuale'
+        required: false
+        default: standard
+        type: choice
+        options:
+          - standard
+          - pagelle
 
 concurrency:
   group: padel-notifications
@@ -41,3 +49,4 @@ jobs:
           TEST_NOTIFICATION_USER_ID: ${{ inputs.test_user_id }}
           TEST_NOTIFICATION_ID: ${{ github.run_id }}-${{ github.run_attempt }}
           TEST_NOTIFICATION_MESSAGE: ${{ inputs.test_message }}
+          TEST_NOTIFICATION_MODE: ${{ inputs.test_mode }}

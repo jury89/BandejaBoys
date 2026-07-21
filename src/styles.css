@@ -2018,6 +2018,25 @@ p {
   background: linear-gradient(115deg, #edf8f8, #f8fbfc 72%);
 }
 
+.match-rating__test-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 13px;
+  border: 1px solid #e7bd43;
+  border-radius: 10px;
+  color: #604400;
+  background: #fff5ca;
+  font-size: 0.8rem;
+  font-weight: 800;
+  line-height: 1.4;
+}
+
+.match-rating__test-note svg {
+  flex: 0 0 auto;
+}
+
 .match-rating__trophy {
   display: grid;
   width: 48px;

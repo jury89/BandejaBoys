@@ -47,4 +47,29 @@ describe('MatchRatingModal', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Chiudi' }))
     await waitFor(() => expect(onDismiss).toHaveBeenCalledOnce())
   })
+
+  it('distingue il collaudo e non promette alcun salvataggio', async () => {
+    const onDismiss = vi.fn().mockResolvedValue(undefined)
+    render(<MatchRatingModal testMode prompt={prompt} onDismiss={onDismiss} onSubmit={vi.fn()} />)
+
+    expect(screen.getByText(/Modalità TEST: puoi provare tutti i controlli/)).toBeInTheDocument()
+    expect(screen.getByText(/non modificano partite, pagelle o storico/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Completa il test' })).toBeDisabled()
+    expect(screen.queryByRole('button', { name: 'Salva i voti' })).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Chiudi il test' }))
+    await waitFor(() => expect(onDismiss).toHaveBeenCalledOnce())
+  })
+
+  it('permette di completare la pagella di test con gli stessi controlli', async () => {
+    const onSubmit = vi.fn().mockResolvedValue(undefined)
+    render(<MatchRatingModal testMode prompt={prompt} onDismiss={vi.fn()} onSubmit={onSubmit} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Dai 6 a Ale' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Dai 7 a Luca' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Dai 8 a Teo' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Completa il test' }))
+
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledOnce())
+  })
 })

@@ -13,6 +13,7 @@ import { firstName, slotDateParts } from '../lib/format'
 import { hasRemoteBackend } from '../lib/firebase'
 import { resolveMemberName } from '../lib/memberNames'
 import { notificationStateLabel, usePushNotifications } from '../lib/notifications'
+import { RATING_TEST_QUERY_PARAM, isRatingTestRequested, makeRatingTestPrompt } from '../lib/ratingTest'
 import { repository } from '../lib/repository'
 import { Brand } from './Brand'
 import { CreatePollModal } from './CreatePollModal'
@@ -38,6 +39,8 @@ export function Dashboard() {
   const [now, setNow] = useState(() => Date.now())
   const [ratingResponses, setRatingResponses] = useState<MatchRatingResponse[]>([])
   const [ratingResponsesLoaded, setRatingResponsesLoaded] = useState(false)
+  const [ratingTestOpen, setRatingTestOpen] = useState(() => isRatingTestRequested(window.location.search))
+  const [ratingTestStartedAt] = useState(() => Date.now())
   const [requestedRating] = useState(() => {
     const parameters = new URLSearchParams(window.location.search)
     const pollId = parameters.get('ratePoll')
@@ -121,6 +124,11 @@ export function Dashboard() {
     }
     return ratingPrompts[0] ?? null
   }, [ratingPrompts, requestedRating])
+  const ratingTestPrompt = useMemo(() => (
+    ratingTestOpen && user
+      ? makeRatingTestPrompt(user, members, ratingTestStartedAt)
+      : null
+  ), [members, ratingTestOpen, ratingTestStartedAt, user])
 
   useEffect(() => {
     if (!requestedRating || !ratingResponsesLoaded || loading) return
@@ -129,6 +137,13 @@ export function Dashboard() {
     url.searchParams.delete('rateSlot')
     window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`)
   }, [loading, ratingResponsesLoaded, requestedRating])
+
+  useEffect(() => {
+    if (!ratingTestOpen) return
+    const url = new URL(window.location.href)
+    url.searchParams.delete(RATING_TEST_QUERY_PARAM)
+    window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`)
+  }, [ratingTestOpen])
 
   const stats = useMemo(() => {
     const openPolls = upcomingPolls.filter((poll) => poll.status === 'open')
@@ -171,6 +186,13 @@ export function Dashboard() {
     const response = await repository.submitMatchRatings(activeRatingPrompt, user, submissions)
     rememberRatingResponse(response)
     notify('Voti salvati nello storico della partita.')
+  }
+  const dismissRatingTest = async () => {
+    setRatingTestOpen(false)
+  }
+  const completeRatingTest = async () => {
+    setRatingTestOpen(false)
+    notify('Collaudo completato: nessun voto è stato salvato.')
   }
 
   return (
@@ -324,7 +346,15 @@ export function Dashboard() {
           onDone={notify}
         />
       )}
-      {activeRatingPrompt && (
+      {ratingTestPrompt ? (
+        <MatchRatingModal
+          testMode
+          key={ratingTestPrompt.id}
+          prompt={ratingTestPrompt}
+          onDismiss={dismissRatingTest}
+          onSubmit={completeRatingTest}
+        />
+      ) : activeRatingPrompt && (
         <MatchRatingModal
           key={activeRatingPrompt.id}
           prompt={activeRatingPrompt}
@@ -332,7 +362,7 @@ export function Dashboard() {
           onSubmit={submitRatings}
         />
       )}
-      {!activeRatingPrompt && (notifications.shouldPrompt || notificationPanelOpen) && (
+      {!ratingTestPrompt && !activeRatingPrompt && (notifications.shouldPrompt || notificationPanelOpen) && (
         <NotificationCallup
           state={notifications.state}
           busy={notifications.busy}

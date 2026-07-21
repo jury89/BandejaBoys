@@ -15,6 +15,7 @@ export const NEW_SLOT_QUIET_PERIOD_MS = 10 * 60 * 1000
 export const MATCH_RATING_NOTIFICATION_WINDOW_MS = 30 * 60 * 1000
 
 export type NotificationKind = 'new-slots' | 'reminder-24h' | 'reminder-2h' | 'match-rating' | 'test'
+export type TestNotificationMode = 'standard' | 'match-rating'
 
 export interface ScheduledNotification {
   id: string
@@ -102,6 +103,7 @@ export function createTestNotification(
   userId: string,
   eventId: string,
   message?: string,
+  mode: TestNotificationMode = 'standard',
 ): ScheduledNotification {
   const recipient = userId.trim()
   const identifier = eventId.trim()
@@ -109,13 +111,19 @@ export function createTestNotification(
   if (!recipient || !identifier) throw new Error('Destinatario o identificativo del test mancante.')
   if (customBody && customBody.length > 240) throw new Error('Il messaggio di test supera i 240 caratteri.')
 
+  const isMatchRatingTest = mode === 'match-rating'
+
   return {
     id: `test:${identifier}`,
     kind: 'test',
-    title: customBody ? 'Bandeja Boys' : 'Test notifiche Bandeja Boys',
-    body: customBody || 'Se leggi questo messaggio, le notifiche funzionano correttamente.',
-    url: '/',
-    tag: `test-${identifier}`,
+    title: isMatchRatingTest
+      ? 'TEST · È ora di dare i voti'
+      : customBody ? 'Bandeja Boys' : 'Test notifiche Bandeja Boys',
+    body: customBody || (isMatchRatingTest
+      ? 'Tocca per aprire la pagella di collaudo. Nessun voto verrà salvato.'
+      : 'Se leggi questo messaggio, le notifiche funzionano correttamente.'),
+    url: isMatchRatingTest ? '/?ratingTest=1' : '/',
+    tag: `${isMatchRatingTest ? 'test-rating' : 'test'}-${identifier}`,
     ttlSeconds: 10 * 60,
     recipientUserIds: [recipient],
     excludedUserIds: [],
