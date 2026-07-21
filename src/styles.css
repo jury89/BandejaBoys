@@ -562,6 +562,68 @@ p {
   box-shadow: 0 0 0 3px rgba(14, 116, 144, 0.1);
 }
 
+.slot-date-time {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.slot-date-time > legend {
+  margin-bottom: 7px;
+  padding: 0;
+  color: #415b68;
+  font-size: 0.74rem;
+  font-weight: 800;
+}
+
+.slot-date-time__controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 64px 72px;
+  gap: 7px;
+}
+
+.slot-date-time__part {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.slot-date-time__part > span {
+  color: #76909b;
+  font-size: 0.61rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.slot-date-time__part input,
+.slot-date-time__part select {
+  width: 100%;
+  min-width: 0;
+  min-height: 48px;
+  padding: 11px 10px;
+  border: 1px solid #c9d9df;
+  border-radius: 9px;
+  background: var(--white);
+  color: var(--ink);
+  font-size: 0.87rem;
+  font-weight: 700;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.slot-date-time__part input:hover,
+.slot-date-time__part select:hover {
+  border-color: #9db8c3;
+}
+
+.slot-date-time__part input:focus,
+.slot-date-time__part select:focus {
+  border-color: var(--court);
+  box-shadow: 0 0 0 3px rgba(14, 116, 144, 0.1);
+}
+
 .field--icon > svg {
   position: absolute;
   bottom: 15px;
@@ -1938,7 +2000,7 @@ p {
   background: var(--white);
 }
 
-.slot-editor__row > .field:not(.field--duration) {
+.slot-editor__row > .slot-date-time {
   grid-row: 1;
   grid-column: 2;
 }
@@ -1967,7 +2029,9 @@ p {
 }
 
 .slot-editor__row .field input,
-.slot-editor__row .field select {
+.slot-editor__row .field select,
+.slot-editor__row .slot-date-time input,
+.slot-editor__row .slot-date-time select {
   min-height: 42px;
   padding-block: 8px;
   font-size: 0.75rem;
@@ -2445,20 +2509,26 @@ p {
     grid-template-columns: auto 1fr auto;
   }
 
-  .slot-editor__row .field--duration {
+  .slot-editor__row > .slot-date-time {
     grid-row: 2;
-    grid-column: 2;
+    grid-column: 1 / -1;
+  }
+
+  .slot-editor__row .field--duration {
+    grid-row: 3;
+    grid-column: 1 / -1;
   }
 
   .slot-editor__number {
-    grid-row: 1 / 3;
+    grid-row: 1;
+    grid-column: 1;
   }
 
   .slot-editor__actions {
-    grid-row: 1 / 3;
+    grid-row: 1;
     grid-column: 3;
     align-self: center;
-    flex-direction: column;
+    flex-direction: row;
   }
 
   .notification-callup__backdrop {

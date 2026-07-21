@@ -3,6 +3,7 @@ import { CalendarPlus } from 'lucide-react'
 import type { PadelPoll, SlotInput } from '../types'
 import { defaultSlotForWeek, toDateTimeInput } from '../lib/domain'
 import { Modal } from './Modal'
+import { SlotDateTimeField } from './SlotDateTimeField'
 
 interface AddSlotModalProps {
   poll: PadelPoll
@@ -61,17 +62,7 @@ export function AddSlotModal({ poll, onClose, onSave, onDone }: AddSlotModalProp
         <p className="modal__lead">
           Se aggiungi più slot entro pochi minuti, gli amici riceveranno una sola notifica.
         </p>
-        <label className="field">
-          <span>Data e ora</span>
-          <input
-            type="datetime-local"
-            step={1800}
-            value={startsAt}
-            onChange={(event) => setStartsAt(event.target.value)}
-            autoFocus
-            required
-          />
-        </label>
+        <SlotDateTimeField value={startsAt} onChange={setStartsAt} autoFocus />
         <label className="field">
           <span>Durata</span>
           <select

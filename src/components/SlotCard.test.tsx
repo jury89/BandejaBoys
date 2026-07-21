@@ -192,10 +192,13 @@ describe('azioni dello slot', () => {
     )
 
     fireEvent.click(screen.getByRole('button', { name: 'Modifica data e ora dello slot' }))
-    expect(screen.getByLabelText('Nuova data e ora')).toHaveAttribute('step', '1800')
-    fireEvent.change(screen.getByLabelText('Nuova data e ora'), {
-      target: { value: '2026-07-29T20:30' },
-    })
+    fireEvent.change(screen.getByLabelText('Data'), { target: { value: '2026-07-29' } })
+    fireEvent.change(screen.getByLabelText('Ora'), { target: { value: '20' } })
+    fireEvent.change(screen.getByLabelText('Minuti'), { target: { value: '30' } })
+    expect(Array.from(
+      screen.getByLabelText('Minuti').querySelectorAll<HTMLOptionElement>('option'),
+      (option) => option.value,
+    )).toEqual(['00', '30'])
     expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Salva data e ora' }))
 

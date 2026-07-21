@@ -10,7 +10,7 @@ const user: SessionUser = {
 }
 
 describe('editor degli slot', () => {
-  it('mantiene il focus sul campo data e ora dopo una modifica', () => {
+  it('mantiene il focus sul selettore dei minuti dopo una modifica', () => {
     render(
       <CreatePollModal
         user={user}
@@ -20,13 +20,12 @@ describe('editor degli slot', () => {
       />,
     )
 
-    const originalInput = screen.getAllByLabelText('Data e ora')[0]
-    expect(originalInput).toHaveAttribute('step', '1800')
+    const originalInput = screen.getAllByLabelText('Minuti')[0]
     originalInput.focus()
 
-    fireEvent.change(originalInput, { target: { value: '2026-07-28T19:00' } })
+    fireEvent.change(originalInput, { target: { value: '00' } })
 
-    expect(screen.getAllByLabelText('Data e ora')[0]).toBe(originalInput)
+    expect(screen.getAllByLabelText('Minuti')[0]).toBe(originalInput)
     expect(originalInput).toHaveFocus()
   })
 
@@ -40,14 +39,16 @@ describe('editor degli slot', () => {
       />,
     )
 
-    fireEvent.change(screen.getAllByLabelText('Data e ora')[0], {
-      target: { value: '2026-07-28T19:00' },
-    })
+    fireEvent.change(screen.getAllByLabelText('Data')[0], { target: { value: '2026-07-28' } })
+    fireEvent.change(screen.getAllByLabelText('Ora')[0], { target: { value: '19' } })
+    fireEvent.change(screen.getAllByLabelText('Minuti')[0], { target: { value: '00' } })
     fireEvent.change(screen.getAllByLabelText('Durata')[0], { target: { value: '120' } })
     fireEvent.click(screen.getByRole('button', { name: 'Duplica slot 1 al giorno successivo' }))
 
-    expect(screen.getAllByLabelText('Data e ora')).toHaveLength(3)
-    expect(screen.getAllByLabelText('Data e ora')[1]).toHaveValue('2026-07-29T19:00')
+    expect(screen.getAllByLabelText('Data')).toHaveLength(3)
+    expect(screen.getAllByLabelText('Data')[1]).toHaveValue('2026-07-29')
+    expect(screen.getAllByLabelText('Ora')[1]).toHaveValue('19')
+    expect(screen.getAllByLabelText('Minuti')[1]).toHaveValue('00')
     expect(screen.getAllByLabelText('Durata')[1]).toHaveValue('120')
     expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
   })

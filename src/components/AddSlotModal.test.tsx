@@ -25,8 +25,13 @@ describe('aggiunta di uno slot', () => {
   it('propone il giorno successivo con la stessa ora e durata', () => {
     render(<AddSlotModal poll={poll} onClose={vi.fn()} onSave={vi.fn()} onDone={vi.fn()} />)
 
-    expect(screen.getByLabelText('Data e ora')).toHaveValue('2026-07-29T18:30')
-    expect(screen.getByLabelText('Data e ora')).toHaveAttribute('step', '1800')
+    expect(screen.getByLabelText('Data')).toHaveValue('2026-07-29')
+    expect(screen.getByLabelText('Ora')).toHaveValue('18')
+    expect(screen.getByLabelText('Minuti')).toHaveValue('30')
+    expect(Array.from(
+      screen.getByLabelText('Minuti').querySelectorAll<HTMLOptionElement>('option'),
+      (option) => option.value,
+    )).toEqual(['00', '30'])
     expect(screen.getByLabelText('Durata')).toHaveValue('120')
     expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
   })

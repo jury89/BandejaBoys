@@ -3,6 +3,7 @@ import { CalendarPlus, CopyPlus, Plus, Trash2 } from 'lucide-react'
 import type { CreatePollInput, SessionUser, SlotInput } from '../types'
 import { defaultSlotForWeek, nextMondayDate } from '../lib/domain'
 import { Modal } from './Modal'
+import { SlotDateTimeField } from './SlotDateTimeField'
 
 interface CreatePollModalProps {
   user: SessionUser
@@ -119,16 +120,10 @@ export function CreatePollModal({ user, onClose, onCreate, onDone }: CreatePollM
               /* La chiave non dipende dai valori editabili: il controllo nativo mantiene il focus tra gli aggiornamenti. */
               <div className="slot-editor__row" key={slot.editorId}>
                 <span className="slot-editor__number">{String(index + 1).padStart(2, '0')}</span>
-                <label className="field">
-                  <span>Data e ora</span>
-                  <input
-                    type="datetime-local"
-                    step={1800}
-                    value={slot.startsAt}
-                    onChange={(event) => updateSlotInput(index, { startsAt: event.target.value })}
-                    required
-                  />
-                </label>
+                <SlotDateTimeField
+                  value={slot.startsAt}
+                  onChange={(startsAt) => updateSlotInput(index, { startsAt })}
+                />
                 <label className="field field--duration">
                   <span>Durata</span>
                   <select

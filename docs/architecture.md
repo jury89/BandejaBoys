@@ -15,7 +15,7 @@
 ## Flusso settimanale
 
 1. Un membro crea un sondaggio, di solito il lunedì, indicando la settimana successiva.
-2. Il sondaggio contiene uno o più slot con data, ora e durata. I minuti ammessi sono soltanto `00` e `30`; finché uno slot non ha una prenotazione, il suo orario è automaticamente considerato indicativo.
+2. Il sondaggio contiene uno o più slot con data, ora e durata. L’interfaccia usa controlli separati per data, ora e minuti, così anche i selettori nativi di iOS espongono soltanto i minuti ammessi `00` e `30`; finché uno slot non ha una prenotazione, il suo orario è automaticamente considerato indicativo.
    Qualunque membro può aggiungere o eliminare slot finché il sondaggio resta aperto; entrambe le operazioni sono transazionali. L’ultimo slot non può essere eliminato, così il sondaggio mantiene sempre almeno una proposta. La conferma di eliminazione esplicita la perdita di adesioni e riserve e, se il campo risulta prenotato, ricorda che va annullato direttamente con l’Oasi Boschetto.
 3. Al momento dell’adesione il giocatore sceglie esplicitamente **Titolare** o **Riserva**; ogni adesione conserva anche il timestamp per mantenere la precedenza cronologica.
 4. I titolari sono al massimo quattro. Una riserva volontaria non occupa un posto libero; quando una formazione di quattro perde un titolare, la prima riserva viene promossa automaticamente.

@@ -4,6 +4,7 @@ import type { PadelSlot } from '../types'
 import { toDateTimeInput } from '../lib/domain'
 import { slotDateParts } from '../lib/format'
 import { Modal } from './Modal'
+import { SlotDateTimeField } from './SlotDateTimeField'
 
 interface EditSlotModalProps {
   slot: PadelSlot
@@ -42,17 +43,12 @@ export function EditSlotModal({ slot, onClose, onSave, onDone }: EditSlotModalPr
     <Modal title="Modifica data e ora" eyebrow={`${current.full} · ${current.time}`} onClose={onClose}>
       <form onSubmit={submit} className="form-stack">
         <p className="modal__lead">Adesioni, riserve e prenotazione del campo resteranno associate allo slot.</p>
-        <label className="field">
-          <span>Nuova data e ora</span>
-          <input
-            type="datetime-local"
-            step={1800}
-            value={startsAt}
-            onChange={(event) => setStartsAt(event.target.value)}
-            autoFocus
-            required
-          />
-        </label>
+        <SlotDateTimeField
+          label="Nuova data e ora"
+          value={startsAt}
+          onChange={setStartsAt}
+          autoFocus
+        />
         {error && <p className="form-message form-message--error" role="alert">{error}</p>}
         <footer className="modal__actions">
           <button className="button button--ghost" type="button" onClick={onClose}>Annulla</button>
