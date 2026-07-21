@@ -1,0 +1,10 @@
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "bandeja-boys-notification-scheduler",
+  "main": "worker.js",
+  "compatibility_date": "2026-07-21",
+  "workers_dev": false,
+  "triggers": {
+    "crons": ["3,13,23,33,43,53 * * * *"]
+  }
+}

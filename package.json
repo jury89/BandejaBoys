@@ -12,8 +12,10 @@
     "test:watch": "vitest",
     "notifications:send": "tsx scripts/send-notifications.ts",
     "notifications:typecheck": "tsc --noEmit -p tsconfig.notifications.json",
+    "scheduler:check": "WRANGLER_LOG_PATH=.wrangler/wrangler.log wrangler deploy --config scheduler/wrangler.jsonc --dry-run",
+    "scheduler:deploy": "WRANGLER_LOG_PATH=.wrangler/wrangler.log wrangler deploy --config scheduler/wrangler.jsonc",
     "assets:icons": "node scripts/generate-icons.mjs",
-    "check": "npm run lint && npm run test && npm run build && npm run notifications:typecheck"
+    "check": "npm run lint && npm run test && npm run build && npm run notifications:typecheck && npm run scheduler:check"
   },
   "dependencies": {
     "@fontsource-variable/manrope": "^5.3.0",
@@ -43,6 +45,7 @@
     "typescript-eslint": "^8.64.0",
     "vite": "^8.1.5",
     "vitest": "^4.1.10",
-    "web-push": "^3.6.7"
+    "web-push": "^3.6.7",
+    "wrangler": "^4.112.0"
   }
 }

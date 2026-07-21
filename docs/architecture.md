@@ -9,7 +9,7 @@
 - Accesso: Firebase Authentication con email e password
 - Hosting: Firebase Hosting con HTTPS
 - Notifiche: Web Push standard con service worker e coppia VAPID
-- Pianificazione: GitHub Actions ogni 10 minuti, ai minuti `03`, `13`, `23`, `33`, `43` e `53`, senza Cloud Functions o fatturazione Firebase
+- Pianificazione: Cron Trigger Cloudflare Workers ogni 10 minuti, ai minuti `03`, `13`, `23`, `33`, `43` e `53`; il Worker avvia GitHub Actions senza Cloud Functions o fatturazione Firebase
 - Repository: pubblico per l’uso gratuito dei runner standard; nessun dato utente o segreto è versionato
 
 ## Flusso settimanale
@@ -44,7 +44,7 @@ Su iPhone e iPad Web Push richiede l’apertura come web app dalla schermata Hom
 
 Il service worker `public/sw.js` riceve il payload, mostra sempre una notifica visibile e riapre la bacheca quando viene toccata. La sottoscrizione standard contiene endpoint e chiavi pubbliche del dispositivo e viene salvata in `pushSubscriptions/{subscriptionId}`; l’identificatore è l’hash SHA-256 dell’endpoint, quindi lo stesso dispositivo può essere reclamato dall’ultimo account che vi attiva gli avvisi.
 
-Il workflow GitHub legge lo stato corrente ogni 10 minuti e genera eventi idempotenti:
+Il Worker Cloudflare richiama tramite `workflow_dispatch` il workflow GitHub, che legge lo stato corrente ogni 10 minuti e genera eventi idempotenti:
 
 - **Nuovi slot**: a tutti i dispositivi registrati tranne quelli di chi li ha aggiunti. Gli slot creati nello stesso sondaggio a non più di 10 minuti di distanza vengono raggruppati; l’evento viene emesso soltanto dopo 10 minuti senza altre aggiunte. Cinque proposte iniziali producono quindi un avviso, mentre un’altra proposta inserita il giorno seguente ne produce uno nuovo. Sono considerate soltanto aggiunte avvenute nelle ultime 24 ore e relative a partite future.
 - **Reminder 24h**: quando una partita prenotata entra nella finestra delle 24 ore, soltanto ai primi quattro iscritti in quel momento; l’archiviazione del sondaggio non disattiva il promemoria.
@@ -54,7 +54,9 @@ I tre avvisi ordinari condividono il titolo informale **“Sveglia fagianotto!�
 
 Ogni slot nuovo conserva `createdAt`, `createdBy` e `createdByName`; un cambio di data e ora lascia invariati questi dati e quindi non viene interpretato come una nuova aggiunta. Gli slot storici privi dei metadati non generano avvisi retroattivi. Ritiri, promozioni dalla riserva, sostituzioni, annullamenti, eliminazioni e cambi di orario non richiedono una coda da correggere: i destinatari vengono sempre derivati dal documento più recente. Uno slot eliminato non produce quindi notifiche ancora in attesa né reminder futuri. L’identità del reminder include data e ora, perciò uno slot spostato genera i reminder per il nuovo orario. `notificationDeliveries/{deliveryId}` registra ogni coppia evento/dispositivo e impedisce duplicati tra esecuzioni successive.
 
-L’elaborazione parte ai minuti `03`, `13`, `23`, `33`, `43` e `53`. Per i nuovi slot si aggiungono i 10 minuti di quiete, quindi l’avviso arriva normalmente tra 10 e 20 minuti dall’ultima aggiunta; i reminder arrivano invece nella prima esecuzione dopo il superamento della soglia, entro circa 10 minuti. GitHub documenta che i workflow pianificati possono subire ritardi occasionali: in tal caso il reminder 24h resta valido fino all’ingresso nella finestra 2h, mentre quello 2h resta valido fino all’inizio della partita.
+L’elaborazione parte ai minuti `03`, `13`, `23`, `33`, `43` e `53`. Per i nuovi slot si aggiungono i 10 minuti di quiete, quindi l’avviso arriva normalmente tra 10 e 20 minuti dall’ultima aggiunta; i reminder arrivano invece nella prima esecuzione dopo il superamento della soglia, entro circa 10 minuti. Il Cron Trigger esterno evita che i ritardi occasionali dei workflow pianificati GitHub diventino ritardi di recapito; la logica idempotente rende innocuo anche un eventuale avvio manuale contemporaneo.
+
+Il Worker non contiene credenziali Firebase o Web Push. Conserva soltanto un secret Cloudflare `GITHUB_TOKEN` fine-grained, limitato al repository `BandejaBoys` e al permesso **Actions: Read and write**, e invia a GitHub una richiesta di dispatch sul branch `main`. Il piano gratuito Cloudflare ammette 100.000 richieste al giorno e 5 Cron Trigger per account; questo progetto ne usa uno e produce 144 invocazioni giornaliere.
 
 Il repository pubblico usa gratuitamente i runner GitHub standard. Per evitare che GitHub disattivi i workflow pianificati dopo 60 giorni senza attività, `keepalive.yml` esegue il primo giorno del mese un heartbeat ristretto al repository originale: valida il progetto con `npm run check`, aggiorna `.github/keepalive.txt` e crea un commit con il `GITHUB_TOKEN`, limitato al solo permesso `contents: write`. L’esecuzione manuale dello stesso workflow permette di verificarlo; un workflow già disattivato deve prima essere riabilitato dalla scheda Actions o tramite API GitHub. I fork pubblici saltano il job grazie al controllo su `github.repository`.
 
@@ -113,7 +115,7 @@ Al termine della transazione il repository restituisce anche il sondaggio aggior
 
 I membri leggono e gestiscono soltanto la propria sottoscrizione push. L’account tecnico `codex@kirivoraup.resend.app` deve avere l’email verificata: le Firestore Security Rules gli consentono di leggere sondaggi e sottoscrizioni, scrivere le sole ricevute di consegna ed eliminare endpoint scaduti. Non può leggere i profili, creare sondaggi o aggiornare slot.
 
-La password tecnica e la chiave VAPID privata vivono esclusivamente nei GitHub Actions secrets e non fanno parte della cronologia pubblica. La chiave VAPID pubblica e la configurazione Web Firebase sono invece parte della configurazione del client. Prima del passaggio a repository pubblico, tutti i blob raggiungibili dalla cronologia Git sono stati controllati per escludere token, chiavi private, service account e file di credenziali. Il progetto non usa service account Google, Cloud Functions, Cloud Scheduler, Pub/Sub o altri servizi che richiedono il piano Blaze.
+La password tecnica e la chiave VAPID privata vivono esclusivamente nei GitHub Actions secrets e non fanno parte della cronologia pubblica. Il token di dispatch vive esclusivamente nei secret cifrati Cloudflare ed è ristretto a un repository e a un solo permesso; Wrangler non ne restituisce il valore dopo il salvataggio. La chiave VAPID pubblica e la configurazione Web Firebase sono invece parte della configurazione del client. Prima del passaggio a repository pubblico, tutti i blob raggiungibili dalla cronologia Git sono stati controllati per escludere token, chiavi private, service account e file di credenziali. Il progetto non usa service account Google, Cloud Functions, Cloud Scheduler, Pub/Sub o altri servizi che richiedono il piano Blaze.
 
 ## Modalità demo
 
