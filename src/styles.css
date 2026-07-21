@@ -1171,46 +1171,63 @@ p {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 9px;
+  gap: 6px;
 }
 
-.slot-card__edit-time,
-.slot-card__delete {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
+.slot-card__icon-action {
+  display: inline-grid;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  place-items: center;
   padding: 0;
-  border: 0;
-  background: transparent;
+  border: 1px solid #d4e2e7;
+  border-radius: 9px;
+  background: #f8fbfc;
   color: var(--court);
   cursor: pointer;
-  font-size: 0.58rem;
-  font-weight: 850;
+  transition: 150ms ease;
+  transition-property: color, background, border-color, transform;
 }
 
-.slot-card__edit-time:hover,
-.slot-card__edit-time:focus-visible {
+.slot-card__icon-action:hover:not(:disabled),
+.slot-card__icon-action:focus-visible {
+  border-color: #9fc0cb;
+  background: #edf7fa;
   color: var(--deep);
-  text-decoration: underline;
-  text-underline-offset: 3px;
+  transform: translateY(-1px);
 }
 
-.slot-card__delete {
+.slot-card__icon-action--calendar {
+  border-color: #bdd94f;
+  background: #f2ffc4;
+  color: #325b00;
+}
+
+.slot-card__icon-action--calendar:hover,
+.slot-card__icon-action--calendar:focus-visible {
+  border-color: #9fbd29;
+  background: var(--ball);
+  color: var(--ink);
+}
+
+.slot-card__icon-action--delete {
+  border-color: #efd0d6;
+  background: #fff8f9;
   color: #bd3b51;
 }
 
-.slot-card__delete:hover,
-.slot-card__delete:focus-visible {
+.slot-card__icon-action--delete:hover:not(:disabled),
+.slot-card__icon-action--delete:focus-visible {
+  border-color: #e3a5b0;
+  background: #fff0f3;
   color: #8f2438;
-  text-decoration: underline;
-  text-underline-offset: 3px;
 }
 
-.slot-card__edit-time:disabled,
-.slot-card__delete:disabled {
+.slot-card__icon-action:disabled {
   opacity: 0.38;
   cursor: not-allowed;
-  text-decoration: none;
+  transform: none;
 }
 
 .status-pill {

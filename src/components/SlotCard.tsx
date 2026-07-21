@@ -3,6 +3,7 @@ import {
   ArrowRight,
   ArrowLeftRight,
   CalendarCheck2,
+  CalendarPlus,
   Check,
   CircleHelp,
   Clock3,
@@ -23,6 +24,7 @@ import {
   MAX_STARTERS,
 } from '../lib/domain'
 import { slotDateParts } from '../lib/format'
+import { downloadSlotCalendar } from '../lib/calendar'
 import { resolveMemberName } from '../lib/memberNames'
 import { repository } from '../lib/repository'
 import { EditSlotModal } from './EditSlotModal'
@@ -114,6 +116,11 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
     `Campo prenotato all’Oasi Boschetto. L’orario è confermato.`,
   )
 
+  const addToCalendar = () => {
+    downloadSlotCalendar(poll, slot)
+    onNotify('File calendario pronto: aprilo per aggiungere la partita.')
+  }
+
   return (
     <article className={`slot-card slot-card--${phase}`}>
       <header className="slot-card__header">
@@ -135,29 +142,41 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
             <PhaseIcon size={14} />
             {phaseCopy[phase].label}
           </div>
-          {!disabled && (
-            <div className="slot-card__management">
-              <button
-                className="slot-card__edit-time"
-                type="button"
-                onClick={() => setScheduleOpen(true)}
-                disabled={busy}
-                aria-label="Modifica data e ora dello slot"
-              >
-                <PencilLine size={12} /> Modifica
-              </button>
-              <button
-                className="slot-card__delete"
-                type="button"
-                onClick={deleteSlot}
-                disabled={busy || poll.slots.length === 1}
-                title={poll.slots.length === 1 ? 'Aggiungi un altro slot prima di eliminare questo.' : undefined}
-                aria-label={`Elimina lo slot di ${date.full} alle ${date.time}`}
-              >
-                <Trash2 size={12} /> Elimina
-              </button>
-            </div>
-          )}
+          <div className="slot-card__management" role="group" aria-label="Azioni dello slot">
+            <button
+              className="slot-card__icon-action slot-card__icon-action--calendar"
+              type="button"
+              onClick={addToCalendar}
+              title="Aggiungi al calendario"
+              aria-label={`Aggiungi lo slot di ${date.full} alle ${date.time} al calendario`}
+            >
+              <CalendarPlus size={16} />
+            </button>
+            {!disabled && (
+              <>
+                <button
+                  className="slot-card__icon-action slot-card__icon-action--edit"
+                  type="button"
+                  onClick={() => setScheduleOpen(true)}
+                  disabled={busy}
+                  title="Modifica data e ora"
+                  aria-label="Modifica data e ora dello slot"
+                >
+                  <PencilLine size={15} />
+                </button>
+                <button
+                  className="slot-card__icon-action slot-card__icon-action--delete"
+                  type="button"
+                  onClick={deleteSlot}
+                  disabled={busy || poll.slots.length === 1}
+                  title={poll.slots.length === 1 ? 'Aggiungi un altro slot prima di eliminare questo.' : 'Elimina slot'}
+                  aria-label={`Elimina lo slot di ${date.full} alle ${date.time}`}
+                >
+                  <Trash2 size={15} />
+                </button>
+              </>
+            )}
+          </div>
         </div>
       </header>
 

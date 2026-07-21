@@ -33,7 +33,10 @@ const poll: PadelPoll = {
 }
 
 describe('azioni dello slot', () => {
-  afterEach(() => vi.restoreAllMocks())
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.restoreAllMocks()
+  })
 
   it('mostra il nome attuale del profilo al posto della vecchia copia ricavata dall’email', () => {
     const mattia: SessionUser = {
@@ -209,6 +212,44 @@ describe('azioni dello slot', () => {
       '2026-07-29T20:30',
     ))
     expect(onNotify).toHaveBeenCalledWith('Data e ora dello slot aggiornate.')
+  })
+
+  it('esporta lo slot nel calendario con un pulsante a icona', () => {
+    vi.useFakeTimers()
+    const createObjectURL = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:padel-calendar')
+    const revokeObjectURL = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    const onNotify = vi.fn()
+
+    render(
+      <SlotCard
+        poll={poll}
+        slot={slot}
+        user={user}
+        members={[user]}
+        onPollChange={vi.fn()}
+        onNotify={onNotify}
+        onError={vi.fn()}
+      />,
+    )
+
+    const actions = screen.getByRole('group', { name: 'Azioni dello slot' })
+    const calendar = screen.getByRole('button', { name: /Aggiungi lo slot.+al calendario/ })
+    const edit = screen.getByRole('button', { name: 'Modifica data e ora dello slot' })
+    const remove = screen.getByRole('button', { name: /Elimina lo slot/ })
+
+    expect(actions).toContainElement(calendar)
+    expect(edit).toHaveTextContent('')
+    expect(remove).toHaveTextContent('')
+    fireEvent.click(calendar)
+
+    expect(createObjectURL).toHaveBeenCalledWith(expect.any(Blob))
+    expect(click).toHaveBeenCalledOnce()
+    expect(onNotify).toHaveBeenCalledWith(
+      'File calendario pronto: aprilo per aggiungere la partita.',
+    )
+    vi.advanceTimersByTime(1_000)
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:padel-calendar')
   })
 
   it('elimina uno slot dopo conferma e aggiorna subito la bacheca', async () => {
