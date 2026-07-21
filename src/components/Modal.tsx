@@ -11,11 +11,16 @@ interface ModalProps {
 
 export function Modal({ title, eyebrow, onClose, children, size = 'default' }: ModalProps) {
   const closeButton = useRef<HTMLButtonElement>(null)
+  const onCloseRef = useRef(onClose)
+
+  useEffect(() => {
+    onCloseRef.current = onClose
+  }, [onClose])
 
   useEffect(() => {
     closeButton.current?.focus()
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose()
+      if (event.key === 'Escape') onCloseRef.current()
     }
     document.body.classList.add('modal-open')
     window.addEventListener('keydown', onKeyDown)
@@ -23,7 +28,7 @@ export function Modal({ title, eyebrow, onClose, children, size = 'default' }: M
       document.body.classList.remove('modal-open')
       window.removeEventListener('keydown', onKeyDown)
     }
-  }, [onClose])
+  }, [])
 
   return (
     <div className="modal-backdrop" role="presentation" onMouseDown={(event) => {
@@ -49,4 +54,3 @@ export function Modal({ title, eyebrow, onClose, children, size = 'default' }: M
     </div>
   )
 }
-
