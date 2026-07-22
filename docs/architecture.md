@@ -14,7 +14,7 @@
 
 ## Flusso settimanale
 
-1. Un membro crea un sondaggio, di solito il lunedì, indicando la settimana successiva. Il nome non è editabile: dominio e interfaccia lo derivano sempre dall’intervallo selezionato nel formato **Padel · 27 lug – 2 ago 2026**. Se la settimana attraversa Capodanno, vengono mostrati entrambi gli anni.
+1. Un membro crea un sondaggio, di solito il lunedì, indicando la settimana successiva. `targetWeekStart` viene sempre normalizzato al lunedì della settimana selezionata, che termina la domenica; la stessa normalizzazione in lettura corregge le etichette dei documenti storici salvati con un giorno infrasettimanale. Il nome non è editabile: dominio e interfaccia lo derivano dall’intervallo nel formato **Padel · 27 lug – 2 ago 2026**. Se la settimana attraversa Capodanno, vengono mostrati entrambi gli anni.
 2. Il sondaggio contiene uno o più slot con data, ora e durata. L’interfaccia usa controlli separati per data, ora e minuti, così anche i selettori nativi di iOS espongono soltanto i minuti ammessi `00` e `30`; finché uno slot non ha una prenotazione, il suo orario è automaticamente considerato indicativo.
    Qualunque membro può aggiungere o eliminare slot finché il sondaggio resta aperto; entrambe le operazioni sono transazionali. L’ultimo slot non può essere eliminato, così il sondaggio mantiene sempre almeno una proposta. La conferma di eliminazione esplicita la perdita di adesioni e riserve e, se il campo risulta prenotato, ricorda che va annullato direttamente con l’Oasi Boschetto.
 3. Al momento dell’adesione il giocatore sceglie esplicitamente **Titolare** o **Riserva**; ogni adesione conserva anche il timestamp per mantenere la precedenza cronologica.
@@ -62,7 +62,7 @@ Il service worker `public/sw.js` riceve il payload, mostra sempre una notifica v
 
 Il Worker Cloudflare richiama tramite `workflow_dispatch` il workflow GitHub, che legge lo stato corrente ogni 10 minuti e genera eventi idempotenti:
 
-- **Nuovi slot**: a tutti i dispositivi registrati tranne quelli di chi li ha aggiunti. Gli slot creati nello stesso sondaggio a non più di 10 minuti di distanza vengono raggruppati; l’evento viene emesso soltanto dopo 10 minuti senza altre aggiunte. Cinque proposte iniziali producono quindi un avviso, mentre un’altra proposta inserita il giorno seguente ne produce uno nuovo. Il messaggio identifica il sondaggio con l’intervallo derivato da `targetWeekStart`, anziché fidarsi del vecchio titolo salvato: anche i documenti storici con il nome generico diventano quindi riconoscibili senza migrazione. Il raggruppamento usa l’intera sequenza di creazione prima di applicare la scadenza, perciò l’identità dell’evento resta stabile anche quando il primo elemento diventa più vecchio. Un gruppo è notificabile soltanto fino a un’ora dall’ultima aggiunta e solo per partite future.
+- **Nuovi slot**: a tutti i dispositivi registrati tranne quelli di chi li ha aggiunti. Gli slot creati nello stesso sondaggio a non più di 10 minuti di distanza vengono raggruppati; l’evento viene emesso soltanto dopo 10 minuti senza altre aggiunte. Cinque proposte iniziali producono quindi un avviso, mentre un’altra proposta inserita il giorno seguente ne produce uno nuovo. Il messaggio identifica il sondaggio con l’intervallo lunedì-domenica derivato da `targetWeekStart`, anziché fidarsi del vecchio titolo salvato: anche i documenti storici con il nome generico o una data infrasettimanale diventano quindi riconoscibili senza migrazione. Il raggruppamento usa l’intera sequenza di creazione prima di applicare la scadenza, perciò l’identità dell’evento resta stabile anche quando il primo elemento diventa più vecchio. Un gruppo è notificabile soltanto fino a un’ora dall’ultima aggiunta e solo per partite future.
 - **Formazione completa**: quando un quarto titolare completa uno slot futuro ancora da prenotare, soltanto ai quattro titolari correnti. L’identità dell’evento include il timestamp del quarto titolare: le esecuzioni successive restano idempotenti, mentre una formazione che si svuota e torna completa genera un nuovo evento. La finestra di 24 ore evita avvisi retroattivi al rilascio; se `bookedAt` è già presente, l’evento non viene creato.
 - **Reminder prenotazione 7g**: nella prima esecuzione a partire da sette giorni prima della partita, soltanto se la formazione era già completa prima della soglia e `bookedAt` è ancora assente. I destinatari sono i quattro titolari correnti e la finestra dura 24 ore; l’identità include l’orario della partita, quindi uno spostamento genera il promemoria rispetto alla nuova data.
 - **Reminder 24h**: quando una partita prenotata entra nella finestra delle 24 ore, soltanto ai primi quattro iscritti in quel momento; l’archiviazione del sondaggio non disattiva il promemoria.
@@ -104,7 +104,7 @@ users/{uid}
   id, displayName, email, createdAt, avatarDataUrl?
 
 polls/{pollId}
-  title (generato dalla settimana), targetWeekStart, createdBy, createdByName
+  title (generato dalla settimana), targetWeekStart (lunedì), createdBy, createdByName
   createdAt, updatedAt, status
   slots[]
     id, startsAt, durationMinutes, venue
@@ -140,7 +140,7 @@ slotViews/{pollId__slotId__viewerId}
   firstViewedAt, lastViewedAt, viewCount
 ```
 
-Un sondaggio e i suoi slot stanno in un solo documento. `title` resta persistito per compatibilità con audit e dati esistenti, ma per la presentazione viene ricalcolato da `targetWeekStart`: non serve migrare i vecchi documenti e un titolo generico salvato in passato non ricompare nell’interfaccia o negli avvisi. È una scelta adatta alle dimensioni del gruppo: permette una transazione singola, aggiornamenti in tempo reale semplici e nessun indice composto. Il limite Firestore di 1 MiB resta molto lontano con poche persone e un massimo di 14 slot imposto dalle regole.
+Un sondaggio e i suoi slot stanno in un solo documento. `title` resta persistito per compatibilità con audit e dati esistenti, ma per la presentazione viene ricalcolato da `targetWeekStart` dopo aver ricavato il lunedì della stessa settimana: non serve migrare i vecchi documenti e un titolo generico o un intervallo infrasettimanale salvato in passato non ricompare nell’interfaccia o negli avvisi. Le nuove scritture persistono direttamente il lunedì. È una scelta adatta alle dimensioni del gruppo: permette una transazione singola, aggiornamenti in tempo reale semplici e nessun indice composto. Il limite Firestore di 1 MiB resta molto lontano con poche persone e un massimo di 14 slot imposto dalle regole.
 
 Le risposte e i voti sono documenti immutabili. L’identificatore deterministico rende idempotente ogni coppia partita/revisore/destinatario; le copie dei nomi fotografano lo storico mentre gli UID permettono di risalire sempre alle persone coinvolte. Le regole consentono a un giocatore di creare i propri voti e di leggere i record in cui è autore o destinatario, vietando aggiornamenti e cancellazioni. La UI espone al destinatario soltanto la media per partita nella propria mini scheda dello storico; non vengono creati documenti aggregati né classifiche globali.
 

@@ -22,13 +22,16 @@ describe('editor degli slot', () => {
     )
 
     expect(screen.queryByLabelText('Nome del sondaggio')).not.toBeInTheDocument()
-    fireEvent.change(screen.getByLabelText('Settimana di gioco'), {
-      target: { value: '2026-07-27' },
+    fireEvent.change(screen.getByLabelText('Settimana di gioco (lun–dom)'), {
+      target: { value: '2026-08-05' },
     })
+    expect(screen.getByLabelText('Settimana di gioco (lun–dom)')).toHaveValue('2026-08-03')
+    expect(screen.getAllByLabelText('Data')[0]).toHaveValue('2026-08-04')
+    expect(screen.getAllByLabelText('Data')[1]).toHaveValue('2026-08-06')
     fireEvent.click(screen.getByRole('button', { name: 'Pubblica sondaggio' }))
 
     await waitFor(() => expect(onCreate).toHaveBeenCalledWith(
-      expect.objectContaining({ targetWeekStart: '2026-07-27' }),
+      expect.objectContaining({ targetWeekStart: '2026-08-03' }),
       user,
     ))
     expect(onCreate.mock.calls[0][0]).not.toHaveProperty('title')

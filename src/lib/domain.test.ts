@@ -2,6 +2,7 @@ import {
   DEFAULT_VENUE,
   addSlotToPoll,
   addSignup,
+  defaultSlotForWeek,
   getMatchRatingResponseId,
   getNextMatchRatingPromptAt,
   getPendingMatchRatingPrompts,
@@ -448,11 +449,11 @@ describe('stato slot e creazione sondaggio', () => {
     expect(getSlotPhase(booked)).toBe('booked')
   })
 
-  it('assegna il titolo settimanale, ordina gli slot e rifiuta due proposte identiche', () => {
+  it('normalizza la settimana al lunedì, assegna il titolo, ordina gli slot e rifiuta duplicati', () => {
     const creator: SessionUser = member('jury', 'Jury')
     const poll = makePoll(
       {
-        targetWeekStart: '2026-07-27',
+        targetWeekStart: '2026-07-29',
         slots: [
           { startsAt: '2026-07-30T20:00', durationMinutes: 90 },
           { startsAt: '2026-07-28T19:30', durationMinutes: 90 },
@@ -462,6 +463,7 @@ describe('stato slot e creazione sondaggio', () => {
       100,
     )
     expect(poll.title).toBe('Padel · 27 lug – 2 ago 2026')
+    expect(poll.targetWeekStart).toBe('2026-07-27')
     expect(poll.slots[0].startsAt < poll.slots[1].startsAt).toBe(true)
     expect(poll.slots[0]).toMatchObject({
       createdAt: 100,
@@ -496,6 +498,10 @@ describe('stato slot e creazione sondaggio', () => {
   it('calcola sempre il lunedì della settimana successiva', () => {
     expect(nextMondayDate(new Date('2026-07-20T12:00:00'))).toBe('2026-07-27')
     expect(nextMondayDate(new Date('2026-07-22T12:00:00'))).toBe('2026-07-27')
+  })
+
+  it('propone gli slot a partire dal lunedì anche con una data infrasettimanale', () => {
+    expect(defaultSlotForWeek('2026-08-05', 1)).toBe('2026-08-04T19:30')
   })
 
   it('sposta uno slot conservando adesioni e prenotazione e riordina il sondaggio', () => {

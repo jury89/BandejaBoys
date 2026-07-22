@@ -14,7 +14,7 @@ import type {
   SlotInput,
   SlotPhase,
 } from '../types'
-import { pollWeekTitle } from './format'
+import { mondayOfWeek, pollWeekTitle } from './format'
 
 export const MAX_STARTERS = 4
 export const MAX_SLOTS = 14
@@ -492,7 +492,8 @@ export function makePoll(
   creator: SessionUser,
   now = Date.now(),
 ): Omit<PadelPoll, 'id'> {
-  if (!input.targetWeekStart) throw new Error('Scegli la settimana di gioco.')
+  const targetWeekStart = mondayOfWeek(input.targetWeekStart)
+  if (!targetWeekStart) throw new Error('Scegli la settimana di gioco.')
   if (input.slots.length === 0) throw new Error('Aggiungi almeno uno slot.')
   if (input.slots.length > MAX_SLOTS) throw new Error(`Puoi inserire al massimo ${MAX_SLOTS} slot.`)
 
@@ -502,8 +503,8 @@ export function makePoll(
   }
 
   return {
-    title: pollWeekTitle(input.targetWeekStart),
-    targetWeekStart: input.targetWeekStart,
+    title: pollWeekTitle(targetWeekStart),
+    targetWeekStart,
     createdBy: creator.id,
     createdByName: creator.displayName,
     createdAt: now,
@@ -546,7 +547,8 @@ export function toDateTimeInput(date: Date): string {
 }
 
 export function defaultSlotForWeek(weekStart: string, dayOffset = 1): string {
-  const date = new Date(`${weekStart}T19:30:00`)
+  const normalizedWeekStart = mondayOfWeek(weekStart) ?? weekStart
+  const date = new Date(`${normalizedWeekStart}T19:30:00`)
   date.setDate(date.getDate() + dayOffset)
   return toDateTimeInput(date)
 }

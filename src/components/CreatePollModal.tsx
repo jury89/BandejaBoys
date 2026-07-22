@@ -2,6 +2,7 @@ import { useMemo, useRef, useState, type FormEvent } from 'react'
 import { CalendarPlus, CopyPlus, Plus, Trash2 } from 'lucide-react'
 import type { CreatePollInput, SessionUser, SlotInput } from '../types'
 import { defaultSlotForWeek, nextMondayDate } from '../lib/domain'
+import { mondayOfWeek } from '../lib/format'
 import { Modal } from './Modal'
 import { SlotDateTimeField } from './SlotDateTimeField'
 
@@ -41,10 +42,11 @@ export function CreatePollModal({ user, onClose, onCreate, onDone }: CreatePollM
   }
 
   const updateWeek = (value: string) => {
-    setWeekStart(value)
+    const normalizedWeek = mondayOfWeek(value) ?? value
+    setWeekStart(normalizedWeek)
     setSlots((current) => current.map((slot, index) => ({
       ...slot,
-      startsAt: defaultSlotForWeek(value, index * 2 + 1),
+      startsAt: defaultSlotForWeek(normalizedWeek, index * 2 + 1),
     })))
   }
 
@@ -83,7 +85,7 @@ export function CreatePollModal({ user, onClose, onCreate, onDone }: CreatePollM
       <form onSubmit={submit} className="poll-form">
         <div className="poll-form__basics">
           <label className="field">
-            <span>Settimana di gioco</span>
+            <span>Settimana di gioco (lun–dom)</span>
             <input type="date" value={weekStart} onChange={(event) => updateWeek(event.target.value)} required />
           </label>
         </div>

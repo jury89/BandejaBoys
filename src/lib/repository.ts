@@ -47,7 +47,7 @@ import {
 } from './domain'
 import { getLocalProfiles, USERS_EVENT } from './auth'
 import { firestore, hasRemoteBackend } from './firebase'
-import { pollWeekTitle } from './format'
+import { mondayOfWeek, pollWeekTitle } from './format'
 
 export interface PadelRepository {
   subscribePolls(listener: (polls: PadelPoll[]) => void, onError: (error: Error) => void): Unsubscribe
@@ -475,7 +475,7 @@ function seedPolls(): PadelPoll[] {
   second.setDate(second.getDate() + 2)
   second.setHours(20, 0, 0, 0)
   const now = Date.now()
-  const targetWeekStart = next.toISOString().slice(0, 10)
+  const targetWeekStart = mondayOfWeek(next.toISOString().slice(0, 10)) ?? next.toISOString().slice(0, 10)
   const signups = demoMembers.slice(0, 5).map((member, index) => ({
     id: `demo-signup-${index}`,
     userId: member.id,
