@@ -6,6 +6,7 @@ import {
   NEW_SLOT_QUIET_PERIOD_MS,
   SLOT_READY_NOTIFICATION_WINDOW_MS,
   collectScheduledNotifications,
+  createNotificationDelivery,
   createTestNotification,
 } from './notificationSchedule'
 
@@ -51,6 +52,21 @@ const poll = (
   updatedAt: createdAt,
   status,
   slots,
+})
+
+describe('ricevuta di consegna', () => {
+  it('conserva titolo e testo esatti della notifica inviata', () => {
+    const notification = createTestNotification('jury', 'manuale-1', 'Sveglia fagianotto!')
+
+    expect(createNotificationDelivery(notification, 'jury', 'subscription-1')).toEqual({
+      eventId: 'test:manuale-1',
+      kind: 'test',
+      title: 'Bandeja Boys',
+      body: 'Sveglia fagianotto!',
+      userId: 'jury',
+      subscriptionId: 'subscription-1',
+    })
+  })
 })
 
 describe('pianificazione notifiche', () => {

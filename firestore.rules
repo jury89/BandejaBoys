@@ -104,6 +104,22 @@ service cloud.firestore {
         && request.resource.data.occurredAt == request.time;
     }
 
+    function validNotificationDelivery() {
+      return request.resource.data.keys().hasOnly([
+          'eventId', 'kind', 'title', 'body', 'userId', 'subscriptionId', 'sentAt'
+        ])
+        && request.resource.data.eventId is string
+        && request.resource.data.kind in [
+          'new-slots', 'slot-ready', 'booking-reminder-7d',
+          'reminder-24h', 'reminder-2h', 'match-rating', 'test'
+        ]
+        && request.resource.data.title is string
+        && request.resource.data.body is string
+        && request.resource.data.userId is string
+        && request.resource.data.subscriptionId is string
+        && request.resource.data.sentAt == request.time;
+    }
+
     function validSlotView() {
       return request.resource.data.keys().hasOnly([
           'pollId', 'pollTitle', 'slotId', 'slotStartsAt',
@@ -170,7 +186,9 @@ service cloud.firestore {
     }
 
     match /notificationDeliveries/{deliveryId} {
-      allow read, write: if isNotifier();
+      allow read: if isNotifier();
+      allow create: if isNotifier() && validNotificationDelivery();
+      allow update, delete: if false;
     }
 
     match /activityEvents/{eventId} {

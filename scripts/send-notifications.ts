@@ -14,7 +14,11 @@ import {
 } from 'firebase/firestore'
 import webpush, { type PushSubscription } from 'web-push'
 import type { MatchRatingResponse, PadelPoll } from '../src/types'
-import { collectScheduledNotifications, createTestNotification } from '../src/lib/notificationSchedule'
+import {
+  collectScheduledNotifications,
+  createNotificationDelivery,
+  createTestNotification,
+} from '../src/lib/notificationSchedule'
 
 interface StoredPushSubscription extends PushSubscription {
   userId: string
@@ -112,10 +116,7 @@ for (const notification of notifications) {
           : 'normal',
       })
       await setDoc(deliveryReference, {
-        eventId: notification.id,
-        kind: notification.kind,
-        userId,
-        subscriptionId: subscription.id,
+        ...createNotificationDelivery(notification, userId, subscription.id),
         sentAt: serverTimestamp(),
       })
       sent += 1

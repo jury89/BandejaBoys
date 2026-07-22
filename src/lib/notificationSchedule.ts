@@ -33,6 +33,30 @@ export interface ScheduledNotification {
   excludedUserIds: string[]
 }
 
+export interface NotificationDeliveryData {
+  eventId: string
+  kind: NotificationKind
+  title: string
+  body: string
+  userId: string
+  subscriptionId: string
+}
+
+export function createNotificationDelivery(
+  notification: ScheduledNotification,
+  userId: string,
+  subscriptionId: string,
+): NotificationDeliveryData {
+  return {
+    eventId: notification.id,
+    kind: notification.kind,
+    title: notification.title,
+    body: notification.body,
+    userId,
+    subscriptionId,
+  }
+}
+
 function formatSession(startsAt: string): string {
   const formatted = new Intl.DateTimeFormat('it-IT', {
     weekday: 'long',

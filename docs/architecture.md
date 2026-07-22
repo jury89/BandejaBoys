@@ -63,7 +63,7 @@ Il Worker Cloudflare richiama tramite `workflow_dispatch` il workflow GitHub, ch
 
 Nuovi slot e reminder di gioco condividono il titolo informale **“Sveglia fagianotto!”**; la formazione completa usa **“Slot completo!”**, il promemoria di prenotazione **“Manca solo una settimana!”** e la richiesta delle pagelle **“È ora di dare i voti”**. I relativi messaggi conservano giorno e ora della sessione.
 
-Ogni slot nuovo conserva `createdAt`, `createdBy` e `createdByName`; un cambio di data e ora lascia invariati questi dati e quindi non viene interpretato come una nuova aggiunta. Gli slot storici privi dei metadati non generano avvisi retroattivi. Ritiri, promozioni dalla riserva, sostituzioni, annullamenti, eliminazioni e cambi di orario non richiedono una coda da correggere: i destinatari vengono sempre derivati dal documento più recente. Uno slot eliminato non produce quindi notifiche ancora in attesa né reminder futuri. L’identità del reminder include data e ora, perciò uno slot spostato genera i reminder per il nuovo orario. `notificationDeliveries/{deliveryId}` registra ogni coppia evento/dispositivo e impedisce duplicati tra esecuzioni successive.
+Ogni slot nuovo conserva `createdAt`, `createdBy` e `createdByName`; un cambio di data e ora lascia invariati questi dati e quindi non viene interpretato come una nuova aggiunta. Gli slot storici privi dei metadati non generano avvisi retroattivi. Ritiri, promozioni dalla riserva, sostituzioni, annullamenti, eliminazioni e cambi di orario non richiedono una coda da correggere: i destinatari vengono sempre derivati dal documento più recente. Uno slot eliminato non produce quindi notifiche ancora in attesa né reminder futuri. L’identità del reminder include data e ora, perciò uno slot spostato genera i reminder per il nuovo orario. `notificationDeliveries/{deliveryId}` registra ogni coppia evento/dispositivo e impedisce duplicati tra esecuzioni successive. La ricevuta viene creata soltanto dopo che il servizio Web Push accetta l’invio e conserva anche `title` e `body`; non dimostra che il sistema operativo abbia mostrato o che l’utente abbia letto la notifica.
 
 L’elaborazione parte ai minuti `03`, `13`, `23`, `33`, `43` e `53`. Per i nuovi slot si aggiungono i 10 minuti di quiete, quindi l’avviso arriva normalmente tra 10 e 20 minuti dall’ultima aggiunta; formazione completa, reminder di prenotazione e reminder di gioco arrivano invece nella prima esecuzione dopo il superamento della rispettiva soglia, entro circa 10 minuti. Il Cron Trigger esterno evita che i ritardi occasionali dei workflow pianificati GitHub diventino ritardi di recapito; la logica idempotente rende innocuo anche un eventuale avvio manuale contemporaneo.
 
@@ -111,7 +111,7 @@ pushSubscriptions/{subscriptionId}
   createdAt, updatedAt
 
 notificationDeliveries/{deliveryId}
-  eventId, kind, userId, subscriptionId, sentAt
+  eventId, kind, title, body, userId, subscriptionId, sentAt
 
 matchRatingResponses/{pollId__slotId__reviewerId}
   id, pollId, slotId, reviewerId, status, closedAt
