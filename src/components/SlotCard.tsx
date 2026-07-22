@@ -28,6 +28,7 @@ import { slotDateParts } from '../lib/format'
 import { resolveMemberName } from '../lib/memberNames'
 import { repository } from '../lib/repository'
 import { slotViewSessionKey, trackSustainedSlotView } from '../lib/slotViewTracking'
+import { slotElementId } from '../lib/slotNavigation'
 import { EditSlotModal } from './EditSlotModal'
 import { ProfileAvatar } from './ProfileAvatar'
 import { SubstitutionModal } from './SubstitutionModal'
@@ -137,7 +138,11 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
   }
 
   return (
-    <article ref={cardRef} className={`slot-card slot-card--${phase}`}>
+    <article
+      id={slotElementId({ pollId: poll.id, slotId: slot.id })}
+      ref={cardRef}
+      className={`slot-card slot-card--${phase}`}
+    >
       <header className="slot-card__header">
         <div className="slot-date" aria-label={`${date.full} alle ${date.time}`}>
           <span>{date.weekday}</span>

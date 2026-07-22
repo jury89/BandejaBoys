@@ -1,5 +1,6 @@
 import {
   ArrowLeft,
+  ArrowRight,
   CalendarCheck2,
   CalendarClock,
   CheckCircle2,
@@ -14,6 +15,7 @@ interface MyMatchesPageProps {
   matches: PlayerMatchLists
   loading: boolean
   onBack: () => void
+  onSelectMatch: (match: PlayerMatch) => void
 }
 
 interface MatchListProps {
@@ -23,16 +25,35 @@ interface MatchListProps {
   emptyTitle: string
   emptyBody: string
   past?: boolean
+  onSelectMatch?: (match: PlayerMatch) => void
 }
 
-function MatchItem({ match, past = false }: { match: PlayerMatch; past?: boolean }) {
+function MatchItem({
+  match,
+  past = false,
+  onSelect,
+}: {
+  match: PlayerMatch
+  past?: boolean
+  onSelect?: (match: PlayerMatch) => void
+}) {
   const date = slotDateParts(match.slot.startsAt)
   const booked = Boolean(match.slot.bookedAt)
   const venue = booked ? (match.slot.venue || DEFAULT_VENUE) : 'Campo da prenotare'
   const status = past ? 'Giocata' : booked ? 'Campo confermato' : 'Da prenotare'
 
   return (
-    <article className={`personal-match ${booked ? 'personal-match--booked' : 'personal-match--pending'}`}>
+    <article className={`personal-match ${booked ? 'personal-match--booked' : 'personal-match--pending'} ${onSelect ? 'personal-match--interactive' : ''}`}>
+      {onSelect && (
+        <button
+          className="personal-match__link"
+          type="button"
+          aria-label={`Apri ${match.pollTitle} del ${date.full} alle ${date.time} nella bacheca`}
+          onClick={() => onSelect(match)}
+        >
+          <span className="sr-only">Apri lo slot nella bacheca</span>
+        </button>
+      )}
       <div className="personal-match__date" aria-hidden="true">
         <span>{date.weekday}</span>
         <strong>{date.day}</strong>
@@ -54,12 +75,13 @@ function MatchItem({ match, past = false }: { match: PlayerMatch; past?: boolean
       <div className={`personal-match__status ${booked ? 'is-booked' : 'is-pending'}`}>
         {booked ? <CheckCircle2 size={17} /> : <CalendarClock size={17} />}
         <span>{status}</span>
+        {onSelect && <ArrowRight className="personal-match__open-icon" size={17} aria-hidden="true" />}
       </div>
     </article>
   )
 }
 
-function MatchList({ eyebrow, title, matches, emptyTitle, emptyBody, past = false }: MatchListProps) {
+function MatchList({ eyebrow, title, matches, emptyTitle, emptyBody, past = false, onSelectMatch }: MatchListProps) {
   return (
     <section className="personal-matches__section">
       <header className="personal-matches__section-heading">
@@ -72,7 +94,12 @@ function MatchList({ eyebrow, title, matches, emptyTitle, emptyBody, past = fals
       {matches.length > 0 ? (
         <div className="personal-matches__list">
           {matches.map((match) => (
-            <MatchItem key={`${match.pollId}-${match.slot.id}`} match={match} past={past} />
+            <MatchItem
+              key={`${match.pollId}-${match.slot.id}`}
+              match={match}
+              past={past}
+              onSelect={onSelectMatch}
+            />
           ))}
         </div>
       ) : (
@@ -85,7 +112,7 @@ function MatchList({ eyebrow, title, matches, emptyTitle, emptyBody, past = fals
   )
 }
 
-export function MyMatchesPage({ matches, loading, onBack }: MyMatchesPageProps) {
+export function MyMatchesPage({ matches, loading, onBack, onSelectMatch }: MyMatchesPageProps) {
   return (
     <main className="dashboard personal-matches">
       <button className="button button--ghost personal-matches__back" type="button" onClick={onBack}>
@@ -113,6 +140,7 @@ export function MyMatchesPage({ matches, loading, onBack }: MyMatchesPageProps) 
             eyebrow="In agenda"
             title="Prossimi match"
             matches={matches.upcoming}
+            onSelectMatch={onSelectMatch}
             emptyTitle="Nessun match in programma"
             emptyBody="Uno slot comparirà qui quando avrà quattro titolari e tu sarai tra loro."
           />

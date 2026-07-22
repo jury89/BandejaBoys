@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Bell, BellRing, CalendarCheck2, CalendarClock, CalendarDays, CalendarPlus, CheckCircle2, ChevronDown, CircleUserRound, History, LogOut, UsersRound } from 'lucide-react'
 import { useAuth } from '../AuthContext'
-import type { MatchRatingResponse, MatchRatingSubmission, MemberProfile, PadelPoll } from '../types'
+import type { MatchRatingResponse, MatchRatingSubmission, MemberProfile, PadelPoll, PlayerMatch } from '../types'
 import {
   getNextMatchRatingPromptAt,
   getPendingMatchRatingPrompts,
@@ -17,6 +17,7 @@ import { resolveMemberName } from '../lib/memberNames'
 import { notificationStateLabel, usePushNotifications } from '../lib/notifications'
 import { RATING_TEST_QUERY_PARAM, isRatingTestRequested, makeRatingTestPrompt } from '../lib/ratingTest'
 import { repository } from '../lib/repository'
+import { slotElementId, type SlotNavigationTarget } from '../lib/slotNavigation'
 import { Brand } from './Brand'
 import { CreatePollModal } from './CreatePollModal'
 import { MatchRatingModal } from './MatchRatingModal'
@@ -78,6 +79,7 @@ export function Dashboard() {
   const [ratingResponsesLoaded, setRatingResponsesLoaded] = useState(false)
   const [ratingTestOpen, setRatingTestOpen] = useState(() => isRatingTestRequested(window.location.search))
   const [ratingTestStartedAt] = useState(() => Date.now())
+  const [slotNavigationTarget, setSlotNavigationTarget] = useState<SlotNavigationTarget | null>(null)
   const accountMenuRef = useRef<HTMLDivElement>(null)
   const [requestedRating] = useState(() => {
     const parameters = new URLSearchParams(window.location.search)
@@ -151,6 +153,31 @@ export function Dashboard() {
       window.removeEventListener('hashchange', syncViewWithHistory)
     }
   }, [])
+
+  useEffect(() => {
+    if (dashboardView !== 'feed' || loading || !slotNavigationTarget) return
+
+    let highlightTimer: number | undefined
+    const frame = window.requestAnimationFrame(() => {
+      const slotElement = document.getElementById(slotElementId(slotNavigationTarget))
+      if (!slotElement) {
+        setSlotNavigationTarget(null)
+        return
+      }
+
+      slotElement.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      slotElement.classList.add('slot-card--highlighted')
+      highlightTimer = window.setTimeout(() => {
+        slotElement.classList.remove('slot-card--highlighted')
+        setSlotNavigationTarget(null)
+      }, 2600)
+    })
+
+    return () => {
+      window.cancelAnimationFrame(frame)
+      if (highlightTimer) window.clearTimeout(highlightTimer)
+    }
+  }, [dashboardView, loading, slotNavigationTarget])
 
   useEffect(() => {
     const nextStart = polls
@@ -271,6 +298,11 @@ export function Dashboard() {
     url.hash = ''
     window.history.replaceState(window.history.state, '', url)
     setDashboardView('feed')
+  }
+  const showPlayerMatchOnBoard = (match: PlayerMatch) => {
+    setFeedFilter('all')
+    setSlotNavigationTarget({ pollId: match.pollId, slotId: match.slot.id })
+    closePlayerMatches()
   }
   const updatePoll = (updatedPoll: PadelPoll) => {
     setPolls((current) => current.map((poll) => poll.id === updatedPoll.id ? updatedPoll : poll))
@@ -397,6 +429,7 @@ export function Dashboard() {
           matches={playerMatches}
           loading={loading}
           onBack={closePlayerMatches}
+          onSelectMatch={showPlayerMatchOnBoard}
         />
       ) : <main className="dashboard">
         <section className="dashboard-intro">

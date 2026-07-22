@@ -33,9 +33,17 @@ const matches: PlayerMatchLists = {
 describe('pagina dei match personali', () => {
   it('separa prossimi match e partite giocate e torna alla bacheca', async () => {
     const onBack = vi.fn()
+    const onSelectMatch = vi.fn()
     const user = userEvent.setup()
 
-    render(<MyMatchesPage matches={matches} loading={false} onBack={onBack} />)
+    render(
+      <MyMatchesPage
+        matches={matches}
+        loading={false}
+        onBack={onBack}
+        onSelectMatch={onSelectMatch}
+      />,
+    )
 
     expect(screen.getByRole('heading', { name: 'Prossimi match' })).toBeInTheDocument()
     expect(screen.getByText('Padel della prossima settimana')).toBeInTheDocument()
@@ -43,6 +51,11 @@ describe('pagina dei match personali', () => {
     expect(screen.getByRole('heading', { name: 'Partite giocate' })).toBeInTheDocument()
     expect(screen.getByText('Padel della settimana scorsa')).toBeInTheDocument()
     expect(screen.getByText('Giocata')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', {
+      name: /Apri Padel della prossima settimana.*nella bacheca/,
+    }))
+    expect(onSelectMatch).toHaveBeenCalledWith(matches.upcoming[0])
 
     await user.click(screen.getByRole('button', { name: 'Torna alla bacheca' }))
     expect(onBack).toHaveBeenCalledOnce()

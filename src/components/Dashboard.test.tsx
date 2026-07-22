@@ -1,7 +1,13 @@
-import { act, render, screen } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { vi } from 'vitest'
+import type { PadelPoll } from '../types'
+import { slotElementId } from '../lib/slotNavigation'
 import { Dashboard } from './Dashboard'
+
+const dashboardTestState = vi.hoisted(() => ({
+  polls: [] as PadelPoll[],
+}))
 
 vi.mock('../AuthContext', () => ({
   useAuth: () => ({
@@ -32,8 +38,8 @@ vi.mock('../lib/notifications', () => ({
 
 vi.mock('../lib/repository', () => ({
   repository: {
-    subscribePolls: (listener: (polls: []) => void) => {
-      listener([])
+    subscribePolls: (listener: (polls: PadelPoll[]) => void) => {
+      listener(dashboardTestState.polls)
       return vi.fn()
     },
     subscribeMembers: (listener: (members: []) => void) => {
@@ -82,5 +88,60 @@ describe('menu account', () => {
     })
 
     expect(screen.getByRole('heading', { name: /Mettiamo in campo/ })).toBeInTheDocument()
+  })
+
+  it('apre dalla lista match lo slot corretto nella bacheca e lo evidenzia', async () => {
+    dashboardTestState.polls = [{
+      id: 'poll-future',
+      title: 'Padel futuro',
+      targetWeekStart: '2099-01-05',
+      createdBy: 'jury',
+      createdByName: 'Jury',
+      createdAt: 1,
+      updatedAt: 1,
+      status: 'open',
+      slots: [{
+        id: 'slot-future',
+        startsAt: '2099-01-05T19:30',
+        durationMinutes: 90,
+        venue: '',
+        signups: [
+          { id: 'signup-jury', userId: 'jury', displayName: 'Jury', joinedAt: 1, role: 'starter' },
+          { id: 'signup-a', userId: 'a', displayName: 'A', joinedAt: 2, role: 'starter' },
+          { id: 'signup-b', userId: 'b', displayName: 'B', joinedAt: 3, role: 'starter' },
+          { id: 'signup-c', userId: 'c', displayName: 'C', joinedAt: 4, role: 'starter' },
+        ],
+      }],
+    }]
+    const scrollIntoView = vi.fn()
+    Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
+      configurable: true,
+      value: scrollIntoView,
+    })
+    const user = userEvent.setup()
+    window.history.replaceState({}, '', '/')
+    render(<Dashboard />)
+
+    await user.click(screen.getByRole('button', { name: /^Slot prenotati/ }))
+    expect(screen.queryByText('Padel futuro')).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Apri menu account di Jury' }))
+    await user.click(screen.getByRole('button', { name: /I miei match/ }))
+    await user.click(screen.getByRole('button', { name: /Apri Padel futuro.*nella bacheca/ }))
+
+    act(() => {
+      window.history.replaceState({}, '', '/')
+      window.dispatchEvent(new PopStateEvent('popstate'))
+    })
+
+    const target = document.getElementById(slotElementId({
+      pollId: 'poll-future',
+      slotId: 'slot-future',
+    }))
+    expect(target).toBeInTheDocument()
+    await waitFor(() => {
+      expect(scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'center' })
+      expect(target).toHaveClass('slot-card--highlighted')
+    })
   })
 })
