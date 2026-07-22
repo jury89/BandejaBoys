@@ -170,18 +170,33 @@ p {
 }
 
 .brand--compact {
+  gap: 9px;
   color: var(--ink);
 }
 
+.brand--compact .brand__words strong,
 .brand--compact .brand__words em {
   display: inline-flex;
   align-items: center;
-  padding: 0.14em 0.32em 0.12em;
-  border-radius: 3px;
+  padding-block: 0.14em 0.12em;
+  line-height: 0.86;
+}
+
+.brand--compact .brand__words strong {
+  padding-inline: 0.4em 0.62em;
+  border-radius: 3px 0 0 3px;
+  background: var(--aqua);
+}
+
+.brand--compact .brand__words em {
+  z-index: 1;
+  margin-left: -0.42em;
+  padding-inline: 0.65em 0.34em;
+  border-radius: 0 3px 3px 0;
   background: var(--deep);
+  clip-path: polygon(16% 0, 100% 0, 100% 100%, 0 100%);
   color: var(--ball);
   letter-spacing: 0.04em;
-  line-height: 0.86;
 }
 
 .brand--compact .brand__ball {
@@ -204,7 +219,8 @@ p {
 }
 
 .brand--compact .brand__words {
-  align-items: center;
+  align-items: stretch;
+  gap: 0;
   font-size: 1.32rem;
 }
 
