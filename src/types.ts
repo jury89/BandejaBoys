@@ -53,6 +53,17 @@ export interface PadelPoll {
   slots: PadelSlot[]
 }
 
+export interface PlayerMatch {
+  pollId: string
+  pollTitle: string
+  slot: PadelSlot
+}
+
+export interface PlayerMatchLists {
+  upcoming: PlayerMatch[]
+  past: PlayerMatch[]
+}
+
 export interface SlotInput {
   startsAt: string
   durationMinutes: number

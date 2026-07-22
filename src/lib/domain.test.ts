@@ -5,6 +5,7 @@ import {
   getMatchRatingResponseId,
   getNextMatchRatingPromptAt,
   getPendingMatchRatingPrompts,
+  getPlayerMatches,
   getReserves,
   getSlotPhase,
   getStarters,
@@ -185,6 +186,85 @@ describe('ordine e visibilità dei sondaggi', () => {
     expect(result).toHaveLength(1)
     expect(result[0].slots.map((item) => item.id)).toEqual(['future'])
     expect(current.slots).toHaveLength(3)
+  })
+})
+
+describe('partite personali', () => {
+  const personalPoll = (): PadelPoll => ({
+    id: 'poll-personal',
+    title: 'Settimana personale',
+    targetWeekStart: '2026-07-27',
+    createdBy: 'jury',
+    createdByName: 'Jury',
+    createdAt: 1,
+    updatedAt: 1,
+    status: 'closed',
+    slots: [],
+  })
+
+  it('include gli slot futuri da titolare anche senza prenotazione e ignora le riserve', () => {
+    const poll = personalPoll()
+    poll.slots = [
+      {
+        ...slot([signup('jury', 1, 'starter')]),
+        id: 'future-later',
+        startsAt: '2026-07-30T19:30:00.000Z',
+      },
+      {
+        ...slot([signup('jury', 1, 'starter')]),
+        id: 'future-near',
+        startsAt: '2026-07-29T19:30:00.000Z',
+      },
+      {
+        ...slot([signup('jury', 1, 'reserve')]),
+        id: 'future-reserve',
+        startsAt: '2026-07-28T19:30:00.000Z',
+      },
+    ]
+
+    const result = getPlayerMatches(
+      [poll],
+      'jury',
+      Date.parse('2026-07-28T12:00:00.000Z'),
+    )
+
+    expect(result.upcoming.map((match) => match.slot.id)).toEqual(['future-near', 'future-later'])
+    expect(result.past).toEqual([])
+  })
+
+  it('considera giocate soltanto le partite prenotate e concluse, dalla più recente', () => {
+    const poll = personalPoll()
+    poll.slots = [
+      {
+        ...slot([signup('jury', 1)]),
+        id: 'past-booked-old',
+        startsAt: '2026-07-25T18:30:00.000Z',
+        bookedAt: 1,
+      },
+      {
+        ...slot([signup('jury', 1)]),
+        id: 'past-booked-recent',
+        startsAt: '2026-07-27T18:30:00.000Z',
+        bookedAt: 2,
+      },
+      {
+        ...slot([signup('jury', 1)]),
+        id: 'past-unbooked',
+        startsAt: '2026-07-26T18:30:00.000Z',
+      },
+      {
+        ...slot([signup('jury', 1)]),
+        id: 'ongoing',
+        startsAt: '2026-07-28T11:30:00.000Z',
+        durationMinutes: 90,
+        bookedAt: 3,
+      },
+    ]
+
+    const result = getPlayerMatches([poll], 'jury', Date.parse('2026-07-28T12:00:00.000Z'))
+
+    expect(result.past.map((match) => match.slot.id)).toEqual(['past-booked-recent', 'past-booked-old'])
+    expect(result.upcoming).toEqual([])
   })
 })
 

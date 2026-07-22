@@ -1950,6 +1950,310 @@ p {
   background: #c2d6de;
 }
 
+/* Personal match history */
+.personal-matches {
+  padding-top: 38px;
+}
+
+.personal-matches__back {
+  margin-bottom: 22px;
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.personal-matches__hero {
+  position: relative;
+  display: flex;
+  overflow: hidden;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 36px;
+  margin-bottom: 34px;
+  padding: 38px 42px;
+  border-radius: 18px;
+  background: var(--deep);
+  color: var(--white);
+  box-shadow: 0 20px 55px rgba(7, 89, 133, 0.18);
+}
+
+.personal-matches__hero::after {
+  position: absolute;
+  top: -58px;
+  right: 16%;
+  width: 230px;
+  height: 230px;
+  border: 24px solid rgba(217, 255, 67, 0.09);
+  border-radius: 50%;
+  content: '';
+}
+
+.personal-matches__hero > * {
+  position: relative;
+  z-index: 1;
+}
+
+.personal-matches__hero .eyebrow {
+  color: var(--ball);
+}
+
+.personal-matches__hero h1 {
+  margin: 3px 0 9px;
+  font-family: var(--display);
+  font-size: clamp(3.5rem, 7vw, 5.6rem);
+  letter-spacing: -0.025em;
+  line-height: 0.84;
+  text-transform: uppercase;
+}
+
+.personal-matches__hero > div:first-child > p:last-child {
+  max-width: 620px;
+  margin: 0;
+  color: #c8dce5;
+  font-size: 0.78rem;
+  line-height: 1.65;
+}
+
+.personal-matches__score {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 20px;
+  padding: 17px 21px;
+  border: 1px solid rgba(255, 255, 255, 0.17);
+  border-radius: 13px;
+  background: rgba(2, 49, 75, 0.45);
+  backdrop-filter: blur(10px);
+}
+
+.personal-matches__score span {
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  color: #c8dce5;
+  font-size: 0.58rem;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.personal-matches__score strong {
+  color: var(--ball);
+  font-family: var(--display);
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.personal-matches__score i {
+  width: 1px;
+  height: 38px;
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.personal-matches__grid {
+  display: grid;
+  align-items: start;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+}
+
+.personal-matches__section {
+  min-width: 0;
+  padding: 24px;
+  border: 1px solid #cfdee4;
+  border-radius: 16px;
+  background: var(--white);
+  box-shadow: 0 14px 42px rgba(16, 55, 72, 0.06);
+}
+
+.personal-matches__section-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 20px;
+}
+
+.personal-matches__section-heading h2 {
+  margin: 2px 0 0;
+  font-family: var(--display);
+  font-size: 2rem;
+  letter-spacing: -0.01em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.personal-matches__section-heading > strong {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--ball);
+  color: var(--ink);
+  font-family: var(--display);
+  font-size: 1.1rem;
+}
+
+.personal-matches__list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.personal-match {
+  display: grid;
+  min-width: 0;
+  align-items: center;
+  gap: 14px;
+  padding: 13px;
+  grid-template-columns: 56px minmax(0, 1fr);
+  border: 1px solid #dce8ec;
+  border-radius: 13px;
+  background: #fbfdfe;
+}
+
+.personal-match--booked {
+  border-left: 4px solid var(--booked);
+}
+
+.personal-match--pending {
+  border-left: 4px solid var(--pending);
+}
+
+.personal-match__date {
+  display: flex;
+  width: 56px;
+  min-height: 67px;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  border-radius: 10px;
+  background: #eaf3f6;
+  color: var(--court);
+}
+
+.personal-match__date span,
+.personal-match__date small {
+  font-size: 0.55rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.personal-match__date strong {
+  color: var(--ink);
+  font-family: var(--display);
+  font-size: 2rem;
+  line-height: 0.9;
+}
+
+.personal-match__body {
+  min-width: 0;
+}
+
+.personal-match__heading {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.personal-match__heading > div {
+  min-width: 0;
+}
+
+.personal-match__heading p {
+  overflow: hidden;
+  margin: 0 0 2px;
+  color: var(--muted);
+  font-size: 0.6rem;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.personal-match__heading h3 {
+  margin: 0;
+  font-family: var(--display);
+  font-size: 1.9rem;
+  line-height: 0.9;
+}
+
+.personal-match__starter {
+  padding: 4px 7px;
+  border-radius: 999px;
+  background: var(--ball);
+  color: var(--ink);
+  font-size: 0.51rem;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.personal-match__details {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px 12px;
+  margin-top: 8px;
+  color: #607782;
+  font-size: 0.59rem;
+  font-weight: 720;
+}
+
+.personal-match__details span {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 4px;
+}
+
+.personal-match__status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  grid-column: 1 / -1;
+  border-radius: 8px;
+  font-size: 0.61rem;
+  font-weight: 850;
+}
+
+.personal-match__status.is-booked {
+  background: #ddf3ed;
+  color: var(--booked-deep);
+}
+
+.personal-match__status.is-pending {
+  background: var(--pending-soft);
+  color: var(--pending-ink);
+}
+
+.personal-matches__empty {
+  display: flex;
+  min-height: 116px;
+  align-items: center;
+  gap: 14px;
+  padding: 20px;
+  border: 1px dashed #bfd2d9;
+  border-radius: 13px;
+  background: #f6fafb;
+  color: var(--court);
+}
+
+.personal-matches__empty strong {
+  color: var(--ink);
+  font-size: 0.72rem;
+}
+
+.personal-matches__empty p {
+  margin: 3px 0 0;
+  color: var(--muted);
+  font-size: 0.64rem;
+  line-height: 1.55;
+}
+
 .site-footer {
   display: flex;
   width: min(1280px, calc(100% - 48px));
@@ -2760,6 +3064,10 @@ p {
 }
 
 @media (max-width: 980px) {
+  .personal-matches__grid {
+    grid-template-columns: 1fr;
+  }
+
   .auth-layout {
     grid-template-columns: 0.84fr 1.16fr;
   }
@@ -2861,6 +3169,54 @@ p {
   .dashboard {
     width: min(100% - 16px, 680px);
     padding-top: 32px;
+  }
+
+  .personal-matches {
+    padding-top: 22px;
+  }
+
+  .personal-matches__back {
+    margin-bottom: 14px;
+  }
+
+  .personal-matches__hero {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 24px;
+    margin-bottom: 18px;
+    padding: 28px 24px;
+  }
+
+  .personal-matches__hero::after {
+    top: -38px;
+    right: -55px;
+    width: 190px;
+    height: 190px;
+  }
+
+  .personal-matches__hero h1 {
+    font-size: clamp(3.6rem, 17vw, 5rem);
+  }
+
+  .personal-matches__score {
+    width: 100%;
+    justify-content: space-around;
+  }
+
+  .personal-matches__score i {
+    height: 34px;
+  }
+
+  .personal-matches__section {
+    padding: 17px;
+  }
+
+  .personal-matches__section-heading h2 {
+    font-size: 1.75rem;
+  }
+
+  .personal-match {
+    padding: 11px;
   }
 
   .dashboard-intro {

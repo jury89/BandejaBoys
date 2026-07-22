@@ -5,6 +5,8 @@ import type {
   MemberProfile,
   PadelPoll,
   PadelSlot,
+  PlayerMatch,
+  PlayerMatchLists,
   SessionUser,
   Signup,
   SignupRole,
@@ -187,6 +189,46 @@ export function getSlotPhase(slot: PadelSlot): SlotPhase {
 
 export function isBookingCandidate(slot: PadelSlot): boolean {
   return !slot.bookedAt && getStarters(slot).length === MAX_STARTERS
+}
+
+export function getPlayerMatches(
+  polls: PadelPoll[],
+  userId: string,
+  now = Date.now(),
+): PlayerMatchLists {
+  const matches: Array<PlayerMatch & { startsAt: number; endsAt: number }> = polls
+    .flatMap((poll) => poll.slots.map((slot) => {
+      const startsAt = padelDateTimeToTimestamp(slot.startsAt)
+      return {
+        pollId: poll.id,
+        pollTitle: poll.title,
+        slot,
+        startsAt,
+        endsAt: startsAt + slot.durationMinutes * 60 * 1000,
+      }
+    }))
+    .filter((match) => (
+      Number.isFinite(match.startsAt)
+      && Number.isFinite(match.endsAt)
+      && isStarter(match.slot, userId)
+    ))
+
+  const toPlayerMatch = ({ pollId, pollTitle, slot }: PlayerMatch): PlayerMatch => ({
+    pollId,
+    pollTitle,
+    slot,
+  })
+
+  return {
+    upcoming: matches
+      .filter((match) => match.startsAt > now)
+      .sort((left, right) => left.startsAt - right.startsAt || left.slot.id.localeCompare(right.slot.id))
+      .map(toPlayerMatch),
+    past: matches
+      .filter((match) => Boolean(match.slot.bookedAt) && match.endsAt <= now)
+      .sort((left, right) => right.startsAt - left.startsAt || left.slot.id.localeCompare(right.slot.id))
+      .map(toPlayerMatch),
+  }
 }
 
 export function getUpcomingPolls(polls: PadelPoll[], now = Date.now()): PadelPoll[] {

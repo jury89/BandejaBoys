@@ -1,0 +1,131 @@
+import {
+  ArrowLeft,
+  CalendarCheck2,
+  CalendarClock,
+  CheckCircle2,
+  Clock3,
+  MapPin,
+} from 'lucide-react'
+import { DEFAULT_VENUE } from '../lib/domain'
+import { slotDateParts } from '../lib/format'
+import type { PlayerMatch, PlayerMatchLists } from '../types'
+
+interface MyMatchesPageProps {
+  matches: PlayerMatchLists
+  loading: boolean
+  onBack: () => void
+}
+
+interface MatchListProps {
+  eyebrow: string
+  title: string
+  matches: PlayerMatch[]
+  emptyTitle: string
+  emptyBody: string
+  past?: boolean
+}
+
+function MatchItem({ match, past = false }: { match: PlayerMatch; past?: boolean }) {
+  const date = slotDateParts(match.slot.startsAt)
+  const booked = Boolean(match.slot.bookedAt)
+  const venue = booked ? (match.slot.venue || DEFAULT_VENUE) : 'Campo da prenotare'
+  const status = past ? 'Giocata' : booked ? 'Campo confermato' : 'Da prenotare'
+
+  return (
+    <article className={`personal-match ${booked ? 'personal-match--booked' : 'personal-match--pending'}`}>
+      <div className="personal-match__date" aria-hidden="true">
+        <span>{date.weekday}</span>
+        <strong>{date.day}</strong>
+        <small>{date.month}</small>
+      </div>
+      <div className="personal-match__body">
+        <div className="personal-match__heading">
+          <div>
+            <p>{match.pollTitle}</p>
+            <h3><time dateTime={match.slot.startsAt}>{date.time}</time></h3>
+          </div>
+          <span className="personal-match__starter">Titolare</span>
+        </div>
+        <div className="personal-match__details">
+          <span><Clock3 size={15} /> {match.slot.durationMinutes} min</span>
+          <span><MapPin size={15} /> {venue}</span>
+        </div>
+      </div>
+      <div className={`personal-match__status ${booked ? 'is-booked' : 'is-pending'}`}>
+        {booked ? <CheckCircle2 size={17} /> : <CalendarClock size={17} />}
+        <span>{status}</span>
+      </div>
+    </article>
+  )
+}
+
+function MatchList({ eyebrow, title, matches, emptyTitle, emptyBody, past = false }: MatchListProps) {
+  return (
+    <section className="personal-matches__section">
+      <header className="personal-matches__section-heading">
+        <div>
+          <p className="eyebrow">{eyebrow}</p>
+          <h2>{title}</h2>
+        </div>
+        <strong>{matches.length}</strong>
+      </header>
+      {matches.length > 0 ? (
+        <div className="personal-matches__list">
+          {matches.map((match) => (
+            <MatchItem key={`${match.pollId}-${match.slot.id}`} match={match} past={past} />
+          ))}
+        </div>
+      ) : (
+        <div className="personal-matches__empty">
+          {past ? <CalendarCheck2 size={24} /> : <CalendarClock size={24} />}
+          <div><strong>{emptyTitle}</strong><p>{emptyBody}</p></div>
+        </div>
+      )}
+    </section>
+  )
+}
+
+export function MyMatchesPage({ matches, loading, onBack }: MyMatchesPageProps) {
+  return (
+    <main className="dashboard personal-matches">
+      <button className="button button--ghost personal-matches__back" type="button" onClick={onBack}>
+        <ArrowLeft size={18} /> Torna alla bacheca
+      </button>
+
+      <section className="personal-matches__hero">
+        <div>
+          <p className="eyebrow">Il tuo calendario Bandeja</p>
+          <h1>I miei match</h1>
+          <p>Tutte le partite in cui sei tra i quattro titolari, prima e dopo il fischio d’inizio.</p>
+        </div>
+        <div className="personal-matches__score" aria-label={`${matches.upcoming.length} prossimi match e ${matches.past.length} partite giocate`}>
+          <span><strong>{matches.upcoming.length}</strong>Prossimi</span>
+          <i />
+          <span><strong>{matches.past.length}</strong>Giocati</span>
+        </div>
+      </section>
+
+      {loading ? (
+        <div className="loading-state"><span /><p>Recuperiamo i tuoi match…</p></div>
+      ) : (
+        <div className="personal-matches__grid">
+          <MatchList
+            eyebrow="In agenda"
+            title="Prossimi match"
+            matches={matches.upcoming}
+            emptyTitle="Nessun match in programma"
+            emptyBody="Quando ti segni come titolare, lo slot comparirà qui."
+          />
+          <MatchList
+            past
+            eyebrow="Il tuo storico"
+            title="Partite giocate"
+            matches={matches.past}
+            emptyTitle="Nessuna partita nello storico"
+            emptyBody="Qui trovi i match conclusi per cui il campo era stato confermato."
+          />
+        </div>
+      )}
+    </main>
+  )
+}

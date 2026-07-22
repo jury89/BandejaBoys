@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Bell, BellRing, CalendarCheck2, CalendarClock, CalendarDays, CalendarPlus, CheckCircle2, ChevronDown, CircleUserRound, LogOut, UsersRound } from 'lucide-react'
+import { Bell, BellRing, CalendarCheck2, CalendarClock, CalendarDays, CalendarPlus, CheckCircle2, ChevronDown, CircleUserRound, History, LogOut, UsersRound } from 'lucide-react'
 import { useAuth } from '../AuthContext'
 import type { MatchRatingResponse, MatchRatingSubmission, MemberProfile, PadelPoll } from '../types'
 import {
   getNextMatchRatingPromptAt,
   getPendingMatchRatingPrompts,
+  getPlayerMatches,
   getSlotPhase,
   getUpcomingPolls,
   isBookingCandidate,
@@ -19,12 +20,14 @@ import { repository } from '../lib/repository'
 import { Brand } from './Brand'
 import { CreatePollModal } from './CreatePollModal'
 import { MatchRatingModal } from './MatchRatingModal'
+import { MyMatchesPage } from './MyMatchesPage'
 import { NotificationCallup } from './NotificationCallup'
 import { PollCard, type PollSlotFilter } from './PollCard'
 import { ProfileAvatar } from './ProfileAvatar'
 import { ProfileModal } from './ProfileModal'
 
 type FeedFilter = PollSlotFilter
+type DashboardView = 'feed' | 'matches'
 
 const feedCopy: Record<FeedFilter, {
   eyebrow: string
@@ -58,6 +61,7 @@ export function Dashboard() {
   const [members, setMembers] = useState<MemberProfile[]>([])
   const [loading, setLoading] = useState(true)
   const [feedFilter, setFeedFilter] = useState<FeedFilter>('all')
+  const [dashboardView, setDashboardView] = useState<DashboardView>('feed')
   const [createOpen, setCreateOpen] = useState(false)
   const [toast, setToast] = useState<{ message: string; tone: 'success' | 'error' } | null>(null)
   const [accountOpen, setAccountOpen] = useState(false)
@@ -130,6 +134,10 @@ export function Dashboard() {
   }, [now, polls, ratingResponses, user])
 
   const upcomingPolls = useMemo(() => getUpcomingPolls(polls, now), [now, polls])
+  const playerMatches = useMemo(
+    () => user ? getPlayerMatches(polls, user.id, now) : { upcoming: [], past: [] },
+    [now, polls, user],
+  )
   const ratingPrompts = useMemo(() => (
     user && ratingResponsesLoaded
       ? getPendingMatchRatingPrompts(polls, ratingResponses, user.id, now)
@@ -259,6 +267,13 @@ export function Dashboard() {
                 <CircleUserRound size={16} />
                 <span>Profilo <small>Nome e foto giocatore</small></span>
               </button>
+              <button type="button" onClick={() => {
+                setAccountOpen(false)
+                setDashboardView('matches')
+              }}>
+                <History size={16} />
+                <span>I miei match <small>Partite passate e future</small></span>
+              </button>
               {hasRemoteBackend && (
                 <button type="button" onClick={() => {
                   setAccountOpen(false)
@@ -274,7 +289,7 @@ export function Dashboard() {
         </div>
       </header>
 
-      <nav className="feed-filter" aria-label="Filtra gli slot">
+      {dashboardView === 'feed' && <nav className="feed-filter" aria-label="Filtra gli slot">
         <div className="feed-filter__inner">
           <button
             className={feedFilter === 'all' ? 'is-active' : ''}
@@ -310,7 +325,7 @@ export function Dashboard() {
             <strong>{bookedSlotCount}</strong>
           </button>
         </div>
-      </nav>
+      </nav>}
 
       {!hasRemoteBackend && (
         <div className="demo-banner">
@@ -318,7 +333,13 @@ export function Dashboard() {
         </div>
       )}
 
-      <main className="dashboard">
+      {dashboardView === 'matches' ? (
+        <MyMatchesPage
+          matches={playerMatches}
+          loading={loading}
+          onBack={() => setDashboardView('feed')}
+        />
+      ) : <main className="dashboard">
         <section className="dashboard-intro">
           <div>
             <p className="eyebrow">Ciao, {firstName(user.displayName)}</p>
@@ -382,7 +403,7 @@ export function Dashboard() {
             {feedFilter === 'all' && <button className="button button--primary" type="button" onClick={() => setCreateOpen(true)}><CalendarPlus size={18} /> Crea il primo sondaggio</button>}
           </section>
         )}
-      </main>
+      </main>}
 
       <footer className="site-footer"><Brand compact /><span>Organizzato fuori. Competitivo dentro.</span></footer>
 
