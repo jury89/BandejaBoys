@@ -158,6 +158,7 @@ export function Dashboard() {
     if (dashboardView !== 'feed' || loading || !slotNavigationTarget) return
 
     let highlightTimer: number | undefined
+    const retryTimers: number[] = []
     const frame = window.requestAnimationFrame(() => {
       const slotElement = document.getElementById(slotElementId(slotNavigationTarget))
       if (!slotElement) {
@@ -165,7 +166,15 @@ export function Dashboard() {
         return
       }
 
-      slotElement.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      const scrollToSlot = () => {
+        slotElement.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }
+
+      scrollToSlot()
+      retryTimers.push(
+        window.setTimeout(scrollToSlot, 180),
+        window.setTimeout(scrollToSlot, 800),
+      )
       slotElement.classList.add('slot-card--highlighted')
       highlightTimer = window.setTimeout(() => {
         slotElement.classList.remove('slot-card--highlighted')
@@ -175,6 +184,7 @@ export function Dashboard() {
 
     return () => {
       window.cancelAnimationFrame(frame)
+      retryTimers.forEach((timer) => window.clearTimeout(timer))
       if (highlightTimer) window.clearTimeout(highlightTimer)
     }
   }, [dashboardView, loading, slotNavigationTarget])

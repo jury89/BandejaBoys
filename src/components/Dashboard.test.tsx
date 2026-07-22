@@ -90,7 +90,7 @@ describe('menu account', () => {
     expect(screen.getByRole('heading', { name: /Mettiamo in campo/ })).toBeInTheDocument()
   })
 
-  it('apre dalla lista match lo slot corretto nella bacheca e lo evidenzia', async () => {
+  it('apre dalla lista match lo slot corretto e ripete lo scroll dopo il ripristino di Safari', async () => {
     dashboardTestState.polls = [{
       id: 'poll-future',
       title: 'Padel futuro',
@@ -140,8 +140,9 @@ describe('menu account', () => {
     }))
     expect(target).toBeInTheDocument()
     await waitFor(() => {
-      expect(scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'center' })
+      expect(scrollIntoView).toHaveBeenCalledTimes(3)
+      expect(scrollIntoView).toHaveBeenLastCalledWith({ behavior: 'smooth', block: 'start' })
       expect(target).toHaveClass('slot-card--highlighted')
-    })
+    }, { timeout: 1_500 })
   })
 })
