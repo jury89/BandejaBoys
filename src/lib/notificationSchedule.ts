@@ -11,7 +11,7 @@ import {
 
 const HOUR_MS = 60 * 60 * 1000
 const DAY_MS = 24 * HOUR_MS
-const NEW_SLOT_WINDOW_MS = DAY_MS
+export const NEW_SLOT_NOTIFICATION_WINDOW_MS = HOUR_MS
 export const NEW_SLOT_QUIET_PERIOD_MS = 10 * 60 * 1000
 export const SLOT_READY_NOTIFICATION_WINDOW_MS = DAY_MS
 export const BOOKING_REMINDER_LEAD_MS = 7 * DAY_MS
@@ -90,19 +90,19 @@ function groupNewSlots(slots: PadelSlot[]): PadelSlot[][] {
 function collectNewSlotNotifications(poll: PadelPoll, now: number): ScheduledNotification[] {
   if (poll.status !== 'open') return []
 
-  const candidates = poll.slots.filter((slot) => {
+  const groups = groupNewSlots(poll.slots.filter((slot) => {
     const createdAt = slot.createdAt
     const startsAt = padelDateTimeToTimestamp(slot.startsAt)
     return typeof createdAt === 'number'
       && Number.isFinite(createdAt)
       && createdAt <= now
-      && createdAt >= now - NEW_SLOT_WINDOW_MS
       && Number.isFinite(startsAt)
       && startsAt > now
-  })
+  }))
 
-  return groupNewSlots(candidates).flatMap((group) => {
+  return groups.flatMap((group) => {
     const latestCreatedAt = Math.max(...group.map((slot) => slot.createdAt ?? 0))
+    if (now - latestCreatedAt > NEW_SLOT_NOTIFICATION_WINDOW_MS) return []
     if (now - latestCreatedAt < NEW_SLOT_QUIET_PERIOD_MS) return []
 
     const first = group[0]

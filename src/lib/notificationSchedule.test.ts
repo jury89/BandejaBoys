@@ -3,6 +3,7 @@ import {
   BOOKING_REMINDER_LEAD_MS,
   BOOKING_REMINDER_WINDOW_MS,
   MATCH_RATING_NOTIFICATION_WINDOW_MS,
+  NEW_SLOT_NOTIFICATION_WINDOW_MS,
   NEW_SLOT_QUIET_PERIOD_MS,
   SLOT_READY_NOTIFICATION_WINDOW_MS,
   collectScheduledNotifications,
@@ -180,6 +181,39 @@ describe('pianificazione notifiche', () => {
       'new-slots:poll-1:slot-2',
     ])
     expect(notifications[1].body).toContain('C’è un nuovo slot disponibile')
+  })
+
+  it('mantiene stabile il gruppo quando il primo slot supera la finestra di invio', () => {
+    const future = new Date(NOW + 7 * 24 * 60 * 60 * 1000).toISOString()
+    const first = slot(future, [], false, {
+      at: NOW - NEW_SLOT_NOTIFICATION_WINDOW_MS - 5 * 60 * 1000,
+      by: 'jury',
+    })
+    const second = {
+      ...slot(future, [], false, {
+        at: NOW - NEW_SLOT_NOTIFICATION_WINDOW_MS + 4 * 60 * 1000,
+        by: 'jury',
+      }),
+      id: 'slot-2',
+      startsAt: new Date(NOW + 8 * 24 * 60 * 60 * 1000).toISOString(),
+    }
+
+    const notifications = collectScheduledNotifications([poll([first, second])], NOW)
+
+    expect(notifications).toHaveLength(1)
+    expect(notifications[0]).toMatchObject({
+      id: 'new-slots:poll-1:slot-1',
+      body: 'Ci sono 2 nuovi slot disponibili per “Padel · prossima settimana”. Segna quando ci sei.',
+    })
+  })
+
+  it('non invia come nuovi gruppi rimasti fermi per oltre un’ora', () => {
+    const createdAt = NOW - NEW_SLOT_NOTIFICATION_WINDOW_MS - 1
+    const future = new Date(NOW + 7 * 24 * 60 * 60 * 1000).toISOString()
+
+    expect(collectScheduledNotifications([
+      poll([slot(future, [], false, { at: createdAt, by: 'jury' })]),
+    ], NOW)).toHaveLength(0)
   })
 
   it('non notifica gli slot storici privi dei metadati di creazione', () => {
