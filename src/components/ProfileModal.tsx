@@ -17,6 +17,7 @@ export function ProfileModal({ user, onClose, onSave, onDone }: ProfileModalProp
   const fileInput = useRef<HTMLInputElement>(null)
   const [displayName, setDisplayName] = useState(user.displayName)
   const [avatarDataUrl, setAvatarDataUrl] = useState(user.avatarDataUrl)
+  const [nameError, setNameError] = useState('')
   const [error, setError] = useState('')
   const [processingPhoto, setProcessingPhoto] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -40,10 +41,12 @@ export function ProfileModal({ user, onClose, onSave, onDone }: ProfileModalProp
     event.preventDefault()
     const validationError = profileNameError(displayName)
     if (validationError) {
-      setError(validationError)
+      setNameError(validationError)
+      setError('')
       return
     }
 
+    setNameError('')
     setError('')
     setSaving(true)
     try {
@@ -90,15 +93,24 @@ export function ProfileModal({ user, onClose, onSave, onDone }: ProfileModalProp
           <span><UserRound size={15} /> Nome visibile</span>
           <input
             aria-label="Nome visibile"
+            aria-describedby="profile-name-feedback"
+            aria-invalid={Boolean(nameError)}
             value={displayName}
             maxLength={PROFILE_NAME_MAX_LENGTH}
             onChange={(event) => {
               setDisplayName(event.target.value)
+              setNameError('')
               setError('')
             }}
             autoComplete="name"
           />
-          <small>È il nome che vedranno i tuoi amici nelle formazioni.</small>
+          <small
+            id="profile-name-feedback"
+            className={nameError ? 'field__error' : undefined}
+            role={nameError ? 'alert' : undefined}
+          >
+            {nameError || 'È il nome che vedranno i tuoi amici nelle formazioni.'}
+          </small>
         </label>
 
         <div className="profile-locked-field" aria-label="Email non modificabile">

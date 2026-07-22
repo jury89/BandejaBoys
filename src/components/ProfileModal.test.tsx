@@ -37,7 +37,11 @@ describe('profilo giocatore', () => {
     await user.type(name, 'SuperEviNinja')
     await user.click(screen.getByRole('button', { name: 'Salva profilo' }))
 
-    expect(screen.getByRole('alert')).toHaveTextContent('sei un asino')
+    const alert = screen.getByRole('alert')
+    expect(alert).toHaveTextContent('sei un asino')
+    expect(name).toHaveAttribute('aria-invalid', 'true')
+    expect(name).toHaveAttribute('aria-describedby', 'profile-name-feedback')
+    expect(name.nextElementSibling).toBe(alert)
     expect(onSave).not.toHaveBeenCalled()
   })
 })

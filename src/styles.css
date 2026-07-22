@@ -607,6 +607,14 @@ p {
   box-shadow: 0 0 0 3px rgba(14, 116, 144, 0.1);
 }
 
+.field input[aria-invalid='true'],
+.field input[aria-invalid='true']:hover,
+.field input[aria-invalid='true']:focus {
+  border-color: var(--danger);
+  background: #fffafb;
+  box-shadow: 0 0 0 3px rgba(194, 61, 82, 0.12);
+}
+
 .slot-date-time {
   min-width: 0;
   margin: 0;
@@ -2335,6 +2343,12 @@ p {
   color: var(--muted);
   font-size: 0.64rem;
   font-weight: 600;
+}
+
+.profile-form .field > small.field__error {
+  color: var(--danger);
+  font-weight: 800;
+  line-height: 1.4;
 }
 
 .profile-locked-field {
