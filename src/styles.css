@@ -1112,6 +1112,29 @@ p {
   font-weight: 850;
 }
 
+.poll-card__collapse {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ocean);
+  font: inherit;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.poll-card__collapse:hover {
+  color: var(--navy);
+}
+
+.poll-card__collapse:focus-visible {
+  border-radius: 4px;
+  outline: 2px solid var(--lime);
+  outline-offset: 3px;
+}
+
 .poll-card__slots {
   display: grid;
   padding: 22px;

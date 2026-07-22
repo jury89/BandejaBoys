@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Archive, CalendarDays, CalendarPlus, RotateCcw } from 'lucide-react'
+import { Archive, CalendarDays, CalendarPlus, ChevronDown, ChevronUp, RotateCcw } from 'lucide-react'
 import type { MemberProfile, PadelPoll, SessionUser, SlotInput } from '../types'
 import { getSlotPhase, isBookingCandidate } from '../lib/domain'
 import { pollWeekTitle } from '../lib/format'
@@ -22,8 +22,11 @@ export type PollSlotFilter = 'all' | 'booking' | 'booked'
 
 export function PollCard({ poll, user, members, slotFilter = 'all', onPollChange, onNotify, onError }: PollCardProps) {
   const [showAddSlot, setShowAddSlot] = useState(false)
+  const [slotsCollapsed, setSlotsCollapsed] = useState(false)
   const canManage = poll.createdBy === user.id
   const creatorName = resolveMemberName(members, poll.createdBy, poll.createdByName)
+  const pollTitle = pollWeekTitle(poll.targetWeekStart)
+  const slotsRegionId = `poll-slots-${poll.id}`
   const visibleSlots = poll.slots.filter((slot) => (
     slotFilter === 'all'
     || (slotFilter === 'booked' && getSlotPhase(slot) === 'booked')
@@ -52,8 +55,24 @@ export function PollCard({ poll, user, members, slotFilter = 'all', onPollChange
         <header className="poll-card__header">
           <div className="poll-card__identity">
             <p className="poll-card__week"><CalendarDays size={14} /> Sondaggio settimanale</p>
-            <h2>{pollWeekTitle(poll.targetWeekStart)}</h2>
-            <p className="poll-card__meta"><span>Creato da {creatorName}</span><span aria-hidden="true">·</span><strong>{visibleSlots.length} slot</strong></p>
+            <h2>{pollTitle}</h2>
+            <p className="poll-card__meta">
+              <span>Creato da {creatorName}</span>
+              <span aria-hidden="true">·</span>
+              <strong>{visibleSlots.length} slot</strong>
+              <span aria-hidden="true">·</span>
+              <button
+                className="poll-card__collapse"
+                type="button"
+                aria-controls={slotsRegionId}
+                aria-expanded={!slotsCollapsed}
+                aria-label={`${slotsCollapsed ? 'Mostra' : 'Nascondi'} gli slot di ${pollTitle}`}
+                onClick={() => setSlotsCollapsed((current) => !current)}
+              >
+                {slotsCollapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+                {slotsCollapsed ? 'Mostra slot' : 'Nascondi slot'}
+              </button>
+            </p>
           </div>
           <div className="poll-card__actions">
             {poll.status === 'open' && slotFilter !== 'booked' && (
@@ -82,21 +101,28 @@ export function PollCard({ poll, user, members, slotFilter = 'all', onPollChange
           </div>
         </header>
         {poll.status === 'closed' && <div className="closed-banner">Sondaggio chiuso · puoi ancora consultare l’ordine delle adesioni</div>}
-        <div className="poll-card__slots">
-          {visibleSlots.map((slot) => (
-            <SlotCard
-              key={slot.id}
-              poll={poll}
-              slot={slot}
-              user={user}
-              members={members}
-              disabled={poll.status === 'closed'}
-              onPollChange={onPollChange}
-              onNotify={onNotify}
-              onError={onError}
-            />
-          ))}
-        </div>
+        {!slotsCollapsed && (
+          <div
+            id={slotsRegionId}
+            className="poll-card__slots"
+            role="region"
+            aria-label={`Slot di ${pollTitle}`}
+          >
+            {visibleSlots.map((slot) => (
+              <SlotCard
+                key={slot.id}
+                poll={poll}
+                slot={slot}
+                user={user}
+                members={members}
+                disabled={poll.status === 'closed'}
+                onPollChange={onPollChange}
+                onNotify={onNotify}
+                onError={onError}
+              />
+            ))}
+          </div>
+        )}
       </section>
       {showAddSlot && (
         <AddSlotModal
