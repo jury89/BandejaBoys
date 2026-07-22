@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { vi } from 'vitest'
 import { Dashboard } from './Dashboard'
@@ -63,5 +63,24 @@ describe('menu account', () => {
     await user.click(trigger)
     await user.keyboard('{Escape}')
     expect(screen.queryByRole('button', { name: /Profilo/ })).not.toBeInTheDocument()
+  })
+
+  it('aggiunge I miei match alla cronologia e torna alla bacheca con la navigazione indietro', async () => {
+    const user = userEvent.setup()
+    window.history.replaceState({}, '', '/')
+    render(<Dashboard />)
+
+    await user.click(screen.getByRole('button', { name: 'Apri menu account di Jury' }))
+    await user.click(screen.getByRole('button', { name: /I miei match/ }))
+
+    expect(window.location.hash).toBe('#i-miei-match')
+    expect(screen.getByRole('heading', { name: 'I miei match' })).toBeInTheDocument()
+
+    act(() => {
+      window.history.replaceState({}, '', '/')
+      window.dispatchEvent(new PopStateEvent('popstate'))
+    })
+
+    expect(screen.getByRole('heading', { name: /Mettiamo in campo/ })).toBeInTheDocument()
   })
 })

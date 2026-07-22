@@ -29,6 +29,12 @@ import { ProfileModal } from './ProfileModal'
 type FeedFilter = PollSlotFilter
 type DashboardView = 'feed' | 'matches'
 
+const PERSONAL_MATCHES_HASH = '#i-miei-match'
+
+function dashboardViewFromLocation(): DashboardView {
+  return window.location.hash === PERSONAL_MATCHES_HASH ? 'matches' : 'feed'
+}
+
 const feedCopy: Record<FeedFilter, {
   eyebrow: string
   heading: string
@@ -61,7 +67,7 @@ export function Dashboard() {
   const [members, setMembers] = useState<MemberProfile[]>([])
   const [loading, setLoading] = useState(true)
   const [feedFilter, setFeedFilter] = useState<FeedFilter>('all')
-  const [dashboardView, setDashboardView] = useState<DashboardView>('feed')
+  const [dashboardView, setDashboardView] = useState<DashboardView>(dashboardViewFromLocation)
   const [createOpen, setCreateOpen] = useState(false)
   const [toast, setToast] = useState<{ message: string; tone: 'success' | 'error' } | null>(null)
   const [accountOpen, setAccountOpen] = useState(false)
@@ -135,6 +141,16 @@ export function Dashboard() {
       document.removeEventListener('keydown', closeOnEscape)
     }
   }, [accountOpen])
+
+  useEffect(() => {
+    const syncViewWithHistory = () => setDashboardView(dashboardViewFromLocation())
+    window.addEventListener('popstate', syncViewWithHistory)
+    window.addEventListener('hashchange', syncViewWithHistory)
+    return () => {
+      window.removeEventListener('popstate', syncViewWithHistory)
+      window.removeEventListener('hashchange', syncViewWithHistory)
+    }
+  }, [])
 
   useEffect(() => {
     const nextStart = polls
@@ -235,6 +251,27 @@ export function Dashboard() {
   const currentFeedCopy = feedCopy[feedFilter]
   const notify = (message: string) => setToast({ message, tone: 'success' })
   const reportError = (message: string) => setToast({ message, tone: 'error' })
+  const openPlayerMatches = () => {
+    setDashboardView('matches')
+    if (window.location.hash === PERSONAL_MATCHES_HASH) return
+    const url = new URL(window.location.href)
+    url.hash = PERSONAL_MATCHES_HASH
+    const currentState = typeof window.history.state === 'object' && window.history.state
+      ? window.history.state
+      : {}
+    window.history.pushState({ ...currentState, bandejaView: 'matches' }, '', url)
+  }
+  const closePlayerMatches = () => {
+    if (window.history.state?.bandejaView === 'matches') {
+      window.history.back()
+      return
+    }
+
+    const url = new URL(window.location.href)
+    url.hash = ''
+    window.history.replaceState(window.history.state, '', url)
+    setDashboardView('feed')
+  }
   const updatePoll = (updatedPoll: PadelPoll) => {
     setPolls((current) => current.map((poll) => poll.id === updatedPoll.id ? updatedPoll : poll))
   }
@@ -291,7 +328,7 @@ export function Dashboard() {
               </button>
               <button type="button" onClick={() => {
                 setAccountOpen(false)
-                setDashboardView('matches')
+                openPlayerMatches()
               }}>
                 <History size={16} />
                 <span>I miei match <small>Partite passate e future</small></span>
@@ -359,7 +396,7 @@ export function Dashboard() {
         <MyMatchesPage
           matches={playerMatches}
           loading={loading}
-          onBack={() => setDashboardView('feed')}
+          onBack={closePlayerMatches}
         />
       ) : <main className="dashboard">
         <section className="dashboard-intro">
