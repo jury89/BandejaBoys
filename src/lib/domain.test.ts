@@ -21,7 +21,7 @@ import {
   setSlotBooking,
   substituteStarter,
 } from './domain'
-import type { MemberProfile, PadelPoll, PadelSlot, SessionUser, Signup, SignupRole } from '../types'
+import type { MatchRatingRecord, MemberProfile, PadelPoll, PadelSlot, SessionUser, Signup, SignupRole } from '../types'
 
 const member = (id: string, displayName = id): MemberProfile => ({
   id,
@@ -282,6 +282,40 @@ describe('partite personali', () => {
 
     expect(result.past.map((match) => match.slot.id)).toEqual(['past-booked-recent', 'past-booked-old'])
     expect(result.upcoming).toEqual([])
+  })
+
+  it('calcola per ogni partita la media dei soli voti ricevuti dal giocatore', () => {
+    const poll = personalPoll()
+    poll.slots = [{
+      ...slot(['jury', 'a', 'b', 'c'].map((id, index) => signup(id, index))),
+      id: 'past-rated',
+      startsAt: '2026-07-27T18:30:00.000Z',
+      bookedAt: 1,
+    }]
+    const rating = (reviewerId: string, revieweeId: string, score: number): MatchRatingRecord => ({
+      id: `rating-${reviewerId}-${revieweeId}`,
+      responseId: `response-${reviewerId}`,
+      pollId: poll.id,
+      pollTitle: poll.title,
+      slotId: 'past-rated',
+      sessionStartsAt: poll.slots[0].startsAt,
+      sessionEndedAt: 1,
+      reviewerId,
+      reviewerName: reviewerId,
+      revieweeId,
+      revieweeName: revieweeId,
+      score,
+      createdAt: 1,
+    })
+
+    const result = getPlayerMatches(
+      [poll],
+      'jury',
+      Date.parse('2026-07-28T12:00:00.000Z'),
+      [rating('a', 'jury', 8), rating('b', 'jury', 9), rating('jury', 'a', 2)],
+    )
+
+    expect(result.past[0].receivedRating).toEqual({ average: 8.5, count: 2 })
   })
 })
 

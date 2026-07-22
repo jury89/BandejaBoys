@@ -19,6 +19,7 @@ const matches: PlayerMatchLists = {
   past: [{
     pollId: 'poll-past',
     pollTitle: 'Padel della settimana scorsa',
+    receivedRating: { average: 8.5, count: 2 },
     slot: {
       id: 'past',
       startsAt: '2026-07-20T18:30:00.000Z',
@@ -51,6 +52,8 @@ describe('pagina dei match personali', () => {
     expect(screen.getByRole('heading', { name: 'Partite giocate' })).toBeInTheDocument()
     expect(screen.getByText('Padel della settimana scorsa')).toBeInTheDocument()
     expect(screen.getByText('Giocata')).toBeInTheDocument()
+    expect(screen.getByLabelText('Media di 2 voti ricevuti: 8,5 su 10')).toBeInTheDocument()
+    expect(screen.getByText('8,5')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', {
       name: /Apri Padel della prossima settimana.*nella bacheca/,

@@ -1,6 +1,7 @@
 import type {
   CreatePollInput,
   MatchRatingPrompt,
+  MatchRatingRecord,
   MatchRatingResponse,
   MemberProfile,
   PadelPoll,
@@ -195,6 +196,7 @@ export function getPlayerMatches(
   polls: PadelPoll[],
   userId: string,
   now = Date.now(),
+  receivedRatings: MatchRatingRecord[] = [],
 ): PlayerMatchLists {
   const matches: Array<PlayerMatch & { startsAt: number; endsAt: number }> = polls
     .flatMap((poll) => poll.slots.map((slot) => {
@@ -214,11 +216,30 @@ export function getPlayerMatches(
       && isStarter(match.slot, userId)
     ))
 
-  const toPlayerMatch = ({ pollId, pollTitle, slot }: PlayerMatch): PlayerMatch => ({
-    pollId,
-    pollTitle,
-    slot,
-  })
+  const toPlayerMatch = ({ pollId, pollTitle, slot }: PlayerMatch): PlayerMatch => {
+    const scores = receivedRatings
+      .filter((rating) => (
+        rating.revieweeId === userId
+        && rating.pollId === pollId
+        && rating.slotId === slot.id
+        && Number.isFinite(rating.score)
+        && rating.score >= 1
+        && rating.score <= 10
+      ))
+      .map((rating) => rating.score)
+
+    return {
+      pollId,
+      pollTitle,
+      slot,
+      ...(scores.length > 0 ? {
+        receivedRating: {
+          average: scores.reduce((total, score) => total + score, 0) / scores.length,
+          count: scores.length,
+        },
+      } : {}),
+    }
+  }
 
   return {
     upcoming: matches

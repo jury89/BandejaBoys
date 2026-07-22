@@ -57,6 +57,10 @@ export interface PlayerMatch {
   pollId: string
   pollTitle: string
   slot: PadelSlot
+  receivedRating?: {
+    average: number
+    count: number
+  }
 }
 
 export interface PlayerMatchLists {

@@ -56,6 +56,11 @@ export interface PadelRepository {
     listener: (responses: MatchRatingResponse[]) => void,
     onError: (error: Error) => void,
   ): Unsubscribe
+  subscribeReceivedMatchRatings(
+    revieweeId: string,
+    listener: (ratings: MatchRatingRecord[]) => void,
+    onError: (error: Error) => void,
+  ): Unsubscribe
   createPoll(input: CreatePollInput, creator: SessionUser): Promise<void>
   addSlot(pollId: string, input: SlotInput, creator: SessionUser): Promise<PadelPoll>
   joinSlot(pollId: string, slotId: string, member: SessionUser, role: SignupRole): Promise<PadelPoll>
@@ -224,6 +229,16 @@ function remoteRepository(): PadelRepository {
           id: item.id,
           ...item.data(),
         }) as MatchRatingResponse)),
+        onError,
+      )
+    },
+    subscribeReceivedMatchRatings(revieweeId, listener, onError) {
+      return onSnapshot(
+        query(collection(db, 'matchRatings'), where('revieweeId', '==', revieweeId)),
+        (snapshot) => listener(snapshot.docs.map((item) => ({
+          id: item.id,
+          ...item.data(),
+        }) as MatchRatingRecord)),
         onError,
       )
     },
@@ -588,6 +603,14 @@ function localRepository(): PadelRepository {
     subscribeMatchRatingResponses(reviewerId, listener) {
       const notify = () => listener(
         readLocalMatchRatingStore().responses.filter((response) => response.reviewerId === reviewerId),
+      )
+      window.addEventListener(MATCH_RATINGS_EVENT, notify)
+      notify()
+      return () => window.removeEventListener(MATCH_RATINGS_EVENT, notify)
+    },
+    subscribeReceivedMatchRatings(revieweeId, listener) {
+      const notify = () => listener(
+        readLocalMatchRatingStore().ratings.filter((rating) => rating.revieweeId === revieweeId),
       )
       window.addEventListener(MATCH_RATINGS_EVENT, notify)
       notify()

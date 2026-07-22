@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Bell, BellRing, CalendarCheck2, CalendarClock, CalendarDays, CalendarPlus, CheckCircle2, ChevronDown, CircleUserRound, History, LogOut, UsersRound } from 'lucide-react'
 import { useAuth } from '../AuthContext'
-import type { MatchRatingResponse, MatchRatingSubmission, MemberProfile, PadelPoll, PlayerMatch } from '../types'
+import type { MatchRatingRecord, MatchRatingResponse, MatchRatingSubmission, MemberProfile, PadelPoll, PlayerMatch } from '../types'
 import {
   getNextMatchRatingPromptAt,
   getPendingMatchRatingPrompts,
@@ -77,6 +77,8 @@ export function Dashboard() {
   const [now, setNow] = useState(() => Date.now())
   const [ratingResponses, setRatingResponses] = useState<MatchRatingResponse[]>([])
   const [ratingResponsesLoaded, setRatingResponsesLoaded] = useState(false)
+  const [receivedRatings, setReceivedRatings] = useState<MatchRatingRecord[]>([])
+  const [receivedRatingsLoaded, setReceivedRatingsLoaded] = useState(false)
   const [ratingTestOpen, setRatingTestOpen] = useState(() => isRatingTestRequested(window.location.search))
   const [ratingTestStartedAt] = useState(() => Date.now())
   const [slotNavigationTarget, setSlotNavigationTarget] = useState<SlotNavigationTarget | null>(null)
@@ -114,6 +116,17 @@ export function Dashboard() {
     }, (error) => {
       setToast({ message: error.message, tone: 'error' })
       setRatingResponsesLoaded(true)
+    })
+  }, [ratingReviewerId])
+
+  useEffect(() => {
+    if (!ratingReviewerId) return
+    return repository.subscribeReceivedMatchRatings(ratingReviewerId, (ratings) => {
+      setReceivedRatings(ratings)
+      setReceivedRatingsLoaded(true)
+    }, (error) => {
+      setToast({ message: error.message, tone: 'error' })
+      setReceivedRatingsLoaded(true)
     })
   }, [ratingReviewerId])
 
@@ -210,8 +223,8 @@ export function Dashboard() {
 
   const upcomingPolls = useMemo(() => getUpcomingPolls(polls, now), [now, polls])
   const playerMatches = useMemo(
-    () => user ? getPlayerMatches(polls, user.id, now) : { upcoming: [], past: [] },
-    [now, polls, user],
+    () => user ? getPlayerMatches(polls, user.id, now, receivedRatings) : { upcoming: [], past: [] },
+    [now, polls, receivedRatings, user],
   )
   const ratingPrompts = useMemo(() => (
     user && ratingResponsesLoaded
@@ -437,7 +450,7 @@ export function Dashboard() {
       {dashboardView === 'matches' ? (
         <MyMatchesPage
           matches={playerMatches}
-          loading={loading}
+          loading={loading || !receivedRatingsLoaded}
           onBack={closePlayerMatches}
           onSelectMatch={showPlayerMatchOnBoard}
         />

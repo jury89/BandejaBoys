@@ -1,12 +1,13 @@
 import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { vi } from 'vitest'
-import type { PadelPoll } from '../types'
+import type { MatchRatingRecord, PadelPoll } from '../types'
 import { slotElementId } from '../lib/slotNavigation'
 import { Dashboard } from './Dashboard'
 
 const dashboardTestState = vi.hoisted(() => ({
   polls: [] as PadelPoll[],
+  ratings: [] as MatchRatingRecord[],
 }))
 
 vi.mock('../AuthContext', () => ({
@@ -48,6 +49,10 @@ vi.mock('../lib/repository', () => ({
     },
     subscribeMatchRatingResponses: (_userId: string, listener: (responses: []) => void) => {
       listener([])
+      return vi.fn()
+    },
+    subscribeReceivedMatchRatings: (_userId: string, listener: (ratings: MatchRatingRecord[]) => void) => {
+      listener(dashboardTestState.ratings)
       return vi.fn()
     },
   },

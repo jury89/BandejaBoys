@@ -2265,6 +2265,41 @@ p {
   color: var(--pending-ink);
 }
 
+.personal-match__rating {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
+  margin-left: auto;
+  padding: 5px 8px;
+  border: 1px solid rgba(19, 55, 64, 0.1);
+  border-radius: 7px;
+  background: var(--ball);
+  color: var(--deep);
+  box-shadow: inset 0 -2px 0 rgba(19, 55, 64, 0.1);
+  line-height: 1;
+}
+
+.personal-match__rating svg {
+  align-self: center;
+  margin-right: 2px;
+}
+
+.personal-match__rating > span {
+  font-size: 0.5rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.personal-match__rating strong {
+  font-family: var(--display);
+  font-size: 1rem;
+  line-height: 0.8;
+}
+
+.personal-match__rating small {
+  font-size: 0.52rem;
+}
+
 .personal-match__open-icon {
   margin-left: auto;
 }

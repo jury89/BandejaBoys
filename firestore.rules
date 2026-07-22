@@ -225,7 +225,9 @@ service cloud.firestore {
     }
 
     match /matchRatings/{ratingId} {
-      allow read: if isMember() && resource.data.reviewerId == request.auth.uid;
+      allow read: if isMember()
+        && (resource.data.reviewerId == request.auth.uid
+          || resource.data.revieweeId == request.auth.uid);
       allow create: if isMember() && validMatchRating(ratingId);
       allow update, delete: if false;
     }

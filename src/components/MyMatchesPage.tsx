@@ -6,6 +6,7 @@ import {
   CheckCircle2,
   Clock3,
   MapPin,
+  Star,
 } from 'lucide-react'
 import { DEFAULT_VENUE } from '../lib/domain'
 import { slotDateParts } from '../lib/format'
@@ -41,6 +42,10 @@ function MatchItem({
   const booked = Boolean(match.slot.bookedAt)
   const venue = booked ? (match.slot.venue || DEFAULT_VENUE) : 'Campo da prenotare'
   const status = past ? 'Giocata' : booked ? 'Campo confermato' : 'Da prenotare'
+  const receivedRating = past ? match.receivedRating : undefined
+  const averageLabel = receivedRating
+    ? new Intl.NumberFormat('it-IT', { maximumFractionDigits: 1 }).format(receivedRating.average)
+    : null
 
   return (
     <article className={`personal-match ${booked ? 'personal-match--booked' : 'personal-match--pending'} ${onSelect ? 'personal-match--interactive' : ''}`}>
@@ -75,6 +80,17 @@ function MatchItem({
       <div className={`personal-match__status ${booked ? 'is-booked' : 'is-pending'}`}>
         {booked ? <CheckCircle2 size={17} /> : <CalendarClock size={17} />}
         <span>{status}</span>
+        {receivedRating && averageLabel && (
+          <span
+            className="personal-match__rating"
+            aria-label={`Media di ${receivedRating.count} ${receivedRating.count === 1 ? 'voto ricevuto' : 'voti ricevuti'}: ${averageLabel} su 10`}
+          >
+            <Star size={14} fill="currentColor" aria-hidden="true" />
+            <span>Media</span>
+            <strong>{averageLabel}</strong>
+            <small>/10</small>
+          </span>
+        )}
         {onSelect && <ArrowRight className="personal-match__open-icon" size={17} aria-hidden="true" />}
       </div>
     </article>
