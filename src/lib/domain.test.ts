@@ -202,23 +202,34 @@ describe('partite personali', () => {
     slots: [],
   })
 
-  it('include gli slot futuri da titolare anche senza prenotazione e ignora le riserve', () => {
+  it('include soltanto gli slot futuri completi in cui il giocatore è titolare', () => {
     const poll = personalPoll()
     poll.slots = [
       {
-        ...slot([signup('jury', 1, 'starter')]),
+        ...slot(['jury', 'a', 'b', 'c'].map((id, index) => signup(id, index, 'starter'))),
         id: 'future-later',
         startsAt: '2026-07-30T19:30:00.000Z',
       },
       {
-        ...slot([signup('jury', 1, 'starter')]),
+        ...slot(['jury', 'a', 'b', 'c'].map((id, index) => signup(id, index, 'starter'))),
         id: 'future-near',
         startsAt: '2026-07-29T19:30:00.000Z',
       },
       {
-        ...slot([signup('jury', 1, 'reserve')]),
-        id: 'future-reserve',
+        ...slot([signup('jury', 1, 'starter')]),
+        id: 'future-incomplete',
         startsAt: '2026-07-28T19:30:00.000Z',
+      },
+      {
+        ...slot([
+          signup('a', 1, 'starter'),
+          signup('b', 2, 'starter'),
+          signup('c', 3, 'starter'),
+          signup('d', 4, 'starter'),
+          signup('jury', 5, 'reserve'),
+        ]),
+        id: 'future-reserve',
+        startsAt: '2026-07-31T19:30:00.000Z',
       },
     ]
 
@@ -236,28 +247,34 @@ describe('partite personali', () => {
     const poll = personalPoll()
     poll.slots = [
       {
-        ...slot([signup('jury', 1)]),
+        ...slot(['jury', 'a', 'b', 'c'].map((id, index) => signup(id, index))),
         id: 'past-booked-old',
         startsAt: '2026-07-25T18:30:00.000Z',
         bookedAt: 1,
       },
       {
-        ...slot([signup('jury', 1)]),
+        ...slot(['jury', 'a', 'b', 'c'].map((id, index) => signup(id, index))),
         id: 'past-booked-recent',
         startsAt: '2026-07-27T18:30:00.000Z',
         bookedAt: 2,
       },
       {
-        ...slot([signup('jury', 1)]),
+        ...slot(['jury', 'a', 'b', 'c'].map((id, index) => signup(id, index))),
         id: 'past-unbooked',
         startsAt: '2026-07-26T18:30:00.000Z',
       },
       {
-        ...slot([signup('jury', 1)]),
+        ...slot(['jury', 'a', 'b', 'c'].map((id, index) => signup(id, index))),
         id: 'ongoing',
         startsAt: '2026-07-28T11:30:00.000Z',
         durationMinutes: 90,
         bookedAt: 3,
+      },
+      {
+        ...slot([signup('jury', 1)]),
+        id: 'past-incomplete',
+        startsAt: '2026-07-24T18:30:00.000Z',
+        bookedAt: 4,
       },
     ]
 

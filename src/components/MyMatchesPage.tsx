@@ -114,7 +114,7 @@ export function MyMatchesPage({ matches, loading, onBack }: MyMatchesPageProps) 
             title="Prossimi match"
             matches={matches.upcoming}
             emptyTitle="Nessun match in programma"
-            emptyBody="Quando ti segni come titolare, lo slot comparirà qui."
+            emptyBody="Uno slot comparirà qui quando avrà quattro titolari e tu sarai tra loro."
           />
           <MatchList
             past

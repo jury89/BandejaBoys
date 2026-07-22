@@ -210,6 +210,7 @@ export function getPlayerMatches(
     .filter((match) => (
       Number.isFinite(match.startsAt)
       && Number.isFinite(match.endsAt)
+      && getStarters(match.slot).length === MAX_STARTERS
       && isStarter(match.slot, userId)
     ))
 
