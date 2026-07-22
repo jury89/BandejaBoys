@@ -9,7 +9,6 @@
   --court: #0e7490;
   --aqua: #dff4f5;
   --ball: #d9ff43;
-  --brand-accent-on-light: #668b00;
   --chalk: #f8fbfc;
   --white: #ffffff;
   --muted: #647985;
@@ -175,7 +174,14 @@ p {
 }
 
 .brand--compact .brand__words em {
-  color: var(--brand-accent-on-light);
+  display: inline-flex;
+  align-items: center;
+  padding: 0.14em 0.32em 0.12em;
+  border-radius: 3px;
+  background: var(--deep);
+  color: var(--ball);
+  letter-spacing: 0.04em;
+  line-height: 0.86;
 }
 
 .brand--compact .brand__ball {
@@ -198,6 +204,7 @@ p {
 }
 
 .brand--compact .brand__words {
+  align-items: center;
   font-size: 1.32rem;
 }
 
