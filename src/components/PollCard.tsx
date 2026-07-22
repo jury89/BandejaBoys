@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Archive, CalendarDays, CalendarPlus, RotateCcw } from 'lucide-react'
 import type { MemberProfile, PadelPoll, SessionUser, SlotInput } from '../types'
 import { getSlotPhase, isBookingCandidate } from '../lib/domain'
-import { weekLabel } from '../lib/format'
+import { pollWeekTitle } from '../lib/format'
 import { resolveMemberName } from '../lib/memberNames'
 import { repository } from '../lib/repository'
 import { AddSlotModal } from './AddSlotModal'
@@ -51,8 +51,8 @@ export function PollCard({ poll, user, members, slotFilter = 'all', onPollChange
       <section className={`poll-card ${poll.status === 'closed' ? 'poll-card--closed' : ''}`}>
         <header className="poll-card__header">
           <div className="poll-card__identity">
-            <p className="poll-card__week"><CalendarDays size={14} /> Settimana {weekLabel(poll.targetWeekStart)}</p>
-            <h2>{poll.title}</h2>
+            <p className="poll-card__week"><CalendarDays size={14} /> Sondaggio settimanale</p>
+            <h2>{pollWeekTitle(poll.targetWeekStart)}</h2>
             <p className="poll-card__meta"><span>Creato da {creatorName}</span><span aria-hidden="true">·</span><strong>{visibleSlots.length} slot</strong></p>
           </div>
           <div className="poll-card__actions">

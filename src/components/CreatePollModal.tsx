@@ -28,7 +28,6 @@ function nextDayAtSameTime(value: string) {
 export function CreatePollModal({ user, onClose, onCreate, onDone }: CreatePollModalProps) {
   const initialWeek = useMemo(() => nextMondayDate(), [])
   const nextEditorId = useRef(3)
-  const [title, setTitle] = useState('Padel · prossima settimana')
   const [weekStart, setWeekStart] = useState(initialWeek)
   const [slots, setSlots] = useState<EditableSlot[]>([
     { editorId: 'slot-1', startsAt: defaultSlotForWeek(initialWeek, 1), durationMinutes: 90 },
@@ -69,7 +68,7 @@ export function CreatePollModal({ user, onClose, onCreate, onDone }: CreatePollM
     setError('')
     try {
       const slotInputs = slots.map(({ startsAt, durationMinutes }) => ({ startsAt, durationMinutes }))
-      await onCreate({ title, targetWeekStart: weekStart, slots: slotInputs }, user)
+      await onCreate({ targetWeekStart: weekStart, slots: slotInputs }, user)
       onDone('Sondaggio creato. È ora di raccogliere le adesioni.')
       onClose()
     } catch (caught) {
@@ -83,10 +82,6 @@ export function CreatePollModal({ user, onClose, onCreate, onDone }: CreatePollM
     <Modal title="Prepara il prossimo sondaggio" eyebrow="Nuova settimana" onClose={onClose} size="wide">
       <form onSubmit={submit} className="poll-form">
         <div className="poll-form__basics">
-          <label className="field">
-            <span>Nome del sondaggio</span>
-            <input value={title} onChange={(event) => setTitle(event.target.value)} required />
-          </label>
           <label className="field">
             <span>Settimana di gioco</span>
             <input type="date" value={weekStart} onChange={(event) => updateWeek(event.target.value)} required />

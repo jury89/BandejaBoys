@@ -36,7 +36,7 @@ describe('file calendario dello slot', () => {
     expect(calendar).toContain('DTSTAMP:20260721T120000Z')
     expect(calendar).toContain('DTSTART;TZID=Europe/Rome:20260728T190000')
     expect(calendar).toContain('DTEND;TZID=Europe/Rome:20260728T203000')
-    expect(calendar).toContain('SUMMARY:Padel\\, amici\\; prossima settimana')
+    expect(calendar).toContain('SUMMARY:Padel · 27 lug – 2 ago 2026')
     expect(calendar).toContain('LOCATION:Oasi Boschetto')
     expect(calendar).toContain('STATUS:TENTATIVE')
     expect(calendar).toMatch(/^BEGIN:VCALENDAR\r\n/)

@@ -8,6 +8,7 @@ import {
   getStarters,
   padelDateTimeToTimestamp,
 } from './domain'
+import { pollWeekTitle } from './format'
 
 const HOUR_MS = 60 * 60 * 1000
 const DAY_MS = 24 * HOUR_MS
@@ -111,7 +112,7 @@ function collectNewSlotNotifications(poll: PadelPoll, now: number): ScheduledNot
     ))
     const body = group.length === 1
       ? `C’è un nuovo slot disponibile: ${formatSession(first.startsAt)}. Segna se ci sei.`
-      : `Ci sono ${group.length} nuovi slot disponibili per “${poll.title}”. Segna quando ci sei.`
+      : `Ci sono ${group.length} nuovi slot disponibili per “${pollWeekTitle(poll.targetWeekStart)}”. Segna quando ci sei.`
 
     return [{
       id: `new-slots:${poll.id}:${first.id}`,

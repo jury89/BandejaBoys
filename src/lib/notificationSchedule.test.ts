@@ -131,7 +131,7 @@ describe('pianificazione notifiche', () => {
       recipientUserIds: null,
       excludedUserIds: ['jury'],
       title: 'Sveglia fagianotto!',
-      body: 'Ci sono 5 nuovi slot disponibili per “Padel · prossima settimana”. Segna quando ci sei.',
+      body: 'Ci sono 5 nuovi slot disponibili per “Padel · 27 lug – 2 ago 2026”. Segna quando ci sei.',
     })
   })
 
@@ -203,7 +203,7 @@ describe('pianificazione notifiche', () => {
     expect(notifications).toHaveLength(1)
     expect(notifications[0]).toMatchObject({
       id: 'new-slots:poll-1:slot-1',
-      body: 'Ci sono 2 nuovi slot disponibili per “Padel · prossima settimana”. Segna quando ci sei.',
+      body: 'Ci sono 2 nuovi slot disponibili per “Padel · 27 lug – 2 ago 2026”. Segna quando ci sei.',
     })
   })
 

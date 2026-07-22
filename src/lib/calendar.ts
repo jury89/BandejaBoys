@@ -1,5 +1,6 @@
 import { DEFAULT_VENUE, getSlotPhase } from './domain'
 import type { PadelPoll, PadelSlot } from '../types'
+import { pollWeekTitle } from './format'
 
 const CALENDAR_TIME_ZONE = 'Europe/Rome'
 const APP_URL = 'https://bandeja-boys.web.app'
@@ -51,8 +52,7 @@ function escapeCalendarText(value: string) {
 }
 
 function calendarTitle(poll: PadelPoll) {
-  const title = poll.title.trim()
-  return /^padel\b/i.test(title) ? title : `Padel · ${title}`
+  return pollWeekTitle(poll.targetWeekStart)
 }
 
 function calendarDescription(slot: PadelSlot) {

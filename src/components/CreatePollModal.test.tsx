@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { CreatePollModal } from './CreatePollModal'
 import type { SessionUser } from '../types'
 
@@ -10,6 +10,30 @@ const user: SessionUser = {
 }
 
 describe('editor degli slot', () => {
+  it('non richiede un nome e crea il sondaggio dalla settimana scelta', async () => {
+    const onCreate = vi.fn().mockResolvedValue(undefined)
+    render(
+      <CreatePollModal
+        user={user}
+        onClose={vi.fn()}
+        onCreate={onCreate}
+        onDone={vi.fn()}
+      />,
+    )
+
+    expect(screen.queryByLabelText('Nome del sondaggio')).not.toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Settimana di gioco'), {
+      target: { value: '2026-07-27' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Pubblica sondaggio' }))
+
+    await waitFor(() => expect(onCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ targetWeekStart: '2026-07-27' }),
+      user,
+    ))
+    expect(onCreate.mock.calls[0][0]).not.toHaveProperty('title')
+  })
+
   it('mantiene il focus sul selettore dei minuti dopo una modifica', () => {
     render(
       <CreatePollModal

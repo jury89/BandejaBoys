@@ -2,6 +2,7 @@ import { useMemo, useState, type FormEvent } from 'react'
 import { CalendarPlus } from 'lucide-react'
 import type { PadelPoll, SlotInput } from '../types'
 import { defaultSlotForWeek, toDateTimeInput } from '../lib/domain'
+import { pollWeekTitle } from '../lib/format'
 import { Modal } from './Modal'
 import { SlotDateTimeField } from './SlotDateTimeField'
 
@@ -57,7 +58,7 @@ export function AddSlotModal({ poll, onClose, onSave, onDone }: AddSlotModalProp
   }
 
   return (
-    <Modal title="Aggiungi uno slot" eyebrow={poll.title} onClose={onClose}>
+    <Modal title="Aggiungi uno slot" eyebrow={pollWeekTitle(poll.targetWeekStart)} onClose={onClose}>
       <form onSubmit={submit} className="form-stack">
         <p className="modal__lead">
           Se aggiungi più slot entro pochi minuti, gli amici riceveranno una sola notifica.

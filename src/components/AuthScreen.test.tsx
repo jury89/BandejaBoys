@@ -74,13 +74,13 @@ describe('accesso locale', () => {
     expect(unbookedFilter).toHaveAttribute('aria-pressed', 'true')
     expect(unbookedFilter).toHaveAccessibleName('Slot da prenotare, 1')
     expect(await screen.findByRole('heading', { name: 'Slot da prenotare' })).toBeInTheDocument()
-    expect(screen.getByText('Padel · prossima settimana')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /^Padel · .* \d{4}$/ })).toBeInTheDocument()
 
     await user.click(bookedFilter)
     expect(bookedFilter).toHaveAttribute('aria-pressed', 'true')
     expect(await screen.findByText('Nessuno slot prenotato.')).toBeInTheDocument()
 
     await user.click(allFilter)
-    expect(await screen.findByText('Padel · prossima settimana')).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: /^Padel · .* \d{4}$/ })).toBeInTheDocument()
   }, 15_000)
 })

@@ -25,6 +25,7 @@ describe('aggiunta di uno slot', () => {
   it('propone il giorno successivo con la stessa ora e durata', () => {
     render(<AddSlotModal poll={poll} onClose={vi.fn()} onSave={vi.fn()} onDone={vi.fn()} />)
 
+    expect(screen.getByText('Padel · 27 lug – 2 ago 2026')).toBeInTheDocument()
     expect(screen.getByLabelText('Data')).toHaveValue('2026-07-29')
     expect(screen.getByLabelText('Data')).not.toHaveFocus()
     expect(screen.getByLabelText('Ora')).toHaveValue('18')

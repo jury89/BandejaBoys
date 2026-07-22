@@ -448,11 +448,10 @@ describe('stato slot e creazione sondaggio', () => {
     expect(getSlotPhase(booked)).toBe('booked')
   })
 
-  it('ordina gli slot e rifiuta due proposte identiche', () => {
+  it('assegna il titolo settimanale, ordina gli slot e rifiuta due proposte identiche', () => {
     const creator: SessionUser = member('jury', 'Jury')
     const poll = makePoll(
       {
-        title: '  Prossima settimana  ',
         targetWeekStart: '2026-07-27',
         slots: [
           { startsAt: '2026-07-30T20:00', durationMinutes: 90 },
@@ -462,7 +461,7 @@ describe('stato slot e creazione sondaggio', () => {
       creator,
       100,
     )
-    expect(poll.title).toBe('Prossima settimana')
+    expect(poll.title).toBe('Padel · 27 lug – 2 ago 2026')
     expect(poll.slots[0].startsAt < poll.slots[1].startsAt).toBe(true)
     expect(poll.slots[0]).toMatchObject({
       createdAt: 100,
@@ -472,7 +471,6 @@ describe('stato slot e creazione sondaggio', () => {
 
     expect(() => makePoll(
       {
-        title: 'Duplicato',
         targetWeekStart: '2026-07-27',
         slots: [
           { startsAt: '2026-07-28T19:30', durationMinutes: 90 },
@@ -488,7 +486,6 @@ describe('stato slot e creazione sondaggio', () => {
 
     expect(() => makePoll(
       {
-        title: 'Orario non valido',
         targetWeekStart: '2026-07-27',
         slots: [{ startsAt: '2026-07-28T19:15', durationMinutes: 90 }],
       },

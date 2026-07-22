@@ -14,6 +14,7 @@ import type {
   SlotInput,
   SlotPhase,
 } from '../types'
+import { pollWeekTitle } from './format'
 
 export const MAX_STARTERS = 4
 export const MAX_SLOTS = 14
@@ -491,8 +492,6 @@ export function makePoll(
   creator: SessionUser,
   now = Date.now(),
 ): Omit<PadelPoll, 'id'> {
-  const title = input.title.trim()
-  if (!title) throw new Error('Dai un nome al sondaggio.')
   if (!input.targetWeekStart) throw new Error('Scegli la settimana di gioco.')
   if (input.slots.length === 0) throw new Error('Aggiungi almeno uno slot.')
   if (input.slots.length > MAX_SLOTS) throw new Error(`Puoi inserire al massimo ${MAX_SLOTS} slot.`)
@@ -503,7 +502,7 @@ export function makePoll(
   }
 
   return {
-    title,
+    title: pollWeekTitle(input.targetWeekStart),
     targetWeekStart: input.targetWeekStart,
     createdBy: creator.id,
     createdByName: creator.displayName,

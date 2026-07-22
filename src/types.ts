@@ -74,7 +74,6 @@ export interface SlotInput {
 }
 
 export interface CreatePollInput {
-  title: string
   targetWeekStart: string
   slots: SlotInput[]
 }

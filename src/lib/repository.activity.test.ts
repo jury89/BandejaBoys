@@ -29,7 +29,6 @@ describe('repository activity log in demo mode', () => {
 
   it('registra creazione, adesione, ritiro e modifica dello slot', async () => {
     await repository.createPoll({
-      title: 'Padel audit',
       targetWeekStart: '2027-01-04',
       slots: [{ startsAt: '2027-01-05T19:30', durationMinutes: 90 }],
     }, user)
@@ -58,7 +57,6 @@ describe('repository activity log in demo mode', () => {
 
   it('aggrega primo accesso, ultimo accesso e conteggio per utente e slot', async () => {
     await repository.createPoll({
-      title: 'Padel viste',
       targetWeekStart: '2027-01-04',
       slots: [{ startsAt: '2027-01-06T19:30', durationMinutes: 90 }],
     }, user)
