@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Bell, BellRing, CalendarCheck2, CalendarClock, CalendarDays, CalendarPlus, CheckCircle2, ChevronDown, CircleUserRound, History, LogOut, UsersRound } from 'lucide-react'
 import { useAuth } from '../AuthContext'
 import type { MatchRatingResponse, MatchRatingSubmission, MemberProfile, PadelPoll } from '../types'
@@ -72,6 +72,7 @@ export function Dashboard() {
   const [ratingResponsesLoaded, setRatingResponsesLoaded] = useState(false)
   const [ratingTestOpen, setRatingTestOpen] = useState(() => isRatingTestRequested(window.location.search))
   const [ratingTestStartedAt] = useState(() => Date.now())
+  const accountMenuRef = useRef<HTMLDivElement>(null)
   const [requestedRating] = useState(() => {
     const parameters = new URLSearchParams(window.location.search)
     const pollId = parameters.get('ratePoll')
@@ -113,6 +114,27 @@ export function Dashboard() {
     const timer = window.setTimeout(() => setToast(null), 4200)
     return () => window.clearTimeout(timer)
   }, [toast])
+
+  useEffect(() => {
+    if (!accountOpen) return
+
+    const closeOnOutsidePress = (event: PointerEvent) => {
+      const menu = accountMenuRef.current
+      if (menu && event.target instanceof Node && !menu.contains(event.target)) {
+        setAccountOpen(false)
+      }
+    }
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setAccountOpen(false)
+    }
+
+    document.addEventListener('pointerdown', closeOnOutsidePress)
+    document.addEventListener('keydown', closeOnEscape)
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutsidePress)
+      document.removeEventListener('keydown', closeOnEscape)
+    }
+  }, [accountOpen])
 
   useEffect(() => {
     const nextStart = polls
@@ -245,7 +267,7 @@ export function Dashboard() {
     <div className="app-shell">
       <header className="topbar">
         <Brand compact />
-        <div className="account-menu">
+        <div className="account-menu" ref={accountMenuRef}>
           <button
             className="account-menu__trigger"
             type="button"
