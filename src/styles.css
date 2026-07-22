@@ -9,6 +9,7 @@
   --court: #0e7490;
   --aqua: #dff4f5;
   --ball: #d9ff43;
+  --brand-accent-on-light: #668b00;
   --chalk: #f8fbfc;
   --white: #ffffff;
   --muted: #647985;
@@ -171,6 +172,10 @@ p {
 
 .brand--compact {
   color: var(--ink);
+}
+
+.brand--compact .brand__words em {
+  color: var(--brand-accent-on-light);
 }
 
 .brand--compact .brand__ball {
