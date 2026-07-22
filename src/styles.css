@@ -863,7 +863,8 @@ p {
   text-overflow: ellipsis;
 }
 
-.account-menu__popover button {
+.account-menu__popover button,
+.account-menu__popover a {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -872,27 +873,42 @@ p {
   border: 0;
   border-radius: 7px;
   background: transparent;
+  color: inherit;
   cursor: pointer;
   font-size: 0.75rem;
   font-weight: 800;
+  text-align: left;
+  text-decoration: none;
 }
 
-.account-menu__popover button:hover {
+.account-menu__popover button:hover,
+.account-menu__popover a:hover {
   background: #f3f7f8;
 }
 
-.account-menu__popover button > span {
+.account-menu__popover button > span,
+.account-menu__popover a > span {
   display: flex;
   flex: 1;
   align-items: flex-start;
   flex-direction: column;
 }
 
-.account-menu__popover button small {
+.account-menu__popover button small,
+.account-menu__popover a small {
   margin-top: 1px;
   color: var(--muted);
   font-size: 0.56rem;
   font-weight: 650;
+}
+
+.account-menu__popover .account-menu__call {
+  background: #e8f7f2;
+  color: var(--booked-deep);
+}
+
+.account-menu__popover .account-menu__call:hover {
+  background: #d9f0e9;
 }
 
 .demo-banner {

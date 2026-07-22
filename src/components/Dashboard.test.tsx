@@ -67,6 +67,8 @@ describe('menu account', () => {
     await user.click(trigger)
     await user.click(screen.getByText('jury@example.test'))
     expect(screen.getByRole('button', { name: /Profilo/ })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Chiama Oasi Boschetto/ }))
+      .toHaveAttribute('href', 'tel:+390376290058')
 
     await user.click(screen.getByRole('heading', { name: /Mettiamo in campo/ }))
     expect(screen.queryByRole('button', { name: /Profilo/ })).not.toBeInTheDocument()

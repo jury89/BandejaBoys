@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Bell, BellRing, CalendarCheck2, CalendarClock, CalendarDays, CalendarPlus, CheckCircle2, ChevronDown, CircleUserRound, History, LogOut, UsersRound } from 'lucide-react'
+import { Bell, BellRing, CalendarCheck2, CalendarClock, CalendarDays, CalendarPlus, CheckCircle2, ChevronDown, CircleUserRound, History, LogOut, PhoneCall, UsersRound } from 'lucide-react'
 import { useAuth } from '../AuthContext'
 import type { MatchRatingRecord, MatchRatingResponse, MatchRatingSubmission, MemberProfile, PadelPoll, PlayerMatch } from '../types'
 import {
@@ -10,6 +10,7 @@ import {
   getUpcomingPolls,
   isBookingCandidate,
   padelDateTimeToTimestamp,
+  DEFAULT_VENUE_PHONE,
 } from '../lib/domain'
 import { firstName, slotDateParts } from '../lib/format'
 import { hasRemoteBackend } from '../lib/firebase'
@@ -397,6 +398,14 @@ export function Dashboard() {
                   <span>Notifiche <small>{notificationStateLabel(notifications.state)}</small></span>
                 </button>
               )}
+              <a
+                className="account-menu__call"
+                href={`tel:${DEFAULT_VENUE_PHONE}`}
+                onClick={() => setAccountOpen(false)}
+              >
+                <PhoneCall size={16} />
+                <span>Chiama Oasi Boschetto <small>0376 290058</small></span>
+              </a>
               <button type="button" onClick={() => signOut()}><LogOut size={16} /> Esci</button>
             </div>
           )}

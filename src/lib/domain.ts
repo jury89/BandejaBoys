@@ -18,6 +18,7 @@ import type {
 export const MAX_STARTERS = 4
 export const MAX_SLOTS = 14
 export const DEFAULT_VENUE = 'Oasi Boschetto'
+export const DEFAULT_VENUE_PHONE = '+390376290058'
 export const PROFILE_NAME_MAX_LENGTH = 40
 export const MATCH_RATING_DELAY_MS = 10 * 60 * 1000
 
