@@ -42,7 +42,7 @@ const feedCopy: Record<FeedFilter, {
     eyebrow: 'Campi da organizzare',
     heading: 'Slot da prenotare',
     emptyHeading: 'Nessuno slot da prenotare.',
-    emptyBody: 'Gli slot con tre titolari e campo non confermato compariranno qui.',
+    emptyBody: 'Gli slot con quattro titolari e campo non confermato compariranno qui.',
   },
   booked: {
     eyebrow: 'Partite confermate',

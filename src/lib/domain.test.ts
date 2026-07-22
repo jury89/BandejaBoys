@@ -287,20 +287,20 @@ describe('stato slot e creazione sondaggio', () => {
     expect(getSlotPhase({ ...ready, bookedAt: 12 })).toBe('booked')
   })
 
-  it('considera da prenotare solo uno slot non confermato con tre titolari', () => {
+  it('considera da prenotare solo uno slot non confermato con quattro titolari', () => {
     const twoPlayers = slot(['a', 'b'].map((id, index) => signup(id, index)))
     const threePlayers = slot(['a', 'b', 'c'].map((id, index) => signup(id, index)))
-    const threePlayersAndReserve = slot([
-      ...threePlayers.signups,
-      { ...signup('reserve', 4), role: 'reserve' },
-    ])
     const fourPlayers = slot(['a', 'b', 'c', 'd'].map((id, index) => signup(id, index)))
+    const fourPlayersAndReserve = slot([
+      ...fourPlayers.signups,
+      { ...signup('reserve', 5), role: 'reserve' },
+    ])
 
     expect(isBookingCandidate(twoPlayers)).toBe(false)
-    expect(isBookingCandidate(threePlayers)).toBe(true)
-    expect(isBookingCandidate(threePlayersAndReserve)).toBe(true)
-    expect(isBookingCandidate(fourPlayers)).toBe(false)
-    expect(isBookingCandidate({ ...threePlayers, bookedAt: 12 })).toBe(false)
+    expect(isBookingCandidate(threePlayers)).toBe(false)
+    expect(isBookingCandidate(fourPlayers)).toBe(true)
+    expect(isBookingCandidate(fourPlayersAndReserve)).toBe(true)
+    expect(isBookingCandidate({ ...fourPlayers, bookedAt: 12 })).toBe(false)
   })
 
   it('registra sempre la prenotazione all’Oasi Boschetto senza richiedere quattro giocatori', () => {
