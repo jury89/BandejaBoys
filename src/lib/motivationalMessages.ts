@@ -1,3 +1,5 @@
+export const MONDAY_MOTIVATIONAL_CATALOG_VERSION = 2
+
 export const MONDAY_MOTIVATIONAL_MESSAGES = [
   'Sei una cazzo di roccia: oggi spaccali tutti.',
   'Oggi al lavoro dovranno avere paura di te: sei il migliore.',
@@ -99,6 +101,56 @@ export const MONDAY_MOTIVATIONAL_MESSAGES = [
   'Oggi porta a casa una piccola vittoria dopo l’altra.',
   'Se la strada sale, perfetto: è lì che fai la differenza.',
   'Hai il fuoco giusto: ora usalo senza bruciarti.',
+  'Oggi dacci dentro, che quella fagiana di tua madre si è già pentita abbastanza.',
+  'Spacca tutto: tua madre continua a mentire alle amiche dicendo che sei promettente.',
+  'Oggi impegnati, così tua madre potrà smettere di cambiare discorso quando parlano di te.',
+  'Dacci dentro: tua madre non ha sofferto nove mesi per produrre questa mediocrità.',
+  'Oggi fai qualcosa di buono, che tua madre sta finendo le scuse per giustificarti.',
+  'Spaccali tutti, prima che tua madre decida di puntare definitivamente sul figlio del vicino.',
+  'Oggi sorprendi tutti: tua madre per prima, visto che ormai non si aspetta più un cazzo.',
+  'Muoviti, campione: tua madre non può continuare a dire che sei soltanto stanco.',
+  'Oggi renditi utile, così tua madre potrà finalmente toglierti dalla categoria “esperimento fallito”.',
+  'Dacci dentro: quella santa donna di tua madre ha già sopportato fin troppo.',
+  'Oggi devi dominare, perché tua madre ha già bruciato tutte le foto peggiori di te.',
+  'Spacca tutto: tua madre ha bisogno di almeno una prova che non abbia completamente sbagliato.',
+  'Oggi fai il fenomeno, o tua madre ricomincia a presentarti come “il figlio particolare”.',
+  'Niente scuse: tua madre è riuscita a crescerti, quindi anche tu puoi riuscire in qualcosa.',
+  'Oggi spingi forte, che tua madre ha già abbassato abbastanza le aspettative.',
+  'Dacci dentro: tua madre continua a sostenere che hai del potenziale, povera illusa.',
+  'Oggi non fare schifo: tua madre ha appena recuperato un minimo di reputazione.',
+  'Spaccali tutti, così tua madre potrà smettere di confrontarti con gente competente.',
+  'Oggi fai paura, anche se per ora l’unica terrorizzata è tua madre quando pensa al tuo futuro.',
+  'Muovi il culo: tua madre non può venire ogni volta a trasformare i tuoi fallimenti in “esperienze”.',
+  'Oggi portala a casa, che tua madre ha già perso troppe scommesse puntando su di te.',
+  'Dacci dentro: quella fagiana di tua madre pretende un rimborso emotivo.',
+  'Oggi comportati da campione, almeno per confondere tua madre.',
+  'Spacca tutto, che tua madre ha già detto troppe cazzate sul tuo talento.',
+  'Oggi vinci qualcosa: tua madre conserva ancora il tuo diploma dell’asilo come ultimo successo.',
+  'Fai il fenomeno, o tua madre inizierà a dire che ti hanno scambiato in ospedale.',
+  'Oggi dai il massimo: tanto peggio di così tua madre sostiene che sia difficile.',
+  'Spingi forte, che tua madre ha già iniziato a rivalutare la contraccezione.',
+  'Oggi fai vedere quanto vali, anche se tua madre accetta ormai qualunque cifra.',
+  'Dacci dentro: tua madre ti giudica e, per una volta, ha pure ragione.',
+  'Oggi domina, che tua madre non può continuare a vantarsi soltanto della tua simpatia.',
+  'Spaccali tutti: tua madre merita finalmente una giornata senza doversi vergognare.',
+  'Oggi produci risultati, non altre storie che tua madre deve raccontare in modo creativo.',
+  'Muoviti: tua madre non ti ha cresciuto così rincoglionito. Quello è venuto dopo.',
+  'Oggi fai sul serio, perché tua madre ha già esaurito santi, candele e pazienza.',
+  'Dacci dentro: quella povera donna di tua madre continua ancora a credere nel recupero.',
+  'Oggi stupiscici, così tua madre potrà finalmente dire “non sembra nemmeno mio figlio”.',
+  'Spacca tutto: tua madre ha bisogno di materiale nuovo per difenderti alle cene di famiglia.',
+  'Oggi niente cazzate, che tua madre ha già dovuto spiegare troppe volte come sei fatto.',
+  'Fai il campione: tua madre non può continuare a mostrare soltanto le tue foto da bambino.',
+  'Oggi tira fuori il talento, ammesso che tua madre non l’abbia buttato insieme alla placenta.',
+  'Dacci dentro: tua madre ha investito troppo in pasta e pazienza per questo rendimento.',
+  'Oggi conquista il mondo, o almeno smetti di essere il problema preferito di tua madre.',
+  'Spingi come una bestia: tua madre ha già iniziato a negare la parentela.',
+  'Oggi fai qualcosa di memorabile che non costringa tua madre a chiedere scusa.',
+  'Dacci dentro: tua madre sostiene che puoi farcela, ma ha anche creduto a Babbo Natale.',
+  'Oggi spaccali tutti, che tua madre vuole smettere di dire “l’importante è che sia felice”.',
+  'Muoviti, fenomeno: tua madre non può continuare a pregare e abbassare l’asticella insieme.',
+  'Oggi vinci: quella fagiana di tua madre ha già sopportato abbastanza umiliazioni.',
+  'Fai il culo al lunedì, prima che tua madre ammetta pubblicamente che il problema sei tu.',
 ] as const
 
 export function normalizeMotivationalMessages(value: unknown): string[] {
@@ -108,4 +160,31 @@ export function normalizeMotivationalMessages(value: unknown): string[] {
     .filter((message): message is string => typeof message === 'string')
     .map((message) => message.trim())
     .filter(Boolean)))
+}
+
+export interface MotivationalCatalogResolution {
+  messages: string[]
+  needsWrite: boolean
+}
+
+export function resolveMotivationalCatalog(value: unknown): MotivationalCatalogResolution {
+  const data = value && typeof value === 'object'
+    ? value as Record<string, unknown>
+    : {}
+  const storedVersion = typeof data.catalogVersion === 'number'
+    && Number.isInteger(data.catalogVersion)
+    ? data.catalogVersion
+    : 1
+
+  if (storedVersion < MONDAY_MOTIVATIONAL_CATALOG_VERSION) {
+    return {
+      messages: [...MONDAY_MOTIVATIONAL_MESSAGES],
+      needsWrite: true,
+    }
+  }
+
+  return {
+    messages: normalizeMotivationalMessages(data.messages),
+    needsWrite: false,
+  }
 }

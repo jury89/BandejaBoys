@@ -122,10 +122,16 @@ service cloud.firestore {
     }
 
     function validMondayMotivationContent() {
-      return request.resource.data.keys().hasOnly(['messages', 'createdAt'])
+      return request.resource.data.keys().hasOnly([
+          'messages', 'catalogVersion', 'createdAt', 'updatedAt'
+        ])
         && request.resource.data.messages is list
-        && request.resource.data.messages.size() == 100
-        && request.resource.data.createdAt == request.time;
+        && request.resource.data.messages.size() >= 100
+        && request.resource.data.messages.size() <= 300
+        && request.resource.data.catalogVersion is int
+        && request.resource.data.catalogVersion >= 1
+        && request.resource.data.createdAt is timestamp
+        && request.resource.data.updatedAt == request.time;
     }
 
     function validSlotView() {
@@ -204,8 +210,18 @@ service cloud.firestore {
       allow list: if false;
       allow create: if isNotifier()
         && contentId == 'mondayMotivation'
-        && validMondayMotivationContent();
-      allow update, delete: if false;
+        && validMondayMotivationContent()
+        && request.resource.data.createdAt == request.time;
+      allow update: if isNotifier()
+        && contentId == 'mondayMotivation'
+        && validMondayMotivationContent()
+        && request.resource.data.createdAt == resource.data.createdAt
+        && ((!resource.data.keys().hasAny(['catalogVersion'])
+            && request.resource.data.catalogVersion == 2)
+          || (resource.data.keys().hasAny(['catalogVersion'])
+            && resource.data.catalogVersion is int
+            && request.resource.data.catalogVersion == resource.data.catalogVersion + 1));
+      allow delete: if false;
     }
 
     match /activityEvents/{eventId} {

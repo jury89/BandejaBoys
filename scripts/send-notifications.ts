@@ -15,8 +15,8 @@ import {
 import webpush, { type PushSubscription } from 'web-push'
 import type { MatchRatingResponse, PadelPoll } from '../src/types'
 import {
-  MONDAY_MOTIVATIONAL_MESSAGES,
-  normalizeMotivationalMessages,
+  MONDAY_MOTIVATIONAL_CATALOG_VERSION,
+  resolveMotivationalCatalog,
 } from '../src/lib/motivationalMessages'
 import {
   collectScheduledNotifications,
@@ -74,16 +74,22 @@ const ratingResponses = ratingResponseSnapshot.docs.map((item) => ({
   id: item.id,
   ...item.data(),
 }) as MatchRatingResponse)
-const motivationalMessages = motivationSnapshot.exists()
-  ? normalizeMotivationalMessages(motivationSnapshot.data().messages)
-  : [...MONDAY_MOTIVATIONAL_MESSAGES]
+const storedMotivationData = motivationSnapshot.exists()
+  ? motivationSnapshot.data()
+  : undefined
+const {
+  messages: motivationalMessages,
+  needsWrite: motivationNeedsWrite,
+} = resolveMotivationalCatalog(storedMotivationData)
 if (motivationalMessages.length === 0) {
   throw new Error('Il documento notificationContent/mondayMotivation non contiene frasi valide.')
 }
-if (!motivationSnapshot.exists()) {
+if (motivationNeedsWrite) {
   await setDoc(motivationReference, {
     messages: motivationalMessages,
-    createdAt: serverTimestamp(),
+    catalogVersion: MONDAY_MOTIVATIONAL_CATALOG_VERSION,
+    createdAt: storedMotivationData?.createdAt ?? serverTimestamp(),
+    updatedAt: serverTimestamp(),
   })
 }
 const motivationRecipientUserIds = Array.from(new Set(

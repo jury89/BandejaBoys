@@ -68,7 +68,7 @@ Il Worker Cloudflare richiama tramite `workflow_dispatch` il workflow GitHub, ch
 - **Reminder 24h**: quando una partita prenotata entra nella finestra delle 24 ore, soltanto ai primi quattro iscritti in quel momento; l’archiviazione del sondaggio non disattiva il promemoria.
 - **Reminder 2h**: quando la stessa partita entra nella finestra delle 2 ore, ricalcolando nuovamente i quattro titolari anche se il sondaggio è già archiviato.
 - **Pagelle post partita**: da 10 a 40 minuti dopo la fine di una partita prenotata completa, ai quattro titolari. Il link apre direttamente la pagella di quella partita; l’app la mostra anche senza notifica se viene aperta in qualunque momento successivo.
-- **Motivazione del lunedì**: nella prima esecuzione tra le 08:30 e le 09:30 `Europe/Rome`, una volta per utente con almeno una sottoscrizione attiva. Il catalogo di 100 frasi vive in `notificationContent/mondayMotivation` e viene inizializzato automaticamente dal notifier se assente. Un hash stabile di lunedì e UID sceglie la frase: destinatari diversi possono ricevere testi diversi, mentre retry e dispositivi dello stesso utente mantengono lo stesso testo.
+- **Motivazione del lunedì**: nella prima esecuzione tra le 08:30 e le 09:30 `Europe/Rome`, una volta per utente con almeno una sottoscrizione attiva. Il catalogo versionato di 150 frasi vive in `notificationContent/mondayMotivation`: il notifier lo inizializza se assente e migra automaticamente una versione precedente. Un hash stabile di lunedì e UID sceglie la frase: destinatari diversi possono ricevere testi diversi, mentre retry e dispositivi dello stesso utente mantengono lo stesso testo.
 
 Nuovi slot e reminder di gioco condividono il titolo informale **“Sveglia fagianotto!”**; la formazione completa usa **“Slot completo!”**, il promemoria di prenotazione **“Manca solo una settimana!”**, la richiesta delle pagelle **“È ora di dare i voti”** e la motivazione settimanale **“Buon lunedì, bestia!”**. I messaggi legati alle partite conservano giorno e ora della sessione.
 
@@ -123,7 +123,7 @@ notificationDeliveries/{deliveryId}
   eventId, kind, title, body, userId, subscriptionId, sentAt
 
 notificationContent/mondayMotivation
-  messages[100], createdAt
+  messages[150], catalogVersion, createdAt, updatedAt
 
 matchRatingResponses/{pollId__slotId__reviewerId}
   id, pollId, slotId, reviewerId, status, closedAt
@@ -162,7 +162,7 @@ Al termine della transazione il repository restituisce anche il sondaggio aggior
 
 ## Sicurezza delle notifiche
 
-I membri leggono e gestiscono soltanto la propria sottoscrizione push. L’account tecnico `codex@kirivoraup.resend.app` deve avere l’email verificata: le Firestore Security Rules gli consentono di leggere sondaggi, sottoscrizioni, esiti delle pagelle e il solo catalogo motivazionale, scrivere le ricevute di consegna, inizializzare una volta il catalogo con esattamente 100 elementi ed eliminare endpoint scaduti. Gli esiti servono esclusivamente a non notificare chi ha già chiuso o inviato; l’account tecnico non può leggere i punteggi, i profili, creare sondaggi o aggiornare slot. I membri non possono leggere o modificare `notificationContent`.
+I membri leggono e gestiscono soltanto la propria sottoscrizione push. L’account tecnico `codex@kirivoraup.resend.app` deve avere l’email verificata: le Firestore Security Rules gli consentono di leggere sondaggi, sottoscrizioni, esiti delle pagelle e il solo catalogo motivazionale, scrivere le ricevute di consegna, inizializzare il catalogo e aggiornarlo soltanto incrementandone la versione, oltre a eliminare endpoint scaduti. Gli esiti servono esclusivamente a non notificare chi ha già chiuso o inviato; l’account tecnico non può leggere i punteggi, i profili, creare sondaggi o aggiornare slot. I membri non possono leggere o modificare `notificationContent`.
 
 La password tecnica e la chiave VAPID privata vivono esclusivamente nei GitHub Actions secrets e non fanno parte della cronologia pubblica. Il token di dispatch vive esclusivamente nei secret cifrati Cloudflare ed è ristretto a un repository e a un solo permesso; Wrangler non ne restituisce il valore dopo il salvataggio. La chiave VAPID pubblica e la configurazione Web Firebase sono invece parte della configurazione del client. Prima del passaggio a repository pubblico, tutti i blob raggiungibili dalla cronologia Git sono stati controllati per escludere token, chiavi private, service account e file di credenziali. Il progetto non usa service account Google, Cloud Functions, Cloud Scheduler, Pub/Sub o altri servizi che richiedono il piano Blaze.
 
