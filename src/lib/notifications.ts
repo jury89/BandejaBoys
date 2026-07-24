@@ -75,7 +75,11 @@ async function subscriptionId(endpoint: string): Promise<string> {
 
 export async function registerNotificationWorker(): Promise<ServiceWorkerRegistration | null> {
   if (!('serviceWorker' in navigator) || !window.isSecureContext) return null
-  return navigator.serviceWorker.register('/sw.js')
+  const registration = await navigator.serviceWorker.register('/sw.js', {
+    updateViaCache: 'none',
+  })
+  void registration.update().catch(() => undefined)
+  return registration
 }
 
 async function readPushState(): Promise<PushNotificationState> {
