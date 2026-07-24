@@ -1,4 +1,9 @@
-import type { MatchRatingResponse, PadelPoll, PadelSlot } from '../types'
+import type {
+  MatchRatingResponse,
+  NotificationPreferences,
+  PadelPoll,
+  PadelSlot,
+} from '../types'
 import {
   DEFAULT_VENUE,
   MATCH_RATING_DELAY_MS,
@@ -13,6 +18,7 @@ import {
   type MotherNamesByRecipient,
   personalizeMotivationalMessage,
 } from './motivationalMessages'
+import { normalizeNotificationPreferences } from './notificationPreferences'
 
 const HOUR_MS = 60 * 60 * 1000
 const DAY_MS = 24 * HOUR_MS
@@ -26,6 +32,24 @@ export const MONDAY_MOTIVATION_WINDOW_MS = HOUR_MS
 
 export type NotificationKind = 'new-slots' | 'slot-ready' | 'booking-reminder-7d' | 'reminder-24h' | 'reminder-2h' | 'match-rating' | 'monday-motivation' | 'test'
 export type TestNotificationMode = 'standard' | 'match-rating'
+
+const NOTIFICATION_PREFERENCE_BY_KIND = {
+  'new-slots': 'newSlots',
+  'slot-ready': 'slotReady',
+  'booking-reminder-7d': 'bookingReminder7d',
+  'reminder-24h': 'reminder24h',
+  'reminder-2h': 'reminder2h',
+  'match-rating': 'matchRating',
+  'monday-motivation': 'mondayMotivation',
+} as const satisfies Record<Exclude<NotificationKind, 'test'>, keyof NotificationPreferences>
+
+export function isNotificationKindEnabled(
+  kind: NotificationKind,
+  preferences?: Partial<NotificationPreferences>,
+): boolean {
+  if (kind === 'test') return true
+  return normalizeNotificationPreferences(preferences)[NOTIFICATION_PREFERENCE_BY_KIND[kind]]
+}
 
 export interface MondayMotivationSchedule {
   messages: readonly string[]

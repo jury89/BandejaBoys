@@ -7,9 +7,13 @@ import {
   updateProfile,
 } from 'firebase/auth'
 import { deleteField, doc, onSnapshot, setDoc, updateDoc } from 'firebase/firestore'
-import type { MemberProfile, SessionUser } from '../types'
+import type { MemberProfile, NotificationPreferences, SessionUser } from '../types'
 import { firebaseAuth, firestore, hasRemoteBackend } from './firebase'
 import { makeId, profileNameError } from './domain'
+import {
+  DEFAULT_NOTIFICATION_PREFERENCES,
+  normalizeNotificationPreferences,
+} from './notificationPreferences'
 
 interface LocalAccount extends MemberProfile {
   passwordHash: string
@@ -40,6 +44,7 @@ function accountProfile(account: LocalAccount): MemberProfile {
     email: account.email,
     createdAt: account.createdAt,
     avatarDataUrl: account.avatarDataUrl,
+    notificationPreferences: normalizeNotificationPreferences(account.notificationPreferences),
   }
 }
 
@@ -81,6 +86,7 @@ export function subscribeToSession(listener: (user: SessionUser | null) => void)
         displayName: user.displayName?.trim() || 'Giocatore',
         email: user.email ?? '',
         createdAt: Number(user.metadata.creationTime ? new Date(user.metadata.creationTime) : Date.now()),
+        notificationPreferences: DEFAULT_NOTIFICATION_PREFERENCES,
       }
 
       stopProfile = onSnapshot(
@@ -97,6 +103,7 @@ export function subscribeToSession(listener: (user: SessionUser | null) => void)
             id: user.uid,
             displayName: profile.displayName?.trim() || fallback.displayName,
             email: profile.email ?? fallback.email,
+            notificationPreferences: normalizeNotificationPreferences(profile.notificationPreferences),
           })
         },
         () => listener(fallback),
@@ -132,6 +139,7 @@ export async function registerAccount(
       displayName: cleanName,
       email: cleanEmail,
       createdAt: Date.now(),
+      notificationPreferences: DEFAULT_NOTIFICATION_PREFERENCES,
     }
     await setDoc(doc(firestore, 'users', profile.id), profile)
     return profile
@@ -146,6 +154,7 @@ export async function registerAccount(
     displayName: cleanName,
     email: cleanEmail,
     createdAt: Date.now(),
+    notificationPreferences: DEFAULT_NOTIFICATION_PREFERENCES,
     passwordHash: await hashPassword(password),
   }
   writeAccounts([...accounts, account])
@@ -158,6 +167,7 @@ export async function updateAccountProfile(
   current: SessionUser,
   displayName: string,
   avatarDataUrl?: string,
+  notificationPreferences?: NotificationPreferences,
 ): Promise<SessionUser> {
   const cleanName = displayName.trim()
   const error = profileNameError(cleanName)
@@ -167,6 +177,7 @@ export async function updateAccountProfile(
     ...current,
     displayName: cleanName,
     avatarDataUrl: avatarDataUrl || undefined,
+    notificationPreferences: normalizeNotificationPreferences(notificationPreferences),
   }
 
   if (hasRemoteBackend && firebaseAuth?.currentUser && firestore) {
@@ -174,6 +185,7 @@ export async function updateAccountProfile(
     await updateDoc(doc(firestore, 'users', current.id), {
       displayName: cleanName,
       avatarDataUrl: avatarDataUrl || deleteField(),
+      notificationPreferences: nextProfile.notificationPreferences,
     })
     await updateProfile(firebaseAuth.currentUser, { displayName: cleanName })
     return nextProfile
@@ -186,6 +198,7 @@ export async function updateAccountProfile(
     ...accounts[accountIndex],
     displayName: cleanName,
     avatarDataUrl: avatarDataUrl || undefined,
+    notificationPreferences: nextProfile.notificationPreferences,
   }
   writeAccounts(accounts)
   emitAuthChange()

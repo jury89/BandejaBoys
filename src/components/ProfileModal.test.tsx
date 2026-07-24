@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { SessionUser } from '../types'
+import { DEFAULT_NOTIFICATION_PREFERENCES } from '../lib/notificationPreferences'
 import { ProfileModal } from './ProfileModal'
 
 const player: SessionUser = {
@@ -21,7 +22,11 @@ describe('profilo giocatore', () => {
     await user.type(name, 'Brescio')
     await user.click(screen.getByRole('button', { name: 'Salva profilo' }))
 
-    expect(onSave).toHaveBeenCalledWith('Brescio', undefined)
+    expect(onSave).toHaveBeenCalledWith(
+      'Brescio',
+      undefined,
+      DEFAULT_NOTIFICATION_PREFERENCES,
+    )
     expect(screen.queryByLabelText('Password')).not.toBeInTheDocument()
     expect(screen.queryByRole('textbox', { name: /Email/ })).not.toBeInTheDocument()
     expect(screen.getByLabelText('Email non modificabile')).toHaveTextContent(player.email)
@@ -43,5 +48,26 @@ describe('profilo giocatore', () => {
     expect(name).toHaveAttribute('aria-describedby', 'profile-name-feedback')
     expect(name.nextElementSibling).toBe(alert)
     expect(onSave).not.toHaveBeenCalled()
+  })
+
+  it('salva una scelta indipendente per ogni tipo di notifica', async () => {
+    const user = userEvent.setup()
+    const onSave = vi.fn().mockResolvedValue(undefined)
+    render(<ProfileModal user={player} onClose={vi.fn()} onSave={onSave} onDone={vi.fn()} />)
+
+    const monday = screen.getByRole('switch', { name: 'Ricevi Sveglia del lunedì' })
+    const twoHours = screen.getByRole('switch', { name: 'Ricevi Partita tra 2 ore' })
+    expect(monday).toBeChecked()
+    expect(twoHours).toBeChecked()
+
+    await user.click(monday)
+    await user.click(twoHours)
+    await user.click(screen.getByRole('button', { name: 'Salva profilo' }))
+
+    expect(onSave).toHaveBeenCalledWith('Jury', undefined, {
+      ...DEFAULT_NOTIFICATION_PREFERENCES,
+      mondayMotivation: false,
+      reminder2h: false,
+    })
   })
 })

@@ -10,10 +10,44 @@ import {
   collectScheduledNotifications,
   createNotificationDelivery,
   createTestNotification,
+  isNotificationKindEnabled,
   isMondayMotivationWindow,
 } from './notificationSchedule'
 
 const NOW = Date.parse('2026-07-20T18:00:00.000Z')
+
+describe('preferenze notifiche', () => {
+  it('mantiene tutti gli avvisi attivi per i profili esistenti', () => {
+    expect(isNotificationKindEnabled('monday-motivation')).toBe(true)
+    expect(isNotificationKindEnabled('new-slots')).toBe(true)
+    expect(isNotificationKindEnabled('slot-ready')).toBe(true)
+    expect(isNotificationKindEnabled('booking-reminder-7d')).toBe(true)
+    expect(isNotificationKindEnabled('reminder-24h')).toBe(true)
+    expect(isNotificationKindEnabled('reminder-2h')).toBe(true)
+    expect(isNotificationKindEnabled('match-rating')).toBe(true)
+  })
+
+  it('disattiva soltanto le categorie scelte e lascia passare i test manuali', () => {
+    const preferences = {
+      mondayMotivation: false,
+      newSlots: true,
+      slotReady: false,
+      bookingReminder7d: true,
+      reminder24h: false,
+      reminder2h: true,
+      matchRating: false,
+    }
+
+    expect(isNotificationKindEnabled('monday-motivation', preferences)).toBe(false)
+    expect(isNotificationKindEnabled('new-slots', preferences)).toBe(true)
+    expect(isNotificationKindEnabled('slot-ready', preferences)).toBe(false)
+    expect(isNotificationKindEnabled('booking-reminder-7d', preferences)).toBe(true)
+    expect(isNotificationKindEnabled('reminder-24h', preferences)).toBe(false)
+    expect(isNotificationKindEnabled('reminder-2h', preferences)).toBe(true)
+    expect(isNotificationKindEnabled('match-rating', preferences)).toBe(false)
+    expect(isNotificationKindEnabled('test', preferences)).toBe(true)
+  })
+})
 
 const signup = (userId: string, joinedAt: number): Signup => ({
   id: `signup-${userId}`,

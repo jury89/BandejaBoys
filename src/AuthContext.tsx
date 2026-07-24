@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
-import type { SessionUser } from './types'
+import type { NotificationPreferences, SessionUser } from './types'
 import {
   registerAccount,
   resetPassword,
@@ -16,7 +16,11 @@ interface AuthContextValue {
   register: (displayName: string, email: string, password: string) => Promise<void>
   signOut: typeof signOut
   resetPassword: typeof resetPassword
-  updateProfile: (displayName: string, avatarDataUrl?: string) => Promise<void>
+  updateProfile: (
+    displayName: string,
+    avatarDataUrl?: string,
+    notificationPreferences?: NotificationPreferences,
+  ) => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -39,9 +43,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(profile)
   }, [])
 
-  const updateProfile = useCallback(async (displayName: string, avatarDataUrl?: string) => {
+  const updateProfile = useCallback(async (
+    displayName: string,
+    avatarDataUrl?: string,
+    notificationPreferences?: NotificationPreferences,
+  ) => {
     if (!user) throw new Error('Devi accedere per modificare il profilo.')
-    const profile = await updateAccountProfile(user, displayName, avatarDataUrl)
+    const profile = await updateAccountProfile(
+      user,
+      displayName,
+      avatarDataUrl,
+      notificationPreferences,
+    )
     setUser(profile)
   }, [user])
 

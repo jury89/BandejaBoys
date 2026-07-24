@@ -13,7 +13,7 @@ import {
   terminate,
 } from 'firebase/firestore'
 import webpush, { type PushSubscription } from 'web-push'
-import type { MatchRatingResponse, PadelPoll } from '../src/types'
+import type { MatchRatingResponse, MemberProfile, PadelPoll } from '../src/types'
 import {
   MONDAY_MOTIVATIONAL_CATALOG_VERSION,
   normalizeMotherNamesByRecipient,
@@ -24,6 +24,7 @@ import {
   collectScheduledNotifications,
   createNotificationDelivery,
   createTestNotification,
+  isNotificationKindEnabled,
 } from '../src/lib/notificationSchedule'
 
 interface StoredPushSubscription extends PushSubscription {
@@ -76,11 +77,18 @@ const db = getFirestore(app)
 webpush.setVapidDetails(origin, publicKey, privateKey)
 
 const motivationReference = doc(db, 'notificationContent', 'mondayMotivation')
-const [pollSnapshot, subscriptionSnapshot, ratingResponseSnapshot, motivationSnapshot] = await Promise.all([
+const [
+  pollSnapshot,
+  subscriptionSnapshot,
+  ratingResponseSnapshot,
+  motivationSnapshot,
+  userSnapshot,
+] = await Promise.all([
   getDocs(collection(db, 'polls')),
   getDocs(collection(db, 'pushSubscriptions')),
   getDocs(collection(db, 'matchRatingResponses')),
   getDoc(motivationReference),
+  getDocs(collection(db, 'users')),
 ])
 
 const polls = pollSnapshot.docs.map((item) => ({ id: item.id, ...item.data() }) as PadelPoll)
@@ -93,6 +101,12 @@ const ratingResponses = ratingResponseSnapshot.docs.map((item) => ({
   id: item.id,
   ...item.data(),
 }) as MatchRatingResponse)
+const notificationPreferencesByUserId = new Map(
+  userSnapshot.docs.map((item) => [
+    item.id,
+    (item.data() as Partial<MemberProfile>).notificationPreferences,
+  ]),
+)
 const storedMotivationData = motivationSnapshot.exists()
   ? motivationSnapshot.data()
   : undefined
@@ -132,6 +146,7 @@ const notifications = testUserId
 
 let sent = 0
 let skipped = 0
+let disabled = 0
 let removed = 0
 let failed = 0
 
@@ -140,6 +155,13 @@ for (const notification of notifications) {
     const { userId } = subscription.data
     const included = notification.recipientUserIds === null || notification.recipientUserIds.includes(userId)
     if (!included || notification.excludedUserIds.includes(userId)) continue
+    if (!isNotificationKindEnabled(
+      notification.kind,
+      notificationPreferencesByUserId.get(userId),
+    )) {
+      disabled += 1
+      continue
+    }
 
     const deliveryId = createHash('sha256')
       .update(`${notification.id}:${userId}:${subscription.id}`)
@@ -188,7 +210,7 @@ for (const notification of notifications) {
   }
 }
 
-console.log(`Notifiche: ${sent} inviate, ${skipped} già consegnate, ${removed} dispositivi rimossi, ${failed} errori.`)
+console.log(`Notifiche: ${sent} inviate, ${skipped} già consegnate, ${disabled} disattivate, ${removed} dispositivi rimossi, ${failed} errori.`)
 await terminate(db)
 await deleteApp(app)
 if (failed > 0) process.exitCode = 1

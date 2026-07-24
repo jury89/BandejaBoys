@@ -25,16 +25,40 @@ service cloud.firestore {
           ));
     }
 
+    function validNotificationPreferences() {
+      return !request.resource.data.keys().hasAny(['notificationPreferences'])
+        || (request.resource.data.notificationPreferences is map
+          && request.resource.data.notificationPreferences.keys().hasOnly([
+            'mondayMotivation', 'newSlots', 'slotReady', 'bookingReminder7d',
+            'reminder24h', 'reminder2h', 'matchRating'
+          ])
+          && request.resource.data.notificationPreferences.keys().hasAll([
+            'mondayMotivation', 'newSlots', 'slotReady', 'bookingReminder7d',
+            'reminder24h', 'reminder2h', 'matchRating'
+          ])
+          && request.resource.data.notificationPreferences.mondayMotivation is bool
+          && request.resource.data.notificationPreferences.newSlots is bool
+          && request.resource.data.notificationPreferences.slotReady is bool
+          && request.resource.data.notificationPreferences.bookingReminder7d is bool
+          && request.resource.data.notificationPreferences.reminder24h is bool
+          && request.resource.data.notificationPreferences.reminder2h is bool
+          && request.resource.data.notificationPreferences.matchRating is bool);
+    }
+
     function validUserProfile(userId) {
       return request.resource.data.keys()
-          .hasOnly(['id', 'displayName', 'email', 'createdAt', 'avatarDataUrl'])
+          .hasOnly([
+            'id', 'displayName', 'email', 'createdAt', 'avatarDataUrl',
+            'notificationPreferences'
+          ])
         && request.resource.data.id == userId
         && request.resource.data.displayName is string
         && request.resource.data.displayName.size() >= 2
         && request.resource.data.displayName.size() <= 40
         && request.resource.data.email is string
         && request.resource.data.createdAt is number
-        && validAvatar();
+        && validAvatar()
+        && validNotificationPreferences();
     }
 
     function validMatchRatingResponse(responseId) {
@@ -154,7 +178,7 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
-      allow read: if isMember();
+      allow read: if isMember() || isNotifier();
       allow create: if isMember()
         && request.auth.uid == userId
         && validUserProfile(userId);

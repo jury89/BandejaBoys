@@ -1,15 +1,83 @@
 import { useRef, useState, type ChangeEvent, type FormEvent } from 'react'
-import { Camera, ImagePlus, LockKeyhole, Trash2, UserRound } from 'lucide-react'
-import type { SessionUser } from '../types'
+import {
+  BellRing,
+  CalendarCheck2,
+  CalendarClock,
+  CalendarPlus,
+  Camera,
+  CheckCircle2,
+  Clock3,
+  ImagePlus,
+  LockKeyhole,
+  Star,
+  Trash2,
+  UserRound,
+} from 'lucide-react'
+import type { NotificationPreferences, SessionUser } from '../types'
 import { compressAvatar } from '../lib/avatar'
 import { profileNameError, PROFILE_NAME_MAX_LENGTH } from '../lib/domain'
+import { normalizeNotificationPreferences } from '../lib/notificationPreferences'
 import { Modal } from './Modal'
 import { ProfileAvatar } from './ProfileAvatar'
+
+const NOTIFICATION_OPTIONS: {
+  key: keyof NotificationPreferences
+  title: string
+  description: string
+  icon: typeof BellRing
+}[] = [
+  {
+    key: 'mondayMotivation',
+    title: 'Sveglia del lunedì',
+    description: 'La frase motivazionale del gruppo.',
+    icon: BellRing,
+  },
+  {
+    key: 'newSlots',
+    title: 'Nuovi slot',
+    description: 'Quando qualcuno propone una nuova data.',
+    icon: CalendarPlus,
+  },
+  {
+    key: 'slotReady',
+    title: 'Formazione completa',
+    description: 'Quando si raggiungono quattro titolari.',
+    icon: CheckCircle2,
+  },
+  {
+    key: 'bookingReminder7d',
+    title: 'Campo da prenotare',
+    description: 'Il promemoria una settimana prima.',
+    icon: CalendarClock,
+  },
+  {
+    key: 'reminder24h',
+    title: 'Partita domani',
+    description: 'Il riepilogo 24 ore prima.',
+    icon: CalendarCheck2,
+  },
+  {
+    key: 'reminder2h',
+    title: 'Partita tra 2 ore',
+    description: 'L’ultimo richiamo prima di giocare.',
+    icon: Clock3,
+  },
+  {
+    key: 'matchRating',
+    title: 'Pagelle',
+    description: 'Quando è il momento di votare i compagni.',
+    icon: Star,
+  },
+]
 
 interface ProfileModalProps {
   user: SessionUser
   onClose: () => void
-  onSave: (displayName: string, avatarDataUrl?: string) => Promise<void>
+  onSave: (
+    displayName: string,
+    avatarDataUrl?: string,
+    notificationPreferences?: NotificationPreferences,
+  ) => Promise<void>
   onDone: (message: string) => void
 }
 
@@ -17,6 +85,9 @@ export function ProfileModal({ user, onClose, onSave, onDone }: ProfileModalProp
   const fileInput = useRef<HTMLInputElement>(null)
   const [displayName, setDisplayName] = useState(user.displayName)
   const [avatarDataUrl, setAvatarDataUrl] = useState(user.avatarDataUrl)
+  const [notificationPreferences, setNotificationPreferences] = useState(
+    () => normalizeNotificationPreferences(user.notificationPreferences),
+  )
   const [nameError, setNameError] = useState('')
   const [error, setError] = useState('')
   const [processingPhoto, setProcessingPhoto] = useState(false)
@@ -50,7 +121,7 @@ export function ProfileModal({ user, onClose, onSave, onDone }: ProfileModalProp
     setError('')
     setSaving(true)
     try {
-      await onSave(displayName.trim(), avatarDataUrl)
+      await onSave(displayName.trim(), avatarDataUrl, notificationPreferences)
       onDone('Profilo aggiornato.')
       onClose()
     } catch (saveError) {
@@ -118,6 +189,53 @@ export function ProfileModal({ user, onClose, onSave, onDone }: ProfileModalProp
           <span><small>Email dell’account</small><strong>{user.email}</strong></span>
           <em>Non modificabile</em>
         </div>
+
+        <section className="profile-notifications" aria-labelledby="profile-notifications-title">
+          <div className="profile-notifications__heading">
+            <span className="profile-notifications__heading-icon" aria-hidden="true">
+              <BellRing size={18} />
+            </span>
+            <span>
+              <small>Convocazioni</small>
+              <strong id="profile-notifications-title">Scegli quali avvisi ricevere</strong>
+            </span>
+          </div>
+          <p>La scelta vale per tutti i tuoi dispositivi e puoi cambiarla quando vuoi.</p>
+          <div className="profile-notifications__list">
+            {NOTIFICATION_OPTIONS.map((option) => {
+              const Icon = option.icon
+              const checked = notificationPreferences[option.key]
+              return (
+                <label
+                  className={`profile-notification-option${checked ? ' is-enabled' : ''}`}
+                  key={option.key}
+                >
+                  <span className="profile-notification-option__icon" aria-hidden="true">
+                    <Icon size={17} />
+                  </span>
+                  <span className="profile-notification-option__copy">
+                    <strong>{option.title}</strong>
+                    <small>{option.description}</small>
+                  </span>
+                  <input
+                    aria-label={`Ricevi ${option.title}`}
+                    checked={checked}
+                    disabled={saving}
+                    role="switch"
+                    type="checkbox"
+                    onChange={(event) => {
+                      setNotificationPreferences((current) => ({
+                        ...current,
+                        [option.key]: event.target.checked,
+                      }))
+                      setError('')
+                    }}
+                  />
+                </label>
+              )
+            })}
+          </div>
+        </section>
 
         {error && <p className="form-message form-message--error" role="alert">{error}</p>}
 

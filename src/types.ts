@@ -1,11 +1,22 @@
 export type PollStatus = 'open' | 'closed'
 
+export interface NotificationPreferences {
+  mondayMotivation: boolean
+  newSlots: boolean
+  slotReady: boolean
+  bookingReminder7d: boolean
+  reminder24h: boolean
+  reminder2h: boolean
+  matchRating: boolean
+}
+
 export interface MemberProfile {
   id: string
   displayName: string
   email: string
   createdAt: number
   avatarDataUrl?: string
+  notificationPreferences?: NotificationPreferences
 }
 
 export type SessionUser = MemberProfile
