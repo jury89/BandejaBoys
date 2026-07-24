@@ -1,15 +1,32 @@
-const weekdayFormatter = new Intl.DateTimeFormat('it-IT', { weekday: 'short' })
-const dayFormatter = new Intl.DateTimeFormat('it-IT', { day: '2-digit' })
-const monthFormatter = new Intl.DateTimeFormat('it-IT', { month: 'short' })
-const timeFormatter = new Intl.DateTimeFormat('it-IT', { hour: '2-digit', minute: '2-digit' })
+export const PADEL_TIME_ZONE = 'Europe/Rome'
+
+const weekdayFormatter = new Intl.DateTimeFormat('it-IT', {
+  weekday: 'short',
+  timeZone: PADEL_TIME_ZONE,
+})
+const dayFormatter = new Intl.DateTimeFormat('it-IT', {
+  day: '2-digit',
+  timeZone: PADEL_TIME_ZONE,
+})
+const monthFormatter = new Intl.DateTimeFormat('it-IT', {
+  month: 'short',
+  timeZone: PADEL_TIME_ZONE,
+})
+const timeFormatter = new Intl.DateTimeFormat('it-IT', {
+  hour: '2-digit',
+  minute: '2-digit',
+  timeZone: PADEL_TIME_ZONE,
+})
 const dateFormatter = new Intl.DateTimeFormat('it-IT', {
   weekday: 'long',
   day: 'numeric',
   month: 'long',
+  timeZone: PADEL_TIME_ZONE,
 })
 const shortDayMonthFormatter = new Intl.DateTimeFormat('it-IT', {
   day: 'numeric',
   month: 'short',
+  timeZone: 'UTC',
 })
 
 function dateFromInput(value: string): Date | null {
@@ -17,10 +34,10 @@ function dateFromInput(value: string): Date | null {
   if (!match) return null
 
   const [, year, month, day] = match.map(Number)
-  const date = new Date(year, month - 1, day, 12)
-  return date.getFullYear() === year
-    && date.getMonth() === month - 1
-    && date.getDate() === day
+  const date = new Date(Date.UTC(year, month - 1, day, 12))
+  return date.getUTCFullYear() === year
+    && date.getUTCMonth() === month - 1
+    && date.getUTCDate() === day
     ? date
     : null
 }
@@ -29,15 +46,15 @@ function mondayDateFromInput(value: string): Date | null {
   const date = dateFromInput(value)
   if (!date) return null
 
-  const daysSinceMonday = (date.getDay() + 6) % 7
-  date.setDate(date.getDate() - daysSinceMonday)
+  const daysSinceMonday = (date.getUTCDay() + 6) % 7
+  date.setUTCDate(date.getUTCDate() - daysSinceMonday)
   return date
 }
 
 function dateInputValue(date: Date): string {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
+  const year = date.getUTCFullYear()
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0')
+  const day = String(date.getUTCDate()).padStart(2, '0')
   return `${year}-${month}-${day}`
 }
 
@@ -61,7 +78,7 @@ export function weekLabel(weekStart: string): string {
   if (!start) return ''
 
   const end = new Date(start)
-  end.setDate(end.getDate() + 6)
+  end.setUTCDate(end.getUTCDate() + 6)
   return `${shortDayMonth(start)} — ${shortDayMonth(end)}`
 }
 
@@ -70,13 +87,13 @@ export function pollWeekTitle(weekStart: string): string {
   if (!start) return 'Padel'
 
   const end = new Date(start)
-  end.setDate(end.getDate() + 6)
+  end.setUTCDate(end.getUTCDate() + 6)
 
-  if (start.getFullYear() === end.getFullYear()) {
-    return `Padel · ${shortDayMonth(start)} – ${shortDayMonth(end)} ${end.getFullYear()}`
+  if (start.getUTCFullYear() === end.getUTCFullYear()) {
+    return `Padel · ${shortDayMonth(start)} – ${shortDayMonth(end)} ${end.getUTCFullYear()}`
   }
 
-  return `Padel · ${shortDayMonth(start)} ${start.getFullYear()} – ${shortDayMonth(end)} ${end.getFullYear()}`
+  return `Padel · ${shortDayMonth(start)} ${start.getUTCFullYear()} – ${shortDayMonth(end)} ${end.getUTCFullYear()}`
 }
 
 export function mondayOfWeek(value: string): string | null {

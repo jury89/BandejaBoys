@@ -50,7 +50,7 @@ describe('repository activity log in demo mode', () => {
       actorId: 'jury',
       pollId: poll.id,
       slotId: slot.id,
-      details: { previousStartsAt: new Date('2027-01-05T19:30').toISOString() },
+      details: { previousStartsAt: '2027-01-05T18:30:00.000Z' },
     })
     expect(activity().events.every((event) => Number.isFinite(event.occurredAt))).toBe(true)
   })

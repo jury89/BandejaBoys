@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { CalendarClock } from 'lucide-react'
 import type { PadelSlot } from '../types'
-import { toDateTimeInput } from '../lib/domain'
+import { padelDateTimeToTimestamp, toDateTimeInput } from '../lib/domain'
 import { slotDateParts } from '../lib/format'
 import { Modal } from './Modal'
 import { SlotDateTimeField } from './SlotDateTimeField'
@@ -21,7 +21,7 @@ export function EditSlotModal({ slot, onClose, onSave, onDone }: EditSlotModalPr
 
   const submit = async (event: FormEvent) => {
     event.preventDefault()
-    if (Number.isNaN(new Date(startsAt).getTime())) {
+    if (Number.isNaN(padelDateTimeToTimestamp(startsAt))) {
       setError('Scegli una data e un orario validi.')
       return
     }

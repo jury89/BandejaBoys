@@ -1,7 +1,12 @@
 import { useMemo, useState, type FormEvent } from 'react'
 import { CalendarPlus } from 'lucide-react'
 import type { PadelPoll, SlotInput } from '../types'
-import { defaultSlotForWeek, toDateTimeInput } from '../lib/domain'
+import {
+  addDaysToDateTimeInput,
+  defaultSlotForWeek,
+  padelDateTimeToTimestamp,
+  toDateTimeInput,
+} from '../lib/domain'
 import { pollWeekTitle } from '../lib/format'
 import { Modal } from './Modal'
 import { SlotDateTimeField } from './SlotDateTimeField'
@@ -22,10 +27,11 @@ function initialSlot(poll: PadelPoll): SlotInput {
     }
   }
 
-  const nextDay = new Date(latest.startsAt)
-  nextDay.setDate(nextDay.getDate() + 1)
   return {
-    startsAt: toDateTimeInput(nextDay),
+    startsAt: addDaysToDateTimeInput(
+      toDateTimeInput(new Date(latest.startsAt)),
+      1,
+    ),
     durationMinutes: latest.durationMinutes,
   }
 }
@@ -39,7 +45,7 @@ export function AddSlotModal({ poll, onClose, onSave, onDone }: AddSlotModalProp
 
   const submit = async (event: FormEvent) => {
     event.preventDefault()
-    if (Number.isNaN(new Date(startsAt).getTime())) {
+    if (Number.isNaN(padelDateTimeToTimestamp(startsAt))) {
       setError('Scegli una data e un orario validi.')
       return
     }

@@ -1,4 +1,16 @@
-import { mondayOfWeek, pollWeekTitle, weekLabel } from './format'
+import { mondayOfWeek, pollWeekTitle, slotDateParts, weekLabel } from './format'
+
+describe('orari degli slot', () => {
+  it('mostra sempre giorno e ora di Roma anche se l’istante è espresso in UTC', () => {
+    expect(slotDateParts('2026-07-28T18:30:00.000Z')).toMatchObject({
+      weekday: 'MAR',
+      day: '28',
+      month: 'LUG',
+      time: '20:30',
+    })
+    expect(slotDateParts('2026-12-15T18:30:00.000Z').time).toBe('19:30')
+  })
+})
 
 describe('etichette settimanali', () => {
   it('genera un titolo riconoscibile con intervallo e anno', () => {

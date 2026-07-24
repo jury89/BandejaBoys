@@ -21,6 +21,7 @@ import {
   rescheduleSlot,
   setSlotBooking,
   substituteStarter,
+  toDateTimeInput,
 } from './domain'
 import type { MatchRatingRecord, MemberProfile, PadelPoll, PadelSlot, SessionUser, Signup, SignupRole } from '../types'
 
@@ -464,7 +465,10 @@ describe('stato slot e creazione sondaggio', () => {
     )
     expect(poll.title).toBe('Padel · 27 lug – 2 ago 2026')
     expect(poll.targetWeekStart).toBe('2026-07-27')
-    expect(poll.slots[0].startsAt < poll.slots[1].startsAt).toBe(true)
+    expect(poll.slots.map((item) => item.startsAt)).toEqual([
+      '2026-07-28T17:30:00.000Z',
+      '2026-07-30T18:00:00.000Z',
+    ])
     expect(poll.slots[0]).toMatchObject({
       createdAt: 100,
       createdBy: 'jury',
@@ -496,8 +500,14 @@ describe('stato slot e creazione sondaggio', () => {
   })
 
   it('calcola sempre il lunedì della settimana successiva', () => {
-    expect(nextMondayDate(new Date('2026-07-20T12:00:00'))).toBe('2026-07-27')
-    expect(nextMondayDate(new Date('2026-07-22T12:00:00'))).toBe('2026-07-27')
+    expect(nextMondayDate(new Date('2026-07-20T12:00:00.000Z'))).toBe('2026-07-27')
+    expect(nextMondayDate(new Date('2026-07-22T12:00:00.000Z'))).toBe('2026-07-27')
+    expect(nextMondayDate(new Date('2026-07-19T22:30:00.000Z'))).toBe('2026-07-27')
+  })
+
+  it('prepara i campi data e ora nel fuso di Roma', () => {
+    expect(toDateTimeInput(new Date('2026-07-28T16:30:00.000Z'))).toBe('2026-07-28T18:30')
+    expect(toDateTimeInput(new Date('2026-12-15T08:00:00.000Z'))).toBe('2026-12-15T09:00')
   })
 
   it('propone gli slot a partire dal lunedì anche con una data infrasettimanale', () => {
@@ -530,7 +540,7 @@ describe('stato slot e creazione sondaggio', () => {
     expect(updated.updatedAt).toBe(99)
     expect(updated.slots.map((item) => item.id)).toEqual(['slot-2', 'slot-1'])
     expect(updated.slots[1]).toMatchObject({
-      startsAt: new Date('2026-07-31T20:00').toISOString(),
+      startsAt: '2026-07-31T18:00:00.000Z',
       venue: 'Bandeja Club',
       bookedAt: 10,
       signups: booked.signups,
@@ -585,7 +595,7 @@ describe('stato slot e creazione sondaggio', () => {
     expect(updated.updatedAt).toBe(99)
     expect(updated.slots).toHaveLength(2)
     expect(updated.slots[0]).toMatchObject({
-      startsAt: new Date('2026-07-27T18:30').toISOString(),
+      startsAt: '2026-07-27T16:30:00.000Z',
       createdAt: 99,
       createdBy: 'ale',
       createdByName: 'Ale',

@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { PadelPoll } from '../types'
 import { AddSlotModal } from './AddSlotModal'
 
-const latestStartsAt = new Date(2026, 6, 28, 18, 30).toISOString()
+const latestStartsAt = '2026-07-28T16:30:00.000Z'
 const poll: PadelPoll = {
   id: 'poll-1',
   title: 'Padel · prossima settimana',

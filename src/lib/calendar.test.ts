@@ -55,6 +55,15 @@ describe('file calendario dello slot', () => {
     expect(calendar).toContain('DTEND;TZID=Europe/Rome:20260728T103000')
   })
 
+  it('converte in ora di Roma gli istanti salvati in UTC', () => {
+    const utcSlot = { ...slot, startsAt: '2026-07-28T17:00:00.000Z' }
+    const calendar = buildSlotCalendar(poll, utcSlot, Date.UTC(2026, 6, 21, 12, 0))
+
+    expect(calendar).toContain('DTSTART;TZID=Europe/Rome:20260728T190000')
+    expect(calendar).toContain('DTEND;TZID=Europe/Rome:20260728T203000')
+    expect(slotCalendarFileName(utcSlot)).toBe('padel-2026-07-28-1900.ics')
+  })
+
   it('marca come confermato il calendario di un campo prenotato', () => {
     const calendar = buildSlotCalendar(poll, setSlotBooking(slot, user, 20), 1)
 

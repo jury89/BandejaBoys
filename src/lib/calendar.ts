@@ -1,4 +1,9 @@
-import { DEFAULT_VENUE, getSlotPhase } from './domain'
+import {
+  DEFAULT_VENUE,
+  getSlotPhase,
+  padelDateTimeToTimestamp,
+  toDateTimeInput,
+} from './domain'
 import type { PadelPoll, PadelSlot } from '../types'
 import { pollWeekTitle } from './format'
 
@@ -26,13 +31,12 @@ const CALENDAR_TIME_ZONE_COMPONENT = [
 ] as const
 
 function normalizeLocalDateTime(value: string) {
-  return `${value.slice(0, 16)}:00`
+  return `${toDateTimeInput(new Date(padelDateTimeToTimestamp(value)))}:00`
 }
 
 function addMinutesToLocalDateTime(value: string, minutes: number) {
-  const date = new Date(`${normalizeLocalDateTime(value)}Z`)
-  date.setUTCMinutes(date.getUTCMinutes() + minutes)
-  return date.toISOString().slice(0, 19)
+  const timestamp = padelDateTimeToTimestamp(value) + minutes * 60 * 1000
+  return `${toDateTimeInput(new Date(timestamp))}:00`
 }
 
 function formatLocalCalendarDate(value: string) {
@@ -99,7 +103,8 @@ export function buildSlotCalendar(poll: PadelPoll, slot: PadelSlot, now = Date.n
 }
 
 export function slotCalendarFileName(slot: PadelSlot) {
-  return `padel-${slot.startsAt.slice(0, 16).replace('T', '-').replace(':', '')}.ics`
+  const localDateTime = normalizeLocalDateTime(slot.startsAt)
+  return `padel-${localDateTime.slice(0, 16).replace('T', '-').replace(':', '')}.ics`
 }
 
 export function downloadSlotCalendar(poll: PadelPoll, slot: PadelSlot) {

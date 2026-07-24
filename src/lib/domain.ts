@@ -14,7 +14,7 @@ import type {
   SlotInput,
   SlotPhase,
 } from '../types'
-import { mondayOfWeek, pollWeekTitle } from './format'
+import { mondayOfWeek, PADEL_TIME_ZONE, pollWeekTitle } from './format'
 
 export const MAX_STARTERS = 4
 export const MAX_SLOTS = 14
@@ -25,7 +25,7 @@ export const MATCH_RATING_DELAY_MS = 10 * 60 * 1000
 
 const LOCAL_DATE_TIME_PATTERN = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,3}))?)?$/
 const romeDateTimeFormatter = new Intl.DateTimeFormat('en-GB', {
-  timeZone: 'Europe/Rome',
+  timeZone: PADEL_TIME_ZONE,
   year: 'numeric',
   month: '2-digit',
   day: '2-digit',
@@ -34,6 +34,12 @@ const romeDateTimeFormatter = new Intl.DateTimeFormat('en-GB', {
   second: '2-digit',
   hourCycle: 'h23',
 })
+
+function romeDateTimeParts(value: Date | number): Record<string, string> {
+  return Object.fromEntries(
+    romeDateTimeFormatter.formatToParts(value).map((part) => [part.type, part.value]),
+  )
+}
 
 export function padelDateTimeToTimestamp(value: string): number {
   const match = LOCAL_DATE_TIME_PATTERN.exec(value)
@@ -52,9 +58,7 @@ export function padelDateTimeToTimestamp(value: string): number {
   let candidate = wallClock
 
   for (let attempt = 0; attempt < 3; attempt += 1) {
-    const parts = Object.fromEntries(
-      romeDateTimeFormatter.formatToParts(new Date(candidate)).map((part) => [part.type, part.value]),
-    )
+    const parts = romeDateTimeParts(candidate)
     const representedWallClock = Date.UTC(
       Number(parts.year),
       Number(parts.month) - 1,
@@ -438,9 +442,17 @@ export function rescheduleSlot(
 }
 
 function normalizeStartsAt(startsAt: string) {
-  const date = new Date(startsAt)
-  if (Number.isNaN(date.getTime())) throw new Error('Scegli una data e un orario validi.')
-  if (![0, 30].includes(date.getMinutes()) || date.getSeconds() !== 0 || date.getMilliseconds() !== 0) {
+  const timestamp = padelDateTimeToTimestamp(startsAt)
+  if (Number.isNaN(timestamp)) throw new Error('Scegli una data e un orario validi.')
+
+  const localParts = LOCAL_DATE_TIME_PATTERN.exec(startsAt)
+  const date = new Date(timestamp)
+  const minutes = localParts ? Number(localParts[5]) : date.getUTCMinutes()
+  const seconds = localParts ? Number(localParts[6] ?? 0) : date.getUTCSeconds()
+  const milliseconds = localParts
+    ? Number((localParts[7] ?? '0').padEnd(3, '0'))
+    : date.getUTCMilliseconds()
+  if (![0, 30].includes(minutes) || seconds !== 0 || milliseconds !== 0) {
     throw new Error('Scegli un orario con minuti 00 oppure 30.')
   }
   return date.toISOString()
@@ -526,29 +538,40 @@ export function makePoll(
 }
 
 export function nextMondayDate(from = new Date()): string {
-  const date = new Date(from)
-  date.setHours(12, 0, 0, 0)
-  const daysUntilMonday = ((8 - date.getDay()) % 7) || 7
-  date.setDate(date.getDate() + daysUntilMonday)
-  return toDateInput(date)
+  const [year, month, day] = toDateInput(from).split('-').map(Number)
+  const date = new Date(Date.UTC(year, month - 1, day, 12))
+  const daysUntilMonday = ((8 - date.getUTCDay()) % 7) || 7
+  date.setUTCDate(date.getUTCDate() + daysUntilMonday)
+  return utcDateInput(date)
 }
 
 export function toDateInput(date: Date): string {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
+  const parts = romeDateTimeParts(date)
+  return `${parts.year}-${parts.month}-${parts.day}`
 }
 
 export function toDateTimeInput(date: Date): string {
-  const hours = String(date.getHours()).padStart(2, '0')
-  const minutes = String(date.getMinutes()).padStart(2, '0')
-  return `${toDateInput(date)}T${hours}:${minutes}`
+  const parts = romeDateTimeParts(date)
+  return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`
+}
+
+function utcDateInput(date: Date): string {
+  const year = date.getUTCFullYear()
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0')
+  const day = String(date.getUTCDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+export function addDaysToDateTimeInput(value: string, days: number): string {
+  const match = LOCAL_DATE_TIME_PATTERN.exec(value)
+  if (!match) throw new Error('Scegli una data e un orario validi.')
+
+  const [, year, month, day, hour, minute] = match
+  const date = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day) + days, 12))
+  return `${utcDateInput(date)}T${hour}:${minute}`
 }
 
 export function defaultSlotForWeek(weekStart: string, dayOffset = 1): string {
   const normalizedWeekStart = mondayOfWeek(weekStart) ?? weekStart
-  const date = new Date(`${normalizedWeekStart}T19:30:00`)
-  date.setDate(date.getDate() + dayOffset)
-  return toDateTimeInput(date)
+  return addDaysToDateTimeInput(`${normalizedWeekStart}T19:30`, dayOffset)
 }
