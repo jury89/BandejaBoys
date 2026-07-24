@@ -162,6 +162,68 @@ export function normalizeMotivationalMessages(value: unknown): string[] {
     .filter(Boolean)))
 }
 
+export type MotherNamesByRecipient = Readonly<Record<string, string>>
+
+function normalizePersonLookupKey(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .toLocaleLowerCase('it-IT')
+}
+
+export function normalizeMotherNamesByRecipient(value: unknown): Record<string, string> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
+
+  return Object.fromEntries(Object.entries(value)
+    .flatMap(([recipientName, motherName]) => {
+      if (typeof motherName !== 'string') return []
+
+      const lookupKey = normalizePersonLookupKey(recipientName)
+      const cleanMotherName = motherName.trim().replace(/\s+/g, ' ')
+      if (!lookupKey || !cleanMotherName || cleanMotherName.length > 40) return []
+
+      return [[lookupKey, cleanMotherName]]
+    }))
+}
+
+function startsWithVowel(value: string): boolean {
+  const firstLetter = value
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .trim()
+    .charAt(0)
+    .toLocaleLowerCase('it-IT')
+  return 'aeiou'.includes(firstLetter)
+}
+
+function preserveInitialCase(source: string, replacement: string): string {
+  return source.charAt(0) === source.charAt(0).toLocaleUpperCase('it-IT')
+    ? replacement.charAt(0).toLocaleUpperCase('it-IT') + replacement.slice(1)
+    : replacement
+}
+
+export function personalizeMotivationalMessage(
+  message: string,
+  recipientDisplayName: string | undefined,
+  motherNamesByRecipient: MotherNamesByRecipient | undefined,
+): string {
+  if (!recipientDisplayName || !motherNamesByRecipient) return message
+
+  const normalizedDirectory = normalizeMotherNamesByRecipient(motherNamesByRecipient)
+  const motherName = normalizedDirectory[normalizePersonLookupKey(recipientDisplayName)]
+  if (!motherName) return message
+
+  const elidedArticle = startsWithVowel(motherName)
+  const directReference = elidedArticle ? `l’${motherName}` : `la ${motherName}`
+  const indirectReference = elidedArticle ? `dell’${motherName}` : `della ${motherName}`
+
+  return message
+    .replace(/di tua madre/giu, (match) => preserveInitialCase(match, indirectReference))
+    .replace(/tua madre/giu, (match) => preserveInitialCase(match, directReference))
+}
+
 export interface MotivationalCatalogResolution {
   messages: string[]
   needsWrite: boolean

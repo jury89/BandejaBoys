@@ -6,6 +6,7 @@ import {
   NEW_SLOT_NOTIFICATION_WINDOW_MS,
   NEW_SLOT_QUIET_PERIOD_MS,
   SLOT_READY_NOTIFICATION_WINDOW_MS,
+  collectPollDisplayNamesByUserId,
   collectScheduledNotifications,
   createNotificationDelivery,
   createTestNotification,
@@ -148,6 +149,56 @@ describe('pianificazione notifiche', () => {
       excludedUserIds: [],
     })
     expect(retry).toEqual(first)
+  })
+
+  it('personalizza tua madre per i destinatari configurati e mantiene il fallback', () => {
+    const mondayMorning = Date.parse('2026-07-27T06:33:00.000Z')
+    const message = 'Spacca tutto: tua madre ha bisogno di una prova.'
+    const notifications = collectScheduledNotifications([], mondayMorning, [], {
+      messages: [message],
+      recipientUserIds: ['player-1', 'player-2'],
+      recipientDisplayNamesByUserId: {
+        'player-1': 'Marco Rossi',
+        'player-2': 'Nome Sconosciuto',
+      },
+      motherNamesByRecipient: {
+        'marco rossi': 'Giulia',
+      },
+    })
+
+    expect(notifications.map((notification) => notification.body)).toEqual([
+      'Spacca tutto: la Giulia ha bisogno di una prova.',
+      message,
+    ])
+  })
+
+  it('ricava dai sondaggi il nome più recente associato a ogni UID', () => {
+    const names = collectPollDisplayNamesByUserId([{
+      ...poll([]),
+      createdBy: 'player-1',
+      createdByName: 'Nome Vecchio',
+      createdAt: 100,
+      slots: [{
+        ...slot('2026-07-28T18:30', [{
+          ...signup('player-1', 300),
+          displayName: 'Nome Nuovo',
+          substitutedFor: {
+            userId: 'player-2',
+            displayName: 'Giocatore Uscito',
+            at: 250,
+          },
+        }], false),
+        createdBy: 'player-3',
+        createdByName: 'Creatore Slot',
+        createdAt: 200,
+      }],
+    }])
+
+    expect(names).toEqual({
+      'player-1': 'Nome Nuovo',
+      'player-2': 'Giocatore Uscito',
+      'player-3': 'Creatore Slot',
+    })
   })
 
   it('rispetta le 08:30 di Roma sia in ora legale sia in ora solare', () => {

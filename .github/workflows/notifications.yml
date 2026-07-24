@@ -50,6 +50,7 @@ jobs:
           FIREBASE_NOTIFIER_PASSWORD: ${{ secrets.FIREBASE_NOTIFIER_PASSWORD }}
           WEB_PUSH_VAPID_PUBLIC_KEY: ${{ vars.WEB_PUSH_VAPID_PUBLIC_KEY }}
           WEB_PUSH_VAPID_PRIVATE_KEY: ${{ secrets.WEB_PUSH_VAPID_PRIVATE_KEY }}
+          MOTHER_NAMES_BY_RECIPIENT_JSON: ${{ secrets.MOTHER_NAMES_BY_RECIPIENT_JSON }}
           TEST_NOTIFICATION_USER_ID: ${{ inputs.test_user_id }}
           TEST_NOTIFICATION_ID: ${{ github.run_id }}-${{ github.run_attempt }}
           TEST_NOTIFICATION_TITLE: ${{ inputs.test_title }}

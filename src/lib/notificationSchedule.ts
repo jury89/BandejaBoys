@@ -9,6 +9,10 @@ import {
   padelDateTimeToTimestamp,
 } from './domain'
 import { pollWeekTitle } from './format'
+import {
+  type MotherNamesByRecipient,
+  personalizeMotivationalMessage,
+} from './motivationalMessages'
 
 const HOUR_MS = 60 * 60 * 1000
 const DAY_MS = 24 * HOUR_MS
@@ -26,6 +30,8 @@ export type TestNotificationMode = 'standard' | 'match-rating'
 export interface MondayMotivationSchedule {
   messages: readonly string[]
   recipientUserIds: readonly string[]
+  recipientDisplayNamesByUserId?: Readonly<Record<string, string>>
+  motherNamesByRecipient?: MotherNamesByRecipient
 }
 
 export interface ScheduledNotification {
@@ -164,6 +170,56 @@ function stableMessageIndex(seed: string, messageCount: number): number {
   return (hash >>> 0) % messageCount
 }
 
+export function collectPollDisplayNamesByUserId(
+  polls: readonly PadelPoll[],
+): Record<string, string> {
+  const names = new Map<string, { displayName: string; observedAt: number; order: number }>()
+  let order = 0
+
+  const remember = (
+    userIdValue: string | undefined,
+    displayNameValue: string | undefined,
+    observedAtValue: number | undefined,
+  ) => {
+    const userId = userIdValue?.trim()
+    const displayName = displayNameValue?.trim().replace(/\s+/g, ' ')
+    if (!userId || !displayName) return
+
+    const observedAt = typeof observedAtValue === 'number' && Number.isFinite(observedAtValue)
+      ? observedAtValue
+      : 0
+    order += 1
+    const current = names.get(userId)
+    if (
+      !current
+      || observedAt > current.observedAt
+      || (observedAt === current.observedAt && order > current.order)
+    ) {
+      names.set(userId, { displayName, observedAt, order })
+    }
+  }
+
+  for (const poll of polls) {
+    remember(poll.createdBy, poll.createdByName, poll.createdAt)
+
+    for (const slot of poll.slots) {
+      remember(slot.createdBy, slot.createdByName, slot.createdAt ?? poll.createdAt)
+      remember(slot.bookedBy, slot.bookedByName, slot.bookedAt ?? slot.createdAt ?? poll.updatedAt)
+
+      for (const signup of slot.signups) {
+        remember(signup.userId, signup.displayName, signup.joinedAt)
+        remember(
+          signup.substitutedFor?.userId,
+          signup.substitutedFor?.displayName,
+          signup.substitutedFor?.at,
+        )
+      }
+    }
+  }
+
+  return Object.fromEntries(Array.from(names, ([userId, value]) => [userId, value.displayName]))
+}
+
 function collectMondayMotivationNotifications(
   now: number,
   schedule?: MondayMotivationSchedule,
@@ -179,17 +235,24 @@ function collectMondayMotivationNotifications(
   const parts = romeDateTimeParts(now)
   const mondayKey = `${parts.year}-${parts.month}-${parts.day}`
 
-  return recipientUserIds.map((userId) => ({
-    id: `monday-motivation:${mondayKey}`,
-    kind: 'monday-motivation',
-    title: 'Buon lunedì, bestia!',
-    body: messages[stableMessageIndex(`${mondayKey}:${userId}`, messages.length)],
-    url: '/',
-    tag: `monday-motivation-${mondayKey}`,
-    ttlSeconds: 12 * 60 * 60,
-    recipientUserIds: [userId],
-    excludedUserIds: [],
-  }))
+  return recipientUserIds.map((userId) => {
+    const message = messages[stableMessageIndex(`${mondayKey}:${userId}`, messages.length)]
+    return {
+      id: `monday-motivation:${mondayKey}`,
+      kind: 'monday-motivation',
+      title: 'Buon lunedì, bestia!',
+      body: personalizeMotivationalMessage(
+        message,
+        schedule.recipientDisplayNamesByUserId?.[userId],
+        schedule.motherNamesByRecipient,
+      ),
+      url: '/',
+      tag: `monday-motivation-${mondayKey}`,
+      ttlSeconds: 12 * 60 * 60,
+      recipientUserIds: [userId],
+      excludedUserIds: [],
+    }
+  })
 }
 
 export function createTestNotification(
