@@ -1,8 +1,19 @@
 const NOTIFICATION_ICON = '/icons/padel-192.png'
 const NOTIFICATION_BADGE = '/icons/padel-badge-96.png'
+const APP_REFRESH_BRIDGE_VERSION = 'profile-preferences-20260724'
 
 self.addEventListener('install', () => self.skipWaiting())
-self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim()))
+self.addEventListener('activate', (event) => event.waitUntil((async () => {
+  await self.clients.claim()
+  const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+  await Promise.all(windows.map((client) => {
+    const destination = new URL(client.url)
+    if (destination.origin !== self.location.origin) return undefined
+    if (destination.searchParams.get('_swv') === APP_REFRESH_BRIDGE_VERSION) return undefined
+    destination.searchParams.set('_swv', APP_REFRESH_BRIDGE_VERSION)
+    return client.navigate(destination.href)
+  }))
+})()))
 
 self.addEventListener('push', (event) => {
   let payload = {
