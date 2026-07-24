@@ -114,6 +114,7 @@ describe('pianificazione notifiche', () => {
       recipientUserIds: ['jury'],
       excludedUserIds: [],
       title: 'Test notifiche Bandeja Boys',
+      url: '/?_pushRefresh=run-42',
     })
   })
 
@@ -146,7 +147,7 @@ describe('pianificazione notifiche', () => {
       kind: 'test',
       title: 'TEST · È ora di dare i voti',
       body: 'Tocca per aprire la pagella di collaudo. Nessun voto verrà salvato.',
-      url: '/?ratingTest=1',
+      url: '/?ratingTest=1&_pushRefresh=run-45',
       tag: 'test-rating-run-45',
       recipientUserIds: ['jury'],
     })
@@ -156,7 +157,7 @@ describe('pianificazione notifiche', () => {
     expect(createTestNotification('jury', 'run-46', 'Apri il test', 'match-rating')).toMatchObject({
       title: 'TEST · È ora di dare i voti',
       body: 'Apri il test',
-      url: '/?ratingTest=1',
+      url: '/?ratingTest=1&_pushRefresh=run-46',
     })
   })
 

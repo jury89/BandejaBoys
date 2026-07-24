@@ -295,6 +295,7 @@ export function createTestNotification(
   if (customTitle && customTitle.length > 80) throw new Error('Il titolo del test supera gli 80 caratteri.')
 
   const isMatchRatingTest = mode === 'match-rating'
+  const refreshParameter = `_pushRefresh=${encodeURIComponent(identifier)}`
 
   return {
     id: `test:${identifier}`,
@@ -305,7 +306,9 @@ export function createTestNotification(
     body: customBody || (isMatchRatingTest
       ? 'Tocca per aprire la pagella di collaudo. Nessun voto verrà salvato.'
       : 'Se leggi questo messaggio, le notifiche funzionano correttamente.'),
-    url: isMatchRatingTest ? '/?ratingTest=1' : '/',
+    url: isMatchRatingTest
+      ? `/?ratingTest=1&${refreshParameter}`
+      : `/?${refreshParameter}`,
     tag: `${isMatchRatingTest ? 'test-rating' : 'test'}-${identifier}`,
     ttlSeconds: 10 * 60,
     recipientUserIds: [recipient],
