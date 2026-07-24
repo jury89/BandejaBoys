@@ -11,6 +11,10 @@ on:
         description: 'Testo facoltativo della notifica manuale (massimo 240 caratteri)'
         required: false
         type: string
+      test_title:
+        description: 'Titolo facoltativo della notifica manuale (massimo 80 caratteri)'
+        required: false
+        type: string
       test_mode:
         description: 'Tipo di collaudo manuale'
         required: false
@@ -48,5 +52,6 @@ jobs:
           WEB_PUSH_VAPID_PRIVATE_KEY: ${{ secrets.WEB_PUSH_VAPID_PRIVATE_KEY }}
           TEST_NOTIFICATION_USER_ID: ${{ inputs.test_user_id }}
           TEST_NOTIFICATION_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+          TEST_NOTIFICATION_TITLE: ${{ inputs.test_title }}
           TEST_NOTIFICATION_MESSAGE: ${{ inputs.test_message }}
           TEST_NOTIFICATION_MODE: ${{ inputs.test_mode }}

@@ -197,12 +197,15 @@ export function createTestNotification(
   eventId: string,
   message?: string,
   mode: TestNotificationMode = 'standard',
+  title?: string,
 ): ScheduledNotification {
   const recipient = userId.trim()
   const identifier = eventId.trim()
   const customBody = message?.trim()
+  const customTitle = title?.trim()
   if (!recipient || !identifier) throw new Error('Destinatario o identificativo del test mancante.')
   if (customBody && customBody.length > 240) throw new Error('Il messaggio di test supera i 240 caratteri.')
+  if (customTitle && customTitle.length > 80) throw new Error('Il titolo del test supera gli 80 caratteri.')
 
   const isMatchRatingTest = mode === 'match-rating'
 
@@ -211,7 +214,7 @@ export function createTestNotification(
     kind: 'test',
     title: isMatchRatingTest
       ? 'TEST · È ora di dare i voti'
-      : customBody ? 'Bandeja Boys' : 'Test notifiche Bandeja Boys',
+      : customTitle || (customBody ? 'Bandeja Boys' : 'Test notifiche Bandeja Boys'),
     body: customBody || (isMatchRatingTest
       ? 'Tocca per aprire la pagella di collaudo. Nessun voto verrà salvato.'
       : 'Se leggi questo messaggio, le notifiche funzionano correttamente.'),

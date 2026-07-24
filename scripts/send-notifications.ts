@@ -38,6 +38,7 @@ const publicKey = process.env.WEB_PUSH_VAPID_PUBLIC_KEY
 const privateKey = process.env.WEB_PUSH_VAPID_PRIVATE_KEY
 const testUserId = process.env.TEST_NOTIFICATION_USER_ID?.trim()
 const testNotificationId = process.env.TEST_NOTIFICATION_ID?.trim()
+const testNotificationTitle = process.env.TEST_NOTIFICATION_TITLE?.trim()
 const testNotificationMessage = process.env.TEST_NOTIFICATION_MESSAGE?.trim()
 const testNotificationMode = process.env.TEST_NOTIFICATION_MODE?.trim() === 'pagelle'
   ? 'match-rating' as const
@@ -47,6 +48,7 @@ const origin = 'https://bandeja-boys.web.app'
 if (!apiKey || !notifierEmail || !notifierPassword) throw new Error('Credenziali Firebase notifier mancanti.')
 if (!publicKey || !privateKey) throw new Error('VAPID keys mancanti.')
 if (testNotificationMessage && !testUserId) throw new Error('Un messaggio manuale richiede il destinatario.')
+if (testNotificationTitle && !testUserId) throw new Error('Un titolo manuale richiede il destinatario.')
 if (testNotificationMode === 'match-rating' && !testUserId) {
   throw new Error('Il collaudo pagelle richiede il destinatario.')
 }
@@ -101,6 +103,7 @@ const notifications = testUserId
       testNotificationId || String(Date.now()),
       testNotificationMessage,
       testNotificationMode,
+      testNotificationTitle,
     )]
   : collectScheduledNotifications(polls, Date.now(), ratingResponses, {
       messages: motivationalMessages,

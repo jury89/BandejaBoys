@@ -83,13 +83,26 @@ describe('pianificazione notifiche', () => {
   })
 
   it('accetta un messaggio manuale personalizzato e ne limita la lunghezza', () => {
-    expect(createTestNotification('michele', 'run-43', '  Sveglia fagianotto  ')).toMatchObject({
+    expect(createTestNotification(
+      'michele',
+      'run-43',
+      '  Sveglia fagianotto  ',
+      'standard',
+      '  Forza Michele  ',
+    )).toMatchObject({
       recipientUserIds: ['michele'],
-      title: 'Bandeja Boys',
+      title: 'Forza Michele',
       body: 'Sveglia fagianotto',
     })
     expect(() => createTestNotification('michele', 'run-44', 'x'.repeat(241)))
       .toThrow('Il messaggio di test supera i 240 caratteri.')
+    expect(() => createTestNotification(
+      'michele',
+      'run-44-title',
+      'Messaggio',
+      'standard',
+      'x'.repeat(81),
+    )).toThrow('Il titolo del test supera gli 80 caratteri.')
   })
 
   it('crea una vera push di collaudo che apre la pagella senza dati partita', () => {

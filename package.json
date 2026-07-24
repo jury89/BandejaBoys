@@ -10,6 +10,9 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
+    "db:get": "tsx scripts/firestore-read.ts get",
+    "db:query": "tsx scripts/firestore-read.ts query",
+    "push:send": "tsx scripts/push-send.ts",
     "notifications:send": "tsx scripts/send-notifications.ts",
     "notifications:typecheck": "tsc --noEmit -p tsconfig.notifications.json",
     "scheduler:check": "WRANGLER_LOG_PATH=.wrangler/wrangler.log wrangler deploy --config scheduler/wrangler.jsonc --dry-run",
@@ -27,6 +30,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@google-cloud/firestore": "^8.7.0",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",

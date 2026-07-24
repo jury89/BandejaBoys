@@ -74,6 +74,47 @@ npx firebase-tools deploy --only firestore:rules,firestore:indexes,hosting
 
 La configurazione Web Firebase non è un segreto: l'accesso ai dati è protetto da Authentication e da `firestore.rules`. Non inserire mai nel repository service account, token CLI o chiavi amministrative.
 
+## Query Firestore da terminale
+
+La CLI locale in [`scripts/firestore-read.ts`](scripts/firestore-read.ts) usa l’SDK ufficiale Google Cloud e offre esclusivamente operazioni di lettura. Non contiene comandi per creare, modificare o eliminare documenti. Per autenticare il proprio account Google Cloud una sola volta:
+
+```bash
+gcloud auth application-default login
+gcloud auth application-default set-quota-project bandeja-boys
+```
+
+Le credenziali Application Default restano fuori dal repository. Non scaricare né versionare service account. Esempi:
+
+```bash
+npm run db:get -- users/UID
+npm run db:query -- users --where displayName '==' Tommy
+npm run db:query -- notificationDeliveries --where kind '==' slot-ready --limit 10
+npm run db:query -- activityEvents \
+  --where type in '["signup_joined","signup_left"]' \
+  --order-by occurredAt desc \
+  --select type,actorName,occurredAt \
+  --json
+```
+
+`--where` può essere ripetuto e accetta gli operatori Firestore standard. Le query restituiscono al massimo 20 documenti per default e non possono superare 100; `--project` e `--database` permettono di puntare a un ambiente alternativo. `--json` elimina le intestazioni per facilitare pipe e trasformazioni. Foto profilo, endpoint push e chiavi delle sottoscrizioni vengono sempre oscurati nell’output.
+
+## Invio push da terminale
+
+`npm run push:send` apre una procedura interattiva: legge i nomi degli utenti da Firestore, mostra quanti dispositivi hanno le notifiche attive, fa scegliere destinatario, titolo e messaggio, quindi chiede una conferma esplicita prima dell’invio. La CLI non possiede le chiavi VAPID: usa `gh` per avviare il workflow GitHub esistente e, per default, attende la ricevuta del servizio push.
+
+```bash
+npm run push:send
+npm run push:send -- Tommy \
+  --title "Forza Tommy" \
+  --message "Rimettiti presto, vecchio rottame!"
+npm run push:send -- --to Luigi \
+  --title "Padel" \
+  --message "Ricordati di chiamare il campo" \
+  --yes
+```
+
+Il comando richiede le Application Default Credentials configurate per la CLI Firestore e una sessione `gh auth login` autorizzata sul repository. `--dry-run` mostra l’anteprima senza inviare; `--uid` distingue eventuali omonimi; `--no-wait` restituisce il controllo appena il workflow viene accodato. Titolo e messaggio sono limitati rispettivamente a 80 e 240 caratteri.
+
 ## Configurazione notifiche
 
 Le notifiche richiedono una coppia VAPID Web Push e un account Firebase Authentication tecnico verificato. L’account tecnico è riconosciuto dalle Security Rules tramite email verificata e può soltanto leggere sondaggi, sottoscrizioni ed esiti chiuso/inviato delle pagelle, scrivere le ricevute di consegna ed eliminare dispositivi scaduti; non può leggere i voti, creare o modificare partite.
@@ -85,7 +126,7 @@ Configurazione GitHub del repository:
 - secret `FIREBASE_NOTIFIER_EMAIL`;
 - secret `FIREBASE_NOTIFIER_PASSWORD`.
 
-Il Worker [`scheduler/worker.js`](scheduler/worker.js) parte ogni 10 minuti, ai minuti `00`, `10`, `20`, `30`, `40` e `50`, e usa `workflow_dispatch` per avviare [`.github/workflows/notifications.yml`](.github/workflows/notifications.yml). Questo evita i ritardi occasionali dei cron GitHub senza spostare su Cloudflare le credenziali Firebase o VAPID. Un nuovo slot resta in attesa per 10 minuti dall’ultima aggiunta ravvicinata: così la creazione iniziale di cinque slot genera un solo avviso, mentre uno slot aggiunto il giorno seguente genera un nuovo avviso. Il gruppo viene costruito sull’intera sequenza di creazione, così la sua identità non cambia quando gli elementi più vecchi superano la finestra temporale; l’avviso scade definitivamente un’ora dopo l’ultima aggiunta. Con la cadenza del Worker la consegna avviene normalmente tra 10 e 20 minuti dall’ultima aggiunta. Dopo che il servizio push accetta l’invio, `notificationDeliveries` salva anche il titolo e il testo effettivamente spediti, oltre a evento, destinatario, dispositivo e timestamp. L’avvio manuale senza parametri elabora la coda ordinaria; specificando `test_user_id` invia invece un’unica notifica ai dispositivi di quell’utente. Il campo facoltativo `test_message` permette di personalizzarne il testo fino a 240 caratteri. Selezionando `test_mode: pagelle`, la vera Web Push apre una pagella marcata **TEST** con gli stessi controlli della scheda reale: chiusura e completamento non scrivono voti, risposte o partite in Firestore.
+Il Worker [`scheduler/worker.js`](scheduler/worker.js) parte ogni 10 minuti, ai minuti `00`, `10`, `20`, `30`, `40` e `50`, e usa `workflow_dispatch` per avviare [`.github/workflows/notifications.yml`](.github/workflows/notifications.yml). Questo evita i ritardi occasionali dei cron GitHub senza spostare su Cloudflare le credenziali Firebase o VAPID. Un nuovo slot resta in attesa per 10 minuti dall’ultima aggiunta ravvicinata: così la creazione iniziale di cinque slot genera un solo avviso, mentre uno slot aggiunto il giorno seguente genera un nuovo avviso. Il gruppo viene costruito sull’intera sequenza di creazione, così la sua identità non cambia quando gli elementi più vecchi superano la finestra temporale; l’avviso scade definitivamente un’ora dopo l’ultima aggiunta. Con la cadenza del Worker la consegna avviene normalmente tra 10 e 20 minuti dall’ultima aggiunta. Dopo che il servizio push accetta l’invio, `notificationDeliveries` salva anche il titolo e il testo effettivamente spediti, oltre a evento, destinatario, dispositivo e timestamp. L’avvio manuale senza parametri elabora la coda ordinaria; specificando `test_user_id` invia invece un’unica notifica ai dispositivi di quell’utente. I campi facoltativi `test_title` e `test_message` permettono di personalizzare titolo e testo, rispettivamente fino a 80 e 240 caratteri. Selezionando `test_mode: pagelle`, la vera Web Push apre una pagella marcata **TEST** con gli stessi controlli della scheda reale: chiusura e completamento non scrivono voti, risposte o partite in Firestore.
 
 Ogni lunedì, nella prima esecuzione dalle **08:30 Europe/Rome**, ogni utente con almeno una sottoscrizione attiva riceve una frase motivazionale personale. Le 150 frasi sono salvate nel documento Firestore `notificationContent/mondayMotivation`; se il documento manca, il notifier lo inizializza con il catalogo versionato, mentre una versione più recente aggiorna automaticamente quello esistente. La scelta è pseudo-casuale e dipende da settimana e UID, quindi resta stabile sui diversi dispositivi e durante i retry, mentre `notificationDeliveries` impedisce un secondo invio nella stessa settimana.
 
@@ -106,9 +147,12 @@ Se il browser non restituisce l’esito del permesso entro 15 secondi, l’inter
 | Comando | Scopo |
 | --- | --- |
 | `npm run dev` | server locale con hot reload |
+| `npm run push:send` | sceglie un membro e invia una push personalizzata tramite GitHub Actions |
 | `npm run lint` | controllo statico del codice |
 | `npm test` | test unitari e di integrazione |
 | `npm run build` | typecheck e build di produzione |
+| `npm run db:get -- <percorso>` | legge un documento Firestore tramite credenziali Google Cloud locali |
+| `npm run db:query -- <collection>` | esegue una query Firestore read-only, con limite massimo di 100 documenti |
 | `npm run notifications:typecheck` | typecheck del processo notifiche |
 | `npm run notifications:send` | elabora manualmente la coda; richiede i secret |
 | `npm run scheduler:check` | valida e crea localmente il bundle del Worker senza pubblicarlo |
