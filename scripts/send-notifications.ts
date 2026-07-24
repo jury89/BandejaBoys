@@ -15,6 +15,10 @@ import {
 import webpush, { type PushSubscription } from 'web-push'
 import type { MatchRatingResponse, PadelPoll } from '../src/types'
 import {
+  MONDAY_MOTIVATIONAL_MESSAGES,
+  normalizeMotivationalMessages,
+} from '../src/lib/motivationalMessages'
+import {
   collectScheduledNotifications,
   createNotificationDelivery,
   createTestNotification,
@@ -52,10 +56,12 @@ await signInWithEmailAndPassword(getAuth(app), notifierEmail, notifierPassword)
 const db = getFirestore(app)
 webpush.setVapidDetails(origin, publicKey, privateKey)
 
-const [pollSnapshot, subscriptionSnapshot, ratingResponseSnapshot] = await Promise.all([
+const motivationReference = doc(db, 'notificationContent', 'mondayMotivation')
+const [pollSnapshot, subscriptionSnapshot, ratingResponseSnapshot, motivationSnapshot] = await Promise.all([
   getDocs(collection(db, 'polls')),
   getDocs(collection(db, 'pushSubscriptions')),
   getDocs(collection(db, 'matchRatingResponses')),
+  getDoc(motivationReference),
 ])
 
 const polls = pollSnapshot.docs.map((item) => ({ id: item.id, ...item.data() }) as PadelPoll)
@@ -68,6 +74,21 @@ const ratingResponses = ratingResponseSnapshot.docs.map((item) => ({
   id: item.id,
   ...item.data(),
 }) as MatchRatingResponse)
+const motivationalMessages = motivationSnapshot.exists()
+  ? normalizeMotivationalMessages(motivationSnapshot.data().messages)
+  : [...MONDAY_MOTIVATIONAL_MESSAGES]
+if (motivationalMessages.length === 0) {
+  throw new Error('Il documento notificationContent/mondayMotivation non contiene frasi valide.')
+}
+if (!motivationSnapshot.exists()) {
+  await setDoc(motivationReference, {
+    messages: motivationalMessages,
+    createdAt: serverTimestamp(),
+  })
+}
+const motivationRecipientUserIds = Array.from(new Set(
+  subscriptions.map((subscription) => subscription.data.userId),
+))
 const notifications = testUserId
   ? [createTestNotification(
       testUserId,
@@ -75,7 +96,10 @@ const notifications = testUserId
       testNotificationMessage,
       testNotificationMode,
     )]
-  : collectScheduledNotifications(polls, Date.now(), ratingResponses)
+  : collectScheduledNotifications(polls, Date.now(), ratingResponses, {
+      messages: motivationalMessages,
+      recipientUserIds: motivationRecipientUserIds,
+    })
 
 let sent = 0
 let skipped = 0

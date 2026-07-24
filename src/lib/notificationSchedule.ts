@@ -18,9 +18,15 @@ export const SLOT_READY_NOTIFICATION_WINDOW_MS = DAY_MS
 export const BOOKING_REMINDER_LEAD_MS = 7 * DAY_MS
 export const BOOKING_REMINDER_WINDOW_MS = DAY_MS
 export const MATCH_RATING_NOTIFICATION_WINDOW_MS = 30 * 60 * 1000
+export const MONDAY_MOTIVATION_WINDOW_MS = HOUR_MS
 
-export type NotificationKind = 'new-slots' | 'slot-ready' | 'booking-reminder-7d' | 'reminder-24h' | 'reminder-2h' | 'match-rating' | 'test'
+export type NotificationKind = 'new-slots' | 'slot-ready' | 'booking-reminder-7d' | 'reminder-24h' | 'reminder-2h' | 'match-rating' | 'monday-motivation' | 'test'
 export type TestNotificationMode = 'standard' | 'match-rating'
+
+export interface MondayMotivationSchedule {
+  messages: readonly string[]
+  recipientUserIds: readonly string[]
+}
 
 export interface ScheduledNotification {
   id: string
@@ -128,6 +134,64 @@ function collectNewSlotNotifications(poll: PadelPoll, now: number): ScheduledNot
   })
 }
 
+function romeDateTimeParts(now: number): Record<string, string> {
+  return Object.fromEntries(new Intl.DateTimeFormat('en-GB', {
+    weekday: 'short',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+    timeZone: 'Europe/Rome',
+  }).formatToParts(new Date(now)).map(({ type, value }) => [type, value]))
+}
+
+export function isMondayMotivationWindow(now = Date.now()): boolean {
+  const parts = romeDateTimeParts(now)
+  const minuteOfDay = Number(parts.hour) * 60 + Number(parts.minute)
+  return parts.weekday === 'Mon'
+    && minuteOfDay >= 8 * 60 + 30
+    && minuteOfDay < 8 * 60 + 30 + MONDAY_MOTIVATION_WINDOW_MS / 60_000
+}
+
+function stableMessageIndex(seed: string, messageCount: number): number {
+  let hash = 2_166_136_261
+  for (let index = 0; index < seed.length; index += 1) {
+    hash ^= seed.charCodeAt(index)
+    hash = Math.imul(hash, 16_777_619)
+  }
+  return (hash >>> 0) % messageCount
+}
+
+function collectMondayMotivationNotifications(
+  now: number,
+  schedule?: MondayMotivationSchedule,
+): ScheduledNotification[] {
+  if (!schedule || !isMondayMotivationWindow(now)) return []
+
+  const messages = Array.from(new Set(schedule.messages.map((message) => message.trim()).filter(Boolean)))
+  const recipientUserIds = Array.from(new Set(
+    schedule.recipientUserIds.map((userId) => userId.trim()).filter(Boolean),
+  )).sort()
+  if (messages.length === 0 || recipientUserIds.length === 0) return []
+
+  const parts = romeDateTimeParts(now)
+  const mondayKey = `${parts.year}-${parts.month}-${parts.day}`
+
+  return recipientUserIds.map((userId) => ({
+    id: `monday-motivation:${mondayKey}`,
+    kind: 'monday-motivation',
+    title: 'Buon lunedì, bestia!',
+    body: messages[stableMessageIndex(`${mondayKey}:${userId}`, messages.length)],
+    url: '/',
+    tag: `monday-motivation-${mondayKey}`,
+    ttlSeconds: 12 * 60 * 60,
+    recipientUserIds: [userId],
+    excludedUserIds: [],
+  }))
+}
+
 export function createTestNotification(
   userId: string,
   eventId: string,
@@ -163,8 +227,9 @@ export function collectScheduledNotifications(
   polls: PadelPoll[],
   now = Date.now(),
   ratingResponses: MatchRatingResponse[] = [],
+  mondayMotivation?: MondayMotivationSchedule,
 ): ScheduledNotification[] {
-  const notifications: ScheduledNotification[] = []
+  const notifications = collectMondayMotivationNotifications(now, mondayMotivation)
   const closedRatingPromptIds = new Set(ratingResponses.map((response) => response.id))
 
   for (const poll of polls) {

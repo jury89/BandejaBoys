@@ -9,6 +9,7 @@ import {
   collectScheduledNotifications,
   createNotificationDelivery,
   createTestNotification,
+  isMondayMotivationWindow,
 } from './notificationSchedule'
 
 const NOW = Date.parse('2026-07-20T18:00:00.000Z')
@@ -109,6 +110,53 @@ describe('pianificazione notifiche', () => {
       body: 'Apri il test',
       url: '/?ratingTest=1',
     })
+  })
+
+  it('manda una frase motivazionale personale il lunedì mattina a ogni utente', () => {
+    const mondayMorning = Date.parse('2026-07-27T06:33:00.000Z')
+    const schedule = {
+      messages: ['Spacca tutto.', 'Sei una roccia.', 'Vai fortissimo.'],
+      recipientUserIds: [' jury ', 'ale', 'jury', ''],
+    }
+
+    const first = collectScheduledNotifications([], mondayMorning, [], schedule)
+    const retry = collectScheduledNotifications([], mondayMorning + 10 * 60 * 1000, [], schedule)
+
+    expect(first).toHaveLength(2)
+    expect(first.map((notification) => notification.recipientUserIds)).toEqual([['ale'], ['jury']])
+    expect(first.every((notification) => schedule.messages.includes(notification.body))).toBe(true)
+    expect(first[0]).toMatchObject({
+      id: 'monday-motivation:2026-07-27',
+      kind: 'monday-motivation',
+      title: 'Buon lunedì, bestia!',
+      url: '/',
+      tag: 'monday-motivation-2026-07-27',
+      ttlSeconds: 12 * 60 * 60,
+      excludedUserIds: [],
+    })
+    expect(retry).toEqual(first)
+  })
+
+  it('rispetta le 08:30 di Roma sia in ora legale sia in ora solare', () => {
+    expect(isMondayMotivationWindow(Date.parse('2026-07-27T06:29:00.000Z'))).toBe(false)
+    expect(isMondayMotivationWindow(Date.parse('2026-07-27T06:30:00.000Z'))).toBe(true)
+    expect(isMondayMotivationWindow(Date.parse('2026-07-27T07:29:00.000Z'))).toBe(true)
+    expect(isMondayMotivationWindow(Date.parse('2026-07-27T07:30:00.000Z'))).toBe(false)
+    expect(isMondayMotivationWindow(Date.parse('2026-01-05T07:30:00.000Z'))).toBe(true)
+    expect(isMondayMotivationWindow(Date.parse('2026-07-28T06:30:00.000Z'))).toBe(false)
+  })
+
+  it('non pianifica la motivazione senza frasi o destinatari validi', () => {
+    const mondayMorning = Date.parse('2026-07-27T06:33:00.000Z')
+
+    expect(collectScheduledNotifications([], mondayMorning, [], {
+      messages: [],
+      recipientUserIds: ['jury'],
+    })).toHaveLength(0)
+    expect(collectScheduledNotifications([], mondayMorning, [], {
+      messages: ['Forza!'],
+      recipientUserIds: ['  '],
+    })).toHaveLength(0)
   })
 
   it('raggruppa cinque slot creati insieme in una sola notifica', () => {

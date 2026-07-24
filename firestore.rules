@@ -111,13 +111,21 @@ service cloud.firestore {
         && request.resource.data.eventId is string
         && request.resource.data.kind in [
           'new-slots', 'slot-ready', 'booking-reminder-7d',
-          'reminder-24h', 'reminder-2h', 'match-rating', 'test'
+          'reminder-24h', 'reminder-2h', 'match-rating',
+          'monday-motivation', 'test'
         ]
         && request.resource.data.title is string
         && request.resource.data.body is string
         && request.resource.data.userId is string
         && request.resource.data.subscriptionId is string
         && request.resource.data.sentAt == request.time;
+    }
+
+    function validMondayMotivationContent() {
+      return request.resource.data.keys().hasOnly(['messages', 'createdAt'])
+        && request.resource.data.messages is list
+        && request.resource.data.messages.size() == 100
+        && request.resource.data.createdAt == request.time;
     }
 
     function validSlotView() {
@@ -188,6 +196,15 @@ service cloud.firestore {
     match /notificationDeliveries/{deliveryId} {
       allow read: if isNotifier();
       allow create: if isNotifier() && validNotificationDelivery();
+      allow update, delete: if false;
+    }
+
+    match /notificationContent/{contentId} {
+      allow get: if isNotifier() && contentId == 'mondayMotivation';
+      allow list: if false;
+      allow create: if isNotifier()
+        && contentId == 'mondayMotivation'
+        && validMondayMotivationContent();
       allow update, delete: if false;
     }
 
