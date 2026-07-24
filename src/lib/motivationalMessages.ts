@@ -188,16 +188,6 @@ export function normalizeMotherNamesByRecipient(value: unknown): Record<string, 
     }))
 }
 
-function startsWithVowel(value: string): boolean {
-  const firstLetter = value
-    .normalize('NFD')
-    .replace(/\p{M}/gu, '')
-    .trim()
-    .charAt(0)
-    .toLocaleLowerCase('it-IT')
-  return 'aeiou'.includes(firstLetter)
-}
-
 function preserveInitialCase(source: string, replacement: string): string {
   return source.charAt(0) === source.charAt(0).toLocaleUpperCase('it-IT')
     ? replacement.charAt(0).toLocaleUpperCase('it-IT') + replacement.slice(1)
@@ -215,9 +205,8 @@ export function personalizeMotivationalMessage(
   const motherName = normalizedDirectory[normalizePersonLookupKey(recipientDisplayName)]
   if (!motherName) return message
 
-  const elidedArticle = startsWithVowel(motherName)
-  const directReference = elidedArticle ? `l’${motherName}` : `la ${motherName}`
-  const indirectReference = elidedArticle ? `dell’${motherName}` : `della ${motherName}`
+  const directReference = `la ${motherName}`
+  const indirectReference = `della ${motherName}`
 
   return message
     .replace(/di tua madre/giu, (match) => preserveInitialCase(match, indirectReference))

@@ -78,12 +78,12 @@ describe('frasi motivazionali del lunedì', () => {
       'Tua madre si aspetta di più da te.',
       'MICHELE',
       directory,
-    )).toBe('L’Ada si aspetta di più da te.')
+    )).toBe('La Ada si aspetta di più da te.')
     expect(personalizeMotivationalMessage(
       'Quella santa donna di tua madre ti giudica.',
       'Michele',
       directory,
-    )).toBe('Quella santa donna dell’Ada ti giudica.')
+    )).toBe('Quella santa donna della Ada ti giudica.')
   })
 
   it('lascia il testo generico quando il nome non è configurato', () => {
