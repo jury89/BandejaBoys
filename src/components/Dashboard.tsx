@@ -27,6 +27,7 @@ import { NotificationCallup } from './NotificationCallup'
 import { PollCard, type PollSlotFilter } from './PollCard'
 import { ProfileAvatar } from './ProfileAvatar'
 import { ProfileModal } from './ProfileModal'
+import { PullToRefresh } from './PullToRefresh'
 
 type FeedFilter = PollSlotFilter
 type DashboardView = 'feed' | 'matches'
@@ -358,6 +359,7 @@ export function Dashboard() {
 
   return (
     <div className="app-shell">
+      {dashboardView === 'feed' && <PullToRefresh />}
       <header className="topbar">
         <Brand compact />
         <div className="account-menu" ref={accountMenuRef}>
