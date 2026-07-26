@@ -90,4 +90,32 @@ describe('cronologia dello slot', () => {
     expect(await screen.findByText('Nessuna modifica registrata')).toBeInTheDocument()
     expect(screen.getByText(/precedenti all’introduzione della cronologia/)).toBeInTheDocument()
   })
+
+  it('mostra una sostituzione storica ricostruita dal dato ancora presente nello slot', async () => {
+    const substitutedAt = Date.UTC(2026, 6, 21, 13, 8, 19)
+    const legacySlot: PadelSlot = {
+      ...slot,
+      signups: [{
+        id: 'signup-dade',
+        userId: 'dade',
+        displayName: 'Dade',
+        joinedAt: substitutedAt,
+        substitutedFor: {
+          userId: 'tommy',
+          displayName: 'Tommy',
+          at: substitutedAt,
+        },
+      }],
+    }
+    vi.spyOn(repository, 'getSlotActivity').mockResolvedValue([])
+
+    render(<SlotActivityModal poll={poll} slot={legacySlot} onClose={vi.fn()} />)
+
+    const timeline = await screen.findByRole('list', { name: 'Cronologia delle modifiche dello slot' })
+    const item = within(timeline).getByRole('listitem')
+    expect(within(item).getByText('Sostituzione del titolare')).toBeInTheDocument()
+    expect(within(item).getByText('Dade ha preso il posto di Tommy.')).toBeInTheDocument()
+    expect(within(item).getByText('Tommy')).toBeInTheDocument()
+    expect(item.querySelector('time')).toHaveTextContent('21 lug 2026 · 15:08:19')
+  })
 })

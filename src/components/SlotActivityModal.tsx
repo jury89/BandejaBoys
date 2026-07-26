@@ -14,7 +14,11 @@ import {
   UserRoundPlus,
 } from 'lucide-react'
 import type { PadelPoll, PadelSlot } from '../types'
-import type { ActivityEventType, LocalActivityEvent } from '../lib/activity'
+import {
+  mergeLegacySubstitutionEvents,
+  type ActivityEventType,
+  type LocalActivityEvent,
+} from '../lib/activity'
 import { PADEL_TIME_ZONE, slotDateParts } from '../lib/format'
 import { repository } from '../lib/repository'
 import { Modal } from './Modal'
@@ -170,6 +174,9 @@ export function SlotActivityModal({ poll, slot, onClose }: SlotActivityModalProp
   const [error, setError] = useState<string | null>(null)
   const [requestVersion, setRequestVersion] = useState(0)
   const slotDate = slotDateParts(slot.startsAt)
+  const displayedEvents = events
+    ? mergeLegacySubstitutionEvents(events, poll, slot)
+    : null
 
   useEffect(() => {
     let active = true
@@ -199,8 +206,8 @@ export function SlotActivityModal({ poll, slot, onClose }: SlotActivityModalProp
           <div>
             <strong>Registro delle modifiche</strong>
             <p>
-              {events
-                ? `${events.length} ${events.length === 1 ? 'evento registrato' : 'eventi registrati'}, dal più recente.`
+              {displayedEvents
+                ? `${displayedEvents.length} ${displayedEvents.length === 1 ? 'evento registrato' : 'eventi registrati'}, dal più recente.`
                 : 'Recuperiamo le modifiche, gli autori e gli orari registrati.'}
             </p>
           </div>
@@ -231,7 +238,7 @@ export function SlotActivityModal({ poll, slot, onClose }: SlotActivityModalProp
           </div>
         )}
 
-        {events?.length === 0 && (
+        {displayedEvents?.length === 0 && (
           <div className="slot-activity__state slot-activity__state--empty">
             <Clock3 size={26} aria-hidden="true" />
             <strong>Nessuna modifica registrata</strong>
@@ -239,9 +246,9 @@ export function SlotActivityModal({ poll, slot, onClose }: SlotActivityModalProp
           </div>
         )}
 
-        {events && events.length > 0 && (
+        {displayedEvents && displayedEvents.length > 0 && (
           <ol className="slot-activity__timeline" aria-label="Cronologia delle modifiche dello slot">
-            {events.map((event) => {
+            {displayedEvents.map((event) => {
               const presentation = activityPresentation(event)
               const EventIcon = presentation.icon
               return (

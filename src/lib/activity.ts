@@ -47,6 +47,8 @@ export interface LocalSlotView {
   viewCount: number
 }
 
+const LEGACY_SUBSTITUTION_MATCH_WINDOW_MS = 5 * 60 * 1000
+
 export function makeActivityEvent(
   type: ActivityEventType,
   actor: Pick<SessionUser, 'id' | 'displayName'>,
@@ -63,6 +65,47 @@ export function makeActivityEvent(
     ...(slot ? { slotId: slot.id, slotStartsAt: slot.startsAt } : {}),
     details,
   }
+}
+
+export function mergeLegacySubstitutionEvents(
+  events: LocalActivityEvent[],
+  poll: Pick<PadelPoll, 'id' | 'title'>,
+  slot: PadelSlot,
+): LocalActivityEvent[] {
+  const recovered = slot.signups.flatMap((signup) => {
+    const substitution = signup.substitutedFor
+    if (!substitution) return []
+
+    const alreadyRecorded = events.some((event) => (
+      event.type === 'starter_substituted'
+      && event.details.outgoingUserId === substitution.userId
+      && event.details.replacementUserId === signup.userId
+      && Math.abs(event.occurredAt - substitution.at) <= LEGACY_SUBSTITUTION_MATCH_WINDOW_MS
+    ))
+    if (alreadyRecorded) return []
+
+    return [{
+      id: `legacy-substitution:${slot.id}:${signup.id}:${substitution.at}`,
+      type: 'starter_substituted' as const,
+      actorId: substitution.userId,
+      actorName: substitution.displayName,
+      pollId: poll.id,
+      pollTitle: poll.title,
+      slotId: slot.id,
+      slotStartsAt: slot.startsAt,
+      occurredAt: substitution.at,
+      details: {
+        outgoingUserId: substitution.userId,
+        outgoingName: substitution.displayName,
+        replacementUserId: signup.userId,
+        replacementName: signup.displayName,
+        recoveredFromSlot: true,
+      },
+    }]
+  })
+
+  return [...events, ...recovered]
+    .sort((left, right) => right.occurredAt - left.occurredAt || right.id.localeCompare(left.id))
 }
 
 export function slotViewDocumentId(pollId: string, slotId: string, userId: string): string {
