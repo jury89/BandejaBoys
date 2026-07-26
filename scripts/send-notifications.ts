@@ -17,6 +17,7 @@ import type { MatchRatingResponse, MemberProfile, PadelPoll } from '../src/types
 import {
   MONDAY_MOTIVATIONAL_CATALOG_VERSION,
   normalizeMotherNamesByRecipient,
+  normalizeMotherNamesByUserId,
   resolveMotivationalCatalog,
 } from '../src/lib/motivationalMessages'
 import {
@@ -77,17 +78,20 @@ const db = getFirestore(app)
 webpush.setVapidDetails(origin, publicKey, privateKey)
 
 const motivationReference = doc(db, 'notificationContent', 'mondayMotivation')
+const motherNamesReference = doc(db, 'notificationContent', 'motherNames')
 const [
   pollSnapshot,
   subscriptionSnapshot,
   ratingResponseSnapshot,
   motivationSnapshot,
+  motherNamesSnapshot,
   userSnapshot,
 ] = await Promise.all([
   getDocs(collection(db, 'polls')),
   getDocs(collection(db, 'pushSubscriptions')),
   getDocs(collection(db, 'matchRatingResponses')),
   getDoc(motivationReference),
+  getDoc(motherNamesReference),
   getDocs(collection(db, 'users')),
 ])
 
@@ -110,6 +114,11 @@ const notificationPreferencesByUserId = new Map(
 const storedMotivationData = motivationSnapshot.exists()
   ? motivationSnapshot.data()
   : undefined
+const motherNamesByUserId = normalizeMotherNamesByUserId(
+  motherNamesSnapshot.exists()
+    ? motherNamesSnapshot.data().namesByUserId
+    : undefined,
+)
 const {
   messages: motivationalMessages,
   needsWrite: motivationNeedsWrite,
@@ -142,6 +151,7 @@ const notifications = testUserId
       recipientUserIds: motivationRecipientUserIds,
       recipientDisplayNamesByUserId,
       motherNamesByRecipient,
+      motherNamesByUserId,
     })
 
 let sent = 0

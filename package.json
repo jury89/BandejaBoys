@@ -12,6 +12,8 @@
     "test:watch": "vitest",
     "db:get": "tsx scripts/firestore-read.ts get",
     "db:query": "tsx scripts/firestore-read.ts query",
+    "mother-names:list": "tsx scripts/mother-names.ts list",
+    "mother-names:set": "tsx scripts/mother-names.ts set",
     "push:send": "tsx scripts/push-send.ts",
     "notifications:send": "tsx scripts/send-notifications.ts",
     "notifications:typecheck": "tsc --noEmit -p tsconfig.notifications.json",

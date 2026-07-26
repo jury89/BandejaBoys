@@ -2,9 +2,12 @@ import { describe, expect, it } from 'vitest'
 import {
   MONDAY_MOTIVATIONAL_CATALOG_VERSION,
   MONDAY_MOTIVATIONAL_MESSAGES,
+  normalizeMotherName,
   normalizeMotherNamesByRecipient,
+  normalizeMotherNamesByUserId,
   normalizeMotivationalMessages,
   personalizeMotivationalMessage,
+  personalizeMotivationalMessageWithMotherName,
   resolveMotivationalCatalog,
 } from './motivationalMessages'
 
@@ -58,6 +61,17 @@ describe('frasi motivazionali del lunedì', () => {
     })
   })
 
+  it('normalizza gli abbinamenti privati per UID e rimuove l’articolo già gestito dal testo', () => {
+    expect(normalizeMotherName('  La Lori  ')).toBe('Lori')
+    expect(normalizeMotherNamesByUserId({
+      ' user-1 ': ' La Lori ',
+      'uid/non-valido': 'Ada',
+      'user-2': 42,
+    })).toEqual({
+      'user-1': 'Lori',
+    })
+  })
+
   it('sostituisce tua madre usando articoli e preposizioni corretti', () => {
     const directory = {
       'marco rossi': 'Giulia',
@@ -84,6 +98,10 @@ describe('frasi motivazionali del lunedì', () => {
       'Michele',
       directory,
     )).toBe('Quella santa donna della Ada ti giudica.')
+    expect(personalizeMotivationalMessageWithMotherName(
+      'Tua madre oggi fa il tifo per te.',
+      'La Lori',
+    )).toBe('La Lori oggi fa il tifo per te.')
   })
 
   it('lascia il testo generico quando il nome non è configurato', () => {

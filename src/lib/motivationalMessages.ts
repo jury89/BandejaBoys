@@ -163,6 +163,7 @@ export function normalizeMotivationalMessages(value: unknown): string[] {
 }
 
 export type MotherNamesByRecipient = Readonly<Record<string, string>>
+export type MotherNamesByUserId = Readonly<Record<string, string>>
 
 function normalizePersonLookupKey(value: string): string {
   return value
@@ -178,13 +179,36 @@ export function normalizeMotherNamesByRecipient(value: unknown): Record<string, 
 
   return Object.fromEntries(Object.entries(value)
     .flatMap(([recipientName, motherName]) => {
-      if (typeof motherName !== 'string') return []
-
       const lookupKey = normalizePersonLookupKey(recipientName)
-      const cleanMotherName = motherName.trim().replace(/\s+/g, ' ')
-      if (!lookupKey || !cleanMotherName || cleanMotherName.length > 40) return []
+      const cleanMotherName = normalizeMotherName(motherName)
+      if (!lookupKey || !cleanMotherName) return []
 
       return [[lookupKey, cleanMotherName]]
+    }))
+}
+
+export function normalizeMotherName(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined
+
+  const cleanName = value
+    .trim()
+    .replace(/\s+/g, ' ')
+    .replace(/^la\s+/iu, '')
+    .trim()
+
+  return cleanName && cleanName.length <= 40 ? cleanName : undefined
+}
+
+export function normalizeMotherNamesByUserId(value: unknown): Record<string, string> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
+
+  return Object.fromEntries(Object.entries(value)
+    .flatMap(([userIdValue, motherName]) => {
+      const userId = userIdValue.trim()
+      const cleanMotherName = normalizeMotherName(motherName)
+      if (!/^[A-Za-z0-9_-]{1,128}$/.test(userId) || !cleanMotherName) return []
+
+      return [[userId, cleanMotherName]]
     }))
 }
 
@@ -192,6 +216,21 @@ function preserveInitialCase(source: string, replacement: string): string {
   return source.charAt(0) === source.charAt(0).toLocaleUpperCase('it-IT')
     ? replacement.charAt(0).toLocaleUpperCase('it-IT') + replacement.slice(1)
     : replacement
+}
+
+export function personalizeMotivationalMessageWithMotherName(
+  message: string,
+  motherName: unknown,
+): string {
+  const cleanMotherName = normalizeMotherName(motherName)
+  if (!cleanMotherName) return message
+
+  const directReference = `la ${cleanMotherName}`
+  const indirectReference = `della ${cleanMotherName}`
+
+  return message
+    .replace(/di tua madre/giu, (match) => preserveInitialCase(match, indirectReference))
+    .replace(/tua madre/giu, (match) => preserveInitialCase(match, directReference))
 }
 
 export function personalizeMotivationalMessage(
@@ -205,12 +244,7 @@ export function personalizeMotivationalMessage(
   const motherName = normalizedDirectory[normalizePersonLookupKey(recipientDisplayName)]
   if (!motherName) return message
 
-  const directReference = `la ${motherName}`
-  const indirectReference = `della ${motherName}`
-
-  return message
-    .replace(/di tua madre/giu, (match) => preserveInitialCase(match, indirectReference))
-    .replace(/tua madre/giu, (match) => preserveInitialCase(match, directReference))
+  return personalizeMotivationalMessageWithMotherName(message, motherName)
 }
 
 export interface MotivationalCatalogResolution {

@@ -16,7 +16,9 @@ import {
 import { pollWeekTitle } from './format'
 import {
   type MotherNamesByRecipient,
+  type MotherNamesByUserId,
   personalizeMotivationalMessage,
+  personalizeMotivationalMessageWithMotherName,
 } from './motivationalMessages'
 import { normalizeNotificationPreferences } from './notificationPreferences'
 
@@ -56,6 +58,7 @@ export interface MondayMotivationSchedule {
   recipientUserIds: readonly string[]
   recipientDisplayNamesByUserId?: Readonly<Record<string, string>>
   motherNamesByRecipient?: MotherNamesByRecipient
+  motherNamesByUserId?: MotherNamesByUserId
 }
 
 export interface ScheduledNotification {
@@ -266,7 +269,10 @@ function collectMondayMotivationNotifications(
       kind: 'monday-motivation',
       title: 'Buon lunedì, bestia!',
       body: personalizeMotivationalMessage(
-        message,
+        personalizeMotivationalMessageWithMotherName(
+          message,
+          schedule.motherNamesByUserId?.[userId],
+        ),
         schedule.recipientDisplayNamesByUserId?.[userId],
         schedule.motherNamesByRecipient,
       ),

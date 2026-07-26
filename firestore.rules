@@ -230,7 +230,8 @@ service cloud.firestore {
     }
 
     match /notificationContent/{contentId} {
-      allow get: if isNotifier() && contentId == 'mondayMotivation';
+      allow get: if isNotifier()
+        && contentId in ['mondayMotivation', 'motherNames'];
       allow list: if false;
       allow create: if isNotifier()
         && contentId == 'mondayMotivation'

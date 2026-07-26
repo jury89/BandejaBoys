@@ -207,6 +207,26 @@ describe('pianificazione notifiche', () => {
     ])
   })
 
+  it('dà precedenza all’abbinamento privato per UID senza dipendere dal nome visibile', () => {
+    const mondayMorning = Date.parse('2026-07-27T06:33:00.000Z')
+    const notifications = collectScheduledNotifications([], mondayMorning, [], {
+      messages: ['Spacca tutto: tua madre ha bisogno di una prova.'],
+      recipientUserIds: ['player-1'],
+      recipientDisplayNamesByUserId: {
+        'player-1': 'Soprannome diverso',
+      },
+      motherNamesByRecipient: {
+        'soprannome diverso': 'Nome precedente',
+      },
+      motherNamesByUserId: {
+        'player-1': 'Lori',
+      },
+    })
+
+    expect(notifications[0]?.body)
+      .toBe('Spacca tutto: la Lori ha bisogno di una prova.')
+  })
+
   it('ricava dai sondaggi il nome più recente associato a ogni UID', () => {
     const names = collectPollDisplayNamesByUserId([{
       ...poll([]),
