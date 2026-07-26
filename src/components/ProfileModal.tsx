@@ -45,6 +45,12 @@ const NOTIFICATION_OPTIONS: {
     icon: CheckCircle2,
   },
   {
+    key: 'starterSubstitution',
+    title: 'Sostituzioni',
+    description: 'Quando qualcuno ti passa un posto da titolare.',
+    icon: UserRound,
+  },
+  {
     key: 'bookingReminder7d',
     title: 'Campo da prenotare',
     description: 'Il promemoria una settimana prima.',

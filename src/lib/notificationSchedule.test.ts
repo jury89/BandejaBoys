@@ -6,6 +6,7 @@ import {
   NEW_SLOT_NOTIFICATION_WINDOW_MS,
   NEW_SLOT_QUIET_PERIOD_MS,
   SLOT_READY_NOTIFICATION_WINDOW_MS,
+  STARTER_SUBSTITUTION_NOTIFICATION_WINDOW_MS,
   collectPollDisplayNamesByUserId,
   collectScheduledNotifications,
   createNotificationDelivery,
@@ -21,6 +22,7 @@ describe('preferenze notifiche', () => {
     expect(isNotificationKindEnabled('monday-motivation')).toBe(true)
     expect(isNotificationKindEnabled('new-slots')).toBe(true)
     expect(isNotificationKindEnabled('slot-ready')).toBe(true)
+    expect(isNotificationKindEnabled('starter-substitution')).toBe(true)
     expect(isNotificationKindEnabled('booking-reminder-7d')).toBe(true)
     expect(isNotificationKindEnabled('reminder-24h')).toBe(true)
     expect(isNotificationKindEnabled('reminder-2h')).toBe(true)
@@ -32,6 +34,7 @@ describe('preferenze notifiche', () => {
       mondayMotivation: false,
       newSlots: true,
       slotReady: false,
+      starterSubstitution: false,
       bookingReminder7d: true,
       reminder24h: false,
       reminder2h: true,
@@ -41,6 +44,7 @@ describe('preferenze notifiche', () => {
     expect(isNotificationKindEnabled('monday-motivation', preferences)).toBe(false)
     expect(isNotificationKindEnabled('new-slots', preferences)).toBe(true)
     expect(isNotificationKindEnabled('slot-ready', preferences)).toBe(false)
+    expect(isNotificationKindEnabled('starter-substitution', preferences)).toBe(false)
     expect(isNotificationKindEnabled('booking-reminder-7d', preferences)).toBe(true)
     expect(isNotificationKindEnabled('reminder-24h', preferences)).toBe(false)
     expect(isNotificationKindEnabled('reminder-2h', preferences)).toBe(true)
@@ -429,6 +433,94 @@ describe('pianificazione notifiche', () => {
     expect(collectScheduledNotifications([poll([slot(future, players)])], NOW)).toHaveLength(0)
     expect(collectScheduledNotifications([
       poll([slot(future, incomplete, false)]),
+    ], NOW)).toHaveLength(0)
+  })
+
+  it('avvisa soltanto il sostituto quando diventa il nuovo titolare', () => {
+    const future = new Date(NOW + 8 * 24 * 60 * 60 * 1000).toISOString()
+    const substitutedAt = NOW - 3 * 60 * 1000
+    const players = [
+      signup('jury', NOW - 5 * 60 * 1000),
+      signup('baru', NOW - 4 * 60 * 1000),
+      signup('brescio', NOW - 3 * 60 * 1000),
+      {
+        ...signup('dade', NOW - 2 * 60 * 1000),
+        substitutedFor: {
+          userId: 'tommy',
+          displayName: 'Tommy',
+          at: substitutedAt,
+        },
+      },
+    ]
+
+    const notifications = collectScheduledNotifications([
+      poll([slot(future, players)]),
+    ], NOW)
+
+    expect(notifications).toHaveLength(1)
+    expect(notifications[0]).toMatchObject({
+      id: `starter-substitution:poll-1:slot-1:dade:${substitutedAt}`,
+      kind: 'starter-substitution',
+      title: 'Sei il nuovo titolare!',
+      body: expect.stringContaining('Hai preso il posto di Tommy'),
+      recipientUserIds: ['dade'],
+      excludedUserIds: [],
+      url: '/?poll=poll-1',
+    })
+    expect(notifications[0].body).toContain('Sei convocato: ci vediamo in campo!')
+  })
+
+  it('non duplica al sostituto l’avviso di una formazione già completa', () => {
+    const future = new Date(NOW + 8 * 24 * 60 * 60 * 1000).toISOString()
+    const completedAt = NOW - 5 * 60 * 1000
+    const substitutedAt = NOW - 60 * 1000
+    const players = [
+      signup('jury', NOW - 8 * 60 * 1000),
+      signup('baru', NOW - 7 * 60 * 1000),
+      signup('brescio', NOW - 6 * 60 * 1000),
+      {
+        ...signup('dade', completedAt),
+        substitutedFor: {
+          userId: 'tommy',
+          displayName: 'Tommy',
+          at: substitutedAt,
+        },
+      },
+    ]
+
+    const notifications = collectScheduledNotifications([
+      poll([slot(future, players, false)]),
+    ], NOW)
+    const substitution = notifications.find((item) => item.kind === 'starter-substitution')
+    const formationReady = notifications.find((item) => item.kind === 'slot-ready')
+
+    expect(substitution?.recipientUserIds).toEqual(['dade'])
+    expect(formationReady?.recipientUserIds).toEqual(['jury', 'baru', 'brescio'])
+  })
+
+  it('non recupera sostituzioni vecchie o relative a slot già iniziati', () => {
+    const oldSubstitution = {
+      ...signup('dade', NOW - 2 * 60 * 1000),
+      substitutedFor: {
+        userId: 'tommy',
+        displayName: 'Tommy',
+        at: NOW - STARTER_SUBSTITUTION_NOTIFICATION_WINDOW_MS,
+      },
+    }
+    const future = new Date(NOW + 8 * 24 * 60 * 60 * 1000).toISOString()
+    const past = new Date(NOW - 60 * 1000).toISOString()
+
+    expect(collectScheduledNotifications([
+      poll([slot(future, [oldSubstitution])]),
+    ], NOW)).toHaveLength(0)
+    expect(collectScheduledNotifications([
+      poll([slot(past, [{
+        ...oldSubstitution,
+        substitutedFor: {
+          ...oldSubstitution.substitutedFor,
+          at: NOW - 60 * 1000,
+        },
+      }])]),
     ], NOW)).toHaveLength(0)
   })
 

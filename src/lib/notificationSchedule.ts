@@ -27,17 +27,19 @@ const DAY_MS = 24 * HOUR_MS
 export const NEW_SLOT_NOTIFICATION_WINDOW_MS = HOUR_MS
 export const NEW_SLOT_QUIET_PERIOD_MS = 10 * 60 * 1000
 export const SLOT_READY_NOTIFICATION_WINDOW_MS = DAY_MS
+export const STARTER_SUBSTITUTION_NOTIFICATION_WINDOW_MS = DAY_MS
 export const BOOKING_REMINDER_LEAD_MS = 7 * DAY_MS
 export const BOOKING_REMINDER_WINDOW_MS = DAY_MS
 export const MATCH_RATING_NOTIFICATION_WINDOW_MS = 30 * 60 * 1000
 export const MONDAY_MOTIVATION_WINDOW_MS = HOUR_MS
 
-export type NotificationKind = 'new-slots' | 'slot-ready' | 'booking-reminder-7d' | 'reminder-24h' | 'reminder-2h' | 'match-rating' | 'monday-motivation' | 'test'
+export type NotificationKind = 'new-slots' | 'slot-ready' | 'starter-substitution' | 'booking-reminder-7d' | 'reminder-24h' | 'reminder-2h' | 'match-rating' | 'monday-motivation' | 'test'
 export type TestNotificationMode = 'standard' | 'match-rating'
 
 const NOTIFICATION_PREFERENCE_BY_KIND = {
   'new-slots': 'newSlots',
   'slot-ready': 'slotReady',
+  'starter-substitution': 'starterSubstitution',
   'booking-reminder-7d': 'bookingReminder7d',
   'reminder-24h': 'reminder24h',
   'reminder-2h': 'reminder2h',
@@ -342,6 +344,32 @@ export function collectScheduledNotifications(
         ? starters[MAX_STARTERS - 1].joinedAt
         : undefined
 
+      if (Number.isFinite(startsAt) && startsAt > now) {
+        for (const signup of starters) {
+          const substitution = signup.substitutedFor
+          if (
+            !substitution
+            || !Number.isFinite(substitution.at)
+            || substitution.at > now
+            || now >= substitution.at + STARTER_SUBSTITUTION_NOTIFICATION_WINDOW_MS
+          ) continue
+
+          notifications.push({
+            id: `starter-substitution:${poll.id}:${slot.id}:${signup.userId}:${substitution.at}`,
+            kind: 'starter-substitution',
+            title: 'Sei il nuovo titolare!',
+            body: `Hai preso il posto di ${substitution.displayName} per ${formatSession(slot.startsAt)}. Sei convocato: ci vediamo in campo!`,
+            url: `/?poll=${encodeURIComponent(poll.id)}`,
+            tag: `starter-substitution-${poll.id}-${slot.id}-${signup.userId}`,
+            ttlSeconds: Math.max(60, Math.floor(
+              (substitution.at + STARTER_SUBSTITUTION_NOTIFICATION_WINDOW_MS - now) / 1000,
+            )),
+            recipientUserIds: [signup.userId],
+            excludedUserIds: [],
+          })
+        }
+      }
+
       if (
         !slot.bookedAt
         && Number.isFinite(startsAt)
@@ -353,6 +381,13 @@ export function collectScheduledNotifications(
           completedAt <= now
           && now < completedAt + SLOT_READY_NOTIFICATION_WINDOW_MS
         ) {
+          const slotReadyRecipientUserIds = starters
+            .filter((signup) => (
+              !signup.substitutedFor
+              || signup.substitutedFor.at <= completedAt
+            ))
+            .map((signup) => signup.userId)
+
           notifications.push({
             id: `slot-ready:${poll.id}:${slot.id}:${completedAt}`,
             kind: 'slot-ready',
@@ -363,7 +398,7 @@ export function collectScheduledNotifications(
             ttlSeconds: Math.max(60, Math.floor(
               (completedAt + SLOT_READY_NOTIFICATION_WINDOW_MS - now) / 1000,
             )),
-            recipientUserIds,
+            recipientUserIds: slotReadyRecipientUserIds,
             excludedUserIds: [],
           })
         }

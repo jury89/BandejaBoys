@@ -29,7 +29,7 @@ service cloud.firestore {
       return !request.resource.data.keys().hasAny(['notificationPreferences'])
         || (request.resource.data.notificationPreferences is map
           && request.resource.data.notificationPreferences.keys().hasOnly([
-            'mondayMotivation', 'newSlots', 'slotReady', 'bookingReminder7d',
+            'mondayMotivation', 'newSlots', 'slotReady', 'starterSubstitution', 'bookingReminder7d',
             'reminder24h', 'reminder2h', 'matchRating'
           ])
           && request.resource.data.notificationPreferences.keys().hasAll([
@@ -39,6 +39,8 @@ service cloud.firestore {
           && request.resource.data.notificationPreferences.mondayMotivation is bool
           && request.resource.data.notificationPreferences.newSlots is bool
           && request.resource.data.notificationPreferences.slotReady is bool
+          && (!request.resource.data.notificationPreferences.keys().hasAny(['starterSubstitution'])
+            || request.resource.data.notificationPreferences.starterSubstitution is bool)
           && request.resource.data.notificationPreferences.bookingReminder7d is bool
           && request.resource.data.notificationPreferences.reminder24h is bool
           && request.resource.data.notificationPreferences.reminder2h is bool
@@ -134,7 +136,7 @@ service cloud.firestore {
         ])
         && request.resource.data.eventId is string
         && request.resource.data.kind in [
-          'new-slots', 'slot-ready', 'booking-reminder-7d',
+          'new-slots', 'slot-ready', 'starter-substitution', 'booking-reminder-7d',
           'reminder-24h', 'reminder-2h', 'match-rating',
           'monday-motivation', 'test'
         ]

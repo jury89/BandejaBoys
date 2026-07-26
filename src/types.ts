@@ -4,6 +4,7 @@ export interface NotificationPreferences {
   mondayMotivation: boolean
   newSlots: boolean
   slotReady: boolean
+  starterSubstitution: boolean
   bookingReminder7d: boolean
   reminder24h: boolean
   reminder2h: boolean
