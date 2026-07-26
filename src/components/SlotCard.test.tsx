@@ -278,6 +278,32 @@ describe('azioni dello slot', () => {
     expect(revokeObjectURL).toHaveBeenCalledWith('blob:padel-calendar')
   })
 
+  it('apre la cronologia dello slot dal pulsante a icona nella scheda', async () => {
+    const getSlotActivity = vi.spyOn(repository, 'getSlotActivity').mockResolvedValue([])
+
+    render(
+      <SlotCard
+        poll={poll}
+        slot={slot}
+        user={user}
+        members={[user]}
+        onPollChange={vi.fn()}
+        onNotify={vi.fn()}
+        onError={vi.fn()}
+      />,
+    )
+
+    const actions = screen.getByRole('group', { name: 'Azioni dello slot' })
+    const history = screen.getByRole('button', { name: /Vedi la cronologia dello slot/ })
+    expect(actions).toContainElement(history)
+    expect(history).toHaveTextContent('')
+
+    fireEvent.click(history)
+
+    expect(await screen.findByRole('dialog', { name: 'Cronologia dello slot' })).toBeInTheDocument()
+    expect(getSlotActivity).toHaveBeenCalledWith(poll.id, slot.id)
+  })
+
   it('elimina uno slot dopo conferma e aggiorna subito la bacheca', async () => {
     const otherSlot: PadelSlot = {
       ...slot,

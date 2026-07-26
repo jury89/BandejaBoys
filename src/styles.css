@@ -1382,6 +1382,19 @@ p {
   color: var(--ink);
 }
 
+.slot-card__icon-action--history {
+  border-color: #b9d6df;
+  background: #edf8fa;
+  color: var(--deep);
+}
+
+.slot-card__icon-action--history:hover,
+.slot-card__icon-action--history:focus-visible {
+  border-color: var(--court);
+  background: #dff4f5;
+  color: var(--ink);
+}
+
 .slot-card__icon-action--delete {
   border-color: #efd0d6;
   background: #fff8f9;
@@ -2529,6 +2542,226 @@ p {
   margin-top: 8px;
   padding-top: 19px;
   border-top: 1px solid #e2eaee;
+}
+
+.slot-activity {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.slot-activity__intro {
+  position: relative;
+  display: grid;
+  overflow: hidden;
+  align-items: center;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 13px;
+  padding: 14px 16px;
+  border: 1px solid #c7dde4;
+  border-left: 4px solid var(--court);
+  border-radius: 12px;
+  background: linear-gradient(110deg, #edf8f9, #f9fcfd);
+}
+
+.slot-activity__intro::after {
+  position: absolute;
+  right: -25px;
+  width: 78px;
+  height: 78px;
+  border: 9px solid rgba(14, 116, 144, 0.07);
+  border-radius: 50%;
+  content: '';
+}
+
+.slot-activity__intro-icon {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border-radius: 10px;
+  background: var(--deep);
+  color: var(--ball);
+}
+
+.slot-activity__intro > div {
+  position: relative;
+  z-index: 1;
+}
+
+.slot-activity__intro strong {
+  font-size: 0.77rem;
+}
+
+.slot-activity__intro p {
+  margin: 3px 0 0;
+  color: var(--muted);
+  font-size: 0.64rem;
+  line-height: 1.45;
+}
+
+.slot-activity__state {
+  display: grid;
+  min-height: 170px;
+  place-items: center;
+  align-content: center;
+  gap: 9px;
+  padding: 24px;
+  border: 1px dashed #bfd2d9;
+  border-radius: 13px;
+  background: #f8fbfc;
+  color: var(--court);
+  text-align: center;
+}
+
+.slot-activity__state strong {
+  color: var(--ink);
+  font-size: 0.76rem;
+}
+
+.slot-activity__state p {
+  max-width: 330px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.65rem;
+  line-height: 1.5;
+}
+
+.slot-activity__state--error {
+  border-color: #efc6ce;
+  background: #fff8f9;
+  color: var(--danger);
+}
+
+.slot-activity__loader {
+  width: 29px;
+  height: 29px;
+  border: 3px solid #bed2da;
+  border-top-color: var(--court);
+  border-radius: 50%;
+  animation: spin 800ms linear infinite;
+}
+
+.slot-activity__timeline {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.slot-activity__item {
+  position: relative;
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  gap: 12px;
+  padding-bottom: 14px;
+}
+
+.slot-activity__item:not(:last-child)::before {
+  position: absolute;
+  top: 38px;
+  bottom: 0;
+  left: 18px;
+  width: 2px;
+  background: #d6e7eb;
+  content: '';
+}
+
+.slot-activity__item:last-child {
+  padding-bottom: 0;
+}
+
+.slot-activity__marker {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border: 1px solid #bad4dd;
+  border-radius: 50%;
+  background: #edf7fa;
+  color: var(--court);
+}
+
+.slot-activity__marker--created,
+.slot-activity__marker--joined {
+  border-color: #b9d75c;
+  background: #f1ffc1;
+  color: #355f00;
+}
+
+.slot-activity__marker--booked {
+  border-color: #8ecfc6;
+  background: #dcf4ef;
+  color: var(--booked-deep);
+}
+
+.slot-activity__marker--left {
+  border-color: #efc8d0;
+  background: #fff1f4;
+  color: var(--danger);
+}
+
+.slot-activity__marker--unbooked {
+  border-color: #e5c364;
+  background: #fff3c8;
+  color: var(--pending-ink);
+}
+
+.slot-activity__marker--substitution {
+  border-color: #b8cadd;
+  background: #edf3f8;
+  color: var(--deep);
+}
+
+.slot-activity__card {
+  padding: 12px 14px;
+  border: 1px solid #d9e6ea;
+  border-radius: 11px;
+  background: #fcfefe;
+}
+
+.slot-activity__card > strong {
+  display: block;
+  color: var(--ink);
+  font-size: 0.73rem;
+}
+
+.slot-activity__card > p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 0.64rem;
+  line-height: 1.5;
+}
+
+.slot-activity__meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  margin-top: 9px;
+  padding-top: 8px;
+  border-top: 1px solid #e5edef;
+  color: #718791;
+  font-size: 0.57rem;
+}
+
+.slot-activity__meta span,
+.slot-activity__meta time {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.slot-activity__meta strong {
+  color: var(--court);
+}
+
+.slot-activity__actions {
+  margin-top: 0;
 }
 
 .match-rating {
@@ -3899,6 +4132,44 @@ p {
 
   .modal__actions .button {
     width: 100%;
+  }
+
+  .slot-activity {
+    gap: 14px;
+  }
+
+  .slot-activity__intro {
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .slot-activity__intro-icon {
+    width: 38px;
+    height: 38px;
+  }
+
+  .slot-activity__item {
+    grid-template-columns: 34px minmax(0, 1fr);
+    gap: 9px;
+  }
+
+  .slot-activity__item:not(:last-child)::before {
+    top: 34px;
+    left: 16px;
+  }
+
+  .slot-activity__marker {
+    width: 34px;
+    height: 34px;
+  }
+
+  .slot-activity__card {
+    padding: 11px 12px;
+  }
+
+  .slot-activity__meta {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .profile-photo {

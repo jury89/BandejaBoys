@@ -7,6 +7,7 @@ import {
   Check,
   CircleHelp,
   Clock3,
+  History,
   LogOut,
   MapPin,
   PencilLine,
@@ -31,6 +32,7 @@ import { slotViewSessionKey, trackSustainedSlotView } from '../lib/slotViewTrack
 import { slotElementId } from '../lib/slotNavigation'
 import { EditSlotModal } from './EditSlotModal'
 import { ProfileAvatar } from './ProfileAvatar'
+import { SlotActivityModal } from './SlotActivityModal'
 import { SubstitutionModal } from './SubstitutionModal'
 
 interface SlotCardProps {
@@ -53,6 +55,7 @@ const phaseCopy = {
 export function SlotCard({ poll, slot, user, members, disabled, onPollChange, onNotify, onError }: SlotCardProps) {
   const substitutionTooltipId = useId()
   const cardRef = useRef<HTMLElement>(null)
+  const [activityOpen, setActivityOpen] = useState(false)
   const [scheduleOpen, setScheduleOpen] = useState(false)
   const [substitutionOpen, setSubstitutionOpen] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -171,6 +174,15 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
               aria-label={`Aggiungi lo slot di ${date.full} alle ${date.time} al calendario`}
             >
               <CalendarPlus size={16} />
+            </button>
+            <button
+              className="slot-card__icon-action slot-card__icon-action--history"
+              type="button"
+              onClick={() => setActivityOpen(true)}
+              title="Vedi cronologia"
+              aria-label={`Vedi la cronologia dello slot di ${date.full} alle ${date.time}`}
+            >
+              <History size={16} />
             </button>
             {!disabled && (
               <>
@@ -375,6 +387,13 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
           onClose={() => setScheduleOpen(false)}
           onSave={(startsAt) => syncPoll(() => repository.rescheduleSlot(poll.id, slot.id, startsAt, user))}
           onDone={onNotify}
+        />
+      )}
+      {activityOpen && (
+        <SlotActivityModal
+          poll={poll}
+          slot={slot}
+          onClose={() => setActivityOpen(false)}
         />
       )}
       {substitutionOpen && (

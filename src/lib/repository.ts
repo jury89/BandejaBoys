@@ -1,6 +1,7 @@
 import {
   collection,
   doc,
+  getDocs,
   onSnapshot,
   orderBy,
   query,
@@ -62,6 +63,7 @@ export interface PadelRepository {
     listener: (ratings: MatchRatingRecord[]) => void,
     onError: (error: Error) => void,
   ): Unsubscribe
+  getSlotActivity(pollId: string, slotId: string): Promise<LocalActivityEvent[]>
   createPoll(input: CreatePollInput, creator: SessionUser): Promise<void>
   addSlot(pollId: string, input: SlotInput, creator: SessionUser): Promise<PadelPoll>
   joinSlot(pollId: string, slotId: string, member: SessionUser, role: SignupRole): Promise<PadelPoll>
@@ -242,6 +244,27 @@ function remoteRepository(): PadelRepository {
         }) as MatchRatingRecord)),
         onError,
       )
+    },
+    async getSlotActivity(pollId, slotId) {
+      const snapshot = await getDocs(
+        query(collection(db, 'activityEvents'), where('slotId', '==', slotId)),
+      )
+      return snapshot.docs
+        .map((item) => {
+          const data = item.data() as ActivityEventInput & {
+            occurredAt?: number | { toMillis: () => number }
+          }
+          const occurredAt = typeof data.occurredAt === 'number'
+            ? data.occurredAt
+            : data.occurredAt?.toMillis() ?? 0
+          return {
+            ...data,
+            id: item.id,
+            occurredAt,
+          }
+        })
+        .filter((event) => event.pollId === pollId)
+        .sort((left, right) => right.occurredAt - left.occurredAt || right.id.localeCompare(left.id))
     },
     async createPoll(input, creator) {
       const data = makePoll(input, creator)
@@ -617,6 +640,11 @@ function localRepository(): PadelRepository {
       window.addEventListener(MATCH_RATINGS_EVENT, notify)
       notify()
       return () => window.removeEventListener(MATCH_RATINGS_EVENT, notify)
+    },
+    async getSlotActivity(pollId, slotId) {
+      return readLocalActivityStore().events
+        .filter((event) => event.pollId === pollId && event.slotId === slotId)
+        .sort((left, right) => right.occurredAt - left.occurredAt || right.id.localeCompare(left.id))
     },
     async createPoll(input, creator) {
       const data = makePoll(input, creator)
