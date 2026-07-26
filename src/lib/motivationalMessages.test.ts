@@ -3,10 +3,8 @@ import {
   MONDAY_MOTIVATIONAL_CATALOG_VERSION,
   MONDAY_MOTIVATIONAL_MESSAGES,
   normalizeMotherName,
-  normalizeMotherNamesByRecipient,
   normalizeMotherNamesByUserId,
   normalizeMotivationalMessages,
-  personalizeMotivationalMessage,
   personalizeMotivationalMessageWithMotherName,
   resolveMotivationalCatalog,
 } from './motivationalMessages'
@@ -49,18 +47,6 @@ describe('frasi motivazionali del lunedì', () => {
     })
   })
 
-  it('normalizza i nomi dei destinatari senza dipendere da maiuscole o accenti', () => {
-    expect(normalizeMotherNamesByRecipient({
-      ' Michele Rossì ': '  Ada  ',
-      Jury: 'Ester',
-      Empty: ' ',
-      Invalid: 42,
-    })).toEqual({
-      'michele rossi': 'Ada',
-      jury: 'Ester',
-    })
-  })
-
   it('normalizza gli abbinamenti privati per UID e rimuove l’articolo già gestito dal testo', () => {
     expect(normalizeMotherName('  La Lori  ')).toBe('Lori')
     expect(normalizeMotherNamesByUserId({
@@ -73,30 +59,21 @@ describe('frasi motivazionali del lunedì', () => {
   })
 
   it('sostituisce tua madre usando articoli e preposizioni corretti', () => {
-    const directory = {
-      'marco rossi': 'Giulia',
-      michele: 'Ada',
-    }
-
-    expect(personalizeMotivationalMessage(
+    expect(personalizeMotivationalMessageWithMotherName(
       'Spacca tutto: tua madre ha bisogno di una prova.',
-      'Marco Rossi',
-      directory,
+      'Giulia',
     )).toBe('Spacca tutto: la Giulia ha bisogno di una prova.')
-    expect(personalizeMotivationalMessage(
+    expect(personalizeMotivationalMessageWithMotherName(
       'Non essere il problema preferito di tua madre.',
-      'Marco Rossi',
-      directory,
+      'Giulia',
     )).toBe('Non essere il problema preferito della Giulia.')
-    expect(personalizeMotivationalMessage(
+    expect(personalizeMotivationalMessageWithMotherName(
       'Tua madre si aspetta di più da te.',
-      'MICHELE',
-      directory,
+      'Ada',
     )).toBe('La Ada si aspetta di più da te.')
-    expect(personalizeMotivationalMessage(
+    expect(personalizeMotivationalMessageWithMotherName(
       'Quella santa donna di tua madre ti giudica.',
-      'Michele',
-      directory,
+      'Ada',
     )).toBe('Quella santa donna della Ada ti giudica.')
     expect(personalizeMotivationalMessageWithMotherName(
       'Tua madre oggi fa il tifo per te.',
@@ -107,11 +84,6 @@ describe('frasi motivazionali del lunedì', () => {
   it('lascia il testo generico quando il nome non è configurato', () => {
     const message = 'Spacca tutto: tua madre ha bisogno di una prova.'
 
-    expect(personalizeMotivationalMessage(message, 'Sconosciuto', {
-      jury: 'Ester',
-    })).toBe(message)
-    expect(personalizeMotivationalMessage(message, undefined, {
-      jury: 'Ester',
-    })).toBe(message)
+    expect(personalizeMotivationalMessageWithMotherName(message, undefined)).toBe(message)
   })
 })

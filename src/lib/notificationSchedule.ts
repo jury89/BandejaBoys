@@ -15,9 +15,7 @@ import {
 } from './domain'
 import { pollWeekTitle } from './format'
 import {
-  type MotherNamesByRecipient,
   type MotherNamesByUserId,
-  personalizeMotivationalMessage,
   personalizeMotivationalMessageWithMotherName,
 } from './motivationalMessages'
 import { normalizeNotificationPreferences } from './notificationPreferences'
@@ -58,8 +56,6 @@ export function isNotificationKindEnabled(
 export interface MondayMotivationSchedule {
   messages: readonly string[]
   recipientUserIds: readonly string[]
-  recipientDisplayNamesByUserId?: Readonly<Record<string, string>>
-  motherNamesByRecipient?: MotherNamesByRecipient
   motherNamesByUserId?: MotherNamesByUserId
 }
 
@@ -199,56 +195,6 @@ function stableMessageIndex(seed: string, messageCount: number): number {
   return (hash >>> 0) % messageCount
 }
 
-export function collectPollDisplayNamesByUserId(
-  polls: readonly PadelPoll[],
-): Record<string, string> {
-  const names = new Map<string, { displayName: string; observedAt: number; order: number }>()
-  let order = 0
-
-  const remember = (
-    userIdValue: string | undefined,
-    displayNameValue: string | undefined,
-    observedAtValue: number | undefined,
-  ) => {
-    const userId = userIdValue?.trim()
-    const displayName = displayNameValue?.trim().replace(/\s+/g, ' ')
-    if (!userId || !displayName) return
-
-    const observedAt = typeof observedAtValue === 'number' && Number.isFinite(observedAtValue)
-      ? observedAtValue
-      : 0
-    order += 1
-    const current = names.get(userId)
-    if (
-      !current
-      || observedAt > current.observedAt
-      || (observedAt === current.observedAt && order > current.order)
-    ) {
-      names.set(userId, { displayName, observedAt, order })
-    }
-  }
-
-  for (const poll of polls) {
-    remember(poll.createdBy, poll.createdByName, poll.createdAt)
-
-    for (const slot of poll.slots) {
-      remember(slot.createdBy, slot.createdByName, slot.createdAt ?? poll.createdAt)
-      remember(slot.bookedBy, slot.bookedByName, slot.bookedAt ?? slot.createdAt ?? poll.updatedAt)
-
-      for (const signup of slot.signups) {
-        remember(signup.userId, signup.displayName, signup.joinedAt)
-        remember(
-          signup.substitutedFor?.userId,
-          signup.substitutedFor?.displayName,
-          signup.substitutedFor?.at,
-        )
-      }
-    }
-  }
-
-  return Object.fromEntries(Array.from(names, ([userId, value]) => [userId, value.displayName]))
-}
-
 function collectMondayMotivationNotifications(
   now: number,
   schedule?: MondayMotivationSchedule,
@@ -270,13 +216,9 @@ function collectMondayMotivationNotifications(
       id: `monday-motivation:${mondayKey}`,
       kind: 'monday-motivation',
       title: 'Buon lunedì, bestia!',
-      body: personalizeMotivationalMessage(
-        personalizeMotivationalMessageWithMotherName(
-          message,
-          schedule.motherNamesByUserId?.[userId],
-        ),
-        schedule.recipientDisplayNamesByUserId?.[userId],
-        schedule.motherNamesByRecipient,
+      body: personalizeMotivationalMessageWithMotherName(
+        message,
+        schedule.motherNamesByUserId?.[userId],
       ),
       url: '/',
       tag: `monday-motivation-${mondayKey}`,

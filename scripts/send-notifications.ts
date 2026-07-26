@@ -16,12 +16,10 @@ import webpush, { type PushSubscription } from 'web-push'
 import type { MatchRatingResponse, MemberProfile, PadelPoll } from '../src/types'
 import {
   MONDAY_MOTIVATIONAL_CATALOG_VERSION,
-  normalizeMotherNamesByRecipient,
   normalizeMotherNamesByUserId,
   resolveMotivationalCatalog,
 } from '../src/lib/motivationalMessages'
 import {
-  collectPollDisplayNamesByUserId,
   collectScheduledNotifications,
   createNotificationDelivery,
   createTestNotification,
@@ -47,7 +45,6 @@ const testNotificationMessage = process.env.TEST_NOTIFICATION_MESSAGE?.trim()
 const testNotificationMode = process.env.TEST_NOTIFICATION_MODE?.trim() === 'pagelle'
   ? 'match-rating' as const
   : 'standard' as const
-const motherNamesByRecipientJson = process.env.MOTHER_NAMES_BY_RECIPIENT_JSON?.trim()
 const origin = 'https://bandeja-boys.web.app'
 
 if (!apiKey || !notifierEmail || !notifierPassword) throw new Error('Credenziali Firebase notifier mancanti.')
@@ -56,20 +53,6 @@ if (testNotificationMessage && !testUserId) throw new Error('Un messaggio manual
 if (testNotificationTitle && !testUserId) throw new Error('Un titolo manuale richiede il destinatario.')
 if (testNotificationMode === 'match-rating' && !testUserId) {
   throw new Error('Il collaudo pagelle richiede il destinatario.')
-}
-
-let motherNamesByRecipient: Record<string, string> = {}
-if (motherNamesByRecipientJson) {
-  let parsedDirectory: unknown
-  try {
-    parsedDirectory = JSON.parse(motherNamesByRecipientJson)
-  } catch {
-    throw new Error('Il secret MOTHER_NAMES_BY_RECIPIENT_JSON non contiene JSON valido.')
-  }
-  motherNamesByRecipient = normalizeMotherNamesByRecipient(parsedDirectory)
-  if (Object.keys(motherNamesByRecipient).length === 0) {
-    throw new Error('Il secret MOTHER_NAMES_BY_RECIPIENT_JSON non contiene associazioni valide.')
-  }
 }
 
 const app = initializeApp({ apiKey, authDomain: `${projectId}.firebaseapp.com`, projectId })
@@ -137,7 +120,6 @@ if (motivationNeedsWrite) {
 const motivationRecipientUserIds = Array.from(new Set(
   subscriptions.map((subscription) => subscription.data.userId),
 ))
-const recipientDisplayNamesByUserId = collectPollDisplayNamesByUserId(polls)
 const notifications = testUserId
   ? [createTestNotification(
       testUserId,
@@ -149,8 +131,6 @@ const notifications = testUserId
   : collectScheduledNotifications(polls, Date.now(), ratingResponses, {
       messages: motivationalMessages,
       recipientUserIds: motivationRecipientUserIds,
-      recipientDisplayNamesByUserId,
-      motherNamesByRecipient,
       motherNamesByUserId,
     })
 

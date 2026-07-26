@@ -162,30 +162,7 @@ export function normalizeMotivationalMessages(value: unknown): string[] {
     .filter(Boolean)))
 }
 
-export type MotherNamesByRecipient = Readonly<Record<string, string>>
 export type MotherNamesByUserId = Readonly<Record<string, string>>
-
-function normalizePersonLookupKey(value: string): string {
-  return value
-    .normalize('NFD')
-    .replace(/\p{M}/gu, '')
-    .trim()
-    .replace(/\s+/g, ' ')
-    .toLocaleLowerCase('it-IT')
-}
-
-export function normalizeMotherNamesByRecipient(value: unknown): Record<string, string> {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
-
-  return Object.fromEntries(Object.entries(value)
-    .flatMap(([recipientName, motherName]) => {
-      const lookupKey = normalizePersonLookupKey(recipientName)
-      const cleanMotherName = normalizeMotherName(motherName)
-      if (!lookupKey || !cleanMotherName) return []
-
-      return [[lookupKey, cleanMotherName]]
-    }))
-}
 
 export function normalizeMotherName(value: unknown): string | undefined {
   if (typeof value !== 'string') return undefined
@@ -231,20 +208,6 @@ export function personalizeMotivationalMessageWithMotherName(
   return message
     .replace(/di tua madre/giu, (match) => preserveInitialCase(match, indirectReference))
     .replace(/tua madre/giu, (match) => preserveInitialCase(match, directReference))
-}
-
-export function personalizeMotivationalMessage(
-  message: string,
-  recipientDisplayName: string | undefined,
-  motherNamesByRecipient: MotherNamesByRecipient | undefined,
-): string {
-  if (!recipientDisplayName || !motherNamesByRecipient) return message
-
-  const normalizedDirectory = normalizeMotherNamesByRecipient(motherNamesByRecipient)
-  const motherName = normalizedDirectory[normalizePersonLookupKey(recipientDisplayName)]
-  if (!motherName) return message
-
-  return personalizeMotivationalMessageWithMotherName(message, motherName)
 }
 
 export interface MotivationalCatalogResolution {
