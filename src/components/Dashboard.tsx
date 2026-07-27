@@ -6,10 +6,10 @@ import {
   getNextMatchRatingPromptAt,
   getPendingMatchRatingPrompts,
   getPlayerMatches,
+  getSlotEndsAt,
   getSlotPhase,
   getUpcomingPolls,
   isBookingCandidate,
-  padelDateTimeToTimestamp,
   DEFAULT_VENUE_PHONE,
 } from '../lib/domain'
 import { firstName, slotDateParts } from '../lib/format'
@@ -359,15 +359,15 @@ export function Dashboard() {
   }, [dashboardView, loading, slotNavigationTarget])
 
   useEffect(() => {
-    const nextStart = polls
+    const nextSlotEnd = polls
       .flatMap((poll) => poll.slots)
-      .map((slot) => padelDateTimeToTimestamp(slot.startsAt))
-      .filter((startsAt) => Number.isFinite(startsAt) && startsAt > now)
+      .map(getSlotEndsAt)
+      .filter((endsAt) => Number.isFinite(endsAt) && endsAt > now)
       .sort((left, right) => left - right)[0]
     const nextRatingPrompt = user
       ? getNextMatchRatingPromptAt(polls, ratingResponses, user.id, now)
       : null
-    const nextWakeAt = [nextStart, nextRatingPrompt]
+    const nextWakeAt = [nextSlotEnd, nextRatingPrompt]
       .filter((timestamp): timestamp is number => typeof timestamp === 'number')
       .sort((left, right) => left - right)[0]
     if (!nextWakeAt) return

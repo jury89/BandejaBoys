@@ -203,7 +203,7 @@ describe('ordine e visibilità dei sondaggi', () => {
     expect(result.map((poll) => poll.id)).toEqual(['poll-near', 'poll-later'])
   })
 
-  it('nasconde gli slot iniziati e i sondaggi senza slot futuri', () => {
+  it('mantiene visibili gli slot in corso e li nasconde soltanto dopo la fine', () => {
     const now = new Date('2026-07-28T19:30:00.000Z').getTime()
     const current: PadelPoll = {
       id: 'poll-mixed',
@@ -217,6 +217,7 @@ describe('ordine e visibilità dei sondaggi', () => {
       slots: [
         { ...slot(), id: 'past', startsAt: '2026-07-27T19:30:00.000Z' },
         { ...slot(), id: 'starting-now' },
+        { ...slot(), id: 'in-progress', startsAt: '2026-07-28T18:30:00.001Z' },
         { ...slot(), id: 'future', startsAt: '2026-07-30T19:30:00.000Z' },
       ],
     }
@@ -229,8 +230,35 @@ describe('ordine e visibilità dei sondaggi', () => {
     const result = getUpcomingPolls([pastOnly, current], now)
 
     expect(result).toHaveLength(1)
-    expect(result[0].slots.map((item) => item.id)).toEqual(['future'])
-    expect(current.slots).toHaveLength(3)
+    expect(result[0].slots.map((item) => item.id)).toEqual([
+      'in-progress',
+      'starting-now',
+      'future',
+    ])
+    expect(current.slots).toHaveLength(4)
+  })
+
+  it('rimuove uno slot quando la sua durata è terminata', () => {
+    const current: PadelPoll = {
+      id: 'poll-current',
+      title: 'Settimana corrente',
+      targetWeekStart: '2026-07-27',
+      createdBy: 'jury',
+      createdByName: 'Jury',
+      createdAt: 1,
+      updatedAt: 1,
+      status: 'open',
+      slots: [{ ...slot(), startsAt: '2026-07-28T18:00:00.000Z', durationMinutes: 90 }],
+    }
+
+    expect(getUpcomingPolls(
+      [current],
+      new Date('2026-07-28T19:29:59.999Z').getTime(),
+    )).toHaveLength(1)
+    expect(getUpcomingPolls(
+      [current],
+      new Date('2026-07-28T19:30:00.000Z').getTime(),
+    )).toHaveLength(0)
   })
 })
 

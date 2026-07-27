@@ -117,10 +117,16 @@ export function getMatchRatingResponseId(pollId: string, slotId: string, reviewe
   return [pollId, slotId, reviewerId].join('__')
 }
 
-export function getMatchRatingDueAt(slot: PadelSlot): number {
+export function getSlotEndsAt(slot: PadelSlot): number {
   const startsAt = padelDateTimeToTimestamp(slot.startsAt)
   if (!Number.isFinite(startsAt) || !Number.isFinite(slot.durationMinutes)) return Number.NaN
-  return startsAt + slot.durationMinutes * 60 * 1000 + MATCH_RATING_DELAY_MS
+  return startsAt + slot.durationMinutes * 60 * 1000
+}
+
+export function getMatchRatingDueAt(slot: PadelSlot): number {
+  const endsAt = getSlotEndsAt(slot)
+  if (!Number.isFinite(endsAt)) return Number.NaN
+  return endsAt + MATCH_RATING_DELAY_MS
 }
 
 function getRatingPromptForSlot(
@@ -225,7 +231,7 @@ export function getPlayerMatches(
         pollTitle: poll.title,
         slot,
         startsAt,
-        endsAt: startsAt + slot.durationMinutes * 60 * 1000,
+        endsAt: getSlotEndsAt(slot),
       }
     }))
     .filter((match) => (
@@ -278,8 +284,8 @@ export function getUpcomingPolls(polls: PadelPoll[], now = Date.now()): PadelPol
       ...poll,
       slots: poll.slots
         .filter((slot) => {
-          const startsAt = padelDateTimeToTimestamp(slot.startsAt)
-          return Number.isFinite(startsAt) && startsAt > now
+          const endsAt = getSlotEndsAt(slot)
+          return Number.isFinite(endsAt) && endsAt > now
         })
         .sort((left, right) => left.startsAt.localeCompare(right.startsAt)),
     }))
