@@ -65,4 +65,33 @@ describe('archivio notifiche', () => {
     expect(screen.getByText('Nessuna notifica salvata')).toBeInTheDocument()
     expect(screen.getByText(/prossime notifiche push consegnate/)).toBeInTheDocument()
   })
+
+  it('mostra notifiche legacy o sconosciute senza bloccare la pagina', () => {
+    render(
+      <NotificationHistoryPage
+        notifications={[{
+          ...notifications[0],
+          id: 'legacy',
+          eventId: 'legacy-event',
+          kind: 'new-poll',
+          title: undefined,
+          body: undefined,
+        }, {
+          ...notifications[1],
+          id: 'future',
+          eventId: 'future-event',
+          kind: 'future-notification',
+        }]}
+        loading={false}
+        error={null}
+        onBack={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByRole('heading', { name: 'Le mie notifiche' })).toBeInTheDocument()
+    expect(screen.getByText('Nuovo sondaggio')).toBeInTheDocument()
+    expect(screen.getByText('Avviso Bandeja Boys')).toBeInTheDocument()
+    expect(screen.getByText('Notifica Bandeja Boys')).toBeInTheDocument()
+    expect(screen.getByText(/testo di questo avviso non veniva ancora archiviato/)).toBeInTheDocument()
+  })
 })

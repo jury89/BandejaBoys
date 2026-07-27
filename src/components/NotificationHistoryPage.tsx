@@ -15,7 +15,6 @@ import {
   UsersRound,
 } from 'lucide-react'
 import type { NotificationHistoryItem } from '../lib/notificationHistory'
-import type { NotificationKind } from '../lib/notificationSchedule'
 import { PADEL_TIME_ZONE } from '../lib/format'
 
 interface NotificationHistoryPageProps {
@@ -41,8 +40,10 @@ const sentAtFormatter = new Intl.DateTimeFormat('it-IT', {
   timeZone: PADEL_TIME_ZONE,
 })
 
-function notificationPresentation(kind: NotificationKind): NotificationPresentation {
+function notificationPresentation(kind: string): NotificationPresentation {
   switch (kind) {
+    case 'new-poll':
+      return { label: 'Nuovo sondaggio', icon: CalendarPlus, tone: 'slots' }
     case 'new-slots':
       return { label: 'Nuovi slot', icon: CalendarPlus, tone: 'slots' }
     case 'slot-ready':
@@ -61,6 +62,8 @@ function notificationPresentation(kind: NotificationKind): NotificationPresentat
       return { label: 'Sveglia del lunedì', icon: BellRing, tone: 'monday' }
     case 'test':
       return { label: 'Notifica manuale', icon: FlaskConical, tone: 'test' }
+    default:
+      return { label: 'Avviso Bandeja Boys', icon: CircleAlert, tone: 'generic' }
   }
 }
 

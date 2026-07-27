@@ -1,9 +1,7 @@
-import type { NotificationKind } from './notificationSchedule'
-
 export interface NotificationDelivery {
   id: string
   eventId: string
-  kind: NotificationKind
+  kind: string
   title?: string
   body?: string
   userId: string
@@ -15,7 +13,7 @@ export interface NotificationDelivery {
 export interface NotificationHistoryItem {
   id: string
   eventId: string
-  kind: NotificationKind
+  kind: string
   title?: string
   body?: string
   sentAt: number
