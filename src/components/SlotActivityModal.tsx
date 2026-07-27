@@ -113,6 +113,28 @@ function activityPresentation(event: LocalActivityEvent): ActivityPresentation {
         icon: LogOut,
         tone: 'left',
       }
+    case 'guest_added': {
+      const guestName = detailString(event, 'guestName')
+      return {
+        title: 'Ospite aggiunto',
+        description: guestName
+          ? `${guestName} è stato inserito come ${signupRoleLabel(event)}.`
+          : `Ingresso come ${signupRoleLabel(event)}.`,
+        icon: UserRoundPlus,
+        tone: 'joined',
+      }
+    }
+    case 'guest_removed': {
+      const guestName = detailString(event, 'guestName')
+      return {
+        title: 'Ospite rimosso',
+        description: guestName
+          ? `${guestName} è stato tolto dallo slot.`
+          : `Uscita dal posto da ${signupRoleLabel(event)}.`,
+        icon: LogOut,
+        tone: 'left',
+      }
+    }
     case 'starter_substituted': {
       const outgoing = detailString(event, 'outgoingName')
       const replacement = detailString(event, 'replacementName')

@@ -1450,6 +1450,19 @@ p {
   color: var(--ink);
 }
 
+.slot-card__icon-action--guest {
+  border-color: #8db4c2;
+  background: var(--deep);
+  color: var(--ball);
+}
+
+.slot-card__icon-action--guest:hover:not(:disabled),
+.slot-card__icon-action--guest:focus-visible {
+  border-color: var(--ball);
+  background: #064b70;
+  color: var(--ball);
+}
+
 .slot-card__icon-action--delete {
   border-color: #efd0d6;
   background: #fff8f9;
@@ -1691,6 +1704,48 @@ p {
   font-weight: 800;
 }
 
+.court-player__name .guest-pass,
+.guest-pass--reserve {
+  align-self: flex-start;
+  margin-top: 3px;
+  padding: 2px 5px;
+  border: 1px dashed rgba(217, 255, 67, 0.78);
+  border-radius: 3px;
+  color: var(--ball);
+  font-family: var(--display);
+  font-size: 0.48rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.court-player--2 .court-player__name .guest-pass,
+.court-player--4 .court-player__name .guest-pass {
+  align-self: flex-end;
+}
+
+.guest-remove-action {
+  display: inline-grid;
+  width: 23px;
+  height: 23px;
+  flex: 0 0 23px;
+  place-items: center;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 50%;
+  background: rgba(4, 54, 71, 0.5);
+  color: var(--white);
+  cursor: pointer;
+}
+
+.guest-remove-action:hover:not(:disabled),
+.guest-remove-action:focus-visible {
+  border-color: var(--ball);
+  background: #073f53;
+  color: var(--ball);
+}
+
 .court-player__name--empty {
   color: rgba(255, 255, 255, 0.6);
   font-size: 0.59rem;
@@ -1775,6 +1830,28 @@ p {
   font-weight: 900;
 }
 
+.reserve-list li .guest-pass--reserve {
+  margin: 0;
+  border-color: #86ac2a;
+  color: #4c6900;
+}
+
+.guest-remove-action--reserve {
+  width: 21px;
+  height: 21px;
+  flex-basis: 21px;
+  border-color: #e2b7c0;
+  background: #fff4f6;
+  color: var(--danger);
+}
+
+.guest-remove-action--reserve:hover:not(:disabled),
+.guest-remove-action--reserve:focus-visible {
+  border-color: var(--danger);
+  background: #fae9ec;
+  color: #962c3d;
+}
+
 .reserve-list > p {
   margin: 0;
   color: #91a2a9;
@@ -1795,6 +1872,141 @@ p {
   min-height: 40px;
   padding: 8px 12px;
   font-size: 0.72rem;
+}
+
+.guest-player-form {
+  gap: 15px;
+}
+
+.guest-player-form__intro {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 13px;
+  border-left: 4px solid var(--court);
+  border-radius: 8px;
+  background: linear-gradient(105deg, #edf8fa 0%, #f7ffc9 120%);
+}
+
+.guest-player-form__intro > span {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  place-items: center;
+  border-radius: 8px;
+  background: var(--deep);
+  color: var(--ball);
+  transform: skewX(-6deg);
+}
+
+.guest-player-form__intro > span svg {
+  transform: skewX(6deg);
+}
+
+.guest-player-form__intro p {
+  margin: 0;
+  color: #526b77;
+  font-size: 0.75rem;
+  line-height: 1.55;
+}
+
+.guest-player-form__error {
+  margin-top: -10px;
+  padding-block: 8px;
+}
+
+.guest-role-picker {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.guest-role-picker legend {
+  grid-column: 1 / -1;
+  margin-bottom: 7px;
+  padding: 0;
+  color: #415b68;
+  font-size: 0.74rem;
+  font-weight: 800;
+}
+
+.guest-role-picker label {
+  display: flex;
+  min-width: 0;
+  min-height: 68px;
+  align-items: center;
+  gap: 9px;
+  padding: 10px;
+  border: 1px dashed #9ab8c3;
+  border-radius: 10px;
+  background: #f7fafb;
+  cursor: pointer;
+  transition: 150ms ease;
+  transition-property: border-color, background, transform;
+}
+
+.guest-role-picker label:hover {
+  border-color: var(--court);
+  transform: translateY(-1px);
+}
+
+.guest-role-picker label.is-selected {
+  border-style: solid;
+  border-color: var(--deep);
+  background: var(--deep);
+  color: var(--white);
+}
+
+.guest-role-picker label:has(input:disabled) {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.guest-role-picker input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.guest-role-picker__icon {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  place-items: center;
+  border-radius: 50%;
+  background: #dceef2;
+  color: var(--court);
+}
+
+.guest-role-picker label.is-selected .guest-role-picker__icon {
+  background: var(--ball);
+  color: var(--deep);
+}
+
+.guest-role-picker label > span:last-child {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.guest-role-picker strong {
+  font-size: 0.75rem;
+}
+
+.guest-role-picker small {
+  margin-top: 2px;
+  color: #718893;
+  font-size: 0.54rem;
+}
+
+.guest-role-picker label.is-selected small {
+  color: #cbe4ec;
 }
 
 .join-choice {
@@ -4484,6 +4696,16 @@ p {
     padding-inline: 14px;
   }
 
+  .slot-card__management {
+    gap: 4px;
+  }
+
+  .slot-card__icon-action {
+    width: 28px;
+    height: 30px;
+    border-radius: 8px;
+  }
+
   .status-pill {
     max-width: 92px;
     white-space: normal;
@@ -4498,6 +4720,12 @@ p {
 
   .court-player {
     gap: 5px;
+  }
+
+  .guest-remove-action--court {
+    width: 20px;
+    height: 20px;
+    flex-basis: 20px;
   }
 
   .court-player__marker {

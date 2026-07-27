@@ -34,11 +34,13 @@ import {
   type LocalSlotView,
 } from './activity'
 import {
+  addGuestSignup,
   addSlotToPoll,
   addSignup,
   getStarters,
   makeId,
   makePoll,
+  removeGuestSignup,
   removeSignup,
   removeSlotFromPoll,
   rescheduleSlot,
@@ -75,6 +77,19 @@ export interface PadelRepository {
   addSlot(pollId: string, input: SlotInput, creator: SessionUser): Promise<PadelPoll>
   joinSlot(pollId: string, slotId: string, member: SessionUser, role: SignupRole): Promise<PadelPoll>
   leaveSlot(pollId: string, slotId: string, member: SessionUser): Promise<PadelPoll>
+  addGuest(
+    pollId: string,
+    slotId: string,
+    actor: SessionUser,
+    displayName: string,
+    role: SignupRole,
+  ): Promise<PadelPoll>
+  removeGuest(
+    pollId: string,
+    slotId: string,
+    actor: SessionUser,
+    signupId: string,
+  ): Promise<PadelPoll>
   deleteSlot(pollId: string, slotId: string, actor: SessionUser): Promise<PadelPoll>
   rescheduleSlot(
     pollId: string,
@@ -162,15 +177,16 @@ function makeRatingRecords(
 ): MatchRatingRecord[] {
   const expectedTeammates = new Set(prompt.teammates.map((teammate) => teammate.userId))
   const submittedTeammates = new Set(submissions.map((submission) => submission.userId))
-  const isComplete = submissions.length === 3
-    && expectedTeammates.size === 3
-    && submittedTeammates.size === 3
+  const isComplete = expectedTeammates.size > 0
+    && expectedTeammates.size <= 3
+    && submissions.length === expectedTeammates.size
+    && submittedTeammates.size === expectedTeammates.size
     && [...submittedTeammates].every((userId) => expectedTeammates.has(userId))
   const scoresAreValid = submissions.every((submission) => (
     Number.isInteger(submission.score) && submission.score >= 1 && submission.score <= 10
   ))
   if (!isComplete || !scoresAreValid || prompt.reviewerId !== reviewer.id) {
-    throw new Error('Assegna un voto da 1 a 10 a tutti e tre i compagni.')
+    throw new Error('Assegna un voto da 1 a 10 a tutti i compagni registrati.')
   }
 
   return submissions.map((submission) => ({
@@ -364,6 +380,47 @@ function remoteRepository(): PadelRepository {
             ? makeActivityEvent('signup_left', member, before, previous, {
               role: signupRole(previous, member.id),
               joinedAt: signup.joinedAt,
+            })
+            : null
+        },
+      )
+    },
+    async addGuest(pollId, slotId, actor, displayName, role) {
+      return mutatePoll(
+        pollId,
+        (poll) => updateSlot(
+          poll,
+          slotId,
+          (slot) => addGuestSignup(slot, displayName, actor, Date.now(), role),
+        ),
+        (before, after) => {
+          const previous = slotById(before, slotId)
+          const updated = slotById(after, slotId)
+          const previousIds = new Set(previous?.signups.map((signup) => signup.id))
+          const guest = updated?.signups.find((signup) => signup.isGuest && !previousIds.has(signup.id))
+          return updated && guest
+            ? makeActivityEvent('guest_added', actor, after, updated, {
+              guestName: guest.displayName,
+              guestSignupId: guest.id,
+              role,
+            })
+            : null
+        },
+      )
+    },
+    async removeGuest(pollId, slotId, actor, signupId) {
+      return mutatePoll(
+        pollId,
+        (poll) => updateSlot(poll, slotId, (slot) => removeGuestSignup(slot, signupId)),
+        (before) => {
+          const previous = slotById(before, slotId)
+          const guest = previous?.signups.find((signup) => signup.id === signupId && signup.isGuest)
+          return previous && guest
+            ? makeActivityEvent('guest_removed', actor, before, previous, {
+              guestName: guest.displayName,
+              guestSignupId: guest.id,
+              role: signupRole(previous, guest.userId),
+              joinedAt: guest.joinedAt,
             })
             : null
         },
@@ -743,6 +800,47 @@ function localRepository(): PadelRepository {
             ? makeActivityEvent('signup_left', member, before, previous, {
               role: signupRole(previous, member.id),
               joinedAt: signup.joinedAt,
+            })
+            : null
+        },
+      )
+    },
+    async addGuest(pollId, slotId, actor, displayName, role) {
+      return mutate(
+        pollId,
+        (poll) => updateSlot(
+          poll,
+          slotId,
+          (slot) => addGuestSignup(slot, displayName, actor, Date.now(), role),
+        ),
+        (before, after) => {
+          const previous = slotById(before, slotId)
+          const updated = slotById(after, slotId)
+          const previousIds = new Set(previous?.signups.map((signup) => signup.id))
+          const guest = updated?.signups.find((signup) => signup.isGuest && !previousIds.has(signup.id))
+          return updated && guest
+            ? makeActivityEvent('guest_added', actor, after, updated, {
+              guestName: guest.displayName,
+              guestSignupId: guest.id,
+              role,
+            })
+            : null
+        },
+      )
+    },
+    async removeGuest(pollId, slotId, actor, signupId) {
+      return mutate(
+        pollId,
+        (poll) => updateSlot(poll, slotId, (slot) => removeGuestSignup(slot, signupId)),
+        (before) => {
+          const previous = slotById(before, slotId)
+          const guest = previous?.signups.find((signup) => signup.id === signupId && signup.isGuest)
+          return previous && guest
+            ? makeActivityEvent('guest_removed', actor, before, previous, {
+              guestName: guest.displayName,
+              guestSignupId: guest.id,
+              role: signupRole(previous, guest.userId),
+              joinedAt: guest.joinedAt,
             })
             : null
         },

@@ -378,6 +378,29 @@ describe('pianificazione notifiche', () => {
     expect(notifications[0].body).toContain('Il campo è ancora da prenotare')
   })
 
+  it('considera completo uno slot con un ospite ma notifica solo i membri registrati', () => {
+    const future = new Date(NOW + 8 * 24 * 60 * 60 * 1000).toISOString()
+    const players = [
+      signup('a', NOW - 4 * 60 * 1000),
+      signup('b', NOW - 3 * 60 * 1000),
+      signup('c', NOW - 2 * 60 * 1000),
+      {
+        ...signup('guest_ciccio', NOW - 60 * 1000),
+        displayName: 'Ciccio',
+        isGuest: true,
+      },
+    ]
+    const notifications = collectScheduledNotifications([
+      poll([slot(future, players, false)]),
+    ], NOW)
+
+    expect(notifications).toHaveLength(1)
+    expect(notifications[0]).toMatchObject({
+      kind: 'slot-ready',
+      recipientUserIds: ['a', 'b', 'c'],
+    })
+  })
+
   it('non avvisa se il campo è già prenotato o manca il quarto titolare', () => {
     const future = new Date(NOW + 8 * 24 * 60 * 60 * 1000).toISOString()
     const players = ['a', 'b', 'c', 'd'].map((id, index) => signup(

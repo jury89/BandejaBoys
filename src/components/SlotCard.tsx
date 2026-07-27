@@ -14,8 +14,9 @@ import {
   PhoneCall,
   Trash2,
   UserRoundPlus,
+  X,
 } from 'lucide-react'
-import type { MemberProfile, PadelPoll, PadelSlot, SessionUser, SignupRole } from '../types'
+import type { MemberProfile, PadelPoll, PadelSlot, SessionUser, Signup, SignupRole } from '../types'
 import {
   DEFAULT_VENUE,
   getReserves,
@@ -31,6 +32,7 @@ import { repository } from '../lib/repository'
 import { slotViewSessionKey, trackSustainedSlotView } from '../lib/slotViewTracking'
 import { slotElementId } from '../lib/slotNavigation'
 import { EditSlotModal } from './EditSlotModal'
+import { GuestPlayerModal } from './GuestPlayerModal'
 import { ProfileAvatar } from './ProfileAvatar'
 import { SlotActivityModal } from './SlotActivityModal'
 import { SubstitutionModal } from './SubstitutionModal'
@@ -56,6 +58,7 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
   const substitutionTooltipId = useId()
   const cardRef = useRef<HTMLElement>(null)
   const [activityOpen, setActivityOpen] = useState(false)
+  const [guestPlayerOpen, setGuestPlayerOpen] = useState(false)
   const [scheduleOpen, setScheduleOpen] = useState(false)
   const [substitutionOpen, setSubstitutionOpen] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -115,6 +118,22 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
     )
   }
 
+  const removeGuest = async (guest: Signup) => {
+    const guestIsStarter = starters.some((signup) => signup.id === guest.id)
+    const promoted = guestIsStarter ? reserves[0] : undefined
+    const promotionCopy = promoted
+      ? ` ${memberName(promoted.userId, promoted.displayName)} passerà tra i titolari.`
+      : ''
+    if (!window.confirm(`Rimuovere ${guest.displayName} dallo slot?${promotionCopy}`)) return
+
+    await run(
+      () => repository.removeGuest(poll.id, slot.id, user, guest.id),
+      promoted
+        ? `${guest.displayName} è stato rimosso. ${memberName(promoted.userId, promoted.displayName)} è ora titolare.`
+        : `${guest.displayName} è stato rimosso dallo slot.`,
+    )
+  }
+
   const unbook = async () => {
     if (!window.confirm('Segnare questo campo come non più prenotato?')) return
     await run(() => repository.setBooking(poll.id, slot.id, null, user), 'Lo slot è tornato da prenotare.')
@@ -166,6 +185,18 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
             {phaseCopy[phase].label}
           </div>
           <div className="slot-card__management" role="group" aria-label="Azioni dello slot">
+            {!disabled && (
+              <button
+                className="slot-card__icon-action slot-card__icon-action--guest"
+                type="button"
+                onClick={() => setGuestPlayerOpen(true)}
+                disabled={busy}
+                title="Aggiungi un ospite"
+                aria-label={`Aggiungi un ospite allo slot di ${date.full} alle ${date.time}`}
+              >
+                <UserRoundPlus size={16} />
+              </button>
+            )}
             <button
               className="slot-card__icon-action slot-card__icon-action--calendar"
               type="button"
@@ -253,10 +284,23 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
                   <span className="court-player__name">
                     <strong>{memberName(signup.userId, signup.displayName)}</strong>
                     {signup.userId === user.id && <small>Tu</small>}
+                    {signup.isGuest && <small className="guest-pass">Ospite</small>}
                     {signup.substitutedFor && (
                       <small>per {memberName(signup.substitutedFor.userId, signup.substitutedFor.displayName)}</small>
                     )}
                   </span>
+                  {!disabled && signup.isGuest && (
+                    <button
+                      className="guest-remove-action guest-remove-action--court"
+                      type="button"
+                      onClick={() => removeGuest(signup)}
+                      disabled={busy}
+                      title={`Rimuovi ${signup.displayName}`}
+                      aria-label={`Rimuovi l’ospite ${signup.displayName} dallo slot`}
+                    >
+                      <X size={13} />
+                    </button>
+                  )}
                 </>
               ) : (
                 <span className="court-player__name court-player__name--empty">Posto libero</span>
@@ -285,6 +329,19 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
                 )}
                 <strong>{memberName(reserve.userId, reserve.displayName)}</strong>
                 {reserve.userId === user.id && <small>Tu</small>}
+                {reserve.isGuest && <small className="guest-pass guest-pass--reserve">Ospite</small>}
+                {!disabled && reserve.isGuest && (
+                  <button
+                    className="guest-remove-action guest-remove-action--reserve"
+                    type="button"
+                    onClick={() => removeGuest(reserve)}
+                    disabled={busy}
+                    title={`Rimuovi ${reserve.displayName}`}
+                    aria-label={`Rimuovi l’ospite ${reserve.displayName} dallo slot`}
+                  >
+                    <X size={13} />
+                  </button>
+                )}
               </li>
             ))}
           </ol>
@@ -386,6 +443,16 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
           slot={slot}
           onClose={() => setScheduleOpen(false)}
           onSave={(startsAt) => syncPoll(() => repository.rescheduleSlot(poll.id, slot.id, startsAt, user))}
+          onDone={onNotify}
+        />
+      )}
+      {guestPlayerOpen && (
+        <GuestPlayerModal
+          slot={slot}
+          onClose={() => setGuestPlayerOpen(false)}
+          onAdd={(displayName, role) => syncPoll(
+            () => repository.addGuest(poll.id, slot.id, user, displayName, role),
+          )}
           onDone={onNotify}
         />
       )}

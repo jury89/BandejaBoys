@@ -75,7 +75,11 @@ export function MatchRatingModal({ prompt, testMode = false, onDismiss, onSubmit
         <div className="match-rating__intro">
           <span className="match-rating__trophy" aria-hidden="true"><Trophy size={24} /></span>
           <div>
-            <p>Valuta la prestazione dei tuoi tre compagni.</p>
+            <p>
+              {prompt.teammates.length === 3
+                ? 'Valuta la prestazione dei tuoi tre compagni.'
+                : 'Valuta la prestazione dei compagni registrati.'}
+            </p>
             <span><CalendarCheck2 size={15} /> {sessionLabel(prompt.sessionStartsAt)}</span>
           </div>
         </div>

@@ -302,13 +302,16 @@ export function collectScheduledNotifications(
     for (const slot of poll.slots) {
       const startsAt = padelDateTimeToTimestamp(slot.startsAt)
       const starters = getStarters(slot)
-      const recipientUserIds = Array.from(new Set(starters.map((signup) => signup.userId)))
-      const completedAt = starters.length === MAX_STARTERS && recipientUserIds.length === MAX_STARTERS
+      const registeredStarters = starters.filter((signup) => !signup.isGuest)
+      const recipientUserIds = Array.from(new Set(
+        registeredStarters.map((signup) => signup.userId),
+      ))
+      const completedAt = starters.length === MAX_STARTERS
         ? starters[MAX_STARTERS - 1].joinedAt
         : undefined
 
       if (Number.isFinite(startsAt) && startsAt > now) {
-        for (const signup of starters) {
+        for (const signup of registeredStarters) {
           const substitution = signup.substitutedFor
           if (
             !substitution
@@ -344,7 +347,7 @@ export function collectScheduledNotifications(
           completedAt <= now
           && now < completedAt + SLOT_READY_NOTIFICATION_WINDOW_MS
         ) {
-          const slotReadyRecipientUserIds = starters
+          const slotReadyRecipientUserIds = registeredStarters
             .filter((signup) => (
               !signup.substitutedFor
               || signup.substitutedFor.at <= completedAt
@@ -396,6 +399,7 @@ export function collectScheduledNotifications(
 
       if (
         starters.length === MAX_STARTERS
+        && registeredStarters.length >= 2
         && pendingRatingRecipientUserIds.length > 0
         && now >= ratingDueAt
         && now < ratingDueAt + MATCH_RATING_NOTIFICATION_WINDOW_MS
@@ -404,7 +408,9 @@ export function collectScheduledNotifications(
           id: `match-rating:${poll.id}:${slot.id}:${slot.startsAt}`,
           kind: 'match-rating',
           title: 'È ora di dare i voti',
-          body: 'Com’è andata in campo? Valuta la prestazione dei tuoi tre compagni.',
+          body: starters.some((signup) => signup.isGuest)
+            ? 'Com’è andata in campo? Valuta la prestazione dei compagni registrati.'
+            : 'Com’è andata in campo? Valuta la prestazione dei tuoi tre compagni.',
           url: `/?ratePoll=${encodeURIComponent(poll.id)}&rateSlot=${encodeURIComponent(slot.id)}`,
           tag: `match-rating-${poll.id}-${slot.id}`,
           ttlSeconds: Math.floor((MATCH_RATING_NOTIFICATION_WINDOW_MS + MATCH_RATING_DELAY_MS) / 1000),

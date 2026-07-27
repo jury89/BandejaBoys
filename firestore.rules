@@ -114,6 +114,7 @@ service cloud.firestore {
           'poll_created', 'poll_archived', 'poll_reopened', 'poll_deleted',
           'slot_created', 'slot_rescheduled', 'slot_deleted',
           'signup_joined', 'signup_left', 'starter_substituted',
+          'guest_added', 'guest_removed',
           'slot_booked', 'slot_unbooked'
         ]
         && request.resource.data.actorId == request.auth.uid

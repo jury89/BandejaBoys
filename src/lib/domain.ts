@@ -21,6 +21,7 @@ export const MAX_SLOTS = 14
 export const DEFAULT_VENUE = 'Oasi Boschetto'
 export const DEFAULT_VENUE_PHONE = '+390376290058'
 export const PROFILE_NAME_MAX_LENGTH = 40
+export const GUEST_NAME_MAX_LENGTH = 40
 export const MATCH_RATING_DELAY_MS = 10 * 60 * 1000
 
 const LOCAL_DATE_TIME_PATTERN = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,3}))?)?$/
@@ -86,6 +87,15 @@ export function profileNameError(displayName: string): string | null {
   return null
 }
 
+export function guestNameError(displayName: string): string | null {
+  const cleanName = displayName.trim()
+  if (cleanName.length < 2) return 'Scrivi il nome dell’ospite.'
+  if (cleanName.length > GUEST_NAME_MAX_LENGTH) {
+    return `Il nome può avere al massimo ${GUEST_NAME_MAX_LENGTH} caratteri.`
+  }
+  return null
+}
+
 export function makeId(prefix = 'id'): string {
   const random = globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2)
   return `${prefix}_${random}`
@@ -127,6 +137,11 @@ function getRatingPromptForSlot(
   const dueAt = getMatchRatingDueAt(slot)
   if (!Number.isFinite(dueAt)) return null
 
+  const teammates = starters
+    .filter((signup) => signup.userId !== reviewerId && !signup.isGuest)
+    .map((signup) => ({ userId: signup.userId, displayName: signup.displayName }))
+  if (teammates.length === 0) return null
+
   return {
     id: getMatchRatingResponseId(poll.id, slot.id, reviewerId),
     pollId: poll.id,
@@ -136,9 +151,7 @@ function getRatingPromptForSlot(
     sessionEndedAt: dueAt - MATCH_RATING_DELAY_MS,
     dueAt,
     reviewerId,
-    teammates: starters
-      .filter((signup) => signup.userId !== reviewerId)
-      .map((signup) => ({ userId: signup.userId, displayName: signup.displayName })),
+    teammates,
   }
 }
 
@@ -331,6 +344,40 @@ export function addSignup(
   }
 }
 
+export function addGuestSignup(
+  slot: PadelSlot,
+  displayName: string,
+  addedBy: Pick<MemberProfile, 'id' | 'displayName'>,
+  joinedAt = Date.now(),
+  role?: SignupRole,
+): PadelSlot {
+  const cleanName = displayName.trim().replace(/\s+/g, ' ')
+  const validationError = guestNameError(cleanName)
+  if (validationError) throw new Error(validationError)
+
+  const selectedRole = role ?? (getStarters(slot).length < MAX_STARTERS ? 'starter' : 'reserve')
+  if (selectedRole === 'starter' && getStarters(slot).length >= MAX_STARTERS) {
+    throw new Error('I quattro posti da titolare sono già occupati. Aggiungilo come riserva.')
+  }
+
+  return {
+    ...slot,
+    signups: sortSignups([
+      ...slot.signups,
+      {
+        id: makeId('signup'),
+        userId: makeId('guest'),
+        displayName: cleanName,
+        joinedAt,
+        role: selectedRole,
+        isGuest: true,
+        addedBy: addedBy.id,
+        addedByName: addedBy.displayName,
+      },
+    ]),
+  }
+}
+
 export function removeSignup(slot: PadelSlot, userId: string): PadelSlot {
   const starters = getStarters(slot)
   const reserves = getReserves(slot)
@@ -345,6 +392,12 @@ export function removeSignup(slot: PadelSlot, userId: string): PadelSlot {
       .filter((signup) => signup.userId !== userId)
       .map((signup) => signup.id === promotedId ? { ...signup, role: 'starter' as const } : signup)),
   }
+}
+
+export function removeGuestSignup(slot: PadelSlot, signupId: string): PadelSlot {
+  const guest = slot.signups.find((signup) => signup.id === signupId && signup.isGuest)
+  if (!guest) throw new Error('Ospite non trovato.')
+  return removeSignup(slot, guest.userId)
 }
 
 export function substituteStarter(

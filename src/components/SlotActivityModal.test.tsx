@@ -91,6 +91,31 @@ describe('cronologia dello slot', () => {
     expect(screen.getByText(/precedenti all’introduzione della cronologia/)).toBeInTheDocument()
   })
 
+  it('mostra nome e ruolo dell’ospite aggiunto dal membro', async () => {
+    vi.spyOn(repository, 'getSlotActivity').mockResolvedValue([{
+      id: 'guest-added',
+      type: 'guest_added',
+      actorId: 'jury',
+      actorName: 'Jury',
+      pollId: poll.id,
+      pollTitle: poll.title,
+      slotId: slot.id,
+      slotStartsAt: slot.startsAt,
+      occurredAt: Date.UTC(2026, 6, 25, 14, 30),
+      details: {
+        guestName: 'Ciccio',
+        guestSignupId: 'signup-guest',
+        role: 'reserve',
+      },
+    }])
+
+    render(<SlotActivityModal poll={poll} slot={slot} onClose={vi.fn()} />)
+
+    expect(await screen.findByText('Ospite aggiunto')).toBeInTheDocument()
+    expect(screen.getByText('Ciccio è stato inserito come riserva.')).toBeInTheDocument()
+    expect(screen.getByText('Jury')).toBeInTheDocument()
+  })
+
   it('mostra una sostituzione storica ricostruita dal dato ancora presente nello slot', async () => {
     const substitutedAt = Date.UTC(2026, 6, 21, 13, 8, 19)
     const legacySlot: PadelSlot = {

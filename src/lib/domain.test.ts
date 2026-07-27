@@ -1,5 +1,6 @@
 import {
   DEFAULT_VENUE,
+  addGuestSignup,
   addSlotToPoll,
   addSignup,
   defaultSlotForWeek,
@@ -11,11 +12,13 @@ import {
   getSlotPhase,
   getStarters,
   getUpcomingPolls,
+  guestNameError,
   isBookingCandidate,
   makePoll,
   nextMondayDate,
   padelDateTimeToTimestamp,
   profileNameError,
+  removeGuestSignup,
   removeSignup,
   removeSlotFromPoll,
   rescheduleSlot,
@@ -39,6 +42,16 @@ describe('nome del profilo', () => {
 
   it('accetta un nome che non contiene Evi', () => {
     expect(profileNameError('Brescio')).toBeNull()
+  })
+})
+
+describe('nome dell’ospite', () => {
+  it('accetta Evi perché il blocco scherzoso vale solo per i profili registrati', () => {
+    expect(guestNameError('Evi ospite')).toBeNull()
+  })
+
+  it('richiede un nome leggibile', () => {
+    expect(guestNameError(' ')).toBe('Scrivi il nome dell’ospite.')
   })
 })
 
@@ -83,6 +96,36 @@ describe('ordine adesioni', () => {
   it('ignora una doppia adesione dello stesso giocatore', () => {
     const current = slot([signup('a', 1)])
     expect(addSignup(current, member('a'), 2)).toBe(current)
+  })
+
+  it('aggiunge un ospite nello stesso ordine cronologico dei membri', () => {
+    const current = slot([signup('a', 1)])
+    const updated = addGuestSignup(current, '  Ciccio   Pasticcio  ', member('jury', 'Jury'), 2, 'starter')
+    const guest = getStarters(updated)[1]
+
+    expect(guest).toMatchObject({
+      displayName: 'Ciccio Pasticcio',
+      joinedAt: 2,
+      role: 'starter',
+      isGuest: true,
+      addedBy: 'jury',
+      addedByName: 'Jury',
+    })
+    expect(guest.userId).toMatch(/^guest_/)
+  })
+
+  it('rimuove solo un ospite e promuove la prima riserva per derivazione', () => {
+    let current = slot(['a', 'b', 'c'].map((id, index) => signup(id, index + 1, 'starter')))
+    current = addGuestSignup(current, 'Ciccio', member('jury'), 4, 'starter')
+    current = {
+      ...current,
+      signups: [...current.signups, signup('reserve', 5, 'reserve')],
+    }
+    const guest = current.signups.find((entry) => entry.isGuest)
+    const updated = removeGuestSignup(current, guest!.id)
+
+    expect(getStarters(updated).map((entry) => entry.userId)).toEqual(['a', 'b', 'c', 'reserve'])
+    expect(updated.signups.some((entry) => entry.isGuest)).toBe(false)
   })
 
   it('permette di scegliere la riserva anche quando ci sono posti da titolare', () => {
@@ -386,6 +429,20 @@ describe('voti di fine partita', () => {
       ...current,
       slots: [{ ...current.slots[0], signups: current.slots[0].signups.slice(0, 3) }],
     }], [], 'jury', dueAt)).toHaveLength(0)
+  })
+
+  it('esclude gli ospiti dalle pagelle ma mantiene valido il match da quattro titolari', () => {
+    const current = ratingPoll()
+    current.slots[0].signups[3] = {
+      ...current.slots[0].signups[3],
+      userId: 'guest_ciccio',
+      displayName: 'Ciccio',
+      isGuest: true,
+    }
+    const dueAt = Date.parse('2026-07-28T08:40:00.000Z')
+    const prompt = getPendingMatchRatingPrompts([current], [], 'jury', dueAt)[0]
+
+    expect(prompt.teammates.map((teammate) => teammate.userId)).toEqual(['ale', 'luca'])
   })
 })
 

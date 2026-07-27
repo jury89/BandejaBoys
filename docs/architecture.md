@@ -99,6 +99,8 @@ Le adesioni sono sempre ordinate da `joinedAt`, con l'identificatore dell'adesio
 
 Quando una persona si ritira, la sua adesione viene rimossa. Se la formazione era completa, la prima riserva viene promossa impostandola come titolare; con meno di quattro titolari, invece, le riserve volontarie restano in lista d’attesa. Se la stessa persona torna a segnarsi, sceglie nuovamente il ruolo ed entra in fondo con un nuovo timestamp.
 
+Un ospite usa lo stesso record `Signup`, con UID sintetico prefissato `guest_` e `isGuest: true`; `addedBy` e `addedByName` fotografano il membro che lo ha inserito. Conta quindi normalmente tra i quattro titolari e può far passare lo slot a `ready`, senza introdurre una seconda lista o un ordinamento speciale. La rimozione accetta soltanto l’id di un’adesione marcata come ospite e riusa la stessa derivazione della promozione. Gli UID sintetici vengono esclusi esplicitamente dai destinatari delle notifiche e delle pagelle: lo slot resta una partita completa, ma soltanto i titolari con account ricevono push e possono valutarsi.
+
 ## Sostituzioni
 
 Solo un titolare può passare il proprio posto. Il sostituto non può essere un altro titolare.
@@ -129,6 +131,7 @@ polls/{pollId}
     bookedAt?, bookedBy?, bookedByName?
     signups[]
       id, userId, displayName, joinedAt, role?, substitutedFor?
+      isGuest?, addedBy?, addedByName?
 
 pushSubscriptions/{subscriptionId}
   userId, endpoint, expirationTime
@@ -167,9 +170,9 @@ Un sondaggio e i suoi slot stanno in un solo documento. `title` resta persistito
 
 `notificationDeliveries` conserva una ricevuta per ogni coppia evento/dispositivo soltanto dopo che il servizio Web Push ha accettato l’invio. La pagina personale interroga la raccolta con `where('userId', '==', uid)` e ordina in memoria, evitando indici composti; raggruppa poi per `eventId`, così la stessa notifica consegnata a telefono e tablet compare una sola volta e conserva il conteggio dei dispositivi. Il badge dell’header conta i soli gruppi privi di `readAt`. Il payload Web Push aggiunge `eventId` al dato della notifica e al parametro `notificationEvent` del deep link: all’avvio la dashboard aggiorna tutte le ricevute di quel gruppo e rimuove il parametro dall’URL. L’apertura diretta della bacheca non scrive nulla; l’apertura dell’archivio marca invece tutti gli avvisi caricati come letti. Le vecchie ricevute prive di `title` o `body` restano leggibili senza inventarne il contenuto. Le Security Rules consentono al notifier di creare le ricevute e a ogni membro di leggere esclusivamente quelle con il proprio UID; il membro può aggiungere o aggiornare soltanto `readAt` con l’ora del server sulle proprie ricevute, mentre cancellazione e ogni altra modifica restano vietate.
 
-Le risposte e i voti sono documenti immutabili. L’identificatore deterministico rende idempotente ogni coppia partita/revisore/destinatario; le copie dei nomi fotografano lo storico mentre gli UID permettono di risalire sempre alle persone coinvolte. Le regole consentono a un giocatore di creare i propri voti e di leggere i record in cui è autore o destinatario, vietando aggiornamenti e cancellazioni. La UI espone al destinatario soltanto la media per partita nella propria mini scheda dello storico; non vengono creati documenti aggregati né classifiche globali.
+Le risposte e i voti sono documenti immutabili. L’identificatore deterministico rende idempotente ogni coppia partita/revisore/destinatario; le copie dei nomi fotografano lo storico mentre gli UID permettono di risalire sempre alle persone coinvolte. Per una formazione con ospiti, il prompt contiene da uno a tre compagni registrati e non crea voti verso gli UID sintetici. Le regole consentono a un giocatore di creare i propri voti e di leggere i record in cui è autore o destinatario, vietando aggiornamenti e cancellazioni. La UI espone al destinatario soltanto la media per partita nella propria mini scheda dello storico; non vengono creati documenti aggregati né classifiche globali.
 
-`activityEvents` è un audit log append-only delle azioni organizzative, non un log di ogni clic: registra creazione e gestione di sondaggi e slot, adesioni, ritiri, sostituzioni e prenotazioni. `occurredAt` usa `serverTimestamp()`, quindi l’orario non dipende dall’orologio del telefono. L’evento viene scritto nella stessa transazione Firestore della modifica a cui si riferisce; la creazione iniziale usa un unico batch per sondaggio ed eventi. Le Security Rules consentono la creazione soltanto all’attore autenticato e vietano aggiornamento e cancellazione.
+`activityEvents` è un audit log append-only delle azioni organizzative, non un log di ogni clic: registra creazione e gestione di sondaggi e slot, adesioni, ritiri, aggiunte e rimozioni degli ospiti, sostituzioni e prenotazioni. Gli eventi `guest_added` e `guest_removed` conservano nome, ruolo e id dell’adesione dell’ospite insieme al membro autenticato che ha agito. `occurredAt` usa `serverTimestamp()`, quindi l’orario non dipende dall’orologio del telefono. L’evento viene scritto nella stessa transazione Firestore della modifica a cui si riferisce; la creazione iniziale usa un unico batch per sondaggio ed eventi. Le Security Rules consentono la creazione soltanto all’attore autenticato e vietano aggiornamento e cancellazione.
 
 Ogni `SlotCard` espone una piccola azione Cronologia anche quando il sondaggio è archiviato. Il modal interroga `activityEvents` per il solo `slotId`, verifica anche il `pollId` nel client e ordina gli eventi per `occurredAt` decrescente: in questo modo la lettura resta limitata, non richiede un indice composto e mostra azione, copia storica dell’autore e timestamp nel fuso `Europe/Rome`. Il repository demo applica lo stesso contratto ai record in `localStorage`.
 
@@ -179,9 +182,9 @@ Le visualizzazioni sono aggregate separatamente per evitare un documento per ape
 
 ## Concorrenza
 
-Ogni aggiunta o eliminazione di uno slot, adesione, ritiro, sostituzione, modifica dell’orario o conferma del campo usa `runTransaction`; il relativo evento di audit fa parte della stessa operazione atomica. Se due membri aggiornano lo stesso sondaggio contemporaneamente, Firestore rilegge la versione più recente e ripete l'operazione, evitando il classico aggiornamento perso.
+Ogni aggiunta o eliminazione di uno slot, adesione, ritiro, aggiunta o rimozione di un ospite, sostituzione, modifica dell’orario o conferma del campo usa `runTransaction`; il relativo evento di audit fa parte della stessa operazione atomica. Se due membri aggiornano lo stesso sondaggio contemporaneamente, Firestore rilegge la versione più recente e ripete l'operazione, evitando il classico aggiornamento perso.
 
-Anche l’invio di una pagella è transazionale: prima verifica che non esista già una risposta, poi crea insieme i tre voti immutabili e la risposta `submitted`. La chiusura crea soltanto la risposta `dismissed`. Una gara tra due dispositivi dello stesso utente produce quindi un solo esito definitivo.
+Anche l’invio di una pagella è transazionale: prima verifica che non esista già una risposta, poi crea insieme da uno a tre voti immutabili, in base ai compagni registrati, e la risposta `submitted`. La chiusura crea soltanto la risposta `dismissed`. Una gara tra due dispositivi dello stesso utente produce quindi un solo esito definitivo.
 
 Al termine della transazione il repository restituisce anche il sondaggio aggiornato: la bacheca lo applica immediatamente, senza attendere il successivo evento realtime. Il listener Firestore resta attivo per confermare lo stato e sincronizzare gli altri dispositivi; questo evita interfacce ferme su connessioni mobili lente o sospese.
 

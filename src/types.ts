@@ -36,6 +36,9 @@ export interface Signup {
   displayName: string
   joinedAt: number
   role?: SignupRole
+  isGuest?: boolean
+  addedBy?: string
+  addedByName?: string
   substitutedFor?: SubstitutionNote
 }
 

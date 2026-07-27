@@ -476,4 +476,78 @@ describe('azioni dello slot', () => {
     expect(screen.getByRole('button', { name: 'Segnati come titolare' })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Segnati come riserva' })).toBeEnabled()
   })
+
+  it('permette a un membro di aggiungere un ospite come titolare', async () => {
+    const emptySlot = { ...slot, signups: [] }
+    const guestSignup = {
+      id: 'signup-guest',
+      userId: 'guest-ciccio',
+      displayName: 'Ciccio',
+      joinedAt: 2,
+      role: 'starter' as const,
+      isGuest: true,
+      addedBy: user.id,
+      addedByName: user.displayName,
+    }
+    const updatedPoll = {
+      ...poll,
+      slots: [{ ...emptySlot, signups: [guestSignup] }],
+    }
+    const addGuest = vi.spyOn(repository, 'addGuest').mockResolvedValue(updatedPoll)
+
+    render(
+      <SlotCard
+        poll={{ ...poll, slots: [emptySlot] }}
+        slot={emptySlot}
+        user={user}
+        members={[user]}
+        onPollChange={vi.fn()}
+        onNotify={vi.fn()}
+        onError={vi.fn()}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /Aggiungi un ospite allo slot/ }))
+    fireEvent.change(screen.getByLabelText('Nome dell’ospite'), { target: { value: 'Ciccio' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Aggiungi ospite' }))
+
+    await waitFor(() => {
+      expect(addGuest).toHaveBeenCalledWith(poll.id, slot.id, user, 'Ciccio', 'starter')
+    })
+  })
+
+  it('permette a un membro di rimuovere un ospite', async () => {
+    const guestSignup = {
+      id: 'signup-guest',
+      userId: 'guest-ciccio',
+      displayName: 'Ciccio',
+      joinedAt: 2,
+      role: 'starter' as const,
+      isGuest: true,
+      addedBy: user.id,
+      addedByName: user.displayName,
+    }
+    const guestSlot = { ...slot, signups: [guestSignup] }
+    const updatedPoll = { ...poll, slots: [{ ...guestSlot, signups: [] }] }
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    const removeGuest = vi.spyOn(repository, 'removeGuest').mockResolvedValue(updatedPoll)
+
+    render(
+      <SlotCard
+        poll={{ ...poll, slots: [guestSlot] }}
+        slot={guestSlot}
+        user={user}
+        members={[user]}
+        onPollChange={vi.fn()}
+        onNotify={vi.fn()}
+        onError={vi.fn()}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Rimuovi l’ospite Ciccio dallo slot' }))
+
+    await waitFor(() => {
+      expect(removeGuest).toHaveBeenCalledWith(poll.id, slot.id, user, guestSignup.id)
+    })
+  })
 })
