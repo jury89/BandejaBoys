@@ -9,6 +9,7 @@ import {
   STARTER_SUBSTITUTION_NOTIFICATION_WINDOW_MS,
   collectScheduledNotifications,
   createNotificationDelivery,
+  createNotificationPushPayload,
   createTestNotification,
   isNotificationKindEnabled,
   isMondayMotivationWindow,
@@ -105,6 +106,18 @@ describe('ricevuta di consegna', () => {
       body: 'Sveglia fagianotto!',
       userId: 'jury',
       subscriptionId: 'subscription-1',
+    })
+  })
+
+  it('inserisce l’identificativo nel payload e nel deep link della push', () => {
+    const notification = createTestNotification('jury', 'manuale-2', 'Aprimi')
+
+    expect(createNotificationPushPayload(notification)).toEqual({
+      title: 'Bandeja Boys',
+      body: 'Aprimi',
+      url: '/?_pushRefresh=manuale-2&notificationEvent=test%3Amanuale-2',
+      tag: 'test-manuale-2',
+      eventId: 'test:manuale-2',
     })
   })
 })

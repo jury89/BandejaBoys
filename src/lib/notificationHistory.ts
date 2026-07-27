@@ -9,6 +9,7 @@ export interface NotificationDelivery {
   userId: string
   subscriptionId: string
   sentAt: number
+  readAt?: number
 }
 
 export interface NotificationHistoryItem {
@@ -19,6 +20,8 @@ export interface NotificationHistoryItem {
   body?: string
   sentAt: number
   deliveredDeviceCount: number
+  deliveryIds: string[]
+  isRead: boolean
 }
 
 export function buildNotificationHistory(
@@ -45,7 +48,13 @@ export function buildNotificationHistory(
         body: latest.body,
         sentAt: latest.sentAt,
         deliveredDeviceCount: new Set(eventDeliveries.map((delivery) => delivery.subscriptionId)).size,
+        deliveryIds: ordered.map((delivery) => delivery.id),
+        isRead: eventDeliveries.some((delivery) => (delivery.readAt ?? 0) > 0),
       }
     })
     .sort((left, right) => right.sentAt - left.sentAt || right.id.localeCompare(left.id))
+}
+
+export function unreadNotificationCount(notifications: NotificationHistoryItem[]): number {
+  return notifications.filter((notification) => !notification.isRead).length
 }

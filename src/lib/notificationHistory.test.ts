@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { buildNotificationHistory, type NotificationDelivery } from './notificationHistory'
+import {
+  buildNotificationHistory,
+  unreadNotificationCount,
+  type NotificationDelivery,
+} from './notificationHistory'
 
 const delivery = (
   id: string,
@@ -33,6 +37,8 @@ describe('storico notifiche push', () => {
       body: 'Testo finale',
       sentAt: 105,
       deliveredDeviceCount: 2,
+      deliveryIds: ['delivery-tablet', 'delivery-phone'],
+      isRead: false,
     }])
   })
 
@@ -43,5 +49,29 @@ describe('storico notifiche push', () => {
     ])
 
     expect(history.map((item) => item.eventId)).toEqual(['event-2', 'event-1'])
+  })
+
+  it('considera letto un avviso su tutti i dispositivi appena una consegna ha readAt', () => {
+    const history = buildNotificationHistory([
+      delivery('delivery-phone', 'event-1', 'phone', 100, 'Testo'),
+      {
+        ...delivery('delivery-tablet', 'event-1', 'tablet', 105, 'Testo'),
+        readAt: 110,
+      },
+    ])
+
+    expect(history[0]).toMatchObject({
+      isRead: true,
+      deliveryIds: ['delivery-tablet', 'delivery-phone'],
+    })
+  })
+
+  it('conta soltanto gli avvisi non letti', () => {
+    const history = buildNotificationHistory([
+      { ...delivery('read', 'event-read', 'phone', 100, 'Letta'), readAt: 120 },
+      delivery('unread', 'event-unread', 'phone', 200, 'Nuova'),
+    ])
+
+    expect(unreadNotificationCount(history)).toBe(1)
   })
 })

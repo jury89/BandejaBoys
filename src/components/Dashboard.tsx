@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Bell, BellRing, CalendarCheck2, CalendarClock, CalendarDays, CalendarPlus, CheckCircle2, ChevronDown, CircleUserRound, History, LogOut, PhoneCall, UsersRound } from 'lucide-react'
 import { useAuth } from '../AuthContext'
 import type { MatchRatingRecord, MatchRatingResponse, MatchRatingSubmission, MemberProfile, PadelPoll, PlayerMatch } from '../types'
@@ -15,7 +15,15 @@ import {
 import { firstName, slotDateParts } from '../lib/format'
 import { hasRemoteBackend } from '../lib/firebase'
 import { resolveMemberName } from '../lib/memberNames'
-import { buildNotificationHistory, type NotificationHistoryItem } from '../lib/notificationHistory'
+import {
+  buildNotificationHistory,
+  unreadNotificationCount,
+  type NotificationHistoryItem,
+} from '../lib/notificationHistory'
+import {
+  notificationEventFromSearch,
+  removeNotificationEventFromCurrentUrl,
+} from '../lib/notificationRead'
 import { notificationStateLabel, usePushNotifications } from '../lib/notifications'
 import { RATING_TEST_QUERY_PARAM, isRatingTestRequested, makeRatingTestPrompt } from '../lib/ratingTest'
 import { repository } from '../lib/repository'
@@ -99,9 +107,39 @@ export function Dashboard() {
     const slotId = parameters.get('rateSlot')
     return pollId && slotId ? { pollId, slotId } : null
   })
+  const [requestedNotificationEvent] = useState(
+    () => notificationEventFromSearch(window.location.search),
+  )
+  const markingNotificationDeliveryIdsRef = useRef(new Set<string>())
   const notifications = usePushNotifications(user)
   const ratingReviewerId = user?.id
   const notificationHistoryUserId = user?.id
+  const markNotificationDeliveriesRead = useCallback((
+    deliveryIds: string[],
+    onSuccess?: () => void,
+  ) => {
+    const pendingIds = deliveryIds.filter(
+      (deliveryId) => !markingNotificationDeliveryIdsRef.current.has(deliveryId),
+    )
+    if (pendingIds.length === 0) return
+
+    pendingIds.forEach((deliveryId) => {
+      markingNotificationDeliveryIdsRef.current.add(deliveryId)
+    })
+    void repository.markNotificationDeliveriesRead(pendingIds)
+      .then(onSuccess)
+      .catch(() => {
+        setToast({
+          message: 'Non siamo riusciti ad aggiornare le notifiche lette.',
+          tone: 'error',
+        })
+      })
+      .finally(() => {
+        pendingIds.forEach((deliveryId) => {
+          markingNotificationDeliveryIdsRef.current.delete(deliveryId)
+        })
+      })
+  }, [])
 
   useEffect(() => {
     const onError = (error: Error) => {
@@ -142,6 +180,41 @@ export function Dashboard() {
       setNotificationHistoryLoaded(true)
     })
   }, [notificationHistoryUserId])
+
+  useEffect(() => {
+    if (!requestedNotificationEvent || !notificationHistoryLoaded) return
+    const clickedNotification = notificationHistory.find(
+      (notification) => notification.eventId === requestedNotificationEvent,
+    )
+    if (!clickedNotification) return
+    if (clickedNotification.isRead) {
+      removeNotificationEventFromCurrentUrl()
+      return
+    }
+
+    markNotificationDeliveriesRead(
+      clickedNotification.deliveryIds,
+      removeNotificationEventFromCurrentUrl,
+    )
+  }, [
+    markNotificationDeliveriesRead,
+    notificationHistory,
+    notificationHistoryLoaded,
+    requestedNotificationEvent,
+  ])
+
+  useEffect(() => {
+    if (dashboardView !== 'notifications' || !notificationHistoryLoaded) return
+    const unreadDeliveryIds = notificationHistory
+      .filter((notification) => !notification.isRead)
+      .flatMap((notification) => notification.deliveryIds)
+    markNotificationDeliveriesRead(unreadDeliveryIds)
+  }, [
+    dashboardView,
+    markNotificationDeliveriesRead,
+    notificationHistory,
+    notificationHistoryLoaded,
+  ])
 
   useEffect(() => {
     if (!ratingReviewerId) return
@@ -249,6 +322,10 @@ export function Dashboard() {
   const playerMatches = useMemo(
     () => user ? getPlayerMatches(polls, user.id, now, receivedRatings) : { upcoming: [], past: [] },
     [now, polls, receivedRatings, user],
+  )
+  const unreadNotifications = useMemo(
+    () => unreadNotificationCount(notificationHistory),
+    [notificationHistory],
   )
   const ratingPrompts = useMemo(() => (
     user && ratingResponsesLoaded
@@ -411,13 +488,13 @@ export function Dashboard() {
             <button
               className={`notification-inbox-trigger ${dashboardView === 'notifications' ? 'is-active' : ''}`}
               type="button"
-              aria-label={`Apri le mie notifiche, ${notificationHistory.length} ${notificationHistory.length === 1 ? 'notifica' : 'notifiche'}`}
+              aria-label={`Apri le mie notifiche, ${unreadNotifications} ${unreadNotifications === 1 ? 'notifica non letta' : 'notifiche non lette'}`}
               aria-current={dashboardView === 'notifications' ? 'page' : undefined}
               onClick={openNotificationHistory}
             >
-              {notificationHistory.length > 0 ? <BellRing size={19} /> : <Bell size={19} />}
-              {notificationHistory.length > 0 && (
-                <span aria-hidden="true">{notificationHistory.length > 99 ? '99+' : notificationHistory.length}</span>
+              {unreadNotifications > 0 ? <BellRing size={19} /> : <Bell size={19} />}
+              {unreadNotifications > 0 && (
+                <span aria-hidden="true">{unreadNotifications > 99 ? '99+' : unreadNotifications}</span>
               )}
             </button>
           )}

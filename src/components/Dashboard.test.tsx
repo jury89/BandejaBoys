@@ -1,15 +1,14 @@
 import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { vi } from 'vitest'
+import { beforeEach, vi } from 'vitest'
 import type { MatchRatingRecord, PadelPoll } from '../types'
 import type { NotificationDelivery } from '../lib/notificationHistory'
+import { repository } from '../lib/repository'
 import { slotElementId } from '../lib/slotNavigation'
 import { Dashboard } from './Dashboard'
 
-const dashboardTestState = vi.hoisted(() => ({
-  polls: [] as PadelPoll[],
-  ratings: [] as MatchRatingRecord[],
-  deliveries: [{
+const dashboardTestState = vi.hoisted(() => {
+  const defaultDelivery = {
     id: 'delivery-1',
     eventId: 'event-1',
     kind: 'test',
@@ -18,8 +17,14 @@ const dashboardTestState = vi.hoisted(() => ({
     userId: 'jury',
     subscriptionId: 'phone',
     sentAt: Date.UTC(2026, 6, 27, 8, 30),
-  }] as NotificationDelivery[],
-}))
+  } satisfies NotificationDelivery
+  return {
+    polls: [] as PadelPoll[],
+    ratings: [] as MatchRatingRecord[],
+    deliveries: [defaultDelivery] as NotificationDelivery[],
+    defaultDelivery,
+  }
+})
 
 vi.mock('../AuthContext', () => ({
   useAuth: () => ({
@@ -70,10 +75,19 @@ vi.mock('../lib/repository', () => ({
       listener(dashboardTestState.deliveries)
       return vi.fn()
     },
+    markNotificationDeliveriesRead: vi.fn().mockResolvedValue(undefined),
   },
 }))
 
 describe('menu account', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    dashboardTestState.polls = []
+    dashboardTestState.ratings = []
+    dashboardTestState.deliveries = [dashboardTestState.defaultDelivery]
+    window.history.replaceState({}, '', '/')
+  })
+
   it('resta aperto al suo interno e si chiude con un clic esterno o con Escape', async () => {
     const user = userEvent.setup()
     render(<Dashboard />)
@@ -118,13 +132,16 @@ describe('menu account', () => {
     render(<Dashboard />)
 
     await user.click(await screen.findByRole('button', {
-      name: 'Apri le mie notifiche, 1 notifica',
+      name: 'Apri le mie notifiche, 1 notifica non letta',
     }))
 
     expect(window.location.hash).toBe('#notifiche')
     expect(screen.getByRole('heading', { name: 'Le mie notifiche' })).toBeInTheDocument()
     expect(screen.getByText('Attenzione fagianotto')).toBeInTheDocument()
     expect(screen.getByText('Messaggio di prova.')).toBeInTheDocument()
+    await waitFor(() => {
+      expect(repository.markNotificationDeliveriesRead).toHaveBeenCalledWith(['delivery-1'])
+    })
 
     act(() => {
       window.history.replaceState({}, '', '/')
@@ -132,6 +149,29 @@ describe('menu account', () => {
     })
 
     expect(screen.getByRole('heading', { name: /Mettiamo in campo/ })).toBeInTheDocument()
+  })
+
+  it('segna come letta la notifica specifica quando l’app viene aperta dalla push', async () => {
+    window.history.replaceState({}, '', '/?notificationEvent=event-1')
+    render(<Dashboard />)
+
+    await waitFor(() => {
+      expect(repository.markNotificationDeliveriesRead).toHaveBeenCalledWith(['delivery-1'])
+      expect(window.location.search).toBe('')
+    })
+  })
+
+  it('non conta né riscrive gli avvisi già letti quando apre normalmente la bacheca', async () => {
+    dashboardTestState.deliveries = [{
+      ...dashboardTestState.defaultDelivery,
+      readAt: Date.UTC(2026, 6, 27, 8, 35),
+    }]
+    render(<Dashboard />)
+
+    expect(await screen.findByRole('button', {
+      name: 'Apri le mie notifiche, 0 notifiche non lette',
+    })).toBeInTheDocument()
+    expect(repository.markNotificationDeliveriesRead).not.toHaveBeenCalled()
   })
 
   it('apre dalla lista match lo slot corretto e ripete lo scroll dopo il ripristino di Safari', async () => {

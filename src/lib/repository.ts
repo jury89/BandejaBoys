@@ -69,6 +69,7 @@ export interface PadelRepository {
     listener: (deliveries: NotificationDelivery[]) => void,
     onError: (error: Error) => void,
   ): Unsubscribe
+  markNotificationDeliveriesRead(deliveryIds: string[]): Promise<void>
   getSlotActivity(pollId: string, slotId: string): Promise<LocalActivityEvent[]>
   createPoll(input: CreatePollInput, creator: SessionUser): Promise<void>
   addSlot(pollId: string, input: SlotInput, creator: SessionUser): Promise<PadelPoll>
@@ -255,20 +256,38 @@ function remoteRepository(): PadelRepository {
       return onSnapshot(
         query(collection(db, 'notificationDeliveries'), where('userId', '==', userId)),
         (snapshot) => listener(snapshot.docs.map((item) => {
-          const data = item.data() as Omit<NotificationDelivery, 'id' | 'sentAt'> & {
+          const data = item.data() as Omit<NotificationDelivery, 'id' | 'sentAt' | 'readAt'> & {
             sentAt?: number | { toMillis: () => number }
+            readAt?: number | { toMillis: () => number }
           }
           const sentAt = typeof data.sentAt === 'number'
             ? data.sentAt
             : data.sentAt?.toMillis() ?? 0
+          const readAt = typeof data.readAt === 'number'
+            ? data.readAt
+            : data.readAt?.toMillis()
           return {
             ...data,
             id: item.id,
             sentAt,
+            readAt,
           }
         })),
         onError,
       )
+    },
+    async markNotificationDeliveriesRead(deliveryIds) {
+      const uniqueIds = Array.from(new Set(deliveryIds))
+      const batchSize = 400
+      for (let offset = 0; offset < uniqueIds.length; offset += batchSize) {
+        const batch = writeBatch(db)
+        uniqueIds.slice(offset, offset + batchSize).forEach((deliveryId) => {
+          batch.update(doc(db, 'notificationDeliveries', deliveryId), {
+            readAt: serverTimestamp(),
+          })
+        })
+        await batch.commit()
+      }
     },
     async getSlotActivity(pollId, slotId) {
       const snapshot = await getDocs(
@@ -669,6 +688,9 @@ function localRepository(): PadelRepository {
     subscribeNotificationDeliveries(_userId, listener) {
       listener([])
       return () => undefined
+    },
+    async markNotificationDeliveriesRead() {
+      return undefined
     },
     async getSlotActivity(pollId, slotId) {
       return readLocalActivityStore().events

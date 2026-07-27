@@ -19,6 +19,7 @@ import {
   personalizeMotivationalMessageWithMotherName,
 } from './motivationalMessages'
 import { normalizeNotificationPreferences } from './notificationPreferences'
+import { notificationUrlWithEvent } from './notificationRead'
 
 const HOUR_MS = 60 * 60 * 1000
 const DAY_MS = 24 * HOUR_MS
@@ -78,6 +79,26 @@ export interface NotificationDeliveryData {
   body: string
   userId: string
   subscriptionId: string
+}
+
+export interface NotificationPushPayload {
+  title: string
+  body: string
+  url: string
+  tag: string
+  eventId: string
+}
+
+export function createNotificationPushPayload(
+  notification: ScheduledNotification,
+): NotificationPushPayload {
+  return {
+    title: notification.title,
+    body: notification.body,
+    url: notificationUrlWithEvent(notification.url, notification.id),
+    tag: notification.tag,
+    eventId: notification.id,
+  }
 }
 
 export function createNotificationDelivery(

@@ -22,6 +22,7 @@ import {
 import {
   collectScheduledNotifications,
   createNotificationDelivery,
+  createNotificationPushPayload,
   createTestNotification,
   isNotificationKindEnabled,
 } from '../src/lib/notificationSchedule'
@@ -167,12 +168,7 @@ for (const notification of notifications) {
         endpoint: subscription.data.endpoint,
         expirationTime: subscription.data.expirationTime,
         keys: subscription.data.keys,
-      }, JSON.stringify({
-        title: notification.title,
-        body: notification.body,
-        url: notification.url,
-        tag: notification.tag,
-      }), {
+      }, JSON.stringify(createNotificationPushPayload(notification)), {
         TTL: notification.ttlSeconds,
         urgency: notification.kind === 'slot-ready'
           || notification.kind === 'reminder-2h'

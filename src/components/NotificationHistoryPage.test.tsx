@@ -12,6 +12,8 @@ const notifications: NotificationHistoryItem[] = [{
   body: 'Dade, prendi il posto di Tommy.',
   sentAt: Date.UTC(2026, 6, 27, 8, 30),
   deliveredDeviceCount: 2,
+  deliveryIds: ['delivery-2'],
+  isRead: false,
 }, {
   id: 'delivery-1',
   eventId: 'event-1',
@@ -20,6 +22,8 @@ const notifications: NotificationHistoryItem[] = [{
   body: 'È lunedì.',
   sentAt: Date.UTC(2026, 6, 27, 6, 30),
   deliveredDeviceCount: 1,
+  deliveryIds: ['delivery-1'],
+  isRead: true,
 }]
 
 describe('archivio notifiche', () => {

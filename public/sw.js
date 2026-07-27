@@ -1,6 +1,6 @@
 const NOTIFICATION_ICON = '/icons/padel-192.png'
 const NOTIFICATION_BADGE = '/icons/padel-badge-96.png'
-const APP_REFRESH_BRIDGE_VERSION = 'profile-preferences-20260724'
+const APP_REFRESH_BRIDGE_VERSION = 'notification-unread-20260727'
 
 self.addEventListener('install', () => self.skipWaiting())
 self.addEventListener('activate', (event) => event.waitUntil((async () => {
@@ -34,20 +34,26 @@ self.addEventListener('push', (event) => {
     icon: NOTIFICATION_ICON,
     badge: NOTIFICATION_BADGE,
     tag: payload.tag,
-    data: { url: payload.url || '/' },
+    data: {
+      url: payload.url || '/',
+      eventId: payload.eventId,
+    },
   }))
 })
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
-  const destination = new URL(event.notification.data?.url || '/', self.location.origin).href
+  const destination = new URL(event.notification.data?.url || '/', self.location.origin)
+  if (event.notification.data?.eventId) {
+    destination.searchParams.set('notificationEvent', event.notification.data.eventId)
+  }
   event.waitUntil((async () => {
     const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
     const existing = windows.find((client) => client.url.startsWith(self.location.origin))
     if (existing) {
-      await existing.navigate(destination)
+      await existing.navigate(destination.href)
       return existing.focus()
     }
-    return self.clients.openWindow(destination)
+    return self.clients.openWindow(destination.href)
   })())
 })
