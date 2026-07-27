@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Bell, BellRing, CalendarCheck2, CalendarClock, CalendarDays, CalendarPlus, CheckCircle2, ChevronDown, CircleUserRound, History, LogOut, PhoneCall, UsersRound } from 'lucide-react'
+import { Bell, BellRing, CalendarCheck2, CalendarClock, CalendarDays, CalendarPlus, CheckCircle2, ChevronDown, CircleUserRound, History, LogOut, PhoneCall, RefreshCw, UsersRound } from 'lucide-react'
 import { useAuth } from '../AuthContext'
 import type { MatchRatingRecord, MatchRatingResponse, MatchRatingSubmission, MemberProfile, PadelPoll, PlayerMatch } from '../types'
 import {
@@ -44,6 +44,8 @@ type DashboardView = 'feed' | 'matches' | 'notifications'
 
 const PERSONAL_MATCHES_HASH = '#i-miei-match'
 const NOTIFICATION_HISTORY_HASH = '#notifiche'
+const INITIAL_DATA_TIMEOUT_MS = 6_000
+const INITIAL_DATA_AUTO_RETRIES = 2
 
 function dashboardViewFromLocation(): DashboardView {
   if (window.location.hash === PERSONAL_MATCHES_HASH) return 'matches'
@@ -82,6 +84,8 @@ export function Dashboard() {
   const [polls, setPolls] = useState<PadelPoll[]>([])
   const [members, setMembers] = useState<MemberProfile[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingError, setLoadingError] = useState<string | null>(null)
+  const [dataSubscriptionAttempt, setDataSubscriptionAttempt] = useState(0)
   const [feedFilter, setFeedFilter] = useState<FeedFilter>('all')
   const [dashboardView, setDashboardView] = useState<DashboardView>(dashboardViewFromLocation)
   const [createOpen, setCreateOpen] = useState(false)
@@ -101,6 +105,8 @@ export function Dashboard() {
   const [ratingTestStartedAt] = useState(() => Date.now())
   const [slotNavigationTarget, setSlotNavigationTarget] = useState<SlotNavigationTarget | null>(null)
   const accountMenuRef = useRef<HTMLDivElement>(null)
+  const hasLoadedPollsRef = useRef(false)
+  const initialDataRetryCountRef = useRef(0)
   const [requestedRating] = useState(() => {
     const parameters = new URLSearchParams(window.location.search)
     const pollId = parameters.get('ratePoll')
@@ -141,21 +147,74 @@ export function Dashboard() {
       })
   }, [])
 
+  const retryDashboardData = useCallback(() => {
+    initialDataRetryCountRef.current = 0
+    setLoadingError(null)
+    if (!hasLoadedPollsRef.current) setLoading(true)
+    setDataSubscriptionAttempt((attempt) => attempt + 1)
+  }, [])
+
   useEffect(() => {
-    const onError = (error: Error) => {
+    let pollsSettled = false
+    const finishInitialLoadWithError = (error: Error) => {
+      pollsSettled = true
       setToast({ message: error.message, tone: 'error' })
-      setLoading(false)
+      if (!hasLoadedPollsRef.current) {
+        setLoadingError('Non siamo riusciti a recuperare gli slot.')
+        setLoading(false)
+      }
     }
     const stopPolls = repository.subscribePolls((nextPolls) => {
+      pollsSettled = true
+      hasLoadedPollsRef.current = true
+      initialDataRetryCountRef.current = 0
       setPolls(nextPolls)
+      setLoadingError(null)
       setLoading(false)
-    }, onError)
-    const stopMembers = repository.subscribeMembers(setMembers, onError)
+    }, finishInitialLoadWithError)
+    const stopMembers = repository.subscribeMembers(setMembers, (error) => {
+      setToast({ message: error.message, tone: 'error' })
+    })
+    const initialLoadTimer = hasLoadedPollsRef.current
+      ? undefined
+      : window.setTimeout(() => {
+        if (pollsSettled) return
+        if (initialDataRetryCountRef.current < INITIAL_DATA_AUTO_RETRIES) {
+          initialDataRetryCountRef.current += 1
+          setDataSubscriptionAttempt((attempt) => attempt + 1)
+          return
+        }
+        setLoadingError('La connessione è rimasta in pausa troppo a lungo.')
+        setLoading(false)
+      }, INITIAL_DATA_TIMEOUT_MS)
+
     return () => {
+      if (initialLoadTimer) window.clearTimeout(initialLoadTimer)
       stopPolls()
       stopMembers()
     }
-  }, [])
+  }, [dataSubscriptionAttempt])
+
+  useEffect(() => {
+    if (!hasRemoteBackend) return
+
+    const reconnect = () => {
+      if (document.visibilityState === 'hidden') return
+      retryDashboardData()
+    }
+    const reconnectFromPageCache = (event: PageTransitionEvent) => {
+      if (event.persisted) reconnect()
+    }
+
+    document.addEventListener('visibilitychange', reconnect)
+    window.addEventListener('online', reconnect)
+    window.addEventListener('pageshow', reconnectFromPageCache)
+    return () => {
+      document.removeEventListener('visibilitychange', reconnect)
+      window.removeEventListener('online', reconnect)
+      window.removeEventListener('pageshow', reconnectFromPageCache)
+    }
+  }, [retryDashboardData])
 
   useEffect(() => {
     if (!ratingReviewerId) return
@@ -651,6 +710,16 @@ export function Dashboard() {
 
         {loading ? (
           <div className="loading-state"><span /><p>Prepariamo il campo…</p></div>
+        ) : loadingError ? (
+          <section className="empty-state loading-recovery">
+            <RefreshCw size={34} aria-hidden="true" />
+            <p className="eyebrow">Connessione in pausa</p>
+            <h2>Aggiorniamo il tabellone.</h2>
+            <p>{loadingError} Quando torna la rete riproviamo automaticamente; puoi anche farlo ora.</p>
+            <button className="button button--primary" type="button" onClick={retryDashboardData}>
+              <RefreshCw size={18} /> Riprova ora
+            </button>
+          </section>
         ) : visiblePolls.length > 0 ? (
           <div className="poll-feed">
             {visiblePolls.map((poll) => (

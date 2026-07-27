@@ -1,6 +1,6 @@
 import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, vi } from 'vitest'
+import { afterEach, beforeEach, vi } from 'vitest'
 import type { MatchRatingRecord, PadelPoll } from '../types'
 import type { NotificationDelivery } from '../lib/notificationHistory'
 import { repository } from '../lib/repository'
@@ -23,6 +23,8 @@ const dashboardTestState = vi.hoisted(() => {
     ratings: [] as MatchRatingRecord[],
     deliveries: [defaultDelivery] as NotificationDelivery[],
     defaultDelivery,
+    pollSubscriptionMode: 'success' as 'success' | 'stalled-once' | 'stalled',
+    pollSubscriptionCalls: 0,
   }
 })
 
@@ -56,7 +58,13 @@ vi.mock('../lib/notifications', () => ({
 vi.mock('../lib/repository', () => ({
   repository: {
     subscribePolls: (listener: (polls: PadelPoll[]) => void) => {
-      listener(dashboardTestState.polls)
+      dashboardTestState.pollSubscriptionCalls += 1
+      const shouldRespond = dashboardTestState.pollSubscriptionMode === 'success'
+        || (
+          dashboardTestState.pollSubscriptionMode === 'stalled-once'
+          && dashboardTestState.pollSubscriptionCalls > 1
+        )
+      if (shouldRespond) listener(dashboardTestState.polls)
       return vi.fn()
     },
     subscribeMembers: (listener: (members: []) => void) => {
@@ -85,7 +93,13 @@ describe('menu account', () => {
     dashboardTestState.polls = []
     dashboardTestState.ratings = []
     dashboardTestState.deliveries = [dashboardTestState.defaultDelivery]
+    dashboardTestState.pollSubscriptionMode = 'success'
+    dashboardTestState.pollSubscriptionCalls = 0
     window.history.replaceState({}, '', '/')
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
   })
 
   it('resta aperto al suo interno e si chiude con un clic esterno o con Escape', async () => {
@@ -172,6 +186,53 @@ describe('menu account', () => {
       name: 'Apri le mie notifiche, 0 notifiche non lette',
     })).toBeInTheDocument()
     expect(repository.markNotificationDeliveriesRead).not.toHaveBeenCalled()
+  })
+
+  it('rinnova automaticamente il listener se il primo caricamento resta sospeso', async () => {
+    vi.useFakeTimers()
+    dashboardTestState.pollSubscriptionMode = 'stalled-once'
+
+    render(<Dashboard />)
+    expect(screen.getByText('Prepariamo il campo…')).toBeInTheDocument()
+    expect(dashboardTestState.pollSubscriptionCalls).toBe(1)
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(6_000)
+    })
+
+    expect(dashboardTestState.pollSubscriptionCalls).toBe(2)
+    expect(screen.queryByText('Prepariamo il campo…')).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Ancora nessun sondaggio.' })).toBeInTheDocument()
+  })
+
+  it('non lascia lo spinner infinito se Firestore non risponde', async () => {
+    vi.useFakeTimers()
+    dashboardTestState.pollSubscriptionMode = 'stalled'
+
+    render(<Dashboard />)
+
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(6_000)
+      })
+    }
+
+    expect(dashboardTestState.pollSubscriptionCalls).toBe(3)
+    expect(screen.queryByText('Prepariamo il campo…')).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Aggiorniamo il tabellone.' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Riprova ora' })).toBeInTheDocument()
+  })
+
+  it('rinnova silenziosamente i listener quando la PWA torna visibile', () => {
+    render(<Dashboard />)
+    expect(dashboardTestState.pollSubscriptionCalls).toBe(1)
+
+    act(() => {
+      document.dispatchEvent(new Event('visibilitychange'))
+    })
+
+    expect(dashboardTestState.pollSubscriptionCalls).toBe(2)
+    expect(screen.queryByText('Prepariamo il campo…')).not.toBeInTheDocument()
   })
 
   it('apre dalla lista match lo slot corretto e ripete lo scroll dopo il ripristino di Safari', async () => {

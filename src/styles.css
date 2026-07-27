@@ -2325,6 +2325,11 @@ p {
   line-height: 1.6;
 }
 
+.loading-recovery > svg {
+  margin-bottom: 6px;
+  color: var(--court);
+}
+
 .empty-state__court {
   position: relative;
   display: grid;

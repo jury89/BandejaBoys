@@ -1,6 +1,12 @@
 import { getApp, getApps, initializeApp } from 'firebase/app'
 import { getAuth, type Auth } from 'firebase/auth'
-import { getFirestore, type Firestore } from 'firebase/firestore'
+import {
+  getFirestore,
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
+  type Firestore,
+} from 'firebase/firestore'
 
 const config = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -15,8 +21,16 @@ export const hasRemoteBackend = Boolean(
   config.apiKey && config.authDomain && config.projectId && config.appId,
 )
 
-const app = hasRemoteBackend ? (getApps().length ? getApp() : initializeApp(config)) : null
+const existingApp = hasRemoteBackend && getApps().length ? getApp() : null
+const app = hasRemoteBackend ? (existingApp ?? initializeApp(config)) : null
 
 export const firebaseAuth: Auth | null = app ? getAuth(app) : null
-export const firestore: Firestore | null = app ? getFirestore(app) : null
-
+export const firestore: Firestore | null = app
+  ? existingApp
+    ? getFirestore(app)
+    : initializeFirestore(app, {
+      localCache: persistentLocalCache({
+        tabManager: persistentMultipleTabManager(),
+      }),
+    })
+  : null
