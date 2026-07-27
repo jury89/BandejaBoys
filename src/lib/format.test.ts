@@ -1,4 +1,18 @@
-import { mondayOfWeek, pollWeekTitle, slotDateParts, weekLabel } from './format'
+import {
+  formatRatingAverage,
+  mondayOfWeek,
+  pollWeekTitle,
+  slotDateParts,
+  weekLabel,
+} from './format'
+
+describe('medie delle pagelle', () => {
+  it('arrotonda al mezzo punto più vicino senza decimali inutili', () => {
+    expect(formatRatingAverage(7.3)).toBe('7,5')
+    expect(formatRatingAverage(7.8)).toBe('8')
+    expect(formatRatingAverage(7.2)).toBe('7')
+  })
+})
 
 describe('orari degli slot', () => {
   it('mostra sempre giorno e ora di Roma anche se l’istante è espresso in UTC', () => {

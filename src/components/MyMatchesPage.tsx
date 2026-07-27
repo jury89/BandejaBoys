@@ -9,7 +9,7 @@ import {
   Star,
 } from 'lucide-react'
 import { DEFAULT_VENUE } from '../lib/domain'
-import { slotDateParts } from '../lib/format'
+import { formatRatingAverage, slotDateParts } from '../lib/format'
 import type { PlayerMatch, PlayerMatchLists } from '../types'
 
 interface MyMatchesPageProps {
@@ -44,7 +44,7 @@ function MatchItem({
   const status = past ? 'Giocata' : booked ? 'Campo confermato' : 'Da prenotare'
   const receivedRating = past ? match.receivedRating : undefined
   const averageLabel = receivedRating
-    ? new Intl.NumberFormat('it-IT', { maximumFractionDigits: 1 }).format(receivedRating.average)
+    ? formatRatingAverage(receivedRating.average)
     : null
 
   return (

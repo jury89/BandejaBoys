@@ -104,3 +104,8 @@ export function mondayOfWeek(value: string): string | null {
 export function firstName(displayName: string): string {
   return displayName.trim().split(/\s+/)[0] || displayName
 }
+
+export function formatRatingAverage(average: number): string {
+  const roundedToHalfPoint = Math.round(average * 2) / 2
+  return new Intl.NumberFormat('it-IT', { maximumFractionDigits: 1 }).format(roundedToHalfPoint)
+}
