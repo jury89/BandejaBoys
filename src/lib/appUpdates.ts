@@ -1,21 +1,45 @@
 const UPDATE_ATTEMPT_KEY = 'bandeja-boys:last-update-attempt'
 const VERSION_CHECK_INTERVAL_MS = 5 * 60 * 1000
+const UPDATE_RETRY_DELAY_MS = 30 * 1000
 
 interface BuildVersion {
   buildId?: unknown
+}
+
+export interface AppUpdateAttempt {
+  buildId: string
+  attemptedAt: number
+}
+
+export function parseAppUpdateAttempt(value: string | null): AppUpdateAttempt | null {
+  if (!value) return null
+
+  try {
+    const parsed = JSON.parse(value) as Partial<AppUpdateAttempt>
+    if (typeof parsed.buildId === 'string' && typeof parsed.attemptedAt === 'number') {
+      return { buildId: parsed.buildId, attemptedAt: parsed.attemptedAt }
+    }
+  } catch {
+    // Legacy versions stored only the build id: make that attempt immediately retryable.
+  }
+
+  return { buildId: value, attemptedAt: 0 }
 }
 
 export function appUpdateUrl(
   remoteBuildId: string,
   currentBuildId: string,
   currentHref: string,
-  lastAttemptedBuildId?: string | null,
+  lastAttempt?: AppUpdateAttempt | null,
+  requestedAt = Date.now(),
 ): string | null {
   const cleanRemoteBuildId = remoteBuildId.trim()
+  const recentlyAttempted = lastAttempt?.buildId === cleanRemoteBuildId
+    && requestedAt - lastAttempt.attemptedAt < UPDATE_RETRY_DELAY_MS
   if (
     !cleanRemoteBuildId
     || cleanRemoteBuildId === currentBuildId
-    || cleanRemoteBuildId === lastAttemptedBuildId
+    || recentlyAttempted
   ) {
     return null
   }
@@ -41,11 +65,13 @@ export function watchForAppUpdates(): () => void {
       const payload = await response.json() as BuildVersion
       if (typeof payload.buildId !== 'string') return
 
+      const requestedAt = Date.now()
       const destination = appUpdateUrl(
         payload.buildId,
         __BANDEJA_BUILD_ID__,
         window.location.href,
-        sessionStorage.getItem(UPDATE_ATTEMPT_KEY),
+        parseAppUpdateAttempt(sessionStorage.getItem(UPDATE_ATTEMPT_KEY)),
+        requestedAt,
       )
       if (!destination) {
         if (payload.buildId === __BANDEJA_BUILD_ID__) {
@@ -54,7 +80,10 @@ export function watchForAppUpdates(): () => void {
         return
       }
 
-      sessionStorage.setItem(UPDATE_ATTEMPT_KEY, payload.buildId)
+      sessionStorage.setItem(UPDATE_ATTEMPT_KEY, JSON.stringify({
+        buildId: payload.buildId,
+        attemptedAt: requestedAt,
+      } satisfies AppUpdateAttempt))
       window.location.replace(destination)
     } catch {
       // Offline or a transient version endpoint failure: retry on the next foreground event.

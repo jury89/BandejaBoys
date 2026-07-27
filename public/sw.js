@@ -1,6 +1,6 @@
 const NOTIFICATION_ICON = '/icons/padel-192.png'
 const NOTIFICATION_BADGE = '/icons/padel-badge-96.png'
-const APP_REFRESH_BRIDGE_VERSION = 'notification-unread-20260727'
+const APP_REFRESH_BRIDGE_VERSION = 'profile-notifications-20260727-2'
 
 self.addEventListener('install', () => self.skipWaiting())
 self.addEventListener('activate', (event) => event.waitUntil((async () => {

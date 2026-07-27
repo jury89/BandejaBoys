@@ -1,4 +1,4 @@
-import { appUpdateUrl } from './appUpdates'
+import { appUpdateUrl, parseAppUpdateAttempt } from './appUpdates'
 
 describe('aggiornamento della web app installata', () => {
   it('non ricarica quando la build pubblicata coincide con quella aperta', () => {
@@ -22,7 +22,25 @@ describe('aggiornamento della web app installata', () => {
       'build-2',
       'build-1',
       'https://bandeja-boys.web.app/?_bbv=build-2',
-      'build-2',
+      { buildId: 'build-2', attemptedAt: 10_000 },
+      20_000,
     )).toBeNull()
+  })
+
+  it('ritenta la stessa release se Safari è rimasto bloccato sulla vecchia build', () => {
+    expect(appUpdateUrl(
+      'build-2',
+      'build-1',
+      'https://bandeja-boys.web.app/?_bbv=build-2',
+      { buildId: 'build-2', attemptedAt: 10_000 },
+      40_000,
+    )).toBe('https://bandeja-boys.web.app/?_bbv=build-2')
+  })
+
+  it('rende subito ritentabili i vecchi tentativi salvati senza timestamp', () => {
+    expect(parseAppUpdateAttempt('build-2')).toEqual({
+      buildId: 'build-2',
+      attemptedAt: 0,
+    })
   })
 })
