@@ -553,16 +553,14 @@ function remoteRepository(): PadelRepository {
     async submitMatchRatings(prompt, reviewer, submissions) {
       const records = makeRatingRecords(prompt, reviewer, submissions)
       const responseReference = doc(db, 'matchRatingResponses', prompt.id)
-      return runTransaction(db, async (transaction) => {
-        const snapshot = await transaction.get(responseReference)
-        if (snapshot.exists()) throw new Error('Questa scheda è già stata chiusa.')
-        const response = makeRatingResponse(prompt, 'submitted', records[0].createdAt)
-        records.forEach((record) => {
-          transaction.set(doc(db, 'matchRatings', record.id), record)
-        })
-        transaction.set(responseReference, response)
-        return response
+      const response = makeRatingResponse(prompt, 'submitted', records[0].createdAt)
+      const batch = writeBatch(db)
+      records.forEach((record) => {
+        batch.set(doc(db, 'matchRatings', record.id), record)
       })
+      batch.set(responseReference, response)
+      await batch.commit()
+      return response
     },
   }
 }
