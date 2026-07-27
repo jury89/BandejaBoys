@@ -34,7 +34,7 @@ describe('PullToRefresh', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Rilascia per aggiornare')
 
     fireEvent.touchEnd(window, { touches: [] })
-    expect(screen.getByRole('status')).toHaveTextContent('Aggiorno la bacheca')
+    expect(screen.getByRole('status')).toHaveTextContent('Aggiorno la pagina')
 
     act(() => vi.advanceTimersByTime(160))
     expect(onRefresh).toHaveBeenCalledTimes(1)
@@ -59,23 +59,54 @@ describe('PullToRefresh', () => {
     expect(document.querySelector('.pull-refresh')).not.toHaveClass('is-visible')
   })
 
-  it('resta disattivato quando è aperto un modal', () => {
+  it('aggiorna anche da un modal quando il suo contenuto è in cima', () => {
+    vi.useFakeTimers()
     const onRefresh = vi.fn()
     render(
-      <>
-        <div className="modal-backdrop" />
-        <PullToRefresh onRefresh={onRefresh} />
-      </>,
+      <div className="modal-backdrop">
+        <section className="modal" data-testid="modal-page">
+          <PullToRefresh onRefresh={onRefresh} />
+        </section>
+      </div>,
     )
+    const modal = screen.getByTestId('modal-page')
 
-    fireEvent.touchStart(window, {
+    fireEvent.touchStart(modal, {
       touches: [touchPoint(120, 50)],
     })
-    fireEvent.touchMove(window, {
+    fireEvent.touchMove(modal, {
       cancelable: true,
       touches: [touchPoint(120, 220)],
     })
-    fireEvent.touchEnd(window, { touches: [] })
+    fireEvent.touchEnd(modal, { touches: [] })
+
+    act(() => vi.advanceTimersByTime(160))
+    expect(onRefresh).toHaveBeenCalledTimes(1)
+  })
+
+  it('non si arma quando il contenuto del modal non è in cima', () => {
+    const onRefresh = vi.fn()
+    render(
+      <div className="modal-backdrop">
+        <section className="modal" data-testid="modal-page">
+        <PullToRefresh onRefresh={onRefresh} />
+        </section>
+      </div>,
+    )
+    const modal = screen.getByTestId('modal-page')
+    Object.defineProperty(modal, 'scrollTop', {
+      configurable: true,
+      value: 40,
+    })
+
+    fireEvent.touchStart(modal, {
+      touches: [touchPoint(120, 50)],
+    })
+    fireEvent.touchMove(modal, {
+      cancelable: true,
+      touches: [touchPoint(120, 220)],
+    })
+    fireEvent.touchEnd(modal, { touches: [] })
 
     expect(document.querySelector('.pull-refresh')).not.toHaveClass('is-visible')
     expect(onRefresh).not.toHaveBeenCalled()

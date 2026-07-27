@@ -17,10 +17,20 @@ function refreshCurrentPage() {
   window.location.replace(pullRefreshUrl(window.location.href, Date.now()))
 }
 
+function pullScrollContainer(target: EventTarget | null): HTMLElement | null {
+  if (!(target instanceof Element)) return null
+  return target.closest<HTMLElement>('.modal, .notification-callup')
+}
+
+function isAtPullStart(container: HTMLElement | null): boolean {
+  return container ? container.scrollTop <= 0 : window.scrollY <= 0
+}
+
 export function PullToRefresh({ onRefresh = refreshCurrentPage }: PullToRefreshProps) {
   const [distance, setDistance] = useState(0)
   const [refreshing, setRefreshing] = useState(false)
   const startPoint = useRef<{ x: number; y: number } | null>(null)
+  const scrollContainer = useRef<HTMLElement | null>(null)
   const currentDistance = useRef(0)
   const refreshingRef = useRef(false)
   const refreshTimer = useRef<number | undefined>(undefined)
@@ -28,22 +38,24 @@ export function PullToRefresh({ onRefresh = refreshCurrentPage }: PullToRefreshP
   useEffect(() => {
     const reset = () => {
       startPoint.current = null
+      scrollContainer.current = null
       currentDistance.current = 0
       setDistance(0)
     }
 
     const onTouchStart = (event: TouchEvent) => {
+      const currentScrollContainer = pullScrollContainer(event.target)
       if (
         refreshingRef.current
         || event.touches.length !== 1
-        || window.scrollY > 0
-        || document.querySelector('.modal-backdrop')
+        || !isAtPullStart(currentScrollContainer)
       ) {
         reset()
         return
       }
 
       const touch = event.touches[0]
+      scrollContainer.current = currentScrollContainer
       startPoint.current = { x: touch.clientX, y: touch.clientY }
     }
 
@@ -60,7 +72,7 @@ export function PullToRefresh({ onRefresh = refreshCurrentPage }: PullToRefreshP
         return
       }
 
-      if (window.scrollY > 0 || document.querySelector('.modal-backdrop')) {
+      if (!isAtPullStart(scrollContainer.current)) {
         reset()
         return
       }
@@ -124,7 +136,7 @@ export function PullToRefresh({ onRefresh = refreshCurrentPage }: PullToRefreshP
       </span>
       <span className="pull-refresh__copy">
         {refreshing
-          ? 'Aggiorno la bacheca…'
+          ? 'Aggiorno la pagina…'
           : ready
             ? 'Rilascia per aggiornare'
             : 'Tira per aggiornare'}

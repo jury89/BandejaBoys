@@ -126,11 +126,13 @@ describe('menu account', () => {
     window.history.replaceState({}, '', '/')
     render(<Dashboard />)
 
+    expect(document.querySelector('.pull-refresh')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Apri menu account di Jury' }))
     await user.click(screen.getByRole('button', { name: /I miei match/ }))
 
     expect(window.location.hash).toBe('#i-miei-match')
     expect(screen.getByRole('heading', { name: 'I miei match' })).toBeInTheDocument()
+    expect(document.querySelector('.pull-refresh')).toBeInTheDocument()
 
     act(() => {
       window.history.replaceState({}, '', '/')
@@ -151,6 +153,7 @@ describe('menu account', () => {
 
     expect(window.location.hash).toBe('#notifiche')
     expect(screen.getByRole('heading', { name: 'Le mie notifiche' })).toBeInTheDocument()
+    expect(document.querySelector('.pull-refresh')).toBeInTheDocument()
     expect(screen.getByText('Attenzione fagianotto')).toBeInTheDocument()
     expect(screen.getByText('Messaggio di prova.')).toBeInTheDocument()
     await waitFor(() => {

@@ -539,7 +539,7 @@ export function Dashboard() {
 
   return (
     <div className="app-shell">
-      {dashboardView === 'feed' && <PullToRefresh />}
+      <PullToRefresh />
       <header className="topbar">
         <Brand compact />
         <div className="topbar__actions">
