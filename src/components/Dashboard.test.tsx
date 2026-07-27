@@ -2,12 +2,23 @@ import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { vi } from 'vitest'
 import type { MatchRatingRecord, PadelPoll } from '../types'
+import type { NotificationDelivery } from '../lib/notificationHistory'
 import { slotElementId } from '../lib/slotNavigation'
 import { Dashboard } from './Dashboard'
 
 const dashboardTestState = vi.hoisted(() => ({
   polls: [] as PadelPoll[],
   ratings: [] as MatchRatingRecord[],
+  deliveries: [{
+    id: 'delivery-1',
+    eventId: 'event-1',
+    kind: 'test',
+    title: 'Attenzione fagianotto',
+    body: 'Messaggio di prova.',
+    userId: 'jury',
+    subscriptionId: 'phone',
+    sentAt: Date.UTC(2026, 6, 27, 8, 30),
+  }] as NotificationDelivery[],
 }))
 
 vi.mock('../AuthContext', () => ({
@@ -23,7 +34,7 @@ vi.mock('../AuthContext', () => ({
   }),
 }))
 
-vi.mock('../lib/firebase', () => ({ hasRemoteBackend: false }))
+vi.mock('../lib/firebase', () => ({ hasRemoteBackend: true }))
 
 vi.mock('../lib/notifications', () => ({
   notificationStateLabel: () => 'Da attivare',
@@ -53,6 +64,10 @@ vi.mock('../lib/repository', () => ({
     },
     subscribeReceivedMatchRatings: (_userId: string, listener: (ratings: MatchRatingRecord[]) => void) => {
       listener(dashboardTestState.ratings)
+      return vi.fn()
+    },
+    subscribeNotificationDeliveries: (_userId: string, listener: (deliveries: NotificationDelivery[]) => void) => {
+      listener(dashboardTestState.deliveries)
       return vi.fn()
     },
   },
@@ -88,6 +103,28 @@ describe('menu account', () => {
 
     expect(window.location.hash).toBe('#i-miei-match')
     expect(screen.getByRole('heading', { name: 'I miei match' })).toBeInTheDocument()
+
+    act(() => {
+      window.history.replaceState({}, '', '/')
+      window.dispatchEvent(new PopStateEvent('popstate'))
+    })
+
+    expect(screen.getByRole('heading', { name: /Mettiamo in campo/ })).toBeInTheDocument()
+  })
+
+  it('apre l’archivio dall’icona accanto al profilo e torna indietro', async () => {
+    const user = userEvent.setup()
+    window.history.replaceState({}, '', '/')
+    render(<Dashboard />)
+
+    await user.click(await screen.findByRole('button', {
+      name: 'Apri le mie notifiche, 1 notifica',
+    }))
+
+    expect(window.location.hash).toBe('#notifiche')
+    expect(screen.getByRole('heading', { name: 'Le mie notifiche' })).toBeInTheDocument()
+    expect(screen.getByText('Attenzione fagianotto')).toBeInTheDocument()
+    expect(screen.getByText('Messaggio di prova.')).toBeInTheDocument()
 
     act(() => {
       window.history.replaceState({}, '', '/')

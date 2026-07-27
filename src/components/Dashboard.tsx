@@ -15,6 +15,7 @@ import {
 import { firstName, slotDateParts } from '../lib/format'
 import { hasRemoteBackend } from '../lib/firebase'
 import { resolveMemberName } from '../lib/memberNames'
+import { buildNotificationHistory, type NotificationHistoryItem } from '../lib/notificationHistory'
 import { notificationStateLabel, usePushNotifications } from '../lib/notifications'
 import { RATING_TEST_QUERY_PARAM, isRatingTestRequested, makeRatingTestPrompt } from '../lib/ratingTest'
 import { repository } from '../lib/repository'
@@ -24,18 +25,22 @@ import { CreatePollModal } from './CreatePollModal'
 import { MatchRatingModal } from './MatchRatingModal'
 import { MyMatchesPage } from './MyMatchesPage'
 import { NotificationCallup } from './NotificationCallup'
+import { NotificationHistoryPage } from './NotificationHistoryPage'
 import { PollCard, type PollSlotFilter } from './PollCard'
 import { ProfileAvatar } from './ProfileAvatar'
 import { ProfileModal } from './ProfileModal'
 import { PullToRefresh } from './PullToRefresh'
 
 type FeedFilter = PollSlotFilter
-type DashboardView = 'feed' | 'matches'
+type DashboardView = 'feed' | 'matches' | 'notifications'
 
 const PERSONAL_MATCHES_HASH = '#i-miei-match'
+const NOTIFICATION_HISTORY_HASH = '#notifiche'
 
 function dashboardViewFromLocation(): DashboardView {
-  return window.location.hash === PERSONAL_MATCHES_HASH ? 'matches' : 'feed'
+  if (window.location.hash === PERSONAL_MATCHES_HASH) return 'matches'
+  if (window.location.hash === NOTIFICATION_HISTORY_HASH) return 'notifications'
+  return 'feed'
 }
 
 const feedCopy: Record<FeedFilter, {
@@ -81,6 +86,9 @@ export function Dashboard() {
   const [ratingResponsesLoaded, setRatingResponsesLoaded] = useState(false)
   const [receivedRatings, setReceivedRatings] = useState<MatchRatingRecord[]>([])
   const [receivedRatingsLoaded, setReceivedRatingsLoaded] = useState(false)
+  const [notificationHistory, setNotificationHistory] = useState<NotificationHistoryItem[]>([])
+  const [notificationHistoryLoaded, setNotificationHistoryLoaded] = useState(!hasRemoteBackend)
+  const [notificationHistoryError, setNotificationHistoryError] = useState<string | null>(null)
   const [ratingTestOpen, setRatingTestOpen] = useState(() => isRatingTestRequested(window.location.search))
   const [ratingTestStartedAt] = useState(() => Date.now())
   const [slotNavigationTarget, setSlotNavigationTarget] = useState<SlotNavigationTarget | null>(null)
@@ -93,6 +101,7 @@ export function Dashboard() {
   })
   const notifications = usePushNotifications(user)
   const ratingReviewerId = user?.id
+  const notificationHistoryUserId = user?.id
 
   useEffect(() => {
     const onError = (error: Error) => {
@@ -120,6 +129,19 @@ export function Dashboard() {
       setRatingResponsesLoaded(true)
     })
   }, [ratingReviewerId])
+
+  useEffect(() => {
+    if (!hasRemoteBackend || !notificationHistoryUserId) return
+
+    return repository.subscribeNotificationDeliveries(notificationHistoryUserId, (deliveries) => {
+      setNotificationHistory(buildNotificationHistory(deliveries))
+      setNotificationHistoryError(null)
+      setNotificationHistoryLoaded(true)
+    }, () => {
+      setNotificationHistoryError('Non siamo riusciti a recuperare le notifiche ricevute.')
+      setNotificationHistoryLoaded(true)
+    })
+  }, [notificationHistoryUserId])
 
   useEffect(() => {
     if (!ratingReviewerId) return
@@ -324,6 +346,28 @@ export function Dashboard() {
     window.history.replaceState(window.history.state, '', url)
     setDashboardView('feed')
   }
+  const openNotificationHistory = () => {
+    setAccountOpen(false)
+    setDashboardView('notifications')
+    if (window.location.hash === NOTIFICATION_HISTORY_HASH) return
+    const url = new URL(window.location.href)
+    url.hash = NOTIFICATION_HISTORY_HASH
+    const currentState = typeof window.history.state === 'object' && window.history.state
+      ? window.history.state
+      : {}
+    window.history.pushState({ ...currentState, bandejaView: 'notifications' }, '', url)
+  }
+  const closeNotificationHistory = () => {
+    if (window.history.state?.bandejaView === 'notifications') {
+      window.history.back()
+      return
+    }
+
+    const url = new URL(window.location.href)
+    url.hash = ''
+    window.history.replaceState(window.history.state, '', url)
+    setDashboardView('feed')
+  }
   const showPlayerMatchOnBoard = (match: PlayerMatch) => {
     setFeedFilter('all')
     setSlotNavigationTarget({ pollId: match.pollId, slotId: match.slot.id })
@@ -362,55 +406,73 @@ export function Dashboard() {
       {dashboardView === 'feed' && <PullToRefresh />}
       <header className="topbar">
         <Brand compact />
-        <div className="account-menu" ref={accountMenuRef}>
-          <button
-            className="account-menu__trigger"
-            type="button"
-            onClick={() => setAccountOpen((open) => !open)}
-            aria-expanded={accountOpen}
-            aria-label={`Apri menu account di ${user.displayName}`}
-          >
-            <ProfileAvatar displayName={user.displayName} avatarDataUrl={user.avatarDataUrl} decorative />
-            <span><strong>{user.displayName}</strong><small>Giocatore</small></span>
-            <ChevronDown size={16} />
-          </button>
-          {accountOpen && (
-            <div className="account-menu__popover">
-              <span>{user.email}</span>
-              <button type="button" onClick={() => {
-                setAccountOpen(false)
-                setProfileOpen(true)
-              }}>
-                <CircleUserRound size={16} />
-                <span>Profilo <small>Nome e foto giocatore</small></span>
-              </button>
-              <button type="button" onClick={() => {
-                setAccountOpen(false)
-                openPlayerMatches()
-              }}>
-                <History size={16} />
-                <span>I miei match <small>Partite passate e future</small></span>
-              </button>
-              {hasRemoteBackend && (
+        <div className="topbar__actions">
+          {hasRemoteBackend && (
+            <button
+              className={`notification-inbox-trigger ${dashboardView === 'notifications' ? 'is-active' : ''}`}
+              type="button"
+              aria-label={`Apri le mie notifiche, ${notificationHistory.length} ${notificationHistory.length === 1 ? 'notifica' : 'notifiche'}`}
+              aria-current={dashboardView === 'notifications' ? 'page' : undefined}
+              onClick={openNotificationHistory}
+            >
+              {notificationHistory.length > 0 ? <BellRing size={19} /> : <Bell size={19} />}
+              {notificationHistory.length > 0 && (
+                <span aria-hidden="true">{notificationHistory.length > 99 ? '99+' : notificationHistory.length}</span>
+              )}
+            </button>
+          )}
+          <div className="account-menu" ref={accountMenuRef}>
+            <button
+              className="account-menu__trigger"
+              type="button"
+              onClick={() => setAccountOpen((open) => !open)}
+              aria-expanded={accountOpen}
+              aria-label={`Apri menu account di ${user.displayName}`}
+            >
+              <ProfileAvatar displayName={user.displayName} avatarDataUrl={user.avatarDataUrl} decorative />
+              <span><strong>{user.displayName}</strong><small>Giocatore</small></span>
+              <ChevronDown size={16} />
+            </button>
+            {accountOpen && (
+              <div className="account-menu__popover">
+                <span>{user.email}</span>
                 <button type="button" onClick={() => {
                   setAccountOpen(false)
-                  setNotificationPanelOpen(true)
+                  setProfileOpen(true)
                 }}>
-                  <Bell size={16} />
-                  <span>Notifiche <small>{notificationStateLabel(notifications.state)}</small></span>
+                  <CircleUserRound size={16} />
+                  <span>Profilo <small>Nome e foto giocatore</small></span>
                 </button>
-              )}
-              <a
-                className="account-menu__call"
-                href={`tel:${DEFAULT_VENUE_PHONE}`}
-                onClick={() => setAccountOpen(false)}
-              >
-                <PhoneCall size={16} />
-                <span>Chiama Oasi Boschetto <small>0376 290058</small></span>
-              </a>
-              <button type="button" onClick={() => signOut()}><LogOut size={16} /> Esci</button>
-            </div>
-          )}
+                <button type="button" onClick={() => {
+                  setAccountOpen(false)
+                  openPlayerMatches()
+                }}>
+                  <History size={16} />
+                  <span>I miei match <small>Partite passate e future</small></span>
+                </button>
+                {hasRemoteBackend && (
+                  <button type="button" onClick={() => {
+                    setAccountOpen(false)
+                    setNotificationPanelOpen(true)
+                  }}>
+                    <Bell size={16} />
+                    <span>Notifiche <small>{notificationStateLabel(notifications.state)}</small></span>
+                  </button>
+                )}
+                <a
+                  className="account-menu__call"
+                  href={`tel:${DEFAULT_VENUE_PHONE}`}
+                  onClick={() => setAccountOpen(false)}
+                >
+                  <PhoneCall size={16} />
+                  <span>Chiama Oasi Boschetto <small>0376 290058</small></span>
+                </a>
+                <button type="button" onClick={() => {
+                  void signOut()
+                }}><LogOut size={16} /> Esci</button>
+              </div>
+            )}
+          </div>
         </div>
       </header>
 
@@ -464,6 +526,13 @@ export function Dashboard() {
           loading={loading || !receivedRatingsLoaded}
           onBack={closePlayerMatches}
           onSelectMatch={showPlayerMatchOnBoard}
+        />
+      ) : dashboardView === 'notifications' ? (
+        <NotificationHistoryPage
+          notifications={notificationHistory}
+          loading={!notificationHistoryLoaded}
+          error={notificationHistoryError}
+          onBack={closeNotificationHistory}
         />
       ) : <main className="dashboard">
         <section className="dashboard-intro">

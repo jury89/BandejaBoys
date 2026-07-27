@@ -226,7 +226,8 @@ service cloud.firestore {
     }
 
     match /notificationDeliveries/{deliveryId} {
-      allow read: if isNotifier();
+      allow read: if isNotifier()
+        || (isMember() && resource.data.userId == request.auth.uid);
       allow create: if isNotifier() && validNotificationDelivery();
       allow update, delete: if false;
     }

@@ -49,6 +49,7 @@ import {
 import { getLocalProfiles, USERS_EVENT } from './auth'
 import { firestore, hasRemoteBackend } from './firebase'
 import { mondayOfWeek, pollWeekTitle } from './format'
+import type { NotificationDelivery } from './notificationHistory'
 
 export interface PadelRepository {
   subscribePolls(listener: (polls: PadelPoll[]) => void, onError: (error: Error) => void): Unsubscribe
@@ -61,6 +62,11 @@ export interface PadelRepository {
   subscribeReceivedMatchRatings(
     revieweeId: string,
     listener: (ratings: MatchRatingRecord[]) => void,
+    onError: (error: Error) => void,
+  ): Unsubscribe
+  subscribeNotificationDeliveries(
+    userId: string,
+    listener: (deliveries: NotificationDelivery[]) => void,
     onError: (error: Error) => void,
   ): Unsubscribe
   getSlotActivity(pollId: string, slotId: string): Promise<LocalActivityEvent[]>
@@ -242,6 +248,25 @@ function remoteRepository(): PadelRepository {
           id: item.id,
           ...item.data(),
         }) as MatchRatingRecord)),
+        onError,
+      )
+    },
+    subscribeNotificationDeliveries(userId, listener, onError) {
+      return onSnapshot(
+        query(collection(db, 'notificationDeliveries'), where('userId', '==', userId)),
+        (snapshot) => listener(snapshot.docs.map((item) => {
+          const data = item.data() as Omit<NotificationDelivery, 'id' | 'sentAt'> & {
+            sentAt?: number | { toMillis: () => number }
+          }
+          const sentAt = typeof data.sentAt === 'number'
+            ? data.sentAt
+            : data.sentAt?.toMillis() ?? 0
+          return {
+            ...data,
+            id: item.id,
+            sentAt,
+          }
+        })),
         onError,
       )
     },
@@ -640,6 +665,10 @@ function localRepository(): PadelRepository {
       window.addEventListener(MATCH_RATINGS_EVENT, notify)
       notify()
       return () => window.removeEventListener(MATCH_RATINGS_EVENT, notify)
+    },
+    subscribeNotificationDeliveries(_userId, listener) {
+      listener([])
+      return () => undefined
     },
     async getSlotActivity(pollId, slotId) {
       return readLocalActivityStore().events
