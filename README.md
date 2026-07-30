@@ -75,10 +75,14 @@ L'istanza di produzione è già configurata; i passaggi seguenti servono soltant
 npx firebase-tools login
 npx firebase-tools use --add
 npm run check
+npm run test:rules:match-report
 npx firebase-tools deploy --only firestore:rules,firestore:indexes,hosting
+npm run smoke:match-report
 ```
 
 La configurazione Web Firebase non è un segreto: l'accesso ai dati è protetto da Authentication e da `firestore.rules`. Non inserire mai nel repository service account, token CLI o chiavi amministrative.
+
+Il test semantico dei referti valuta otto casi contro le regole locali, inclusi creazione e modifica con il massimo di cinque set. Lo smoke test successivo al deploy crea invece un account e un referto temporanei tramite il Web SDK di produzione, verifica lettura, query e modifica, quindi elimina tutti i dati di collaudo. Entrambi usano le Application Default Credentials locali e non salvano credenziali nel repository.
 
 ## Query Firestore da terminale
 
