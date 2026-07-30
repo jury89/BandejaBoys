@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import {
   ArrowLeft,
+  BookOpenText,
   CalendarDays,
   Check,
   CircleAlert,
@@ -28,6 +29,7 @@ import {
 } from '../lib/domain'
 import { PADEL_TIME_ZONE } from '../lib/format'
 import { resolveMemberName } from '../lib/memberNames'
+import { Modal } from './Modal'
 import { ProfileAvatar } from './ProfileAvatar'
 
 interface FantasyBandejaPageProps {
@@ -106,6 +108,102 @@ function PlayerAvatar({
       avatarDataUrl={member?.avatarDataUrl}
       decorative
     />
+  )
+}
+
+function FantasyRulesModal({ onClose }: { onClose: () => void }) {
+  return (
+    <Modal
+      title="Come si gioca"
+      eyebrow="Regolamento FantaBandeja"
+      onClose={onClose}
+      size="wide"
+    >
+      <div className="fantasy-rulebook">
+        <p className="fantasy-rulebook__lead">
+          Segui la partita da fuori, schiera la coppia giusta e conquista punti
+          con le prestazioni reali dei Bandeja Boys.
+        </p>
+
+        <ol className="fantasy-rulebook__steps">
+          <li>
+            <span>1</span>
+            <div>
+              <h3>Entra da spettatore</h3>
+              <p>
+                Il round si apre quando il campo è prenotato e ci sono quattro
+                titolari registrati. I quattro giocatori in campo non possono
+                partecipare al proprio round.
+              </p>
+            </div>
+          </li>
+          <li>
+            <span>2</span>
+            <div>
+              <h3>Schiera due giocatori</h3>
+              <p>
+                Scegli due dei quattro titolari e assegna la fascia a uno di
+                loro. Puoi cambiare formazione fino all’orario d’inizio.
+              </p>
+            </div>
+          </li>
+          <li>
+            <span>3</span>
+            <div>
+              <h3>Giocata segreta</h3>
+              <p>
+                Prima del via soltanto tu puoi vedere la tua scelta. Al fischio
+                d’inizio tutte le formazioni vengono bloccate e rese pubbliche.
+              </p>
+            </div>
+          </li>
+          <li>
+            <span>4</span>
+            <div>
+              <h3>Scala la classifica</h3>
+              <p>
+                I primi tre del round ricevono 5, 3 e 1 punto. La classifica
+                generale somma i punti ottenuti in tutte le partite.
+              </p>
+            </div>
+          </li>
+        </ol>
+
+        <section className="fantasy-rulebook__score" aria-labelledby="fantasy-score-title">
+          <header>
+            <Trophy size={22} />
+            <div>
+              <p className="eyebrow">Punteggio giocatore</p>
+              <h3 id="fantasy-score-title">Come nasce il totale</h3>
+            </div>
+          </header>
+          <dl>
+            <div>
+              <dt>Pagella</dt>
+              <dd>Media dei voti ricevuti, oppure 6 d’ufficio con meno di due voti.</dd>
+            </div>
+            <div>
+              <dt>Risultato</dt>
+              <dd>+1,5 con più set vinti, −0,5 con più set persi.</dd>
+            </div>
+            <div>
+              <dt>Game</dt>
+              <dd>+0,5 a chi condivide la miglior differenza game positiva.</dd>
+            </div>
+            <div>
+              <dt>Capitano</dt>
+              <dd>Punteggio ×1,5 e altri +2 se è l’MVP della pagella.</dd>
+            </div>
+          </dl>
+        </section>
+
+        <p className="fantasy-rulebook__note">
+          <Clock3 size={18} />
+          Il risultato viene calcolato 48 ore dopo la fine. Se manca il referto
+          dei set, il round viene annullato.
+        </p>
+      </div>
+    </Modal>
   )
 }
 
@@ -492,6 +590,7 @@ export function FantasyBandejaPage({
   onBack,
   onSave,
 }: FantasyBandejaPageProps) {
+  const [rulesOpen, setRulesOpen] = useState(false)
   const orderedRounds = useMemo(
     () => [...rounds].sort((left, right) => left.locksAt - right.locksAt),
     [rounds],
@@ -512,14 +611,30 @@ export function FantasyBandejaPage({
       <section className="fantasy-hero">
         <div>
           <p className="eyebrow">Il fantasy del gruppo</p>
-          <h1>Fanta<span>Bandeja</span></h1>
-          <p>Scegli la coppia. Affida la fascia. Prenditi la gloria senza nemmeno entrare in campo.</p>
+          <h1>
+            <span className="fantasy-hero__title-main">Fanta</span>
+            <span className="fantasy-hero__title-accent">Bandeja</span>
+          </h1>
+          <p className="fantasy-hero__intro">
+            Scegli la coppia. Affida la fascia. Prenditi la gloria senza nemmeno
+            entrare in campo.
+          </p>
+          <button
+            className="fantasy-hero__rules-button"
+            type="button"
+            onClick={() => setRulesOpen(true)}
+          >
+            <BookOpenText size={18} />
+            Come si gioca
+          </button>
         </div>
         <div className="fantasy-hero__mark" aria-hidden="true">
           <Trophy size={44} />
           <span>FB</span>
         </div>
       </section>
+
+      {rulesOpen && <FantasyRulesModal onClose={() => setRulesOpen(false)} />}
 
       <section className="fantasy-rules" aria-label="Regole rapide">
         <div><UsersRound size={20} /><p><strong>2 giocatori</strong><span>tra i quattro titolari</span></p></div>

@@ -53,6 +53,21 @@ function renderPage(overrides: Partial<Parameters<typeof FantasyBandejaPage>[0]>
 }
 
 describe('FantaBandeja', () => {
+  it('apre il regolamento completo e permette di chiuderlo', async () => {
+    const user = userEvent.setup()
+    renderPage()
+
+    await user.click(screen.getByRole('button', { name: 'Come si gioca' }))
+
+    const dialog = screen.getByRole('dialog', { name: 'Come si gioca' })
+    expect(within(dialog).getByText('Entra da spettatore')).toBeInTheDocument()
+    expect(within(dialog).getByText('Punteggio giocatore')).toBeInTheDocument()
+    expect(within(dialog).getByText(/48 ore dopo la fine/i)).toBeInTheDocument()
+
+    await user.click(within(dialog).getByRole('button', { name: 'Chiudi' }))
+    expect(screen.queryByRole('dialog', { name: 'Come si gioca' })).not.toBeInTheDocument()
+  })
+
   it('permette a uno spettatore di scegliere due giocatori e il capitano', async () => {
     const user = userEvent.setup()
     const { onSave } = renderPage()
