@@ -333,8 +333,8 @@ export function makeMatchReport(
     throw new Error('La formazione della partita è cambiata. Aggiorna la pagina e riprova.')
   }
 
-  const participants = existing?.participants ?? currentParticipants
-  const participantIds = existing?.participantIds ?? currentParticipantIds
+  const participants = currentParticipants
+  const participantIds = currentParticipantIds
   return {
     id,
     pollId: match.pollId,
@@ -369,7 +369,7 @@ export function getPlayerMatches(
       const startsAt = padelDateTimeToTimestamp(slot.startsAt)
       return {
         pollId: poll.id,
-        pollTitle: poll.title,
+        pollTitle: pollWeekTitle(poll.targetWeekStart),
         slot,
         startsAt,
         endsAt: getSlotEndsAt(slot),

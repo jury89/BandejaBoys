@@ -23,7 +23,7 @@ import {
 } from '../lib/domain'
 import { firstName, slotDateParts } from '../lib/format'
 import { hasRemoteBackend } from '../lib/firebase'
-import { resolveMemberName } from '../lib/memberNames'
+import { resolveMemberName, resolvePlayerMatchNames } from '../lib/memberNames'
 import {
   buildNotificationHistory,
   unreadNotificationCount,
@@ -402,11 +402,24 @@ export function Dashboard() {
   }, [now, polls, ratingResponses, user])
 
   const upcomingPolls = useMemo(() => getUpcomingPolls(polls, now), [now, polls])
-  const playerMatches = useMemo(
+  const matchNameMembers = useMemo(
     () => user
-      ? getPlayerMatches(polls, user.id, now, receivedRatings, matchReports)
-      : { upcoming: [], past: [] },
-    [matchReports, now, polls, receivedRatings, user],
+      ? [user, ...members.filter((member) => member.id !== user.id)]
+      : members,
+    [members, user],
+  )
+  const playerMatches = useMemo(
+    () => {
+      if (!user) return { upcoming: [], past: [] }
+      const matches = getPlayerMatches(polls, user.id, now, receivedRatings, matchReports)
+      return {
+        upcoming: matches.upcoming
+          .map((match) => resolvePlayerMatchNames(matchNameMembers, match)),
+        past: matches.past
+          .map((match) => resolvePlayerMatchNames(matchNameMembers, match)),
+      }
+    },
+    [matchNameMembers, matchReports, now, polls, receivedRatings, user],
   )
   const unreadNotifications = useMemo(
     () => unreadNotificationCount(notificationHistory),

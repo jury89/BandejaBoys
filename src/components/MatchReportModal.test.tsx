@@ -57,4 +57,19 @@ describe('referto dei set', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Il set 1 non può finire in parità.')
     expect(onSave).not.toHaveBeenCalled()
   })
+
+  it('traduce un eventuale errore di permessi senza mostrare il messaggio tecnico', async () => {
+    const onSave = vi.fn().mockRejectedValue(new Error('Missing or insufficient permissions.'))
+    const user = userEvent.setup()
+    render(<MatchReportModal match={match} onClose={vi.fn()} onSave={onSave} />)
+
+    await user.type(screen.getByLabelText('Punteggio Jury + Ale, set 1'), '6')
+    await user.type(screen.getByLabelText('Punteggio Luca + Teo, set 1'), '4')
+    await user.click(screen.getByRole('button', { name: 'Salva referto' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Non hai i permessi per salvare questo referto. Aggiorna l’app e riprova.',
+    )
+    expect(screen.queryByText('Missing or insufficient permissions.')).not.toBeInTheDocument()
+  })
 })

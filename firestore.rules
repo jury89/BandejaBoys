@@ -397,7 +397,9 @@ service cloud.firestore {
     }
 
     match /matchReports/{reportId} {
-      allow read: if isMember() && request.auth.uid in resource.data.participantIds;
+      allow get: if isMember()
+        && (resource == null || request.auth.uid in resource.data.participantIds);
+      allow list: if isMember() && request.auth.uid in resource.data.participantIds;
       allow create: if isMember()
         && validMatchReport(reportId)
         && request.resource.data.createdBy == request.auth.uid
@@ -409,7 +411,7 @@ service cloud.firestore {
         && request.resource.data.createdAt == resource.data.createdAt
         && request.resource.data.updatedAt >= resource.data.updatedAt
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          'sets', 'updatedBy', 'updatedByName', 'updatedAt'
+          'participants', 'sets', 'updatedBy', 'updatedByName', 'updatedAt'
         ]);
       allow delete: if false;
     }

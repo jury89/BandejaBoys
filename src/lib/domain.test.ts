@@ -242,7 +242,16 @@ describe('referto dei set', () => {
       },
     ])
 
-    const updated = makeMatchReport(match, member('b', 'Baru'), [
+    const renamedMatch = {
+      ...match,
+      slot: {
+        ...match.slot,
+        signups: match.slot.signups.map((item) => (
+          item.userId === 'a' ? { ...item, displayName: 'Alex' } : item
+        )),
+      },
+    }
+    const updated = makeMatchReport(renamedMatch, member('b', 'Baru'), [
       { teamAUserIds: ['a', 'd'], scoreA: 7, scoreB: 5 },
     ], created, 200)
     expect(updated).toMatchObject({
@@ -253,6 +262,8 @@ describe('referto dei set', () => {
       updatedByName: 'Baru',
       updatedAt: 200,
     })
+    expect(updated.participants[0].displayName).toBe('Alex')
+    expect(updated.sets[0].teamA[0].displayName).toBe('Alex')
   })
 
   it('rifiuta set in parità e collega il referto allo storico personale', () => {
@@ -283,6 +294,7 @@ describe('referto dei set', () => {
     )
 
     expect(lists.past[0].report).toEqual(report)
+    expect(lists.past[0].pollTitle).toBe('Padel · 27 lug – 2 ago 2026')
   })
 })
 

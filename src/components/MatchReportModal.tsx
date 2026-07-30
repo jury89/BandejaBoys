@@ -60,6 +60,14 @@ function updatedLabel(timestamp: number): string {
   }).format(timestamp)
 }
 
+function saveErrorMessage(reason: unknown): string {
+  const message = reason instanceof Error ? reason.message : String(reason)
+  if (/permission-denied|insufficient permissions/i.test(message)) {
+    return 'Non hai i permessi per salvare questo referto. Aggiorna l’app e riprova.'
+  }
+  return reason instanceof Error ? reason.message : 'Non siamo riusciti a salvare il referto.'
+}
+
 export function MatchReportModal({ match, onClose, onSave }: MatchReportModalProps) {
   const pairings = useMemo(() => getMatchPairings(match.slot), [match.slot])
   const [sets, setSets] = useState<SetDraft[]>(() => draftsFromMatch(match, pairings))
@@ -124,7 +132,7 @@ export function MatchReportModal({ match, onClose, onSave }: MatchReportModalPro
     setBusy(true)
     setError(null)
     void onSave(inputs).catch((reason) => {
-      setError(reason instanceof Error ? reason.message : 'Non siamo riusciti a salvare il referto.')
+      setError(saveErrorMessage(reason))
       setBusy(false)
     })
   }

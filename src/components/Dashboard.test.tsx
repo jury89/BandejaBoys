@@ -1,7 +1,7 @@
 import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, vi } from 'vitest'
-import type { MatchRatingRecord, MatchReport, PadelPoll } from '../types'
+import type { MatchRatingRecord, MatchReport, MemberProfile, PadelPoll } from '../types'
 import type { NotificationDelivery } from '../lib/notificationHistory'
 import { repository } from '../lib/repository'
 import { slotElementId } from '../lib/slotNavigation'
@@ -20,6 +20,7 @@ const dashboardTestState = vi.hoisted(() => {
   } satisfies NotificationDelivery
   return {
     polls: [] as PadelPoll[],
+    members: [] as MemberProfile[],
     ratings: [] as MatchRatingRecord[],
     reports: [] as MatchReport[],
     deliveries: [defaultDelivery] as NotificationDelivery[],
@@ -68,8 +69,8 @@ vi.mock('../lib/repository', () => ({
       if (shouldRespond) listener(dashboardTestState.polls)
       return vi.fn()
     },
-    subscribeMembers: (listener: (members: []) => void) => {
-      listener([])
+    subscribeMembers: (listener: (members: MemberProfile[]) => void) => {
+      listener(dashboardTestState.members)
       return vi.fn()
     },
     subscribeMatchRatingResponses: (_userId: string, listener: (responses: []) => void) => {
@@ -97,6 +98,7 @@ describe('menu account', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     dashboardTestState.polls = []
+    dashboardTestState.members = []
     dashboardTestState.ratings = []
     dashboardTestState.reports = []
     dashboardTestState.deliveries = [dashboardTestState.defaultDelivery]
@@ -282,7 +284,9 @@ describe('menu account', () => {
 
     await user.click(screen.getByRole('button', { name: 'Apri menu account di Jury' }))
     await user.click(screen.getByRole('button', { name: /I miei match/ }))
-    await user.click(screen.getByRole('button', { name: /Apri Padel futuro.*nella bacheca/ }))
+    await user.click(screen.getByRole('button', {
+      name: /Apri Padel · 5 gen – 11 gen 2099.*nella bacheca/,
+    }))
 
     act(() => {
       window.history.replaceState({}, '', '/')
@@ -299,5 +303,50 @@ describe('menu account', () => {
       expect(scrollIntoView).toHaveBeenLastCalledWith({ behavior: 'smooth', block: 'start' })
       expect(target).toHaveClass('slot-card--highlighted')
     }, { timeout: 1_500 })
+  })
+
+  it('usa i nomi profilo correnti e il titolo settimanale nel referto', async () => {
+    dashboardTestState.members = [
+      { id: 'jury', displayName: 'Jury', email: 'jury@example.test', createdAt: 1 },
+      { id: 'luigi', displayName: 'Luigi', email: 'luigi@example.test', createdAt: 1 },
+      { id: 'alex', displayName: 'Alex', email: 'alex@example.test', createdAt: 1 },
+      { id: 'brescio', displayName: 'Brescio', email: 'brescio@example.test', createdAt: 1 },
+    ]
+    dashboardTestState.polls = [{
+      id: 'poll-past',
+      title: 'Padel · prossima settimana',
+      targetWeekStart: '2020-07-27',
+      createdBy: 'jury',
+      createdByName: 'jurydambros',
+      createdAt: 1,
+      updatedAt: 1,
+      status: 'closed',
+      slots: [{
+        id: 'slot-past',
+        startsAt: '2020-07-29T16:00:00.000Z',
+        durationMinutes: 90,
+        venue: 'Oasi Boschetto',
+        bookedAt: 1,
+        signups: [
+          { id: 'signup-jury', userId: 'jury', displayName: 'jurydambros', joinedAt: 1 },
+          { id: 'signup-luigi', userId: 'luigi', displayName: 'larduini03', joinedAt: 2 },
+          { id: 'signup-alex', userId: 'alex', displayName: 'Alex', joinedAt: 3 },
+          { id: 'signup-brescio', userId: 'brescio', displayName: 'EviNinja', joinedAt: 4 },
+        ],
+      }],
+    }]
+    const user = userEvent.setup()
+    render(<Dashboard />)
+
+    await user.click(screen.getByRole('button', { name: 'Apri menu account di Jury' }))
+    await user.click(screen.getByRole('button', { name: /I miei match/ }))
+
+    expect(screen.getByText('Padel · 27 lug – 2 ago 2020')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /Aggiungi il referto/ }))
+
+    expect(screen.getByRole('option', {
+      name: 'Jury + Luigi — Alex + Brescio',
+    })).toBeInTheDocument()
+    expect(screen.queryByText(/jurydambros|larduini03|EviNinja/)).not.toBeInTheDocument()
   })
 })
