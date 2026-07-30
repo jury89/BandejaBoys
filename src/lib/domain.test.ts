@@ -4,6 +4,7 @@ import {
   addSlotToPoll,
   addSignup,
   defaultSlotForWeek,
+  groupMatchReportSetsByTeams,
   getMatchPairings,
   getMatchRatingResponseId,
   getNextMatchRatingPromptAt,
@@ -264,6 +265,46 @@ describe('referto dei set', () => {
     })
     expect(updated.participants[0].displayName).toBe('Alex')
     expect(updated.sets[0].teamA[0].displayName).toBe('Alex')
+  })
+
+  it('raggruppa i set per squadre e riallinea i punteggi se vengono invertite', () => {
+    const report = makeMatchReport(match, member('a'), [
+      { teamAUserIds: ['a', 'b'], scoreA: 6, scoreB: 4 },
+      { teamAUserIds: ['a', 'c'], scoreA: 3, scoreB: 6 },
+      { teamAUserIds: ['c', 'd'], scoreA: 5, scoreB: 7 },
+    ], undefined, 100)
+
+    expect(groupMatchReportSetsByTeams(report.sets)).toEqual([
+      {
+        key: '["[\\"a\\",\\"b\\"]","[\\"c\\",\\"d\\"]"]',
+        teamA: [
+          { userId: 'a', displayName: 'A' },
+          { userId: 'b', displayName: 'B' },
+        ],
+        teamB: [
+          { userId: 'c', displayName: 'C' },
+          { userId: 'd', displayName: 'D' },
+        ],
+        sets: [
+          { setId: 'set-1', setNumber: 1, scoreA: 6, scoreB: 4 },
+          { setId: 'set-3', setNumber: 3, scoreA: 7, scoreB: 5 },
+        ],
+      },
+      {
+        key: '["[\\"a\\",\\"c\\"]","[\\"b\\",\\"d\\"]"]',
+        teamA: [
+          { userId: 'a', displayName: 'A' },
+          { userId: 'c', displayName: 'C' },
+        ],
+        teamB: [
+          { userId: 'b', displayName: 'B' },
+          { userId: 'd', displayName: 'D' },
+        ],
+        sets: [
+          { setId: 'set-2', setNumber: 2, scoreA: 3, scoreB: 6 },
+        ],
+      },
+    ])
   })
 
   it('rifiuta set in parità e collega il referto allo storico personale', () => {

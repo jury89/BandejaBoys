@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { vi } from 'vitest'
 import type { PlayerMatchLists } from '../types'
@@ -60,6 +60,19 @@ const matches: PlayerMatchLists = {
           scoreA: 3,
           scoreB: 6,
         },
+        {
+          id: 'set-3',
+          teamA: [
+            { userId: 'c', displayName: 'Luca' },
+            { userId: 'd', displayName: 'Teo' },
+          ],
+          teamB: [
+            { userId: 'a', displayName: 'Ale' },
+            { userId: 'b', displayName: 'Baru' },
+          ],
+          scoreA: 5,
+          scoreB: 7,
+        },
       ],
       createdBy: 'a',
       createdByName: 'Ale',
@@ -104,8 +117,22 @@ describe('pagina dei match personali', () => {
     expect(screen.getByText('Giocata')).toBeInTheDocument()
     expect(screen.getByLabelText('Media di 2 voti ricevuti: 8,5 su 10')).toBeInTheDocument()
     expect(screen.getByText('8,5')).toBeInTheDocument()
-    expect(screen.getByText('2 set registrati')).toBeInTheDocument()
-    expect(screen.getByText('6–4 · 3–6')).toBeInTheDocument()
+    expect(screen.getByText('3 set registrati')).toBeInTheDocument()
+    const firstFormation = screen.getByRole('table', {
+      name: 'Formazione 1: Ale + Baru contro Luca + Teo',
+    })
+    expect(within(firstFormation).getByText('S1')).toBeInTheDocument()
+    expect(within(firstFormation).getByText('S3')).toBeInTheDocument()
+    expect(within(firstFormation).getByRole('row', { name: 'Ale + Baru 6 7' })).toBeInTheDocument()
+    expect(within(firstFormation).getByRole('row', { name: 'Luca + Teo 4 5' })).toBeInTheDocument()
+
+    const secondFormation = screen.getByRole('table', {
+      name: 'Formazione 2: Ale + Luca contro Baru + Teo',
+    })
+    expect(within(secondFormation).getByText('S2')).toBeInTheDocument()
+    expect(within(secondFormation).getByRole('row', { name: 'Ale + Luca 3' })).toBeInTheDocument()
+    expect(within(secondFormation).getByRole('row', { name: 'Baru + Teo 6' })).toBeInTheDocument()
+    expect(screen.queryByText('6–4 · 3–6 · 5–7')).not.toBeInTheDocument()
 
     await user.click(screen.getByRole('button', {
       name: /Apri Padel della prossima settimana.*nella bacheca/,

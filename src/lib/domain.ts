@@ -8,6 +8,7 @@ import type {
   MatchReportPlayer,
   MatchSetInput,
   MatchSetResult,
+  MatchTeamResultGroup,
   MemberProfile,
   PadelPoll,
   PadelSlot,
@@ -244,6 +245,48 @@ export function getMatchPairings(slot: PadelSlot): MatchPairing[] {
     { teamA: [players[0], players[2]], teamB: [players[1], players[3]] },
     { teamA: [players[0], players[3]], teamB: [players[1], players[2]] },
   ]
+}
+
+function matchTeamKey(team: MatchReportPlayer[]): string {
+  return JSON.stringify(team.map((player) => player.userId).sort())
+}
+
+export function groupMatchReportSetsByTeams(
+  sets: MatchSetResult[],
+): MatchTeamResultGroup[] {
+  const groups = new Map<string, MatchTeamResultGroup>()
+
+  sets.forEach((set, index) => {
+    const teamAKey = matchTeamKey(set.teamA)
+    const teamBKey = matchTeamKey(set.teamB)
+    const key = JSON.stringify([teamAKey, teamBKey].sort())
+    const existing = groups.get(key)
+
+    if (!existing) {
+      groups.set(key, {
+        key,
+        teamA: set.teamA,
+        teamB: set.teamB,
+        sets: [{
+          setId: set.id,
+          setNumber: index + 1,
+          scoreA: set.scoreA,
+          scoreB: set.scoreB,
+        }],
+      })
+      return
+    }
+
+    const sameOrientation = matchTeamKey(existing.teamA) === teamAKey
+    existing.sets.push({
+      setId: set.id,
+      setNumber: index + 1,
+      scoreA: sameOrientation ? set.scoreA : set.scoreB,
+      scoreB: sameOrientation ? set.scoreB : set.scoreA,
+    })
+  })
+
+  return [...groups.values()]
 }
 
 export function matchSetInputsError(slot: PadelSlot, inputs: MatchSetInput[]): string | null {

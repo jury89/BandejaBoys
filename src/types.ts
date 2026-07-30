@@ -166,6 +166,18 @@ export interface MatchSetResult extends MatchPairing {
   scoreB: number
 }
 
+export interface MatchTeamSetScore {
+  setId: string
+  setNumber: number
+  scoreA: number
+  scoreB: number
+}
+
+export interface MatchTeamResultGroup extends MatchPairing {
+  key: string
+  sets: MatchTeamSetScore[]
+}
+
 export interface MatchReport {
   id: string
   pollId: string
