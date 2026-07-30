@@ -700,9 +700,9 @@ describe('voti di fine partita', () => {
       .toBe(Date.parse('2026-07-28T09:00:00.000Z'))
   })
 
-  it('propone i tre compagni solo dieci minuti dopo la fine di un campo prenotato', () => {
+  it('propone i tre compagni appena finisce un campo prenotato', () => {
     const polls = [ratingPoll()]
-    const dueAt = Date.parse('2026-07-28T08:40:00.000Z')
+    const dueAt = Date.parse('2026-07-28T08:30:00.000Z')
 
     expect(getPendingMatchRatingPrompts(polls, [], 'jury', dueAt - 1)).toHaveLength(0)
     expect(getNextMatchRatingPromptAt(polls, [], 'jury', dueAt - 1)).toBe(dueAt)
@@ -720,7 +720,7 @@ describe('voti di fine partita', () => {
 
   it('non ripropone una scheda già chiusa e ignora riserve o formazioni incomplete', () => {
     const current = ratingPoll()
-    const dueAt = Date.parse('2026-07-28T08:40:00.000Z')
+    const dueAt = Date.parse('2026-07-28T08:30:00.000Z')
     const responseId = getMatchRatingResponseId(current.id, current.slots[0].id, 'jury')
 
     expect(getPendingMatchRatingPrompts([current], [{
@@ -746,7 +746,7 @@ describe('voti di fine partita', () => {
       displayName: 'Ciccio',
       isGuest: true,
     }
-    const dueAt = Date.parse('2026-07-28T08:40:00.000Z')
+    const dueAt = Date.parse('2026-07-28T08:30:00.000Z')
     const prompt = getPendingMatchRatingPrompts([current], [], 'jury', dueAt)[0]
 
     expect(prompt.teammates.map((teammate) => teammate.userId)).toEqual(['ale', 'luca'])

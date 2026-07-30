@@ -650,9 +650,9 @@ describe('pianificazione notifiche', () => {
     expect(notifications[0].body).toContain('Guarda che tra 2 ore giochi')
   })
 
-  it('dieci minuti dopo la fine invita tutti e quattro i titolari a dare i voti', () => {
+  it('alla fine del match invita tutti e quattro i titolari a dare i voti', () => {
     const players = ['a', 'b', 'c', 'd'].map((id, index) => signup(id, index))
-    const finishedSlot = slot('2026-07-20T18:20', players)
+    const finishedSlot = slot('2026-07-20T18:30', players)
     const notifications = collectScheduledNotifications([poll([finishedSlot])], NOW)
 
     expect(notifications).toHaveLength(1)
@@ -666,7 +666,7 @@ describe('pianificazione notifiche', () => {
 
   it('non invia la richiesta voti prima della scadenza, a formazione incompleta o troppo tardi', () => {
     const players = ['a', 'b', 'c', 'd'].map((id, index) => signup(id, index))
-    const finishedSlot = slot('2026-07-20T18:20', players)
+    const finishedSlot = slot('2026-07-20T18:30', players)
 
     expect(collectScheduledNotifications([poll([finishedSlot])], NOW - 1)).toHaveLength(0)
     expect(collectScheduledNotifications([
@@ -680,7 +680,7 @@ describe('pianificazione notifiche', () => {
 
   it('esclude dalla notifica chi ha già salvato o chiuso la propria pagella', () => {
     const players = ['a', 'b', 'c', 'd'].map((id, index) => signup(id, index))
-    const finishedSlot = slot('2026-07-20T18:20', players)
+    const finishedSlot = slot('2026-07-20T18:30', players)
     const notifications = collectScheduledNotifications([poll([finishedSlot])], NOW, [{
       id: 'poll-1__slot-1__a',
       pollId: 'poll-1',
