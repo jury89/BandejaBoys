@@ -4,8 +4,11 @@ import {
   CalendarCheck2,
   CalendarClock,
   CheckCircle2,
+  ClipboardList,
   Clock3,
   MapPin,
+  PencilLine,
+  Plus,
   Star,
 } from 'lucide-react'
 import { DEFAULT_VENUE } from '../lib/domain'
@@ -17,6 +20,7 @@ interface MyMatchesPageProps {
   loading: boolean
   onBack: () => void
   onSelectMatch: (match: PlayerMatch) => void
+  onEditReport: (match: PlayerMatch) => void
 }
 
 interface MatchListProps {
@@ -27,16 +31,19 @@ interface MatchListProps {
   emptyBody: string
   past?: boolean
   onSelectMatch?: (match: PlayerMatch) => void
+  onEditReport?: (match: PlayerMatch) => void
 }
 
 function MatchItem({
   match,
   past = false,
   onSelect,
+  onEditReport,
 }: {
   match: PlayerMatch
   past?: boolean
   onSelect?: (match: PlayerMatch) => void
+  onEditReport?: (match: PlayerMatch) => void
 }) {
   const date = slotDateParts(match.slot.startsAt)
   const booked = Boolean(match.slot.bookedAt)
@@ -46,6 +53,7 @@ function MatchItem({
   const averageLabel = receivedRating
     ? formatRatingAverage(receivedRating.average)
     : null
+  const report = past ? match.report : undefined
 
   return (
     <article className={`personal-match ${booked ? 'personal-match--booked' : 'personal-match--pending'} ${onSelect ? 'personal-match--interactive' : ''}`}>
@@ -93,11 +101,44 @@ function MatchItem({
         )}
         {onSelect && <ArrowRight className="personal-match__open-icon" size={17} aria-hidden="true" />}
       </div>
+      {past && onEditReport && (
+        <div className={`personal-match__report ${report ? 'is-complete' : ''}`}>
+          <div className="personal-match__report-summary">
+            <span aria-hidden="true"><ClipboardList size={17} /></span>
+            <div>
+              <small>{report ? `${report.sets.length} ${report.sets.length === 1 ? 'set registrato' : 'set registrati'}` : 'Referto set'}</small>
+              <strong>
+                {report
+                  ? report.sets.map((set) => `${set.scoreA}–${set.scoreB}`).join(' · ')
+                  : 'Aggiungi coppie e punteggi'}
+              </strong>
+            </div>
+          </div>
+          <button
+            className="button button--ghost personal-match__report-action"
+            type="button"
+            aria-label={`${report ? 'Modifica' : 'Aggiungi'} il referto di ${match.pollTitle} del ${date.full}`}
+            onClick={() => onEditReport(match)}
+          >
+            {report ? <PencilLine size={15} /> : <Plus size={15} />}
+            {report ? 'Modifica' : 'Compila'}
+          </button>
+        </div>
+      )}
     </article>
   )
 }
 
-function MatchList({ eyebrow, title, matches, emptyTitle, emptyBody, past = false, onSelectMatch }: MatchListProps) {
+function MatchList({
+  eyebrow,
+  title,
+  matches,
+  emptyTitle,
+  emptyBody,
+  past = false,
+  onSelectMatch,
+  onEditReport,
+}: MatchListProps) {
   return (
     <section className="personal-matches__section">
       <header className="personal-matches__section-heading">
@@ -115,6 +156,7 @@ function MatchList({ eyebrow, title, matches, emptyTitle, emptyBody, past = fals
               match={match}
               past={past}
               onSelect={onSelectMatch}
+              onEditReport={onEditReport}
             />
           ))}
         </div>
@@ -128,7 +170,13 @@ function MatchList({ eyebrow, title, matches, emptyTitle, emptyBody, past = fals
   )
 }
 
-export function MyMatchesPage({ matches, loading, onBack, onSelectMatch }: MyMatchesPageProps) {
+export function MyMatchesPage({
+  matches,
+  loading,
+  onBack,
+  onSelectMatch,
+  onEditReport,
+}: MyMatchesPageProps) {
   return (
     <main className="dashboard personal-matches">
       <button className="button button--ghost personal-matches__back" type="button" onClick={onBack}>
@@ -165,6 +213,7 @@ export function MyMatchesPage({ matches, loading, onBack, onSelectMatch }: MyMat
             eyebrow="Il tuo storico"
             title="Partite giocate"
             matches={matches.past}
+            onEditReport={onEditReport}
             emptyTitle="Nessuna partita nello storico"
             emptyBody="Qui trovi i match conclusi per cui il campo era stato confermato."
           />

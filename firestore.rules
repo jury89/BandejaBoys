@@ -105,6 +105,103 @@ service cloud.firestore {
         && getAfter(/databases/$(database)/documents/matchRatingResponses/$(request.resource.data.responseId)).data.closedAt == request.resource.data.createdAt;
     }
 
+    function validMatchReportPlayer(player) {
+      return player is map
+        && player.keys().hasOnly(['userId', 'displayName'])
+        && player.userId is string
+        && player.userId.size() > 0
+        && player.displayName is string
+        && player.displayName.size() >= 2
+        && player.displayName.size() <= 40;
+    }
+
+    function validMatchReportSet(set, participantIds) {
+      return set is map
+        && set.keys().hasOnly(['id', 'teamA', 'teamB', 'scoreA', 'scoreB'])
+        && set.id is string
+        && set.teamA is list
+        && set.teamA.size() == 2
+        && set.teamB is list
+        && set.teamB.size() == 2
+        && validMatchReportPlayer(set.teamA[0])
+        && validMatchReportPlayer(set.teamA[1])
+        && validMatchReportPlayer(set.teamB[0])
+        && validMatchReportPlayer(set.teamB[1])
+        && set.teamA[0].userId in participantIds
+        && set.teamA[1].userId in participantIds
+        && set.teamB[0].userId in participantIds
+        && set.teamB[1].userId in participantIds
+        && set.teamA[0].userId != set.teamA[1].userId
+        && set.teamA[0].userId != set.teamB[0].userId
+        && set.teamA[0].userId != set.teamB[1].userId
+        && set.teamA[1].userId != set.teamB[0].userId
+        && set.teamA[1].userId != set.teamB[1].userId
+        && set.teamB[0].userId != set.teamB[1].userId
+        && set.scoreA is int
+        && set.scoreB is int
+        && set.scoreA >= 0
+        && set.scoreB >= 0
+        && set.scoreA <= 99
+        && set.scoreB <= 99
+        && set.scoreA != set.scoreB;
+    }
+
+    function validMatchReportSets(sets, participantIds) {
+      return sets is list
+        && sets.size() >= 1
+        && sets.size() <= 5
+        && validMatchReportSet(sets[0], participantIds)
+        && (sets.size() < 2 || validMatchReportSet(sets[1], participantIds))
+        && (sets.size() < 3 || validMatchReportSet(sets[2], participantIds))
+        && (sets.size() < 4 || validMatchReportSet(sets[3], participantIds))
+        && (sets.size() < 5 || validMatchReportSet(sets[4], participantIds));
+    }
+
+    function validMatchReport(reportId) {
+      return request.resource.data.keys().hasOnly([
+          'id', 'pollId', 'pollTitle', 'slotId', 'sessionStartsAt',
+          'participantIds', 'participants', 'sets',
+          'createdBy', 'createdByName', 'createdAt',
+          'updatedBy', 'updatedByName', 'updatedAt'
+        ])
+        && request.resource.data.id == reportId
+        && reportId == request.resource.data.pollId + '__' + request.resource.data.slotId
+        && request.resource.data.pollId is string
+        && request.resource.data.pollTitle is string
+        && request.resource.data.slotId is string
+        && request.resource.data.sessionStartsAt is string
+        && request.resource.data.participantIds is list
+        && request.resource.data.participantIds.size() == 4
+        && request.auth.uid in request.resource.data.participantIds
+        && request.resource.data.participants is list
+        && request.resource.data.participants.size() == 4
+        && validMatchReportPlayer(request.resource.data.participants[0])
+        && validMatchReportPlayer(request.resource.data.participants[1])
+        && validMatchReportPlayer(request.resource.data.participants[2])
+        && validMatchReportPlayer(request.resource.data.participants[3])
+        && request.resource.data.participants[0].userId == request.resource.data.participantIds[0]
+        && request.resource.data.participants[1].userId == request.resource.data.participantIds[1]
+        && request.resource.data.participants[2].userId == request.resource.data.participantIds[2]
+        && request.resource.data.participants[3].userId == request.resource.data.participantIds[3]
+        && request.resource.data.participantIds[0] != request.resource.data.participantIds[1]
+        && request.resource.data.participantIds[0] != request.resource.data.participantIds[2]
+        && request.resource.data.participantIds[0] != request.resource.data.participantIds[3]
+        && request.resource.data.participantIds[1] != request.resource.data.participantIds[2]
+        && request.resource.data.participantIds[1] != request.resource.data.participantIds[3]
+        && request.resource.data.participantIds[2] != request.resource.data.participantIds[3]
+        && validMatchReportSets(
+          request.resource.data.sets,
+          request.resource.data.participantIds
+        )
+        && request.resource.data.createdBy is string
+        && request.resource.data.createdByName is string
+        && request.resource.data.createdAt is int
+        && request.resource.data.updatedBy == request.auth.uid
+        && request.resource.data.updatedByName is string
+        && request.resource.data.updatedAt is int
+        && request.resource.data.updatedAt >= request.resource.data.createdAt;
+    }
+
     function validActivityEvent() {
       return request.resource.data.keys().hasOnly([
           'type', 'actorId', 'actorName', 'pollId', 'pollTitle',
@@ -297,6 +394,24 @@ service cloud.firestore {
           || resource.data.revieweeId == request.auth.uid);
       allow create: if isMember() && validMatchRating(ratingId);
       allow update, delete: if false;
+    }
+
+    match /matchReports/{reportId} {
+      allow read: if isMember() && request.auth.uid in resource.data.participantIds;
+      allow create: if isMember()
+        && validMatchReport(reportId)
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.createdAt == request.resource.data.updatedAt;
+      allow update: if isMember()
+        && validMatchReport(reportId)
+        && request.resource.data.createdBy == resource.data.createdBy
+        && request.resource.data.createdByName == resource.data.createdByName
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.updatedAt >= resource.data.updatedAt
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'sets', 'updatedBy', 'updatedByName', 'updatedAt'
+        ]);
+      allow delete: if false;
     }
   }
 }

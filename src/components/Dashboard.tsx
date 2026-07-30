@@ -1,7 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Bell, BellRing, CalendarCheck2, CalendarClock, CalendarDays, CalendarPlus, CheckCircle2, ChevronDown, CircleUserRound, History, LogOut, PhoneCall, RefreshCw, UsersRound } from 'lucide-react'
 import { useAuth } from '../AuthContext'
-import type { MatchRatingRecord, MatchRatingResponse, MatchRatingSubmission, MemberProfile, PadelPoll, PlayerMatch } from '../types'
+import type {
+  MatchRatingRecord,
+  MatchRatingResponse,
+  MatchRatingSubmission,
+  MatchReport,
+  MatchSetInput,
+  MemberProfile,
+  PadelPoll,
+  PlayerMatch,
+} from '../types'
 import {
   getNextMatchRatingPromptAt,
   getPendingMatchRatingPrompts,
@@ -31,6 +40,7 @@ import { slotElementId, type SlotNavigationTarget } from '../lib/slotNavigation'
 import { Brand } from './Brand'
 import { CreatePollModal } from './CreatePollModal'
 import { MatchRatingModal } from './MatchRatingModal'
+import { MatchReportModal } from './MatchReportModal'
 import { MyMatchesPage } from './MyMatchesPage'
 import { NotificationCallup } from './NotificationCallup'
 import { NotificationHistoryPage } from './NotificationHistoryPage'
@@ -98,6 +108,9 @@ export function Dashboard() {
   const [ratingResponsesLoaded, setRatingResponsesLoaded] = useState(false)
   const [receivedRatings, setReceivedRatings] = useState<MatchRatingRecord[]>([])
   const [receivedRatingsLoaded, setReceivedRatingsLoaded] = useState(false)
+  const [matchReports, setMatchReports] = useState<MatchReport[]>([])
+  const [matchReportsLoaded, setMatchReportsLoaded] = useState(false)
+  const [reportMatch, setReportMatch] = useState<PlayerMatch | null>(null)
   const [notificationHistory, setNotificationHistory] = useState<NotificationHistoryItem[]>([])
   const [notificationHistoryLoaded, setNotificationHistoryLoaded] = useState(!hasRemoteBackend)
   const [notificationHistoryError, setNotificationHistoryError] = useState<string | null>(null)
@@ -287,6 +300,17 @@ export function Dashboard() {
   }, [ratingReviewerId])
 
   useEffect(() => {
+    if (!ratingReviewerId) return
+    return repository.subscribeMatchReports(ratingReviewerId, (reports) => {
+      setMatchReports(reports)
+      setMatchReportsLoaded(true)
+    }, (error) => {
+      setToast({ message: error.message, tone: 'error' })
+      setMatchReportsLoaded(true)
+    })
+  }, [ratingReviewerId])
+
+  useEffect(() => {
     if (!toast) return
     const timer = window.setTimeout(() => setToast(null), 4200)
     return () => window.clearTimeout(timer)
@@ -379,8 +403,10 @@ export function Dashboard() {
 
   const upcomingPolls = useMemo(() => getUpcomingPolls(polls, now), [now, polls])
   const playerMatches = useMemo(
-    () => user ? getPlayerMatches(polls, user.id, now, receivedRatings) : { upcoming: [], past: [] },
-    [now, polls, receivedRatings, user],
+    () => user
+      ? getPlayerMatches(polls, user.id, now, receivedRatings, matchReports)
+      : { upcoming: [], past: [] },
+    [matchReports, now, polls, receivedRatings, user],
   )
   const unreadNotifications = useMemo(
     () => unreadNotificationCount(notificationHistory),
@@ -529,6 +555,16 @@ export function Dashboard() {
     rememberRatingResponse(response)
     notify('Voti salvati nello storico della partita.')
   }
+  const saveMatchReport = async (sets: MatchSetInput[]) => {
+    if (!reportMatch) return
+    const saved = await repository.saveMatchReport(reportMatch, user, sets)
+    setMatchReports((current) => [
+      ...current.filter((report) => report.id !== saved.id),
+      saved,
+    ])
+    setReportMatch(null)
+    notify('Referto della partita salvato.')
+  }
   const dismissRatingTest = async () => {
     setRatingTestOpen(false)
   }
@@ -659,9 +695,10 @@ export function Dashboard() {
       {dashboardView === 'matches' ? (
         <MyMatchesPage
           matches={playerMatches}
-          loading={loading || !receivedRatingsLoaded}
+          loading={loading || !receivedRatingsLoaded || !matchReportsLoaded}
           onBack={closePlayerMatches}
           onSelectMatch={showPlayerMatchOnBoard}
+          onEditReport={setReportMatch}
         />
       ) : dashboardView === 'notifications' ? (
         <NotificationHistoryPage
@@ -759,7 +796,14 @@ export function Dashboard() {
           onDone={notify}
         />
       )}
-      {ratingTestPrompt ? (
+      {reportMatch ? (
+        <MatchReportModal
+          key={`${reportMatch.pollId}-${reportMatch.slot.id}`}
+          match={reportMatch}
+          onClose={() => setReportMatch(null)}
+          onSave={saveMatchReport}
+        />
+      ) : ratingTestPrompt ? (
         <MatchRatingModal
           testMode
           key={ratingTestPrompt.id}
@@ -775,7 +819,7 @@ export function Dashboard() {
           onSubmit={submitRatings}
         />
       )}
-      {!ratingTestPrompt && !activeRatingPrompt && (notifications.shouldPrompt || notificationPanelOpen) && (
+      {!reportMatch && !ratingTestPrompt && !activeRatingPrompt && (notifications.shouldPrompt || notificationPanelOpen) && (
         <NotificationCallup
           state={notifications.state}
           busy={notifications.busy}

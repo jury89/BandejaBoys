@@ -4,6 +4,7 @@ import {
   addSlotToPoll,
   addSignup,
   defaultSlotForWeek,
+  getMatchPairings,
   getMatchRatingResponseId,
   getNextMatchRatingPromptAt,
   getPendingMatchRatingPrompts,
@@ -14,7 +15,9 @@ import {
   getUpcomingPolls,
   guestNameError,
   isBookingCandidate,
+  makeMatchReport,
   makePoll,
+  matchSetInputsError,
   nextMondayDate,
   padelDateTimeToTimestamp,
   profileNameError,
@@ -170,6 +173,116 @@ describe('ordine adesioni', () => {
     const current = slot(['a', 'b', 'c', 'd'].map((id, index) => signup(id, index, 'starter')))
 
     expect(() => addSignup(current, member('e'), 5, 'starter')).toThrow('quattro posti da titolare')
+  })
+})
+
+describe('referto dei set', () => {
+  const playedSlot = {
+    ...slot(['a', 'b', 'c', 'd'].map((id, index) => signup(id, index + 1))),
+    bookedAt: 1,
+    venue: DEFAULT_VENUE,
+  }
+  const match = {
+    pollId: 'poll-1',
+    pollTitle: 'Padel · 27 lug – 2 ago 2026',
+    slot: playedSlot,
+  }
+
+  it('propone soltanto le tre coppie possibili tra i quattro titolari', () => {
+    expect(getMatchPairings(playedSlot).map((pairing) => [
+      pairing.teamA.map((player) => player.userId),
+      pairing.teamB.map((player) => player.userId),
+    ])).toEqual([
+      [['a', 'b'], ['c', 'd']],
+      [['a', 'c'], ['b', 'd']],
+      [['a', 'd'], ['b', 'c']],
+    ])
+  })
+
+  it('salva coppie, punteggi e autori preservando la creazione nelle modifiche', () => {
+    const created = makeMatchReport(match, member('a', 'Ale'), [
+      { teamAUserIds: ['a', 'b'], scoreA: 6, scoreB: 4 },
+      { teamAUserIds: ['a', 'c'], scoreA: 3, scoreB: 6 },
+    ], undefined, 100)
+
+    expect(created).toMatchObject({
+      id: 'poll-1__slot-1',
+      participantIds: ['a', 'b', 'c', 'd'],
+      createdBy: 'a',
+      createdByName: 'Ale',
+      createdAt: 100,
+      updatedAt: 100,
+    })
+    expect(created.sets).toEqual([
+      {
+        id: 'set-1',
+        teamA: [
+          { userId: 'a', displayName: 'A' },
+          { userId: 'b', displayName: 'B' },
+        ],
+        teamB: [
+          { userId: 'c', displayName: 'C' },
+          { userId: 'd', displayName: 'D' },
+        ],
+        scoreA: 6,
+        scoreB: 4,
+      },
+      {
+        id: 'set-2',
+        teamA: [
+          { userId: 'a', displayName: 'A' },
+          { userId: 'c', displayName: 'C' },
+        ],
+        teamB: [
+          { userId: 'b', displayName: 'B' },
+          { userId: 'd', displayName: 'D' },
+        ],
+        scoreA: 3,
+        scoreB: 6,
+      },
+    ])
+
+    const updated = makeMatchReport(match, member('b', 'Baru'), [
+      { teamAUserIds: ['a', 'd'], scoreA: 7, scoreB: 5 },
+    ], created, 200)
+    expect(updated).toMatchObject({
+      createdBy: 'a',
+      createdByName: 'Ale',
+      createdAt: 100,
+      updatedBy: 'b',
+      updatedByName: 'Baru',
+      updatedAt: 200,
+    })
+  })
+
+  it('rifiuta set in parità e collega il referto allo storico personale', () => {
+    expect(matchSetInputsError(playedSlot, [
+      { teamAUserIds: ['a', 'b'], scoreA: 6, scoreB: 6 },
+    ])).toBe('Il set 1 non può finire in parità.')
+
+    const report = makeMatchReport(match, member('a'), [
+      { teamAUserIds: ['a', 'b'], scoreA: 6, scoreB: 2 },
+    ], undefined, 100)
+    const poll: PadelPoll = {
+      id: match.pollId,
+      title: match.pollTitle,
+      targetWeekStart: '2026-07-27',
+      createdBy: 'a',
+      createdByName: 'A',
+      createdAt: 1,
+      updatedAt: 1,
+      status: 'closed',
+      slots: [playedSlot],
+    }
+    const lists = getPlayerMatches(
+      [poll],
+      'a',
+      padelDateTimeToTimestamp(playedSlot.startsAt) + playedSlot.durationMinutes * 60_000 + 1,
+      [],
+      [report],
+    )
+
+    expect(lists.past[0].report).toEqual(report)
   })
 })
 

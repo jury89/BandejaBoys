@@ -1,7 +1,7 @@
 import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, vi } from 'vitest'
-import type { MatchRatingRecord, PadelPoll } from '../types'
+import type { MatchRatingRecord, MatchReport, PadelPoll } from '../types'
 import type { NotificationDelivery } from '../lib/notificationHistory'
 import { repository } from '../lib/repository'
 import { slotElementId } from '../lib/slotNavigation'
@@ -21,6 +21,7 @@ const dashboardTestState = vi.hoisted(() => {
   return {
     polls: [] as PadelPoll[],
     ratings: [] as MatchRatingRecord[],
+    reports: [] as MatchReport[],
     deliveries: [defaultDelivery] as NotificationDelivery[],
     defaultDelivery,
     pollSubscriptionMode: 'success' as 'success' | 'stalled-once' | 'stalled',
@@ -79,11 +80,16 @@ vi.mock('../lib/repository', () => ({
       listener(dashboardTestState.ratings)
       return vi.fn()
     },
+    subscribeMatchReports: (_userId: string, listener: (reports: MatchReport[]) => void) => {
+      listener(dashboardTestState.reports)
+      return vi.fn()
+    },
     subscribeNotificationDeliveries: (_userId: string, listener: (deliveries: NotificationDelivery[]) => void) => {
       listener(dashboardTestState.deliveries)
       return vi.fn()
     },
     markNotificationDeliveriesRead: vi.fn().mockResolvedValue(undefined),
+    saveMatchReport: vi.fn(),
   },
 }))
 
@@ -92,6 +98,7 @@ describe('menu account', () => {
     vi.clearAllMocks()
     dashboardTestState.polls = []
     dashboardTestState.ratings = []
+    dashboardTestState.reports = []
     dashboardTestState.deliveries = [dashboardTestState.defaultDelivery]
     dashboardTestState.pollSubscriptionMode = 'success'
     dashboardTestState.pollSubscriptionCalls = 0

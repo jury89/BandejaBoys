@@ -18,9 +18,12 @@ import type {
   MatchRatingRecord,
   MatchRatingResponse,
   MatchRatingSubmission,
+  MatchReport,
+  MatchSetInput,
   MemberProfile,
   PadelPoll,
   PadelSlot,
+  PlayerMatch,
   PollStatus,
   SessionUser,
   SignupRole,
@@ -38,6 +41,7 @@ import {
   addSlotToPoll,
   addSignup,
   getStarters,
+  makeMatchReport,
   makeId,
   makePoll,
   removeGuestSignup,
@@ -64,6 +68,11 @@ export interface PadelRepository {
   subscribeReceivedMatchRatings(
     revieweeId: string,
     listener: (ratings: MatchRatingRecord[]) => void,
+    onError: (error: Error) => void,
+  ): Unsubscribe
+  subscribeMatchReports(
+    participantId: string,
+    listener: (reports: MatchReport[]) => void,
     onError: (error: Error) => void,
   ): Unsubscribe
   subscribeNotificationDeliveries(
@@ -118,6 +127,11 @@ export interface PadelRepository {
     reviewer: SessionUser,
     submissions: MatchRatingSubmission[],
   ): Promise<MatchRatingResponse>
+  saveMatchReport(
+    match: PlayerMatch,
+    editor: SessionUser,
+    sets: MatchSetInput[],
+  ): Promise<MatchReport>
 }
 
 type ActivityFactory = (before: PadelPoll, after: PadelPoll) => ActivityEventInput | null
@@ -265,6 +279,16 @@ function remoteRepository(): PadelRepository {
           id: item.id,
           ...item.data(),
         }) as MatchRatingRecord)),
+        onError,
+      )
+    },
+    subscribeMatchReports(participantId, listener, onError) {
+      return onSnapshot(
+        query(collection(db, 'matchReports'), where('participantIds', 'array-contains', participantId)),
+        (snapshot) => listener(snapshot.docs.map((item) => ({
+          id: item.id,
+          ...item.data(),
+        }) as MatchReport)),
         onError,
       )
     },
@@ -562,6 +586,18 @@ function remoteRepository(): PadelRepository {
       await batch.commit()
       return response
     },
+    async saveMatchReport(match, editor, sets) {
+      const reference = doc(db, 'matchReports', `${match.pollId}__${match.slot.id}`)
+      return runTransaction(db, async (transaction) => {
+        const snapshot = await transaction.get(reference)
+        const existing = snapshot.exists()
+          ? { id: snapshot.id, ...snapshot.data() } as MatchReport
+          : undefined
+        const report = makeMatchReport(match, editor, sets, existing)
+        transaction.set(reference, report)
+        return report
+      })
+    },
   }
 }
 
@@ -569,6 +605,8 @@ const LOCAL_POLLS_KEY = 'bandeja-boys:polls'
 const POLLS_EVENT = 'bandeja-boys:polls-changed'
 const LOCAL_MATCH_RATINGS_KEY = 'bandeja-boys:match-ratings'
 const MATCH_RATINGS_EVENT = 'bandeja-boys:match-ratings-changed'
+const LOCAL_MATCH_REPORTS_KEY = 'bandeja-boys:match-reports'
+const MATCH_REPORTS_EVENT = 'bandeja-boys:match-reports-changed'
 const LOCAL_ACTIVITY_KEY = 'bandeja-boys:activity'
 
 interface LocalMatchRatingStore {
@@ -666,6 +704,21 @@ function writeLocalMatchRatingStore(store: LocalMatchRatingStore) {
   window.dispatchEvent(new Event(MATCH_RATINGS_EVENT))
 }
 
+function readLocalMatchReports(): MatchReport[] {
+  try {
+    const stored = localStorage.getItem(LOCAL_MATCH_REPORTS_KEY)
+    if (stored) return JSON.parse(stored) as MatchReport[]
+  } catch {
+    // Malformed demo reports must not block the match history.
+  }
+  return []
+}
+
+function writeLocalMatchReports(reports: MatchReport[]) {
+  localStorage.setItem(LOCAL_MATCH_REPORTS_KEY, JSON.stringify(reports))
+  window.dispatchEvent(new Event(MATCH_REPORTS_EVENT))
+}
+
 function readLocalActivityStore(): LocalActivityStore {
   try {
     const stored = localStorage.getItem(LOCAL_ACTIVITY_KEY)
@@ -739,6 +792,14 @@ function localRepository(): PadelRepository {
       window.addEventListener(MATCH_RATINGS_EVENT, notify)
       notify()
       return () => window.removeEventListener(MATCH_RATINGS_EVENT, notify)
+    },
+    subscribeMatchReports(participantId, listener) {
+      const notify = () => listener(
+        readLocalMatchReports().filter((report) => report.participantIds.includes(participantId)),
+      )
+      window.addEventListener(MATCH_REPORTS_EVENT, notify)
+      notify()
+      return () => window.removeEventListener(MATCH_REPORTS_EVENT, notify)
     },
     subscribeNotificationDeliveries(_userId, listener) {
       listener([])
@@ -977,6 +1038,22 @@ function localRepository(): PadelRepository {
         ratings: [...store.ratings, ...records],
       })
       return response
+    },
+    async saveMatchReport(match, editor, sets) {
+      const reports = readLocalMatchReports()
+      const existingIndex = reports.findIndex(
+        (report) => report.pollId === match.pollId && report.slotId === match.slot.id,
+      )
+      const report = makeMatchReport(
+        match,
+        editor,
+        sets,
+        existingIndex >= 0 ? reports[existingIndex] : undefined,
+      )
+      if (existingIndex >= 0) reports[existingIndex] = report
+      else reports.push(report)
+      writeLocalMatchReports(reports)
+      return report
     },
   }
 }

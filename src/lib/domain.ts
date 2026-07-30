@@ -1,8 +1,13 @@
 import type {
   CreatePollInput,
+  MatchPairing,
   MatchRatingPrompt,
   MatchRatingRecord,
   MatchRatingResponse,
+  MatchReport,
+  MatchReportPlayer,
+  MatchSetInput,
+  MatchSetResult,
   MemberProfile,
   PadelPoll,
   PadelSlot,
@@ -23,6 +28,8 @@ export const DEFAULT_VENUE_PHONE = '+390376290058'
 export const PROFILE_NAME_MAX_LENGTH = 40
 export const GUEST_NAME_MAX_LENGTH = 40
 export const MATCH_RATING_DELAY_MS = 10 * 60 * 1000
+export const MAX_MATCH_SETS = 5
+export const MAX_MATCH_SET_SCORE = 99
 
 const LOCAL_DATE_TIME_PATTERN = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,3}))?)?$/
 const romeDateTimeFormatter = new Intl.DateTimeFormat('en-GB', {
@@ -217,12 +224,146 @@ export function isBookingCandidate(slot: PadelSlot): boolean {
   return !slot.bookedAt && getStarters(slot).length === MAX_STARTERS
 }
 
+function reportPlayers(slot: PadelSlot): MatchReportPlayer[] {
+  return getStarters(slot).map((signup) => ({
+    userId: signup.userId,
+    displayName: signup.displayName,
+  }))
+}
+
+export function getMatchReportId(pollId: string, slotId: string): string {
+  return `${pollId}__${slotId}`
+}
+
+export function getMatchPairings(slot: PadelSlot): MatchPairing[] {
+  const players = reportPlayers(slot)
+  if (players.length !== MAX_STARTERS) return []
+
+  return [
+    { teamA: [players[0], players[1]], teamB: [players[2], players[3]] },
+    { teamA: [players[0], players[2]], teamB: [players[1], players[3]] },
+    { teamA: [players[0], players[3]], teamB: [players[1], players[2]] },
+  ]
+}
+
+export function matchSetInputsError(slot: PadelSlot, inputs: MatchSetInput[]): string | null {
+  const participants = reportPlayers(slot)
+  if (participants.length !== MAX_STARTERS) {
+    return 'Il referto richiede esattamente quattro titolari.'
+  }
+  if (inputs.length < 1 || inputs.length > MAX_MATCH_SETS) {
+    return `Inserisci da 1 a ${MAX_MATCH_SETS} set.`
+  }
+
+  const participantIds = new Set(participants.map((player) => player.userId))
+  for (let index = 0; index < inputs.length; index += 1) {
+    const input = inputs[index]
+    const teamIds = input.teamAUserIds
+    if (
+      teamIds.length !== 2
+      || teamIds[0] === teamIds[1]
+      || !teamIds.every((userId) => participantIds.has(userId))
+    ) {
+      return `Scegli una coppia valida per il set ${index + 1}.`
+    }
+    if (
+      !Number.isInteger(input.scoreA)
+      || !Number.isInteger(input.scoreB)
+      || input.scoreA < 0
+      || input.scoreB < 0
+      || input.scoreA > MAX_MATCH_SET_SCORE
+      || input.scoreB > MAX_MATCH_SET_SCORE
+    ) {
+      return `Inserisci un punteggio valido per il set ${index + 1}.`
+    }
+    if (input.scoreA === input.scoreB) {
+      return `Il set ${index + 1} non può finire in parità.`
+    }
+  }
+
+  return null
+}
+
+function makeMatchSetResults(
+  participants: MatchReportPlayer[],
+  inputs: MatchSetInput[],
+): MatchSetResult[] {
+  const byId = new Map(participants.map((player) => [player.userId, player]))
+  return inputs.map((input, index) => {
+    const teamAIds = new Set(input.teamAUserIds)
+    const teamA = input.teamAUserIds.map((userId) => byId.get(userId)) as [
+      MatchReportPlayer,
+      MatchReportPlayer,
+    ]
+    const teamB = participants.filter((player) => !teamAIds.has(player.userId)) as [
+      MatchReportPlayer,
+      MatchReportPlayer,
+    ]
+    return {
+      id: `set-${index + 1}`,
+      teamA,
+      teamB,
+      scoreA: input.scoreA,
+      scoreB: input.scoreB,
+    }
+  })
+}
+
+export function makeMatchReport(
+  match: PlayerMatch,
+  editor: SessionUser,
+  inputs: MatchSetInput[],
+  existing?: MatchReport,
+  now = Date.now(),
+): MatchReport {
+  const inputError = matchSetInputsError(match.slot, inputs)
+  if (inputError) throw new Error(inputError)
+
+  const id = getMatchReportId(match.pollId, match.slot.id)
+  const currentParticipants = reportPlayers(match.slot)
+  const currentParticipantIds = currentParticipants.map((player) => player.userId)
+  if (
+    existing
+    && (
+      existing.id !== id
+      || existing.participantIds.length !== currentParticipantIds.length
+      || existing.participantIds.some((userId, index) => userId !== currentParticipantIds[index])
+    )
+  ) {
+    throw new Error('La formazione della partita è cambiata. Aggiorna la pagina e riprova.')
+  }
+
+  const participants = existing?.participants ?? currentParticipants
+  const participantIds = existing?.participantIds ?? currentParticipantIds
+  return {
+    id,
+    pollId: match.pollId,
+    pollTitle: existing?.pollTitle ?? match.pollTitle,
+    slotId: match.slot.id,
+    sessionStartsAt: existing?.sessionStartsAt ?? match.slot.startsAt,
+    participantIds,
+    participants,
+    sets: makeMatchSetResults(participants, inputs),
+    createdBy: existing?.createdBy ?? editor.id,
+    createdByName: existing?.createdByName ?? editor.displayName,
+    createdAt: existing?.createdAt ?? now,
+    updatedBy: editor.id,
+    updatedByName: editor.displayName,
+    updatedAt: now,
+  }
+}
+
 export function getPlayerMatches(
   polls: PadelPoll[],
   userId: string,
   now = Date.now(),
   receivedRatings: MatchRatingRecord[] = [],
+  matchReports: MatchReport[] = [],
 ): PlayerMatchLists {
+  const reportsByMatch = new Map(matchReports.map((report) => [
+    getMatchReportId(report.pollId, report.slotId),
+    report,
+  ]))
   const matches: Array<PlayerMatch & { startsAt: number; endsAt: number }> = polls
     .flatMap((poll) => poll.slots.map((slot) => {
       const startsAt = padelDateTimeToTimestamp(slot.startsAt)
@@ -257,6 +398,7 @@ export function getPlayerMatches(
       pollId,
       pollTitle,
       slot,
+      report: reportsByMatch.get(getMatchReportId(pollId, slot.id)),
       ...(scores.length > 0 ? {
         receivedRating: {
           average: scores.reduce((total, score) => total + score, 0) / scores.length,

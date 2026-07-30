@@ -72,6 +72,7 @@ export interface PlayerMatch {
   pollId: string
   pollTitle: string
   slot: PadelSlot
+  report?: MatchReport
   receivedRating?: {
     average: number
     count: number
@@ -141,4 +142,43 @@ export interface MatchRatingRecord {
   revieweeName: string
   score: number
   createdAt: number
+}
+
+export interface MatchReportPlayer {
+  userId: string
+  displayName: string
+}
+
+export interface MatchPairing {
+  teamA: [MatchReportPlayer, MatchReportPlayer]
+  teamB: [MatchReportPlayer, MatchReportPlayer]
+}
+
+export interface MatchSetInput {
+  teamAUserIds: [string, string]
+  scoreA: number
+  scoreB: number
+}
+
+export interface MatchSetResult extends MatchPairing {
+  id: string
+  scoreA: number
+  scoreB: number
+}
+
+export interface MatchReport {
+  id: string
+  pollId: string
+  pollTitle: string
+  slotId: string
+  sessionStartsAt: string
+  participantIds: string[]
+  participants: MatchReportPlayer[]
+  sets: MatchSetResult[]
+  createdBy: string
+  createdByName: string
+  createdAt: number
+  updatedBy: string
+  updatedByName: string
+  updatedAt: number
 }
