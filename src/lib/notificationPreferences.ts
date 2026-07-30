@@ -9,6 +9,7 @@ export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
   reminder24h: true,
   reminder2h: true,
   matchRating: true,
+  fantasy: true,
 }
 
 export function normalizeNotificationPreferences(
@@ -23,5 +24,6 @@ export function normalizeNotificationPreferences(
     reminder24h: preferences?.reminder24h ?? true,
     reminder2h: preferences?.reminder2h ?? true,
     matchRating: preferences?.matchRating ?? true,
+    fantasy: preferences?.fantasy ?? true,
   }
 }

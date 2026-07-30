@@ -1,0 +1,608 @@
+import { useMemo, useState } from 'react'
+import {
+  ArrowLeft,
+  CalendarDays,
+  Check,
+  CircleAlert,
+  Clock3,
+  Crown,
+  EyeOff,
+  LockKeyhole,
+  ShieldCheck,
+  Sparkles,
+  Trophy,
+  UsersRound,
+} from 'lucide-react'
+import type {
+  FantasyEntry,
+  FantasyLeaderboardRow,
+  FantasyRound,
+  FantasyRoundPlayer,
+  FantasySelectionInput,
+  MemberProfile,
+  SessionUser,
+} from '../types'
+import {
+  fantasyEntryIsCurrent,
+  getFantasyLeaderboard,
+} from '../lib/domain'
+import { PADEL_TIME_ZONE } from '../lib/format'
+import { resolveMemberName } from '../lib/memberNames'
+import { ProfileAvatar } from './ProfileAvatar'
+
+interface FantasyBandejaPageProps {
+  rounds: FantasyRound[]
+  ownEntries: Record<string, FantasyEntry | undefined>
+  roundEntries: Record<string, FantasyEntry[] | undefined>
+  members: MemberProfile[]
+  user: SessionUser
+  now: number
+  loading: boolean
+  error: string | null
+  onBack: () => void
+  onSave: (roundId: string, input: FantasySelectionInput) => Promise<void>
+}
+
+interface FantasyRoundCardProps {
+  round: FantasyRound
+  savedEntry?: FantasyEntry
+  members: MemberProfile[]
+  user: SessionUser
+  now: number
+  onSave: (roundId: string, input: FantasySelectionInput) => Promise<void>
+}
+
+const matchFormatter = new Intl.DateTimeFormat('it-IT', {
+  weekday: 'long',
+  day: 'numeric',
+  month: 'long',
+  hour: '2-digit',
+  minute: '2-digit',
+  timeZone: PADEL_TIME_ZONE,
+})
+
+function sentenceCase(value: string): string {
+  return value ? `${value.charAt(0).toUpperCase()}${value.slice(1)}` : value
+}
+
+function matchDate(round: FantasyRound): string {
+  return sentenceCase(matchFormatter.format(new Date(round.locksAt)))
+}
+
+function lockCountdown(locksAt: number, now: number): string {
+  const minutes = Math.max(0, Math.ceil((locksAt - now) / 60_000))
+  if (minutes < 60) return `${minutes} min`
+  const hours = Math.ceil(minutes / 60)
+  if (hours < 24) return `${hours} ${hours === 1 ? 'ora' : 'ore'}`
+  const days = Math.ceil(hours / 24)
+  return `${days} ${days === 1 ? 'giorno' : 'giorni'}`
+}
+
+function memberFor(members: MemberProfile[], userId: string): MemberProfile | undefined {
+  return members.find((member) => member.id === userId)
+}
+
+function resolvedPlayer(
+  player: FantasyRoundPlayer,
+  members: MemberProfile[],
+): FantasyRoundPlayer {
+  return {
+    ...player,
+    displayName: resolveMemberName(members, player.userId, player.displayName),
+  }
+}
+
+function PlayerAvatar({
+  player,
+  members,
+}: {
+  player: FantasyRoundPlayer
+  members: MemberProfile[]
+}) {
+  const member = memberFor(members, player.userId)
+  return (
+    <ProfileAvatar
+      displayName={resolveMemberName(members, player.userId, player.displayName)}
+      avatarDataUrl={member?.avatarDataUrl}
+      decorative
+    />
+  )
+}
+
+function FantasyCourt({
+  round,
+  members,
+  selectedIds,
+  interactive,
+  onToggle,
+}: {
+  round: FantasyRound
+  members: MemberProfile[]
+  selectedIds: string[]
+  interactive: boolean
+  onToggle?: (userId: string) => void
+}) {
+  return (
+    <div className="fantasy-court" aria-label="I quattro titolari disponibili">
+      <span className="fantasy-court__net" aria-hidden="true" />
+      {round.participants.map((rawPlayer, index) => {
+        const player = resolvedPlayer(rawPlayer, members)
+        const selected = selectedIds.includes(player.userId)
+        return (
+          <button
+            className={`fantasy-player ${selected ? 'is-selected' : ''}`}
+            type="button"
+            key={player.userId}
+            aria-pressed={selected}
+            disabled={!interactive}
+            onClick={() => onToggle?.(player.userId)}
+          >
+            <span className="fantasy-player__number">{index + 1}</span>
+            <PlayerAvatar player={player} members={members} />
+            <span className="fantasy-player__name">{player.displayName}</span>
+            {selected && <span className="fantasy-player__check"><Check size={15} /></span>}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+function FantasyRoundCard({
+  round,
+  savedEntry,
+  members,
+  user,
+  now,
+  onSave,
+}: FantasyRoundCardProps) {
+  const savedEntryIsCurrent = fantasyEntryIsCurrent(round, savedEntry)
+  const [selectedIds, setSelectedIds] = useState<string[]>(
+    savedEntryIsCurrent && savedEntry ? savedEntry.playerIds : [],
+  )
+  const [captainId, setCaptainId] = useState(
+    savedEntryIsCurrent && savedEntry ? savedEntry.captainId : '',
+  )
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState('')
+  const isStarter = round.participantIds.includes(user.id)
+
+  const togglePlayer = (userId: string) => {
+    setSaveError('')
+    setSelectedIds((current) => {
+      if (current.includes(userId)) {
+        if (captainId === userId) setCaptainId('')
+        return current.filter((id) => id !== userId)
+      }
+      if (current.length < 2) return [...current, userId]
+      if (captainId === current[0]) setCaptainId('')
+      return [current[1], userId]
+    })
+  }
+
+  const save = async () => {
+    if (selectedIds.length !== 2 || !captainId) return
+    setSaving(true)
+    setSaveError('')
+    try {
+      await onSave(round.id, {
+        playerIds: [selectedIds[0], selectedIds[1]],
+        captainId,
+      })
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : 'Salvataggio non riuscito.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const selectedPlayers = selectedIds
+    .map((userId) => round.participants.find((player) => player.userId === userId))
+    .filter((player): player is FantasyRoundPlayer => Boolean(player))
+
+  return (
+    <article className="fantasy-round-card">
+      <header className="fantasy-round-card__header">
+        <div className="fantasy-round-card__match">
+          <span><CalendarDays size={18} /></span>
+          <div>
+            <p>{round.pollTitle}</p>
+            <h3>{matchDate(round)}</h3>
+          </div>
+        </div>
+        <div className="fantasy-round-card__deadline">
+          <Clock3 size={15} />
+          <span>Blocca tra</span>
+          <strong>{lockCountdown(round.locksAt, now)}</strong>
+        </div>
+      </header>
+
+      {isStarter ? (
+        <div className="fantasy-round-card__ineligible">
+          <ShieldCheck size={24} />
+          <div>
+            <strong>Tu sei in campo.</strong>
+            <p>I quattro titolari non giocano questo round fantasy: lascia che siano gli altri a puntare su di te.</p>
+          </div>
+        </div>
+      ) : (
+        <div className="fantasy-round-card__instructions">
+          <div><strong>1.</strong><span>Scegli due giocatori</span></div>
+          <div><strong>2.</strong><span>Nomina il capitano</span></div>
+          <span>{selectedIds.length}/2 scelti</span>
+        </div>
+      )}
+
+      <FantasyCourt
+        round={round}
+        members={members}
+        selectedIds={selectedIds}
+        interactive={!isStarter}
+        onToggle={togglePlayer}
+      />
+
+      {!isStarter && (
+        <div className="fantasy-round-card__selection">
+          {selectedPlayers.length > 0 ? (
+            <>
+              <p><Crown size={16} /> Chi porta la fascia?</p>
+              <div className="fantasy-captain-options">
+                {selectedPlayers.map((player) => (
+                  <button
+                    type="button"
+                    key={player.userId}
+                    className={captainId === player.userId ? 'is-captain' : ''}
+                    aria-pressed={captainId === player.userId}
+                    onClick={() => setCaptainId(player.userId)}
+                  >
+                    <PlayerAvatar player={player} members={members} />
+                    <span>{resolvedPlayer(player, members).displayName}</span>
+                    <Crown size={16} />
+                  </button>
+                ))}
+              </div>
+            </>
+          ) : (
+            <div className="fantasy-round-card__placeholder">
+              <UsersRound size={20} />
+              Tocca due titolari sul campo per comporre la coppia.
+            </div>
+          )}
+
+          {!savedEntryIsCurrent && savedEntry && (
+            <div className="fantasy-round-card__warning" role="status">
+              <CircleAlert size={17} />
+              La formazione reale è cambiata: ricomponi la tua coppia.
+            </div>
+          )}
+          {saveError && (
+            <div className="fantasy-round-card__warning" role="alert">
+              <CircleAlert size={17} /> {saveError}
+            </div>
+          )}
+          <div className="fantasy-round-card__save">
+            <span><EyeOff size={16} /> Scelta segreta fino al via</span>
+            <button
+              className="button button--primary"
+              type="button"
+              disabled={selectedIds.length !== 2 || !captainId || saving}
+              onClick={() => void save()}
+            >
+              {saving ? 'Salvataggio…' : savedEntryIsCurrent ? 'Aggiorna formazione' : 'Salva formazione'}
+            </button>
+          </div>
+        </div>
+      )}
+    </article>
+  )
+}
+
+function LockedRound({
+  round,
+  entries,
+  members,
+  user,
+}: {
+  round: FantasyRound
+  entries?: FantasyEntry[]
+  members: MemberProfile[]
+  user: SessionUser
+}) {
+  return (
+    <article className="fantasy-locked-round">
+      <header>
+        <div>
+          <p className="eyebrow">Formazioni bloccate</p>
+          <h3>{matchDate(round)}</h3>
+          <span>{round.pollTitle}</span>
+        </div>
+        <LockKeyhole size={22} />
+      </header>
+      {entries === undefined ? (
+        <div className="fantasy-locked-round__state">Recuperiamo le formazioni…</div>
+      ) : entries.length === 0 ? (
+        <div className="fantasy-locked-round__state">Nessuno ha schierato una coppia per questo round.</div>
+      ) : (
+        <ol className="fantasy-entry-list">
+          {entries.map((entry) => (
+            <li key={entry.managerId} className={entry.managerId === user.id ? 'is-mine' : ''}>
+              <div>
+                <strong>
+                  {resolveMemberName(members, entry.managerId, entry.managerName)}
+                  {entry.managerId === user.id && <small>La tua</small>}
+                </strong>
+                <span>
+                  {entry.playerIds.map((playerId) => resolveMemberName(
+                    members,
+                    playerId,
+                    round.participants.find((player) => player.userId === playerId)?.displayName ?? playerId,
+                  )).join(' + ')}
+                </span>
+              </div>
+              <span>
+                <Crown size={15} />
+                {resolveMemberName(
+                  members,
+                  entry.captainId,
+                  round.participants.find((player) => player.userId === entry.captainId)?.displayName ?? entry.captainId,
+                )}
+              </span>
+            </li>
+          ))}
+        </ol>
+      )}
+      <footer><Clock3 size={15} /> Calcolo definitivo 48 ore dopo la partita.</footer>
+    </article>
+  )
+}
+
+function RoundResult({
+  round,
+  members,
+  user,
+}: {
+  round: FantasyRound
+  members: MemberProfile[]
+  user: SessionUser
+}) {
+  if (round.status === 'void') {
+    return (
+      <article className="fantasy-result fantasy-result--void">
+        <header><CircleAlert size={22} /><div><p>Round annullato</p><h3>{matchDate(round)}</h3></div></header>
+        <p>{round.voidReason || 'Il round non poteva essere calcolato.'}</p>
+      </article>
+    )
+  }
+
+  return (
+    <article className="fantasy-result">
+      <header className="fantasy-result__header">
+        <div>
+          <p className="eyebrow">Classifica di giornata</p>
+          <h3>{matchDate(round)}</h3>
+          <span>{round.pollTitle}</span>
+        </div>
+        <Trophy size={23} />
+      </header>
+      {(round.standings?.length ?? 0) > 0 ? (
+        <ol className="fantasy-result__standings">
+          {round.standings?.map((standing) => (
+            <li key={standing.managerId} className={standing.managerId === user.id ? 'is-mine' : ''}>
+              <strong className="fantasy-result__rank">{standing.rank}</strong>
+              <div>
+                <p>
+                  {resolveMemberName(members, standing.managerId, standing.managerName)}
+                  {standing.managerId === user.id && <small>Tu</small>}
+                </p>
+                <span>
+                  {standing.playerIds.map((playerId) => resolveMemberName(
+                    members,
+                    playerId,
+                    round.participants.find((player) => player.userId === playerId)?.displayName ?? playerId,
+                  )).join(' + ')}
+                  {' · '}
+                  <Crown size={13} />
+                  {resolveMemberName(
+                    members,
+                    standing.captainId,
+                    round.participants.find((player) => player.userId === standing.captainId)?.displayName ?? standing.captainId,
+                  )}
+                </span>
+              </div>
+              <p className="fantasy-result__points">
+                <strong>{standing.totalScore.toLocaleString('it-IT', { maximumFractionDigits: 2 })}</strong>
+                <span>+{standing.leaguePoints} pt</span>
+              </p>
+            </li>
+          ))}
+        </ol>
+      ) : (
+        <p className="fantasy-result__empty">Nessuna formazione valida è stata schierata.</p>
+      )}
+      <div className="fantasy-player-scores">
+        {(round.playerScores ?? []).map((score) => (
+          <div key={score.userId}>
+            <PlayerAvatar player={score} members={members} />
+            <p>
+              <strong>{resolveMemberName(members, score.userId, score.displayName)}</strong>
+              <span>
+                Pagella {score.baseRating.toLocaleString('it-IT', { maximumFractionDigits: 2 })}
+                {score.usedDefaultRating && ' d’ufficio'}
+              </span>
+            </p>
+            <strong>{score.fantasyScore.toLocaleString('it-IT', { maximumFractionDigits: 2 })}</strong>
+            {score.isMvp && <Sparkles size={15} aria-label="MVP" />}
+          </div>
+        ))}
+      </div>
+    </article>
+  )
+}
+
+function Leaderboard({
+  rows,
+  user,
+  members,
+}: {
+  rows: FantasyLeaderboardRow[]
+  user: SessionUser
+  members: MemberProfile[]
+}) {
+  return (
+    <section className="fantasy-leaderboard" aria-labelledby="fantasy-leaderboard-title">
+      <header>
+        <div>
+          <p className="eyebrow">Campionato</p>
+          <h2 id="fantasy-leaderboard-title">Classifica generale</h2>
+        </div>
+        <Trophy size={25} />
+      </header>
+      {rows.length > 0 ? (
+        <ol>
+          {rows.map((row) => (
+            <li key={row.managerId} className={row.managerId === user.id ? 'is-mine' : ''}>
+              <strong>{row.rank}</strong>
+              <div>
+                <p>
+                  {resolveMemberName(members, row.managerId, row.managerName)}
+                  {row.managerId === user.id && <small>Tu</small>}
+                </p>
+                <span>{row.wins} vittorie · {row.roundsPlayed} round · {row.rawFantasyPoints.toLocaleString('it-IT', { maximumFractionDigits: 2 })} fantasy pt</span>
+              </div>
+              <strong>{row.leaguePoints}<small>pt</small></strong>
+            </li>
+          ))}
+        </ol>
+      ) : (
+        <p className="fantasy-leaderboard__empty">La classifica nascerà con il primo round calcolato.</p>
+      )}
+    </section>
+  )
+}
+
+export function FantasyBandejaPage({
+  rounds,
+  ownEntries,
+  roundEntries,
+  members,
+  user,
+  now,
+  loading,
+  error,
+  onBack,
+  onSave,
+}: FantasyBandejaPageProps) {
+  const orderedRounds = useMemo(
+    () => [...rounds].sort((left, right) => left.locksAt - right.locksAt),
+    [rounds],
+  )
+  const openRounds = orderedRounds.filter((round) => round.status === 'open' && now < round.locksAt)
+  const lockedRounds = orderedRounds.filter((round) => round.status === 'open' && now >= round.locksAt)
+  const finishedRounds = [...orderedRounds]
+    .filter((round) => round.status === 'scored' || round.status === 'void')
+    .sort((left, right) => right.locksAt - left.locksAt)
+  const leaderboard = getFantasyLeaderboard(rounds)
+
+  return (
+    <main className="dashboard fantasy-page">
+      <button className="button button--ghost fantasy-page__back" type="button" onClick={onBack}>
+        <ArrowLeft size={18} /> Torna alla bacheca
+      </button>
+
+      <section className="fantasy-hero">
+        <div>
+          <p className="eyebrow">Il fantasy del gruppo</p>
+          <h1>Fanta<span>Bandeja</span></h1>
+          <p>Scegli la coppia. Affida la fascia. Prenditi la gloria senza nemmeno entrare in campo.</p>
+        </div>
+        <div className="fantasy-hero__mark" aria-hidden="true">
+          <Trophy size={44} />
+          <span>FB</span>
+        </div>
+      </section>
+
+      <section className="fantasy-rules" aria-label="Regole rapide">
+        <div><UsersRound size={20} /><p><strong>2 giocatori</strong><span>tra i quattro titolari</span></p></div>
+        <div><Crown size={20} /><p><strong>Capitano ×1,5</strong><span>e +2 se è MVP</span></p></div>
+        <div><Trophy size={20} /><p><strong>5 · 3 · 1 punti</strong><span>ai primi tre del round</span></p></div>
+        <div><EyeOff size={20} /><p><strong>Scelte segrete</strong><span>visibili soltanto al via</span></p></div>
+      </section>
+
+      {loading ? (
+        <div className="loading-state"><span /><p>Prepariamo il tabellone fantasy…</p></div>
+      ) : error ? (
+        <div className="fantasy-page__error" role="alert">
+          <CircleAlert size={24} />
+          <div><strong>FantaBandeja non disponibile</strong><p>{error}</p></div>
+        </div>
+      ) : rounds.length === 0 ? (
+        <section className="fantasy-empty">
+          <Trophy size={34} />
+          <p className="eyebrow">Spogliatoi ancora vuoti</p>
+          <h2>Il prossimo round nasce con una partita prenotata.</h2>
+          <p>Servono quattro titolari registrati e il campo confermato. Appena ci sono, potrai schierare la coppia.</p>
+        </section>
+      ) : (
+        <>
+          <Leaderboard rows={leaderboard} user={user} members={members} />
+
+          {openRounds.length > 0 && (
+            <section className="fantasy-section" aria-labelledby="fantasy-open-title">
+              <header className="fantasy-section__heading">
+                <div><p className="eyebrow">Mercato aperto</p><h2 id="fantasy-open-title">Schiera la coppia</h2></div>
+                <strong>{openRounds.length}</strong>
+              </header>
+              <div className="fantasy-round-list">
+                {openRounds.map((round) => (
+                  <FantasyRoundCard
+                    key={`${round.id}:${round.rosterKey}:${round.locksAt}:${ownEntries[round.id]?.updatedAt ?? 0}`}
+                    round={round}
+                    savedEntry={ownEntries[round.id]}
+                    members={members}
+                    user={user}
+                    now={now}
+                    onSave={onSave}
+                  />
+                ))}
+              </div>
+            </section>
+          )}
+
+          {lockedRounds.length > 0 && (
+            <section className="fantasy-section" aria-labelledby="fantasy-locked-title">
+              <header className="fantasy-section__heading">
+                <div><p className="eyebrow">In campo</p><h2 id="fantasy-locked-title">Round in calcolo</h2></div>
+                <LockKeyhole size={22} />
+              </header>
+              <div className="fantasy-round-list fantasy-round-list--compact">
+                {lockedRounds.map((round) => (
+                  <LockedRound
+                    key={round.id}
+                    round={round}
+                    entries={roundEntries[round.id]}
+                    members={members}
+                    user={user}
+                  />
+                ))}
+              </div>
+            </section>
+          )}
+
+          {finishedRounds.length > 0 && (
+            <section className="fantasy-section" aria-labelledby="fantasy-results-title">
+              <header className="fantasy-section__heading">
+                <div><p className="eyebrow">Archivio</p><h2 id="fantasy-results-title">Risultati dei round</h2></div>
+                <strong>{finishedRounds.length}</strong>
+              </header>
+              <div className="fantasy-round-list fantasy-round-list--compact">
+                {finishedRounds.map((round) => (
+                  <RoundResult key={round.id} round={round} members={members} user={user} />
+                ))}
+              </div>
+            </section>
+          )}
+        </>
+      )}
+    </main>
+  )
+}

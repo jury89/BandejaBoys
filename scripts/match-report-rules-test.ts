@@ -114,6 +114,16 @@ function auth(uid = userId) {
   }
 }
 
+function notifierAuth() {
+  return {
+    uid: 'notifier-qa',
+    token: {
+      email: 'codex@kirivoraup.resend.app',
+      email_verified: true,
+    },
+  }
+}
+
 function createCase(
   data: MatchReportDocument,
   expectation: RulesTestCase['expectation'],
@@ -223,6 +233,23 @@ const summary = {
   lastRatingId: ratingId,
   updatedAt: createdAt,
 }
+const fantasyRoundPath = `/databases/(default)/documents/fantasyRounds/${reportId}`
+const fantasyRound = {
+  id: reportId,
+  pollId,
+  pollTitle: oneSet.pollTitle,
+  slotId,
+  slotStartsAt: oneSet.sessionStartsAt,
+  slotEndsAt: createdAt + 90 * 60_000,
+  locksAt: createdAt,
+  settlesAt: createdAt + (90 * 60_000) + (48 * 60 * 60_000),
+  participantIds: participants.map((participant) => participant.userId),
+  participants,
+  rosterKey: JSON.stringify(participants.map((participant) => participant.userId)),
+  status: 'open',
+  createdAt,
+  updatedAt: createdAt,
+}
 
 const tests: TestDefinition[] = [
   {
@@ -299,6 +326,40 @@ const tests: TestDefinition[] = [
       'ALLOW',
       'qa-a',
     ),
+  },
+  {
+    label: 'round fantasy creato soltanto dal notifier',
+    testCase: {
+      expectation: 'ALLOW',
+      request: {
+        auth: notifierAuth(),
+        path: fantasyRoundPath,
+        method: 'create',
+        resource: { data: fantasyRound },
+      },
+      expressionReportLevel: 'FULL',
+    },
+  },
+  {
+    label: 'membro non può creare un round fantasy fidato',
+    testCase: {
+      expectation: 'DENY',
+      request: {
+        auth: auth(),
+        path: fantasyRoundPath,
+        method: 'create',
+        resource: { data: fantasyRound },
+      },
+      expressionReportLevel: 'FULL',
+    },
+  },
+  {
+    label: 'round fantasy leggibile da un membro',
+    testCase: readCase(fantasyRoundPath, fantasyRound, 'ALLOW', outsiderId),
+  },
+  {
+    label: 'round fantasy non leggibile senza autenticazione',
+    testCase: readCase(fantasyRoundPath, fantasyRound, 'DENY'),
   },
 ]
 

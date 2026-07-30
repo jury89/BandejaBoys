@@ -2,6 +2,8 @@ import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, vi } from 'vitest'
 import type {
+  FantasyEntry,
+  FantasyRound,
   MatchRatingRecord,
   MatchRatingSummary,
   MatchReport,
@@ -30,6 +32,8 @@ const dashboardTestState = vi.hoisted(() => {
     ratings: [] as MatchRatingRecord[],
     ratingSummaries: [] as MatchRatingSummary[],
     reports: [] as MatchReport[],
+    fantasyRounds: [] as FantasyRound[],
+    fantasyEntries: [] as FantasyEntry[],
     deliveries: [defaultDelivery] as NotificationDelivery[],
     defaultDelivery,
     pollSubscriptionMode: 'success' as 'success' | 'stalled-once' | 'stalled',
@@ -100,12 +104,34 @@ vi.mock('../lib/repository', () => ({
       listener(dashboardTestState.reports)
       return vi.fn()
     },
+    subscribeFantasyRounds: (listener: (rounds: FantasyRound[]) => void) => {
+      listener(dashboardTestState.fantasyRounds)
+      return vi.fn()
+    },
+    subscribeFantasyEntry: (
+      roundId: string,
+      managerId: string,
+      listener: (entry: FantasyEntry | undefined) => void,
+    ) => {
+      listener(dashboardTestState.fantasyEntries.find((entry) => (
+        entry.roundId === roundId && entry.managerId === managerId
+      )))
+      return vi.fn()
+    },
+    subscribeFantasyRoundEntries: (
+      roundId: string,
+      listener: (entries: FantasyEntry[]) => void,
+    ) => {
+      listener(dashboardTestState.fantasyEntries.filter((entry) => entry.roundId === roundId))
+      return vi.fn()
+    },
     subscribeNotificationDeliveries: (_userId: string, listener: (deliveries: NotificationDelivery[]) => void) => {
       listener(dashboardTestState.deliveries)
       return vi.fn()
     },
     markNotificationDeliveriesRead: vi.fn().mockResolvedValue(undefined),
     saveMatchReport: vi.fn(),
+    saveFantasyEntry: vi.fn(),
   },
 }))
 
@@ -117,6 +143,8 @@ describe('menu account', () => {
     dashboardTestState.ratings = []
     dashboardTestState.ratingSummaries = []
     dashboardTestState.reports = []
+    dashboardTestState.fantasyRounds = []
+    dashboardTestState.fantasyEntries = []
     dashboardTestState.deliveries = [dashboardTestState.defaultDelivery]
     dashboardTestState.pollSubscriptionMode = 'success'
     dashboardTestState.pollSubscriptionCalls = 0
@@ -224,6 +252,20 @@ describe('menu account', () => {
     })
 
     expect(screen.getByRole('heading', { name: /Mettiamo in campo/ })).toBeInTheDocument()
+  })
+
+  it('apre FantaBandeja dal menu account e mantiene la route dedicata', async () => {
+    const user = userEvent.setup()
+    render(<Dashboard />)
+
+    await user.click(screen.getByRole('button', { name: 'Apri menu account di Jury' }))
+    await user.click(screen.getByRole('button', { name: /FantaBandeja/ }))
+
+    expect(window.location.hash).toBe('#fantabandeja')
+    expect(screen.getByRole('heading', { name: /FantaBandeja/i })).toBeInTheDocument()
+    expect(screen.getByRole('heading', {
+      name: 'Il prossimo round nasce con una partita prenotata.',
+    })).toBeInTheDocument()
   })
 
   it('apre l’archivio dall’icona accanto al profilo e torna indietro', async () => {

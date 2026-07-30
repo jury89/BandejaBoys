@@ -15,6 +15,9 @@ import {
 } from 'firebase/firestore'
 import type {
   CreatePollInput,
+  FantasyEntry,
+  FantasyRound,
+  FantasySelectionInput,
   MatchRatingPrompt,
   MatchRatingRecord,
   MatchRatingResponse,
@@ -45,12 +48,14 @@ import {
   aggregateMatchRatingSummaries,
   getMatchRatingSummaryId,
   getStarters,
+  makeFantasyEntry,
   makeMatchReport,
   makeId,
   makePoll,
   removeGuestSignup,
   removeSignup,
   removeSlotFromPoll,
+  reconcileFantasyRounds,
   rescheduleSlot,
   setSlotBooking,
   substituteStarter,
@@ -85,6 +90,21 @@ export interface PadelRepository {
   ): Unsubscribe
   subscribeAllMatchReports(
     listener: (reports: MatchReport[]) => void,
+    onError: (error: Error) => void,
+  ): Unsubscribe
+  subscribeFantasyRounds(
+    listener: (rounds: FantasyRound[]) => void,
+    onError: (error: Error) => void,
+  ): Unsubscribe
+  subscribeFantasyEntry(
+    roundId: string,
+    managerId: string,
+    listener: (entry: FantasyEntry | undefined) => void,
+    onError: (error: Error) => void,
+  ): Unsubscribe
+  subscribeFantasyRoundEntries(
+    roundId: string,
+    listener: (entries: FantasyEntry[]) => void,
     onError: (error: Error) => void,
   ): Unsubscribe
   subscribeNotificationDeliveries(
@@ -144,6 +164,11 @@ export interface PadelRepository {
     editor: SessionUser,
     sets: MatchSetInput[],
   ): Promise<MatchReport>
+  saveFantasyEntry(
+    roundId: string,
+    manager: SessionUser,
+    input: FantasySelectionInput,
+  ): Promise<FantasyEntry>
 }
 
 type ActivityFactory = (before: PadelPoll, after: PadelPoll) => ActivityEventInput | null
@@ -321,6 +346,35 @@ function remoteRepository(): PadelRepository {
           id: item.id,
           ...item.data(),
         }) as MatchReport)),
+        onError,
+      )
+    },
+    subscribeFantasyRounds(listener, onError) {
+      return onSnapshot(
+        collection(db, 'fantasyRounds'),
+        (snapshot) => listener(snapshot.docs.map((item) => ({
+          id: item.id,
+          ...item.data(),
+        }) as FantasyRound)),
+        onError,
+      )
+    },
+    subscribeFantasyEntry(roundId, managerId, listener, onError) {
+      return onSnapshot(
+        doc(db, 'fantasyRounds', roundId, 'entries', managerId),
+        (snapshot) => listener(snapshot.exists()
+          ? { id: snapshot.id, ...snapshot.data() } as FantasyEntry
+          : undefined),
+        onError,
+      )
+    },
+    subscribeFantasyRoundEntries(roundId, listener, onError) {
+      return onSnapshot(
+        collection(db, 'fantasyRounds', roundId, 'entries'),
+        (snapshot) => listener(snapshot.docs.map((item) => ({
+          id: item.id,
+          ...item.data(),
+        }) as FantasyEntry)),
         onError,
       )
     },
@@ -648,6 +702,24 @@ function remoteRepository(): PadelRepository {
         return report
       })
     },
+    async saveFantasyEntry(roundId, manager, input) {
+      const roundReference = doc(db, 'fantasyRounds', roundId)
+      const entryReference = doc(db, 'fantasyRounds', roundId, 'entries', manager.id)
+      return runTransaction(db, async (transaction) => {
+        const [roundSnapshot, entrySnapshot] = await Promise.all([
+          transaction.get(roundReference),
+          transaction.get(entryReference),
+        ])
+        if (!roundSnapshot.exists()) throw new Error('Round FantaBandeja non trovato.')
+        const round = { id: roundSnapshot.id, ...roundSnapshot.data() } as FantasyRound
+        const existing = entrySnapshot.exists()
+          ? { id: entrySnapshot.id, ...entrySnapshot.data() } as FantasyEntry
+          : undefined
+        const entry = makeFantasyEntry(round, manager, input, existing)
+        transaction.set(entryReference, entry)
+        return entry
+      })
+    },
   }
 }
 
@@ -657,6 +729,8 @@ const LOCAL_MATCH_RATINGS_KEY = 'bandeja-boys:match-ratings'
 const MATCH_RATINGS_EVENT = 'bandeja-boys:match-ratings-changed'
 const LOCAL_MATCH_REPORTS_KEY = 'bandeja-boys:match-reports'
 const MATCH_REPORTS_EVENT = 'bandeja-boys:match-reports-changed'
+const LOCAL_FANTASY_KEY = 'bandeja-boys:fantasy'
+const FANTASY_EVENT = 'bandeja-boys:fantasy-changed'
 const LOCAL_ACTIVITY_KEY = 'bandeja-boys:activity'
 
 interface LocalMatchRatingStore {
@@ -667,6 +741,11 @@ interface LocalMatchRatingStore {
 interface LocalActivityStore {
   events: LocalActivityEvent[]
   views: LocalSlotView[]
+}
+
+interface LocalFantasyStore {
+  rounds: FantasyRound[]
+  entries: FantasyEntry[]
 }
 
 const demoMembers: MemberProfile[] = [
@@ -769,6 +848,37 @@ function writeLocalMatchReports(reports: MatchReport[]) {
   window.dispatchEvent(new Event(MATCH_REPORTS_EVENT))
 }
 
+function readLocalFantasyStore(): LocalFantasyStore {
+  try {
+    const stored = localStorage.getItem(LOCAL_FANTASY_KEY)
+    if (stored) return JSON.parse(stored) as LocalFantasyStore
+  } catch {
+    // Malformed demo fantasy data must not block the rest of the app.
+  }
+  return { rounds: [], entries: [] }
+}
+
+function writeLocalFantasyStore(store: LocalFantasyStore, notify = true) {
+  localStorage.setItem(LOCAL_FANTASY_KEY, JSON.stringify(store))
+  if (notify) window.dispatchEvent(new Event(FANTASY_EVENT))
+}
+
+function reconcileLocalFantasyStore(): LocalFantasyStore {
+  const current = readLocalFantasyStore()
+  const rounds = reconcileFantasyRounds(
+    readLocalPolls(),
+    current.rounds,
+    current.entries,
+    aggregateMatchRatingSummaries(readLocalMatchRatingStore().ratings),
+    readLocalMatchReports(),
+  )
+  const next = { ...current, rounds }
+  if (JSON.stringify(next.rounds) !== JSON.stringify(current.rounds)) {
+    writeLocalFantasyStore(next, false)
+  }
+  return next
+}
+
 function readLocalActivityStore(): LocalActivityStore {
   try {
     const stored = localStorage.getItem(LOCAL_ACTIVITY_KEY)
@@ -864,6 +974,31 @@ function localRepository(): PadelRepository {
       window.addEventListener(MATCH_REPORTS_EVENT, notify)
       notify()
       return () => window.removeEventListener(MATCH_REPORTS_EVENT, notify)
+    },
+    subscribeFantasyRounds(listener) {
+      const notify = () => listener(reconcileLocalFantasyStore().rounds)
+      const events = [FANTASY_EVENT, POLLS_EVENT, MATCH_RATINGS_EVENT, MATCH_REPORTS_EVENT]
+      events.forEach((eventName) => window.addEventListener(eventName, notify))
+      notify()
+      return () => events.forEach((eventName) => window.removeEventListener(eventName, notify))
+    },
+    subscribeFantasyEntry(roundId, managerId, listener) {
+      const notify = () => listener(
+        readLocalFantasyStore().entries.find((entry) => (
+          entry.roundId === roundId && entry.managerId === managerId
+        )),
+      )
+      window.addEventListener(FANTASY_EVENT, notify)
+      notify()
+      return () => window.removeEventListener(FANTASY_EVENT, notify)
+    },
+    subscribeFantasyRoundEntries(roundId, listener) {
+      const notify = () => listener(
+        readLocalFantasyStore().entries.filter((entry) => entry.roundId === roundId),
+      )
+      window.addEventListener(FANTASY_EVENT, notify)
+      notify()
+      return () => window.removeEventListener(FANTASY_EVENT, notify)
     },
     subscribeNotificationDeliveries(_userId, listener) {
       listener([])
@@ -1118,6 +1253,24 @@ function localRepository(): PadelRepository {
       else reports.push(report)
       writeLocalMatchReports(reports)
       return report
+    },
+    async saveFantasyEntry(roundId, manager, input) {
+      const store = reconcileLocalFantasyStore()
+      const round = store.rounds.find((item) => item.id === roundId)
+      if (!round) throw new Error('Round FantaBandeja non trovato.')
+      const existingIndex = store.entries.findIndex((entry) => (
+        entry.roundId === roundId && entry.managerId === manager.id
+      ))
+      const entry = makeFantasyEntry(
+        round,
+        manager,
+        input,
+        existingIndex >= 0 ? store.entries[existingIndex] : undefined,
+      )
+      if (existingIndex >= 0) store.entries[existingIndex] = entry
+      else store.entries.push(entry)
+      writeLocalFantasyStore(store)
+      return entry
     },
   }
 }

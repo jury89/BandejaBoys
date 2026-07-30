@@ -30,7 +30,7 @@ service cloud.firestore {
         || (request.resource.data.notificationPreferences is map
           && request.resource.data.notificationPreferences.keys().hasOnly([
             'mondayMotivation', 'newSlots', 'slotReady', 'starterSubstitution', 'bookingReminder7d',
-            'reminder24h', 'reminder2h', 'matchRating'
+            'reminder24h', 'reminder2h', 'matchRating', 'fantasy'
           ])
           && request.resource.data.notificationPreferences.keys().hasAll([
             'mondayMotivation', 'newSlots', 'slotReady', 'bookingReminder7d',
@@ -44,7 +44,9 @@ service cloud.firestore {
           && request.resource.data.notificationPreferences.bookingReminder7d is bool
           && request.resource.data.notificationPreferences.reminder24h is bool
           && request.resource.data.notificationPreferences.reminder2h is bool
-          && request.resource.data.notificationPreferences.matchRating is bool);
+          && request.resource.data.notificationPreferences.matchRating is bool
+          && (!request.resource.data.notificationPreferences.keys().hasAny(['fantasy'])
+            || request.resource.data.notificationPreferences.fantasy is bool));
     }
 
     function validUserProfile(userId) {
@@ -228,6 +230,73 @@ service cloud.firestore {
         && request.resource.data.updatedAt >= request.resource.data.createdAt;
     }
 
+    function validFantasyRound(roundId) {
+      return request.resource.data.keys().hasOnly([
+          'id', 'pollId', 'pollTitle', 'slotId', 'slotStartsAt',
+          'slotEndsAt', 'locksAt', 'settlesAt',
+          'participantIds', 'participants', 'rosterKey', 'status',
+          'createdAt', 'updatedAt', 'settledAt', 'voidReason',
+          'playerScores', 'standings'
+        ])
+        && request.resource.data.keys().hasAll([
+          'id', 'pollId', 'pollTitle', 'slotId', 'slotStartsAt',
+          'slotEndsAt', 'locksAt', 'settlesAt',
+          'participantIds', 'participants', 'rosterKey', 'status',
+          'createdAt', 'updatedAt'
+        ])
+        && request.resource.data.id == roundId
+        && roundId == request.resource.data.pollId + '__' + request.resource.data.slotId
+        && request.resource.data.pollId is string
+        && request.resource.data.pollTitle is string
+        && request.resource.data.slotId is string
+        && request.resource.data.slotStartsAt is string
+        && request.resource.data.slotEndsAt is int
+        && request.resource.data.locksAt is int
+        && request.resource.data.settlesAt is int
+        && request.resource.data.locksAt < request.resource.data.slotEndsAt
+        && request.resource.data.slotEndsAt < request.resource.data.settlesAt
+        && request.resource.data.participantIds is list
+        && request.resource.data.participantIds.size() == 4
+        && request.resource.data.participantIds.toSet().size() == 4
+        && request.resource.data.participants is list
+        && request.resource.data.participants.size() == 4
+        && request.resource.data.rosterKey is string
+        && request.resource.data.status in ['open', 'scored', 'void']
+        && request.resource.data.createdAt is int
+        && request.resource.data.updatedAt is int
+        && request.resource.data.updatedAt >= request.resource.data.createdAt;
+    }
+
+    function validFantasyEntry(roundId, managerId) {
+      let round = get(/databases/$(database)/documents/fantasyRounds/$(roundId));
+      return request.resource.data.keys().hasOnly([
+          'id', 'roundId', 'pollId', 'slotId',
+          'managerId', 'managerName', 'playerIds', 'captainId',
+          'rosterKey', 'locksAt', 'createdAt', 'updatedAt'
+        ])
+        && request.resource.data.id == managerId
+        && request.resource.data.roundId == roundId
+        && request.resource.data.pollId == round.data.pollId
+        && request.resource.data.slotId == round.data.slotId
+        && request.resource.data.managerId == request.auth.uid
+        && managerId == request.auth.uid
+        && request.resource.data.managerName
+          == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.displayName
+        && request.resource.data.playerIds is list
+        && request.resource.data.playerIds.size() == 2
+        && request.resource.data.playerIds.toSet().size() == 2
+        && round.data.participantIds.hasAll(request.resource.data.playerIds)
+        && !round.data.participantIds.hasAny([request.auth.uid])
+        && request.resource.data.captainId in request.resource.data.playerIds
+        && request.resource.data.rosterKey == round.data.rosterKey
+        && request.resource.data.locksAt == round.data.locksAt
+        && request.resource.data.createdAt is int
+        && request.resource.data.updatedAt is int
+        && request.resource.data.updatedAt >= request.resource.data.createdAt
+        && round.data.status == 'open'
+        && request.time.toMillis() < round.data.locksAt;
+    }
+
     function validActivityEvent() {
       return request.resource.data.keys().hasOnly([
           'type', 'actorId', 'actorName', 'pollId', 'pollTitle',
@@ -262,7 +331,8 @@ service cloud.firestore {
         && request.resource.data.kind in [
           'new-slots', 'slot-ready', 'starter-substitution', 'booking-reminder-7d',
           'reminder-24h', 'reminder-2h', 'match-rating',
-          'monday-motivation', 'test'
+          'monday-motivation', 'fantasy-open', 'fantasy-roster-changed',
+          'fantasy-result', 'test'
         ]
         && request.resource.data.title is string
         && request.resource.data.body is string
@@ -423,14 +493,14 @@ service cloud.firestore {
     }
 
     match /matchRatingSummaries/{summaryId} {
-      allow read: if isMember();
+      allow read: if isMember() || isNotifier();
       allow create: if isMember() && validMatchRatingSummaryCreate(summaryId);
       allow update: if isMember() && validMatchRatingSummaryUpdate(summaryId);
       allow delete: if false;
     }
 
     match /matchReports/{reportId} {
-      allow read: if isMember();
+      allow read: if isMember() || isNotifier();
       allow create: if isMember()
         && validMatchReport(reportId)
         && request.resource.data.createdBy == request.auth.uid
@@ -445,6 +515,27 @@ service cloud.firestore {
           'participants', 'sets', 'updatedBy', 'updatedByName', 'updatedAt'
         ]);
       allow delete: if false;
+    }
+
+    match /fantasyRounds/{roundId} {
+      allow read: if isMember() || isNotifier();
+      allow create, update: if isNotifier() && validFantasyRound(roundId);
+      allow delete: if false;
+
+      match /entries/{managerId} {
+        allow get: if isNotifier()
+          || (isMember() && (request.auth.uid == managerId
+            || request.time.toMillis()
+              >= get(/databases/$(database)/documents/fantasyRounds/$(roundId)).data.locksAt));
+        allow list: if isNotifier()
+          || (isMember() && request.time.toMillis()
+            >= get(/databases/$(database)/documents/fantasyRounds/$(roundId)).data.locksAt);
+        allow create: if isMember() && validFantasyEntry(roundId, managerId);
+        allow update: if isMember()
+          && validFantasyEntry(roundId, managerId)
+          && request.resource.data.createdAt == resource.data.createdAt;
+        allow delete: if false;
+      }
     }
   }
 }

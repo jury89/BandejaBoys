@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { MatchRatingPrompt, PlayerMatch, SessionUser } from '../types'
+import type { FantasyRound, MatchRatingPrompt, PlayerMatch, SessionUser } from '../types'
 
 const firestoreMocks = vi.hoisted(() => {
   const batch = {
@@ -13,9 +13,7 @@ const firestoreMocks = vi.hoisted(() => {
   return {
     batch,
     transaction,
-    doc: vi.fn((_database: unknown, collectionName: string, documentId: string) => (
-      `${collectionName}/${documentId}`
-    )),
+    doc: vi.fn((_database: unknown, ...segments: string[]) => segments.join('/')),
     runTransaction: vi.fn((_database: unknown, operation: (current: typeof transaction) => unknown) => (
       operation(transaction)
     )),
@@ -144,6 +142,56 @@ describe('repository remoto delle pagelle', () => {
         { scoreA: 6, scoreB: 4 },
         { scoreA: 3, scoreB: 6 },
       ],
+    })
+  })
+
+  it('salva la formazione fantasy leggendo round e giocata nella stessa transazione', async () => {
+    const locksAt = Date.now() + 60 * 60 * 1000
+    const round: FantasyRound = {
+      id: 'poll-1__slot-1',
+      pollId: 'poll-1',
+      pollTitle: 'Padel · 27 lug – 2 ago 2026',
+      slotId: 'slot-1',
+      slotStartsAt: '2026-07-27T18:30',
+      slotEndsAt: locksAt + 90 * 60_000,
+      locksAt,
+      settlesAt: locksAt + 49.5 * 60 * 60_000,
+      participantIds: ['ale', 'luca', 'teo', 'baru'],
+      participants: ['ale', 'luca', 'teo', 'baru'].map((userId) => ({
+        userId,
+        displayName: userId.toUpperCase(),
+      })),
+      rosterKey: '["ale","luca","teo","baru"]',
+      status: 'open',
+      createdAt: 1,
+      updatedAt: 1,
+    }
+    firestoreMocks.transaction.get.mockImplementation(async (reference: string) => (
+      reference === 'fantasyRounds/poll-1__slot-1'
+        ? { exists: () => true, id: round.id, data: () => round }
+        : { exists: () => false }
+    ))
+
+    const saved = await repository.saveFantasyEntry(round.id, reviewer, {
+      playerIds: ['ale', 'baru'],
+      captainId: 'baru',
+    })
+
+    expect(firestoreMocks.transaction.get).toHaveBeenCalledWith(
+      'fantasyRounds/poll-1__slot-1',
+    )
+    expect(firestoreMocks.transaction.get).toHaveBeenCalledWith(
+      'fantasyRounds/poll-1__slot-1/entries/jury',
+    )
+    expect(firestoreMocks.transaction.set).toHaveBeenCalledWith(
+      'fantasyRounds/poll-1__slot-1/entries/jury',
+      saved,
+    )
+    expect(saved).toMatchObject({
+      managerId: 'jury',
+      playerIds: ['ale', 'baru'],
+      captainId: 'baru',
+      rosterKey: round.rosterKey,
     })
   })
 })

@@ -1,4 +1,4 @@
-import type { PadelPoll, PadelSlot, Signup } from '../types'
+import type { FantasyEntry, FantasyRound, PadelPoll, PadelSlot, Signup } from '../types'
 import {
   BOOKING_REMINDER_LEAD_MS,
   BOOKING_REMINDER_WINDOW_MS,
@@ -7,6 +7,7 @@ import {
   NEW_SLOT_QUIET_PERIOD_MS,
   SLOT_READY_NOTIFICATION_WINDOW_MS,
   STARTER_SUBSTITUTION_NOTIFICATION_WINDOW_MS,
+  collectFantasyNotifications,
   collectScheduledNotifications,
   createNotificationDelivery,
   createNotificationPushPayload,
@@ -27,6 +28,7 @@ describe('preferenze notifiche', () => {
     expect(isNotificationKindEnabled('reminder-24h')).toBe(true)
     expect(isNotificationKindEnabled('reminder-2h')).toBe(true)
     expect(isNotificationKindEnabled('match-rating')).toBe(true)
+    expect(isNotificationKindEnabled('fantasy-open')).toBe(true)
   })
 
   it('disattiva soltanto le categorie scelte e lascia passare i test manuali', () => {
@@ -39,6 +41,7 @@ describe('preferenze notifiche', () => {
       reminder24h: false,
       reminder2h: true,
       matchRating: false,
+      fantasy: false,
     }
 
     expect(isNotificationKindEnabled('monday-motivation', preferences)).toBe(false)
@@ -49,6 +52,7 @@ describe('preferenze notifiche', () => {
     expect(isNotificationKindEnabled('reminder-24h', preferences)).toBe(false)
     expect(isNotificationKindEnabled('reminder-2h', preferences)).toBe(true)
     expect(isNotificationKindEnabled('match-rating', preferences)).toBe(false)
+    expect(isNotificationKindEnabled('fantasy-result', preferences)).toBe(false)
     expect(isNotificationKindEnabled('test', preferences)).toBe(true)
   })
 })
@@ -722,5 +726,90 @@ describe('pianificazione notifiche', () => {
     ], NOW)
 
     expect(notifications).toHaveLength(0)
+  })
+})
+
+describe('notifiche FantaBandeja', () => {
+  const fantasyRound: FantasyRound = {
+    id: 'poll-1__slot-1',
+    pollId: 'poll-1',
+    pollTitle: 'Padel · 27 lug – 2 ago 2026',
+    slotId: 'slot-1',
+    slotStartsAt: '2026-07-27T20:00',
+    slotEndsAt: NOW + 3 * 60 * 60 * 1000,
+    locksAt: NOW + 90 * 60 * 1000,
+    settlesAt: NOW + 51 * 60 * 60 * 1000,
+    participantIds: ['a', 'b', 'c', 'd'],
+    participants: ['a', 'b', 'c', 'd'].map((userId) => ({
+      userId,
+      displayName: userId.toUpperCase(),
+    })),
+    rosterKey: '["a","b","c","d"]',
+    status: 'open',
+    createdAt: NOW,
+    updatedAt: NOW,
+  }
+  const fantasyEntry: FantasyEntry = {
+    id: 'manager',
+    roundId: fantasyRound.id,
+    pollId: fantasyRound.pollId,
+    slotId: fantasyRound.slotId,
+    managerId: 'manager',
+    managerName: 'Manager',
+    playerIds: ['a', 'b'],
+    captainId: 'a',
+    rosterKey: fantasyRound.rosterKey,
+    locksAt: fantasyRound.locksAt,
+    createdAt: NOW,
+    updatedAt: NOW,
+  }
+
+  it('apre il round a tutti tranne i quattro titolari', () => {
+    expect(collectFantasyNotifications([fantasyRound], [], NOW)[0]).toMatchObject({
+      kind: 'fantasy-open',
+      recipientUserIds: null,
+      excludedUserIds: ['a', 'b', 'c', 'd'],
+      url: '/#fantabandeja',
+    })
+  })
+
+  it('avvisa il manager quando la formazione salvata non è più valida', () => {
+    const changed = {
+      ...fantasyRound,
+      participantIds: ['a', 'b', 'c', 'e'],
+      participants: fantasyRound.participants.map((player) => (
+        player.userId === 'd' ? { userId: 'e', displayName: 'E' } : player
+      )),
+      rosterKey: '["a","b","c","e"]',
+    }
+    const notifications = collectFantasyNotifications([changed], [fantasyEntry], NOW)
+
+    expect(notifications.find((notification) => notification.kind === 'fantasy-roster-changed'))
+      .toMatchObject({ recipientUserIds: ['manager'] })
+  })
+
+  it('manda il piazzamento personale quando il round è calcolato', () => {
+    const scored: FantasyRound = {
+      ...fantasyRound,
+      status: 'scored',
+      settledAt: NOW,
+      standings: [{
+        managerId: 'manager',
+        managerName: 'Manager',
+        playerIds: ['a', 'b'],
+        captainId: 'a',
+        totalScore: 24.5,
+        captainRating: 8,
+        baseRatingTotal: 15,
+        rank: 1,
+        leaguePoints: 5,
+      }],
+    }
+
+    expect(collectFantasyNotifications([scored], [fantasyEntry], NOW)[0]).toMatchObject({
+      kind: 'fantasy-result',
+      title: 'Hai vinto il round!',
+      recipientUserIds: ['manager'],
+    })
   })
 })

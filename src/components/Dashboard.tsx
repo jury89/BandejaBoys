@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Bell, BellRing, CalendarCheck2, CalendarClock, CalendarDays, CalendarPlus, CheckCircle2, ChevronDown, CircleUserRound, History, LogOut, PhoneCall, RefreshCw, UsersRound } from 'lucide-react'
+import { Bell, BellRing, CalendarCheck2, CalendarClock, CalendarDays, CalendarPlus, CheckCircle2, ChevronDown, CircleUserRound, History, LogOut, PhoneCall, RefreshCw, Trophy, UsersRound } from 'lucide-react'
 import { useAuth } from '../AuthContext'
 import type {
+  FantasyEntry,
+  FantasyRound,
+  FantasySelectionInput,
   MatchRatingRecord,
   MatchRatingResponse,
   MatchRatingSummary,
@@ -41,6 +44,7 @@ import { repository } from '../lib/repository'
 import { slotElementId, type SlotNavigationTarget } from '../lib/slotNavigation'
 import { Brand } from './Brand'
 import { CreatePollModal } from './CreatePollModal'
+import { FantasyBandejaPage } from './FantasyBandejaPage'
 import { GroupMatchesPage } from './GroupMatchesPage'
 import { MatchRatingModal } from './MatchRatingModal'
 import { MatchReportModal } from './MatchReportModal'
@@ -53,10 +57,11 @@ import { ProfileModal } from './ProfileModal'
 import { PullToRefresh } from './PullToRefresh'
 
 type FeedFilter = PollSlotFilter
-type DashboardView = 'feed' | 'matches' | 'group-matches' | 'notifications'
+type DashboardView = 'feed' | 'matches' | 'group-matches' | 'fantasy' | 'notifications'
 
 const PERSONAL_MATCHES_HASH = '#i-miei-match'
 const GROUP_MATCHES_HASH = '#gli-altri-match'
+const FANTASY_HASH = '#fantabandeja'
 const NOTIFICATION_HISTORY_HASH = '#notifiche'
 const INITIAL_DATA_TIMEOUT_MS = 6_000
 const INITIAL_DATA_AUTO_RETRIES = 2
@@ -64,6 +69,7 @@ const INITIAL_DATA_AUTO_RETRIES = 2
 function dashboardViewFromLocation(): DashboardView {
   if (window.location.hash === PERSONAL_MATCHES_HASH) return 'matches'
   if (window.location.hash === GROUP_MATCHES_HASH) return 'group-matches'
+  if (window.location.hash === FANTASY_HASH) return 'fantasy'
   if (window.location.hash === NOTIFICATION_HISTORY_HASH) return 'notifications'
   return 'feed'
 }
@@ -120,6 +126,11 @@ export function Dashboard() {
   const [groupRatingSummariesLoaded, setGroupRatingSummariesLoaded] = useState(false)
   const [groupMatchReportsLoaded, setGroupMatchReportsLoaded] = useState(false)
   const [groupMatchesError, setGroupMatchesError] = useState<string | null>(null)
+  const [fantasyRounds, setFantasyRounds] = useState<FantasyRound[]>([])
+  const [fantasyRoundsLoaded, setFantasyRoundsLoaded] = useState(false)
+  const [fantasyOwnEntries, setFantasyOwnEntries] = useState<Record<string, FantasyEntry | undefined>>({})
+  const [fantasyRoundEntries, setFantasyRoundEntries] = useState<Record<string, FantasyEntry[]>>({})
+  const [fantasyError, setFantasyError] = useState<string | null>(null)
   const [reportMatch, setReportMatch] = useState<PlayerMatch | null>(null)
   const [notificationHistory, setNotificationHistory] = useState<NotificationHistoryItem[]>([])
   const [notificationHistoryLoaded, setNotificationHistoryLoaded] = useState(!hasRemoteBackend)
@@ -357,6 +368,52 @@ export function Dashboard() {
   }, [dashboardView])
 
   useEffect(() => {
+    if (dashboardView !== 'fantasy') return
+    return repository.subscribeFantasyRounds((rounds) => {
+      setFantasyRounds(rounds)
+      setFantasyRoundsLoaded(true)
+      setFantasyError(null)
+    }, () => {
+      setFantasyRoundsLoaded(true)
+      setFantasyError('Non siamo riusciti a recuperare i round FantaBandeja.')
+    })
+  }, [dashboardView])
+
+  useEffect(() => {
+    if (dashboardView !== 'fantasy' || !user || !fantasyRoundsLoaded) return
+    const subscriptions: Array<() => void> = []
+    const showFantasyEntryError = () => {
+      setFantasyError('Non siamo riusciti a recuperare tutte le formazioni fantasy.')
+    }
+
+    fantasyRounds.forEach((round) => {
+      if (round.status !== 'open') return
+      if (now < round.locksAt) {
+        if (round.participantIds.includes(user.id)) return
+        subscriptions.push(repository.subscribeFantasyEntry(
+          round.id,
+          user.id,
+          (entry) => {
+            setFantasyOwnEntries((current) => ({ ...current, [round.id]: entry }))
+          },
+          showFantasyEntryError,
+        ))
+        return
+      }
+
+      subscriptions.push(repository.subscribeFantasyRoundEntries(
+        round.id,
+        (entries) => {
+          setFantasyRoundEntries((current) => ({ ...current, [round.id]: entries }))
+        },
+        showFantasyEntryError,
+      ))
+    })
+
+    return () => subscriptions.forEach((unsubscribe) => unsubscribe())
+  }, [dashboardView, fantasyRounds, fantasyRoundsLoaded, now, user])
+
+  useEffect(() => {
     if (!toast) return
     const timer = window.setTimeout(() => setToast(null), 4200)
     return () => window.clearTimeout(timer)
@@ -437,7 +494,11 @@ export function Dashboard() {
     const nextRatingPrompt = user
       ? getNextMatchRatingPromptAt(polls, ratingResponses, user.id, now)
       : null
-    const nextWakeAt = [nextSlotEnd, nextRatingPrompt]
+    const nextFantasyBoundary = fantasyRounds
+      .flatMap((round) => [round.locksAt, round.settlesAt])
+      .filter((timestamp) => Number.isFinite(timestamp) && timestamp > now)
+      .sort((left, right) => left - right)[0]
+    const nextWakeAt = [nextSlotEnd, nextRatingPrompt, nextFantasyBoundary]
       .filter((timestamp): timestamp is number => typeof timestamp === 'number')
       .sort((left, right) => left - right)[0]
     if (!nextWakeAt) return
@@ -445,7 +506,7 @@ export function Dashboard() {
     const delay = Math.min(Math.max(nextWakeAt - Date.now() + 50, 0), 2_147_483_647)
     const timer = window.setTimeout(() => setNow(Date.now()), delay)
     return () => window.clearTimeout(timer)
-  }, [now, polls, ratingResponses, user])
+  }, [fantasyRounds, now, polls, ratingResponses, user])
 
   const upcomingPolls = useMemo(() => getUpcomingPolls(polls, now), [now, polls])
   const matchNameMembers = useMemo(
@@ -605,6 +666,30 @@ export function Dashboard() {
     window.history.replaceState(window.history.state, '', url)
     setDashboardView('feed')
   }
+  const openFantasy = () => {
+    setAccountOpen(false)
+    setFantasyRoundsLoaded(false)
+    setFantasyError(null)
+    setDashboardView('fantasy')
+    if (window.location.hash === FANTASY_HASH) return
+    const url = new URL(window.location.href)
+    url.hash = FANTASY_HASH
+    const currentState = typeof window.history.state === 'object' && window.history.state
+      ? window.history.state
+      : {}
+    window.history.pushState({ ...currentState, bandejaView: 'fantasy' }, '', url)
+  }
+  const closeFantasy = () => {
+    if (window.history.state?.bandejaView === 'fantasy') {
+      window.history.back()
+      return
+    }
+
+    const url = new URL(window.location.href)
+    url.hash = ''
+    window.history.replaceState(window.history.state, '', url)
+    setDashboardView('feed')
+  }
   const openNotificationHistory = () => {
     setAccountOpen(false)
     setDashboardView('notifications')
@@ -661,6 +746,14 @@ export function Dashboard() {
     ])
     setReportMatch(null)
     notify('Referto della partita salvato.')
+  }
+  const saveFantasyEntry = async (
+    roundId: string,
+    input: FantasySelectionInput,
+  ) => {
+    const saved = await repository.saveFantasyEntry(roundId, user, input)
+    setFantasyOwnEntries((current) => ({ ...current, [roundId]: saved }))
+    notify('Formazione FantaBandeja salvata e nascosta fino al via.')
   }
   const dismissRatingTest = async () => {
     setRatingTestOpen(false)
@@ -722,6 +815,10 @@ export function Dashboard() {
                 <button type="button" onClick={openGroupMatches}>
                   <UsersRound size={16} />
                   <span>Gli altri match <small>Pagellini e risultati del gruppo</small></span>
+                </button>
+                <button type="button" onClick={openFantasy}>
+                  <Trophy size={16} />
+                  <span>FantaBandeja <small>Schiera la coppia e scala la classifica</small></span>
                 </button>
                 {hasRemoteBackend && (
                   <button type="button" onClick={() => {
@@ -808,6 +905,19 @@ export function Dashboard() {
           loading={loading || !groupRatingSummariesLoaded || !groupMatchReportsLoaded}
           error={groupMatchesError}
           onBack={closeGroupMatches}
+        />
+      ) : dashboardView === 'fantasy' ? (
+        <FantasyBandejaPage
+          rounds={fantasyRounds}
+          ownEntries={fantasyOwnEntries}
+          roundEntries={fantasyRoundEntries}
+          members={matchNameMembers}
+          user={user}
+          now={now}
+          loading={!fantasyRoundsLoaded}
+          error={fantasyError}
+          onBack={closeFantasy}
+          onSave={saveFantasyEntry}
         />
       ) : dashboardView === 'notifications' ? (
         <NotificationHistoryPage

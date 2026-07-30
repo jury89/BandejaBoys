@@ -11,6 +11,7 @@ import {
   FlaskConical,
   Smartphone,
   Star,
+  Trophy,
   UserRoundCheck,
   UsersRound,
 } from 'lucide-react'
@@ -60,6 +61,12 @@ function notificationPresentation(kind: string): NotificationPresentation {
       return { label: 'Pagelle', icon: Star, tone: 'rating' }
     case 'monday-motivation':
       return { label: 'Sveglia del lunedì', icon: BellRing, tone: 'monday' }
+    case 'fantasy-open':
+      return { label: 'FantaBandeja', icon: Trophy, tone: 'fantasy' }
+    case 'fantasy-roster-changed':
+      return { label: 'Formazione fantasy', icon: Trophy, tone: 'fantasy' }
+    case 'fantasy-result':
+      return { label: 'Risultato fantasy', icon: Trophy, tone: 'fantasy' }
     case 'test':
       return { label: 'Notifica manuale', icon: FlaskConical, tone: 'test' }
     default:

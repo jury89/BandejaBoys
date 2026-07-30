@@ -1,4 +1,6 @@
 import type {
+  FantasyEntry,
+  FantasyRound,
   MatchRatingResponse,
   NotificationPreferences,
   PadelPoll,
@@ -11,6 +13,7 @@ import {
   getMatchRatingDueAt,
   getMatchRatingResponseId,
   getStarters,
+  fantasyEntryIsCurrent,
   padelDateTimeToTimestamp,
 } from './domain'
 import { pollWeekTitle } from './format'
@@ -32,7 +35,7 @@ export const BOOKING_REMINDER_WINDOW_MS = DAY_MS
 export const MATCH_RATING_NOTIFICATION_WINDOW_MS = 30 * 60 * 1000
 export const MONDAY_MOTIVATION_WINDOW_MS = HOUR_MS
 
-export type NotificationKind = 'new-slots' | 'slot-ready' | 'starter-substitution' | 'booking-reminder-7d' | 'reminder-24h' | 'reminder-2h' | 'match-rating' | 'monday-motivation' | 'test'
+export type NotificationKind = 'new-slots' | 'slot-ready' | 'starter-substitution' | 'booking-reminder-7d' | 'reminder-24h' | 'reminder-2h' | 'match-rating' | 'monday-motivation' | 'fantasy-open' | 'fantasy-roster-changed' | 'fantasy-result' | 'test'
 export type TestNotificationMode = 'standard' | 'match-rating'
 
 const NOTIFICATION_PREFERENCE_BY_KIND = {
@@ -44,6 +47,9 @@ const NOTIFICATION_PREFERENCE_BY_KIND = {
   'reminder-2h': 'reminder2h',
   'match-rating': 'matchRating',
   'monday-motivation': 'mondayMotivation',
+  'fantasy-open': 'fantasy',
+  'fantasy-roster-changed': 'fantasy',
+  'fantasy-result': 'fantasy',
 } as const satisfies Record<Exclude<NotificationKind, 'test'>, keyof NotificationPreferences>
 
 export function isNotificationKindEnabled(
@@ -285,6 +291,89 @@ export function createTestNotification(
     recipientUserIds: [recipient],
     excludedUserIds: [],
   }
+}
+
+export function collectFantasyNotifications(
+  rounds: FantasyRound[],
+  entries: FantasyEntry[],
+  now = Date.now(),
+): ScheduledNotification[] {
+  const notifications: ScheduledNotification[] = []
+
+  rounds.forEach((round) => {
+    const roundEntries = entries.filter((entry) => entry.roundId === round.id)
+
+    if (round.status === 'open' && now < round.locksAt) {
+      notifications.push({
+        id: `fantasy-open:${round.id}:${round.rosterKey}:${round.locksAt}`,
+        kind: 'fantasy-open',
+        title: 'FantaBandeja aperto',
+        body: `Scegli due titolari e il tuo capitano per ${formatSession(round.slotStartsAt)}. La formazione resta segreta fino all’inizio.`,
+        url: '/#fantabandeja',
+        tag: `fantasy-open-${round.id}`,
+        ttlSeconds: Math.max(60, Math.floor((round.locksAt - now) / 1000)),
+        recipientUserIds: null,
+        excludedUserIds: round.participantIds,
+      })
+
+      const staleManagerIds = Array.from(new Set(
+        roundEntries
+          .filter((entry) => !fantasyEntryIsCurrent(round, entry))
+          .map((entry) => entry.managerId),
+      ))
+      if (staleManagerIds.length > 0) {
+        notifications.push({
+          id: `fantasy-roster-changed:${round.id}:${round.rosterKey}:${round.locksAt}`,
+          kind: 'fantasy-roster-changed',
+          title: 'Formazione cambiata',
+          body: 'È cambiato uno dei quattro titolari: aggiorna la tua coppia FantaBandeja prima dell’inizio.',
+          url: '/#fantabandeja',
+          tag: `fantasy-roster-${round.id}`,
+          ttlSeconds: Math.max(60, Math.floor((round.locksAt - now) / 1000)),
+          recipientUserIds: staleManagerIds,
+          excludedUserIds: [],
+        })
+      }
+      return
+    }
+
+    if (round.status === 'scored' && round.settledAt) {
+      ;(round.standings ?? []).forEach((standing) => {
+        notifications.push({
+          id: `fantasy-result:${round.id}:${round.settledAt}`,
+          kind: 'fantasy-result',
+          title: standing.rank === 1 ? 'Hai vinto il round!' : 'Risultati FantaBandeja',
+          body: `Hai chiuso ${standing.rank}º con ${standing.totalScore.toLocaleString('it-IT', {
+            maximumFractionDigits: 2,
+          })} punti: +${standing.leaguePoints} in classifica.`,
+          url: '/#fantabandeja',
+          tag: `fantasy-result-${round.id}`,
+          ttlSeconds: 7 * 24 * 60 * 60,
+          recipientUserIds: [standing.managerId],
+          excludedUserIds: [],
+        })
+      })
+      return
+    }
+
+    if (round.status === 'void' && round.settledAt) {
+      Array.from(new Set(roundEntries.map((entry) => entry.managerId))).forEach((managerId) => {
+        notifications.push({
+          id: `fantasy-result:${round.id}:${round.settledAt}`,
+          kind: 'fantasy-result',
+          title: 'Round FantaBandeja annullato',
+          body: round.voidReason || 'Il round non poteva essere calcolato.',
+          url: '/#fantabandeja',
+          tag: `fantasy-result-${round.id}`,
+          ttlSeconds: 7 * 24 * 60 * 60,
+          recipientUserIds: [managerId],
+          excludedUserIds: [],
+        })
+      })
+    }
+  })
+
+  return notifications
 }
 
 export function collectScheduledNotifications(

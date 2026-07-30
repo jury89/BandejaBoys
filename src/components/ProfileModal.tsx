@@ -11,6 +11,7 @@ import {
   LockKeyhole,
   Star,
   Trash2,
+  Trophy,
   UserRound,
 } from 'lucide-react'
 import type { NotificationPreferences, SessionUser } from '../types'
@@ -73,6 +74,12 @@ const NOTIFICATION_OPTIONS: {
     title: 'Pagelle',
     description: 'Quando è il momento di votare i compagni.',
     icon: Star,
+  },
+  {
+    key: 'fantasy',
+    title: 'FantaBandeja',
+    description: 'Apertura round, cambi formazione e risultati fantasy.',
+    icon: Trophy,
   },
 ]
 

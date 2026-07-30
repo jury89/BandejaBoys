@@ -9,6 +9,7 @@ export interface NotificationPreferences {
   reminder24h: boolean
   reminder2h: boolean
   matchRating: boolean
+  fantasy: boolean
 }
 
 export interface MemberProfile {
@@ -214,4 +215,87 @@ export interface MatchReport {
   updatedBy: string
   updatedByName: string
   updatedAt: number
+}
+
+export type FantasyRoundStatus = 'open' | 'scored' | 'void'
+
+export interface FantasyRoundPlayer {
+  userId: string
+  displayName: string
+}
+
+export interface FantasyPlayerScore extends FantasyRoundPlayer {
+  baseRating: number
+  ratingCount: number
+  usedDefaultRating: boolean
+  setWins: number
+  setLosses: number
+  gameDifference: number
+  resultBonus: number
+  differenceBonus: number
+  fantasyScore: number
+  isMvp: boolean
+}
+
+export interface FantasyRoundStanding {
+  managerId: string
+  managerName: string
+  playerIds: [string, string]
+  captainId: string
+  totalScore: number
+  captainRating: number
+  baseRatingTotal: number
+  rank: number
+  leaguePoints: number
+}
+
+export interface FantasyRound {
+  id: string
+  pollId: string
+  pollTitle: string
+  slotId: string
+  slotStartsAt: string
+  slotEndsAt: number
+  locksAt: number
+  settlesAt: number
+  participantIds: string[]
+  participants: FantasyRoundPlayer[]
+  rosterKey: string
+  status: FantasyRoundStatus
+  createdAt: number
+  updatedAt: number
+  settledAt?: number
+  voidReason?: string
+  playerScores?: FantasyPlayerScore[]
+  standings?: FantasyRoundStanding[]
+}
+
+export interface FantasyEntry {
+  id: string
+  roundId: string
+  pollId: string
+  slotId: string
+  managerId: string
+  managerName: string
+  playerIds: [string, string]
+  captainId: string
+  rosterKey: string
+  locksAt: number
+  createdAt: number
+  updatedAt: number
+}
+
+export interface FantasySelectionInput {
+  playerIds: [string, string]
+  captainId: string
+}
+
+export interface FantasyLeaderboardRow {
+  managerId: string
+  managerName: string
+  leaguePoints: number
+  wins: number
+  rawFantasyPoints: number
+  roundsPlayed: number
+  rank: number
 }

@@ -1,5 +1,12 @@
 import type {
   CreatePollInput,
+  FantasyEntry,
+  FantasyLeaderboardRow,
+  FantasyPlayerScore,
+  FantasyRound,
+  FantasyRoundPlayer,
+  FantasyRoundStanding,
+  FantasySelectionInput,
   GroupMatch,
   MatchPairing,
   MatchRatingPrompt,
@@ -33,6 +40,9 @@ export const GUEST_NAME_MAX_LENGTH = 40
 export const MATCH_RATING_DELAY_MS = 10 * 60 * 1000
 export const MAX_MATCH_SETS = 5
 export const MAX_MATCH_SET_SCORE = 99
+export const FANTASY_SETTLEMENT_DELAY_MS = 48 * 60 * 60 * 1000
+export const FANTASY_DEFAULT_RATING = 6
+export const FANTASY_MIN_RATINGS = 2
 
 const LOCAL_DATE_TIME_PATTERN = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,3}))?)?$/
 const romeDateTimeFormatter = new Intl.DateTimeFormat('en-GB', {
@@ -564,6 +574,456 @@ export function getOtherPlayedMatches(
         }
       }),
     }))
+}
+
+function roundTo(value: number, decimals: number): number {
+  const factor = 10 ** decimals
+  return Math.round((value + Number.EPSILON) * factor) / factor
+}
+
+export function getFantasyRoundId(pollId: string, slotId: string): string {
+  return `${pollId}__${slotId}`
+}
+
+export function getFantasyRosterKey(participantIds: readonly string[]): string {
+  return JSON.stringify([...participantIds])
+}
+
+interface FantasyRoundCandidate {
+  id: string
+  pollId: string
+  pollTitle: string
+  slotId: string
+  slotStartsAt: string
+  slotEndsAt: number
+  locksAt: number
+  settlesAt: number
+  participantIds: string[]
+  participants: FantasyRoundPlayer[]
+  rosterKey: string
+}
+
+function fantasyRoundCandidate(poll: PadelPoll, slot: PadelSlot): FantasyRoundCandidate | null {
+  const starters = getStarters(slot)
+  const locksAt = padelDateTimeToTimestamp(slot.startsAt)
+  const slotEndsAt = getSlotEndsAt(slot)
+  if (
+    !slot.bookedAt
+    || starters.length !== MAX_STARTERS
+    || starters.some((signup) => signup.isGuest)
+    || !Number.isFinite(locksAt)
+    || !Number.isFinite(slotEndsAt)
+  ) {
+    return null
+  }
+
+  const participants = starters.map((signup) => ({
+    userId: signup.userId,
+    displayName: signup.displayName,
+  }))
+  const participantIds = participants.map((participant) => participant.userId)
+  return {
+    id: getFantasyRoundId(poll.id, slot.id),
+    pollId: poll.id,
+    pollTitle: pollWeekTitle(poll.targetWeekStart),
+    slotId: slot.id,
+    slotStartsAt: slot.startsAt,
+    slotEndsAt,
+    locksAt,
+    settlesAt: slotEndsAt + FANTASY_SETTLEMENT_DELAY_MS,
+    participantIds,
+    participants,
+    rosterKey: getFantasyRosterKey(participantIds),
+  }
+}
+
+export function makeFantasyRound(
+  poll: PadelPoll,
+  slot: PadelSlot,
+  now = Date.now(),
+): FantasyRound | null {
+  const candidate = fantasyRoundCandidate(poll, slot)
+  if (!candidate || candidate.locksAt <= now) return null
+  return {
+    ...candidate,
+    status: 'open',
+    createdAt: now,
+    updatedAt: now,
+  }
+}
+
+export function fantasySelectionError(
+  round: FantasyRound,
+  managerId: string,
+  input: FantasySelectionInput,
+  now = Date.now(),
+): string | null {
+  if (round.status !== 'open') return 'Questo round è già terminato.'
+  if (now >= round.locksAt) return 'Le formazioni sono già state bloccate.'
+  if (round.participantIds.includes(managerId)) {
+    return 'I quattro titolari non possono partecipare al fantasy di questa partita.'
+  }
+  if (
+    input.playerIds.length !== 2
+    || input.playerIds[0] === input.playerIds[1]
+    || !input.playerIds.every((userId) => round.participantIds.includes(userId))
+  ) {
+    return 'Scegli due titolari diversi.'
+  }
+  if (!input.playerIds.includes(input.captainId)) {
+    return 'Scegli il capitano tra i due giocatori selezionati.'
+  }
+  return null
+}
+
+export function makeFantasyEntry(
+  round: FantasyRound,
+  manager: SessionUser,
+  input: FantasySelectionInput,
+  existing?: FantasyEntry,
+  now = Date.now(),
+): FantasyEntry {
+  const inputError = fantasySelectionError(round, manager.id, input, now)
+  if (inputError) throw new Error(inputError)
+  if (existing && (existing.id !== manager.id || existing.roundId !== round.id)) {
+    throw new Error('La formazione salvata appartiene a un altro round.')
+  }
+
+  return {
+    id: manager.id,
+    roundId: round.id,
+    pollId: round.pollId,
+    slotId: round.slotId,
+    managerId: manager.id,
+    managerName: manager.displayName,
+    playerIds: [...input.playerIds],
+    captainId: input.captainId,
+    rosterKey: round.rosterKey,
+    locksAt: round.locksAt,
+    createdAt: existing?.createdAt ?? now,
+    updatedAt: now,
+  }
+}
+
+export function fantasyEntryIsCurrent(
+  round: FantasyRound,
+  entry: FantasyEntry | undefined,
+): boolean {
+  return Boolean(
+    entry
+    && entry.roundId === round.id
+    && entry.rosterKey === round.rosterKey
+    && entry.locksAt === round.locksAt
+    && !round.participantIds.includes(entry.managerId)
+    && entry.playerIds.length === 2
+    && entry.playerIds[0] !== entry.playerIds[1]
+    && entry.playerIds.every((userId) => round.participantIds.includes(userId))
+    && entry.playerIds.includes(entry.captainId),
+  )
+}
+
+function fantasyPlayerScores(
+  round: FantasyRound,
+  report: MatchReport,
+  ratingSummaries: MatchRatingSummary[],
+): FantasyPlayerScore[] {
+  const summariesByPlayer = new Map(
+    ratingSummaries
+      .filter((summary) => summary.pollId === round.pollId && summary.slotId === round.slotId)
+      .map((summary) => [summary.revieweeId, summary]),
+  )
+  const statsByPlayer = new Map(round.participants.map((player) => [
+    player.userId,
+    { setWins: 0, setLosses: 0, gameDifference: 0 },
+  ]))
+
+  report.sets.forEach((set) => {
+    const teamAWon = set.scoreA > set.scoreB
+    set.teamA.forEach((player) => {
+      const stats = statsByPlayer.get(player.userId)
+      if (!stats) return
+      stats.setWins += teamAWon ? 1 : 0
+      stats.setLosses += teamAWon ? 0 : 1
+      stats.gameDifference += set.scoreA - set.scoreB
+    })
+    set.teamB.forEach((player) => {
+      const stats = statsByPlayer.get(player.userId)
+      if (!stats) return
+      stats.setWins += teamAWon ? 0 : 1
+      stats.setLosses += teamAWon ? 1 : 0
+      stats.gameDifference += set.scoreB - set.scoreA
+    })
+  })
+
+  const baseScores = round.participants.map((player) => {
+    const summary = summariesByPlayer.get(player.userId)
+    const hasEnoughRatings = Boolean(
+      summary
+      && Number.isFinite(summary.scoreTotal)
+      && Number.isInteger(summary.ratingCount)
+      && summary.ratingCount >= FANTASY_MIN_RATINGS,
+    )
+    const stats = statsByPlayer.get(player.userId)!
+    return {
+      ...player,
+      baseRating: hasEnoughRatings
+        ? roundTo(summary!.scoreTotal / summary!.ratingCount, 2)
+        : FANTASY_DEFAULT_RATING,
+      ratingCount: hasEnoughRatings ? summary!.ratingCount : summary?.ratingCount ?? 0,
+      usedDefaultRating: !hasEnoughRatings,
+      ...stats,
+    }
+  })
+  const bestGameDifference = Math.max(...baseScores.map((score) => score.gameDifference))
+  const bestBaseRating = Math.max(...baseScores.map((score) => score.baseRating))
+
+  return baseScores.map((score) => {
+    const resultBonus = score.setWins > score.setLosses
+      ? 1.5
+      : score.setWins < score.setLosses ? -0.5 : 0
+    const differenceBonus = bestGameDifference > 0
+      && score.gameDifference === bestGameDifference ? 0.5 : 0
+    return {
+      ...score,
+      resultBonus,
+      differenceBonus,
+      fantasyScore: roundTo(score.baseRating + resultBonus + differenceBonus, 2),
+      isMvp: score.baseRating === bestBaseRating,
+    }
+  })
+}
+
+function fantasyStandingLeaguePoints(rank: number): number {
+  if (rank === 1) return 5
+  if (rank === 2) return 3
+  if (rank === 3) return 1
+  return 0
+}
+
+function compareFantasyStandings(
+  left: Omit<FantasyRoundStanding, 'rank' | 'leaguePoints'>,
+  right: Omit<FantasyRoundStanding, 'rank' | 'leaguePoints'>,
+): number {
+  return right.totalScore - left.totalScore
+    || right.captainRating - left.captainRating
+    || right.baseRatingTotal - left.baseRatingTotal
+    || left.managerName.localeCompare(right.managerName, 'it')
+    || left.managerId.localeCompare(right.managerId)
+}
+
+function sameFantasyStandingRank(
+  left: Omit<FantasyRoundStanding, 'rank' | 'leaguePoints'>,
+  right: Omit<FantasyRoundStanding, 'rank' | 'leaguePoints'>,
+): boolean {
+  return left.totalScore === right.totalScore
+    && left.captainRating === right.captainRating
+    && left.baseRatingTotal === right.baseRatingTotal
+}
+
+export function scoreFantasyRound(
+  round: FantasyRound,
+  entries: FantasyEntry[],
+  report: MatchReport,
+  ratingSummaries: MatchRatingSummary[],
+  now = Date.now(),
+): FantasyRound {
+  const reportParticipantIds = new Set(report.participantIds)
+  if (
+    report.pollId !== round.pollId
+    || report.slotId !== round.slotId
+    || reportParticipantIds.size !== round.participantIds.length
+    || round.participantIds.some((userId) => !reportParticipantIds.has(userId))
+  ) {
+    throw new Error('Il referto non corrisponde alla formazione bloccata del round.')
+  }
+
+  const playerScores = fantasyPlayerScores(round, report, ratingSummaries)
+  const scoresByPlayer = new Map(playerScores.map((score) => [score.userId, score]))
+  const ranked = entries
+    .filter((entry) => fantasyEntryIsCurrent(round, entry))
+    .map((entry) => {
+      const selectedScores = entry.playerIds.map((userId) => scoresByPlayer.get(userId)!)
+      const captain = scoresByPlayer.get(entry.captainId)!
+      return {
+        managerId: entry.managerId,
+        managerName: entry.managerName,
+        playerIds: entry.playerIds,
+        captainId: entry.captainId,
+        totalScore: roundTo(
+          selectedScores.reduce((total, score) => total + score.fantasyScore, 0)
+            + captain.fantasyScore * 0.5
+            + (captain.isMvp ? 2 : 0),
+          2,
+        ),
+        captainRating: captain.baseRating,
+        baseRatingTotal: roundTo(
+          selectedScores.reduce((total, score) => total + score.baseRating, 0),
+          2,
+        ),
+      }
+    })
+    .sort(compareFantasyStandings)
+
+  let previous: typeof ranked[number] | undefined
+  let previousRank = 0
+  const standings: FantasyRoundStanding[] = ranked.map((standing, index) => {
+    const rank = previous && sameFantasyStandingRank(previous, standing)
+      ? previousRank
+      : index + 1
+    previous = standing
+    previousRank = rank
+    return {
+      ...standing,
+      rank,
+      leaguePoints: fantasyStandingLeaguePoints(rank),
+    }
+  })
+
+  return {
+    ...round,
+    status: 'scored',
+    playerScores,
+    standings,
+    settledAt: now,
+    updatedAt: now,
+  }
+}
+
+function voidFantasyRound(
+  round: FantasyRound,
+  reason: string,
+  now: number,
+): FantasyRound {
+  return {
+    ...round,
+    status: 'void',
+    voidReason: reason,
+    settledAt: now,
+    updatedAt: now,
+  }
+}
+
+function fantasyCandidateChanged(
+  round: FantasyRound,
+  candidate: FantasyRoundCandidate,
+): boolean {
+  return round.pollTitle !== candidate.pollTitle
+    || round.slotStartsAt !== candidate.slotStartsAt
+    || round.slotEndsAt !== candidate.slotEndsAt
+    || round.locksAt !== candidate.locksAt
+    || round.settlesAt !== candidate.settlesAt
+    || round.rosterKey !== candidate.rosterKey
+}
+
+export function reconcileFantasyRounds(
+  polls: PadelPoll[],
+  existingRounds: FantasyRound[],
+  entries: FantasyEntry[],
+  ratingSummaries: MatchRatingSummary[],
+  matchReports: MatchReport[],
+  now = Date.now(),
+): FantasyRound[] {
+  const candidates = new Map<string, FantasyRoundCandidate>()
+  polls.forEach((poll) => {
+    poll.slots.forEach((slot) => {
+      const candidate = fantasyRoundCandidate(poll, slot)
+      if (candidate) candidates.set(candidate.id, candidate)
+    })
+  })
+  const reportsByRound = new Map(matchReports.map((report) => [
+    getFantasyRoundId(report.pollId, report.slotId),
+    report,
+  ]))
+  const existingById = new Map(existingRounds.map((round) => [round.id, round]))
+
+  const reconciled = existingRounds.map((round) => {
+    if (round.status !== 'open') return round
+    const candidate = candidates.get(round.id)
+
+    if (now < round.locksAt) {
+      if (!candidate || candidate.locksAt <= now) return round
+      return fantasyCandidateChanged(round, candidate)
+        ? { ...round, ...candidate, updatedAt: now }
+        : round
+    }
+
+    if (
+      !candidate
+      || candidate.rosterKey !== round.rosterKey
+      || candidate.locksAt !== round.locksAt
+    ) {
+      return voidFantasyRound(round, 'La formazione è cambiata al momento del blocco.', now)
+    }
+    if (now < round.settlesAt) return round
+
+    const report = reportsByRound.get(round.id)
+    if (!report) {
+      return voidFantasyRound(round, 'Il referto non è stato inserito entro 48 ore.', now)
+    }
+    return scoreFantasyRound(
+      round,
+      entries.filter((entry) => entry.roundId === round.id),
+      report,
+      ratingSummaries,
+      now,
+    )
+  })
+
+  candidates.forEach((candidate) => {
+    if (existingById.has(candidate.id) || candidate.locksAt <= now) return
+    reconciled.push({
+      ...candidate,
+      status: 'open',
+      createdAt: now,
+      updatedAt: now,
+    })
+  })
+
+  return reconciled.sort((left, right) => (
+    right.locksAt - left.locksAt || left.id.localeCompare(right.id)
+  ))
+}
+
+export function getFantasyLeaderboard(rounds: FantasyRound[]): FantasyLeaderboardRow[] {
+  const rows = new Map<string, Omit<FantasyLeaderboardRow, 'rank'>>()
+  rounds
+    .filter((round) => round.status === 'scored')
+    .flatMap((round) => round.standings ?? [])
+    .forEach((standing) => {
+      const current = rows.get(standing.managerId)
+      rows.set(standing.managerId, {
+        managerId: standing.managerId,
+        managerName: standing.managerName,
+        leaguePoints: (current?.leaguePoints ?? 0) + standing.leaguePoints,
+        wins: (current?.wins ?? 0) + (standing.rank === 1 ? 1 : 0),
+        rawFantasyPoints: roundTo(
+          (current?.rawFantasyPoints ?? 0) + standing.totalScore,
+          2,
+        ),
+        roundsPlayed: (current?.roundsPlayed ?? 0) + 1,
+      })
+    })
+
+  const sorted = [...rows.values()].sort((left, right) => (
+    right.leaguePoints - left.leaguePoints
+    || right.wins - left.wins
+    || right.rawFantasyPoints - left.rawFantasyPoints
+    || left.managerName.localeCompare(right.managerName, 'it')
+    || left.managerId.localeCompare(right.managerId)
+  ))
+
+  let previous: typeof sorted[number] | undefined
+  let previousRank = 0
+  return sorted.map((row, index) => {
+    const isTied = previous
+      && row.leaguePoints === previous.leaguePoints
+      && row.wins === previous.wins
+      && row.rawFantasyPoints === previous.rawFantasyPoints
+    const rank = isTied ? previousRank : index + 1
+    previous = row
+    previousRank = rank
+    return { ...row, rank }
+  })
 }
 
 export function getUpcomingPolls(polls: PadelPoll[], now = Date.now()): PadelPoll[] {

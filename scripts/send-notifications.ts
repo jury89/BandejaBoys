@@ -13,7 +13,16 @@ import {
   terminate,
 } from 'firebase/firestore'
 import webpush, { type PushSubscription } from 'web-push'
-import type { MatchRatingResponse, MemberProfile, PadelPoll } from '../src/types'
+import type {
+  FantasyEntry,
+  FantasyRound,
+  MatchRatingResponse,
+  MatchRatingSummary,
+  MatchReport,
+  MemberProfile,
+  PadelPoll,
+} from '../src/types'
+import { reconcileFantasyRounds } from '../src/lib/domain'
 import {
   MONDAY_MOTIVATIONAL_CATALOG_VERSION,
   normalizeMotherNamesByUserId,
@@ -21,6 +30,7 @@ import {
 } from '../src/lib/motivationalMessages'
 import {
   collectScheduledNotifications,
+  collectFantasyNotifications,
   createNotificationDelivery,
   createNotificationPushPayload,
   createTestNotification,
@@ -70,6 +80,9 @@ const [
   motivationSnapshot,
   motherNamesSnapshot,
   userSnapshot,
+  fantasyRoundSnapshot,
+  ratingSummarySnapshot,
+  matchReportSnapshot,
 ] = await Promise.all([
   getDocs(collection(db, 'polls')),
   getDocs(collection(db, 'pushSubscriptions')),
@@ -77,6 +90,9 @@ const [
   getDoc(motivationReference),
   getDoc(motherNamesReference),
   getDocs(collection(db, 'users')),
+  getDocs(collection(db, 'fantasyRounds')),
+  getDocs(collection(db, 'matchRatingSummaries')),
+  getDocs(collection(db, 'matchReports')),
 ])
 
 const polls = pollSnapshot.docs.map((item) => ({ id: item.id, ...item.data() }) as PadelPoll)
@@ -89,6 +105,25 @@ const ratingResponses = ratingResponseSnapshot.docs.map((item) => ({
   id: item.id,
   ...item.data(),
 }) as MatchRatingResponse)
+const existingFantasyRounds = fantasyRoundSnapshot.docs.map((item) => ({
+  id: item.id,
+  ...item.data(),
+}) as FantasyRound)
+const fantasyEntries = (await Promise.all(existingFantasyRounds.map(async (round) => {
+  const snapshot = await getDocs(collection(db, 'fantasyRounds', round.id, 'entries'))
+  return snapshot.docs.map((item) => ({
+    id: item.id,
+    ...item.data(),
+  }) as FantasyEntry)
+}))).flat()
+const ratingSummaries = ratingSummarySnapshot.docs.map((item) => ({
+  id: item.id,
+  ...item.data(),
+}) as MatchRatingSummary)
+const matchReports = matchReportSnapshot.docs.map((item) => ({
+  id: item.id,
+  ...item.data(),
+}) as MatchReport)
 const notificationPreferencesByUserId = new Map(
   userSnapshot.docs.map((item) => [
     item.id,
@@ -121,6 +156,23 @@ if (motivationNeedsWrite) {
 const motivationRecipientUserIds = Array.from(new Set(
   subscriptions.map((subscription) => subscription.data.userId),
 ))
+const now = Date.now()
+const fantasyRounds = reconcileFantasyRounds(
+  polls,
+  existingFantasyRounds,
+  fantasyEntries,
+  ratingSummaries,
+  matchReports,
+  now,
+)
+const existingFantasyRoundsById = new Map(
+  existingFantasyRounds.map((round) => [round.id, round]),
+)
+await Promise.all(fantasyRounds.map(async (round) => {
+  const existing = existingFantasyRoundsById.get(round.id)
+  if (existing && JSON.stringify(existing) === JSON.stringify(round)) return
+  await setDoc(doc(db, 'fantasyRounds', round.id), round)
+}))
 const notifications = testUserId
   ? [createTestNotification(
       testUserId,
@@ -129,11 +181,14 @@ const notifications = testUserId
       testNotificationMode,
       testNotificationTitle,
     )]
-  : collectScheduledNotifications(polls, Date.now(), ratingResponses, {
-      messages: motivationalMessages,
-      recipientUserIds: motivationRecipientUserIds,
-      motherNamesByUserId,
-    })
+  : [
+      ...collectScheduledNotifications(polls, now, ratingResponses, {
+        messages: motivationalMessages,
+        recipientUserIds: motivationRecipientUserIds,
+        motherNamesByUserId,
+      }),
+      ...collectFantasyNotifications(fantasyRounds, fantasyEntries, now),
+    ]
 
 let sent = 0
 let skipped = 0
