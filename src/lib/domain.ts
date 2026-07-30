@@ -1,9 +1,11 @@
 import type {
   CreatePollInput,
+  GroupMatch,
   MatchPairing,
   MatchRatingPrompt,
   MatchRatingRecord,
   MatchRatingResponse,
+  MatchRatingSummary,
   MatchReport,
   MatchReportPlayer,
   MatchSetInput,
@@ -123,6 +125,43 @@ export function getStarters(slot: PadelSlot): Signup[] {
 
 export function getMatchRatingResponseId(pollId: string, slotId: string, reviewerId: string): string {
   return [pollId, slotId, reviewerId].join('__')
+}
+
+export function getMatchRatingSummaryId(
+  pollId: string,
+  slotId: string,
+  revieweeId: string,
+): string {
+  return [pollId, slotId, revieweeId].join('__')
+}
+
+export function aggregateMatchRatingSummaries(
+  ratings: MatchRatingRecord[],
+): MatchRatingSummary[] {
+  const summaries = new Map<string, MatchRatingSummary>()
+
+  ratings.forEach((rating) => {
+    if (!Number.isInteger(rating.score) || rating.score < 1 || rating.score > 10) return
+
+    const id = getMatchRatingSummaryId(rating.pollId, rating.slotId, rating.revieweeId)
+    const current = summaries.get(id)
+    const isLatest = !current
+      || rating.createdAt > current.updatedAt
+      || (rating.createdAt === current.updatedAt && rating.id.localeCompare(current.lastRatingId) > 0)
+
+    summaries.set(id, {
+      id,
+      pollId: rating.pollId,
+      slotId: rating.slotId,
+      revieweeId: rating.revieweeId,
+      scoreTotal: (current?.scoreTotal ?? 0) + rating.score,
+      ratingCount: (current?.ratingCount ?? 0) + 1,
+      lastRatingId: isLatest ? rating.id : current.lastRatingId,
+      updatedAt: isLatest ? rating.createdAt : current.updatedAt,
+    })
+  })
+
+  return [...summaries.values()].sort((left, right) => left.id.localeCompare(right.id))
 }
 
 export function getSlotEndsAt(slot: PadelSlot): number {
@@ -461,6 +500,70 @@ export function getPlayerMatches(
       .sort((left, right) => right.startsAt - left.startsAt || left.slot.id.localeCompare(right.slot.id))
       .map(toPlayerMatch),
   }
+}
+
+export function getOtherPlayedMatches(
+  polls: PadelPoll[],
+  viewerId: string,
+  now = Date.now(),
+  ratingSummaries: MatchRatingSummary[] = [],
+  matchReports: MatchReport[] = [],
+): GroupMatch[] {
+  const reportsByMatch = new Map(matchReports.map((report) => [
+    getMatchReportId(report.pollId, report.slotId),
+    report,
+  ]))
+  const summariesByMatchAndPlayer = new Map(ratingSummaries.map((summary) => [
+    `${getMatchReportId(summary.pollId, summary.slotId)}__${summary.revieweeId}`,
+    summary,
+  ]))
+
+  return polls
+    .flatMap((poll) => poll.slots.map((slot) => ({
+      pollId: poll.id,
+      pollTitle: pollWeekTitle(poll.targetWeekStart),
+      slot,
+      startsAt: padelDateTimeToTimestamp(slot.startsAt),
+      endsAt: getSlotEndsAt(slot),
+    })))
+    .filter((match) => {
+      const starters = getStarters(match.slot)
+      return (
+        Number.isFinite(match.startsAt)
+        && Number.isFinite(match.endsAt)
+        && Boolean(match.slot.bookedAt)
+        && match.endsAt <= now
+        && starters.length === MAX_STARTERS
+        && !starters.some((signup) => signup.userId === viewerId)
+      )
+    })
+    .sort((left, right) => (
+      right.startsAt - left.startsAt || left.slot.id.localeCompare(right.slot.id)
+    ))
+    .map(({ pollId, pollTitle, slot }) => ({
+      pollId,
+      pollTitle,
+      slot,
+      report: reportsByMatch.get(getMatchReportId(pollId, slot.id)),
+      playerRatings: getStarters(slot).map((signup) => {
+        const summary = summariesByMatchAndPlayer.get(
+          `${getMatchReportId(pollId, slot.id)}__${signup.userId}`,
+        )
+        if (
+          !summary
+          || !Number.isFinite(summary.scoreTotal)
+          || !Number.isInteger(summary.ratingCount)
+          || summary.ratingCount <= 0
+        ) {
+          return { userId: signup.userId, count: 0 }
+        }
+        return {
+          userId: signup.userId,
+          count: summary.ratingCount,
+          average: summary.scoreTotal / summary.ratingCount,
+        }
+      }),
+    }))
 }
 
 export function getUpcomingPolls(polls: PadelPoll[], now = Date.now()): PadelPoll[] {

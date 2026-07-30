@@ -34,10 +34,10 @@ function resolveMatchTeam(
   return team.map((player) => resolveMatchPlayer(members, player)) as MatchPairing['teamA']
 }
 
-export function resolvePlayerMatchNames(
+export function resolvePlayerMatchNames<T extends PlayerMatch>(
   members: MemberProfile[],
-  match: PlayerMatch,
-): PlayerMatch {
+  match: T,
+): T {
   return {
     ...match,
     slot: {
@@ -59,5 +59,5 @@ export function resolvePlayerMatchNames(
         })),
       },
     } : {}),
-  }
+  } as T
 }

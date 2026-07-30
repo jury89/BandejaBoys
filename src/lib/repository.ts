@@ -2,6 +2,7 @@ import {
   collection,
   doc,
   getDocs,
+  increment,
   onSnapshot,
   orderBy,
   query,
@@ -17,6 +18,7 @@ import type {
   MatchRatingPrompt,
   MatchRatingRecord,
   MatchRatingResponse,
+  MatchRatingSummary,
   MatchRatingSubmission,
   MatchReport,
   MatchSetInput,
@@ -40,6 +42,8 @@ import {
   addGuestSignup,
   addSlotToPoll,
   addSignup,
+  aggregateMatchRatingSummaries,
+  getMatchRatingSummaryId,
   getStarters,
   makeMatchReport,
   makeId,
@@ -70,8 +74,16 @@ export interface PadelRepository {
     listener: (ratings: MatchRatingRecord[]) => void,
     onError: (error: Error) => void,
   ): Unsubscribe
+  subscribeMatchRatingSummaries(
+    listener: (summaries: MatchRatingSummary[]) => void,
+    onError: (error: Error) => void,
+  ): Unsubscribe
   subscribeMatchReports(
     participantId: string,
+    listener: (reports: MatchReport[]) => void,
+    onError: (error: Error) => void,
+  ): Unsubscribe
+  subscribeAllMatchReports(
     listener: (reports: MatchReport[]) => void,
     onError: (error: Error) => void,
   ): Unsubscribe
@@ -282,9 +294,29 @@ function remoteRepository(): PadelRepository {
         onError,
       )
     },
+    subscribeMatchRatingSummaries(listener, onError) {
+      return onSnapshot(
+        collection(db, 'matchRatingSummaries'),
+        (snapshot) => listener(snapshot.docs.map((item) => ({
+          id: item.id,
+          ...item.data(),
+        }) as MatchRatingSummary)),
+        onError,
+      )
+    },
     subscribeMatchReports(participantId, listener, onError) {
       return onSnapshot(
         query(collection(db, 'matchReports'), where('participantIds', 'array-contains', participantId)),
+        (snapshot) => listener(snapshot.docs.map((item) => ({
+          id: item.id,
+          ...item.data(),
+        }) as MatchReport)),
+        onError,
+      )
+    },
+    subscribeAllMatchReports(listener, onError) {
+      return onSnapshot(
+        collection(db, 'matchReports'),
         (snapshot) => listener(snapshot.docs.map((item) => ({
           id: item.id,
           ...item.data(),
@@ -581,6 +613,24 @@ function remoteRepository(): PadelRepository {
       const batch = writeBatch(db)
       records.forEach((record) => {
         batch.set(doc(db, 'matchRatings', record.id), record)
+        batch.set(
+          doc(
+            db,
+            'matchRatingSummaries',
+            getMatchRatingSummaryId(record.pollId, record.slotId, record.revieweeId),
+          ),
+          {
+            id: getMatchRatingSummaryId(record.pollId, record.slotId, record.revieweeId),
+            pollId: record.pollId,
+            slotId: record.slotId,
+            revieweeId: record.revieweeId,
+            scoreTotal: increment(record.score),
+            ratingCount: increment(1),
+            lastRatingId: record.id,
+            updatedAt: record.createdAt,
+          },
+          { merge: true },
+        )
       })
       batch.set(responseReference, response)
       await batch.commit()
@@ -793,10 +843,24 @@ function localRepository(): PadelRepository {
       notify()
       return () => window.removeEventListener(MATCH_RATINGS_EVENT, notify)
     },
+    subscribeMatchRatingSummaries(listener) {
+      const notify = () => listener(
+        aggregateMatchRatingSummaries(readLocalMatchRatingStore().ratings),
+      )
+      window.addEventListener(MATCH_RATINGS_EVENT, notify)
+      notify()
+      return () => window.removeEventListener(MATCH_RATINGS_EVENT, notify)
+    },
     subscribeMatchReports(participantId, listener) {
       const notify = () => listener(
         readLocalMatchReports().filter((report) => report.participantIds.includes(participantId)),
       )
+      window.addEventListener(MATCH_REPORTS_EVENT, notify)
+      notify()
+      return () => window.removeEventListener(MATCH_REPORTS_EVENT, notify)
+    },
+    subscribeAllMatchReports(listener) {
+      const notify = () => listener(readLocalMatchReports())
       window.addEventListener(MATCH_REPORTS_EVENT, notify)
       notify()
       return () => window.removeEventListener(MATCH_REPORTS_EVENT, notify)

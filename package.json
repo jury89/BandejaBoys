@@ -14,6 +14,7 @@
     "smoke:match-report": "tsx scripts/match-report-production-smoke.ts",
     "db:get": "tsx scripts/firestore-read.ts get",
     "db:query": "tsx scripts/firestore-read.ts query",
+    "db:backfill-match-rating-summaries": "tsx scripts/backfill-match-rating-summaries.ts",
     "mother-names:list": "tsx scripts/mother-names.ts list",
     "mother-names:set": "tsx scripts/mother-names.ts set",
     "push:send": "tsx scripts/push-send.ts",

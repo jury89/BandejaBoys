@@ -6,6 +6,7 @@ import {
   createUserWithEmailAndPassword,
   deleteUser,
   getAuth,
+  signInWithEmailAndPassword,
 } from 'firebase/auth'
 import {
   collection,
@@ -13,10 +14,12 @@ import {
   getDoc,
   getDocs,
   getFirestore,
+  increment,
   query,
   runTransaction,
   terminate,
   where,
+  writeBatch,
 } from 'firebase/firestore'
 
 function readProductionConfig() {
@@ -44,13 +47,19 @@ const config = readProductionConfig()
 const suffix = `${Date.now().toString(36)}-${randomUUID().slice(0, 8)}`
 const email = `codex-match-report-${suffix}@example.test`
 const password = `Bb-${randomUUID()}-9!`
+const observerEmail = `codex-group-match-${suffix}@example.test`
+const observerPassword = `Bb-${randomUUID()}-9!`
 const app = initializeApp(config, `match-report-smoke-${suffix}`)
 const auth = getAuth(app)
 const clientDb = getFirestore(app)
 const adminDb = new AdminFirestore({ projectId: config.projectId })
 
 let userId: string | undefined
+let observerUserId: string | undefined
 let reportId: string | undefined
+let responseId: string | undefined
+let ratingId: string | undefined
+let summaryId: string | undefined
 let stage = 'creazione utente'
 
 try {
@@ -166,7 +175,91 @@ try {
     throw new Error('La modifica non è stata riletta correttamente.')
   }
 
-  console.log('PASS: creazione, lettura, query e modifica del referto riuscite in produzione.')
+  stage = 'creazione voto e media aggregata'
+  responseId = `${pollId}__${slotId}__${userId}`
+  ratingId = `${responseId}__${participants[1].userId}`
+  summaryId = `${pollId}__${slotId}__${participants[1].userId}`
+  const ratingCreatedAt = Date.now()
+  const ratingBatch = writeBatch(clientDb)
+  ratingBatch.set(doc(clientDb, 'matchRatings', ratingId), {
+    id: ratingId,
+    responseId,
+    pollId,
+    pollTitle: report.pollTitle,
+    slotId,
+    sessionStartsAt: report.sessionStartsAt,
+    sessionEndedAt: ratingCreatedAt,
+    reviewerId: userId,
+    reviewerName: 'Codex QA',
+    revieweeId: participants[1].userId,
+    revieweeName: participants[1].displayName,
+    score: 8,
+    createdAt: ratingCreatedAt,
+  })
+  ratingBatch.set(doc(clientDb, 'matchRatingSummaries', summaryId), {
+    id: summaryId,
+    pollId,
+    slotId,
+    revieweeId: participants[1].userId,
+    scoreTotal: increment(8),
+    ratingCount: increment(1),
+    lastRatingId: ratingId,
+    updatedAt: ratingCreatedAt,
+  }, { merge: true })
+  ratingBatch.set(doc(clientDb, 'matchRatingResponses', responseId), {
+    id: responseId,
+    pollId,
+    slotId,
+    reviewerId: userId,
+    status: 'submitted',
+    closedAt: ratingCreatedAt,
+  })
+  await ratingBatch.commit()
+
+  stage = 'creazione membro osservatore'
+  const observerCredential = await createUserWithEmailAndPassword(
+    auth,
+    observerEmail,
+    observerPassword,
+  )
+  observerUserId = observerCredential.user.uid
+  await adminDb.doc(`users/${observerUserId}`).set({
+    id: observerUserId,
+    displayName: 'Codex Observer',
+    email: observerEmail,
+    createdAt: Date.now(),
+  })
+
+  stage = 'lettura condivisa del referto'
+  const sharedReports = await getDocs(collection(clientDb, 'matchReports'))
+  if (!sharedReports.docs.some((snapshot) => snapshot.id === reportId)) {
+    throw new Error('Il membro osservatore non vede il referto condiviso.')
+  }
+
+  stage = 'lettura della media aggregata'
+  const sharedSummary = await getDoc(doc(clientDb, 'matchRatingSummaries', summaryId))
+  if (
+    !sharedSummary.exists()
+    || sharedSummary.data().scoreTotal !== 8
+    || sharedSummary.data().ratingCount !== 1
+  ) {
+    throw new Error('Il membro osservatore non vede la media aggregata corretta.')
+  }
+
+  stage = 'protezione del voto individuale'
+  try {
+    await getDoc(doc(clientDb, 'matchRatings', ratingId))
+    throw new Error('Il membro osservatore ha letto un voto individuale.')
+  } catch (error) {
+    const code = typeof error === 'object' && error && 'code' in error
+      ? String(error.code)
+      : ''
+    if (!code.includes('permission-denied')) throw error
+  }
+
+  console.log(
+    'PASS: referto condiviso, media aggregata e riservatezza dei voti verificati in produzione.',
+  )
 } catch (error) {
   const code = typeof error === 'object' && error && 'code' in error
     ? String(error.code)
@@ -176,8 +269,23 @@ try {
   process.exitCode = 1
 } finally {
   if (reportId) await adminDb.doc(`matchReports/${reportId}`).delete().catch(() => undefined)
+  if (summaryId) {
+    await adminDb.doc(`matchRatingSummaries/${summaryId}`).delete().catch(() => undefined)
+  }
+  if (ratingId) await adminDb.doc(`matchRatings/${ratingId}`).delete().catch(() => undefined)
+  if (responseId) {
+    await adminDb.doc(`matchRatingResponses/${responseId}`).delete().catch(() => undefined)
+  }
   if (userId) await adminDb.doc(`users/${userId}`).delete().catch(() => undefined)
-  if (auth.currentUser) await deleteUser(auth.currentUser).catch(() => undefined)
+  if (observerUserId) {
+    await adminDb.doc(`users/${observerUserId}`).delete().catch(() => undefined)
+  }
+  await signInWithEmailAndPassword(auth, observerEmail, observerPassword)
+    .then((credential) => deleteUser(credential.user))
+    .catch(() => undefined)
+  await signInWithEmailAndPassword(auth, email, password)
+    .then((credential) => deleteUser(credential.user))
+    .catch(() => undefined)
   await terminate(clientDb).catch(() => undefined)
   await adminDb.terminate()
 }

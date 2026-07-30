@@ -10,16 +10,12 @@ interface RulesTestCase {
         email: string
         email_verified: boolean
       }
-    }
+    } | null
     path: string
-    method: 'create' | 'update'
-    resource: {
-      data: MatchReportDocument
-    }
+    method: 'create' | 'update' | 'get'
+    resource?: { data: unknown }
   }
-  resource?: {
-    data: MatchReportDocument
-  }
+  resource?: { data: unknown }
   expressionReportLevel: 'FULL'
 }
 
@@ -153,6 +149,24 @@ function updateCase(
   }
 }
 
+function readCase(
+  documentPath: string,
+  data: unknown,
+  expectation: RulesTestCase['expectation'],
+  uid?: string,
+): RulesTestCase {
+  return {
+    expectation,
+    request: {
+      auth: uid ? auth(uid) : null,
+      path: documentPath,
+      method: 'get',
+    },
+    resource: { data },
+    expressionReportLevel: 'FULL',
+  }
+}
+
 const oneSet = makeReport(1)
 const fiveSets = makeReport(5)
 const validUpdate = {
@@ -181,6 +195,33 @@ tiedSet.sets[0] = {
 const forbiddenUpdate = {
   ...validUpdate,
   pollTitle: 'Titolo alterato',
+}
+const ratingId = `${reportId}__${userId}__qa-a`
+const rating = {
+  id: ratingId,
+  responseId: `${reportId}__${userId}`,
+  pollId,
+  pollTitle: oneSet.pollTitle,
+  slotId,
+  sessionStartsAt: oneSet.sessionStartsAt,
+  sessionEndedAt: createdAt,
+  reviewerId: userId,
+  reviewerName: 'Codex QA',
+  revieweeId: 'qa-a',
+  revieweeName: 'Player A',
+  score: 8,
+  createdAt,
+}
+const summaryId = `${reportId}__qa-a`
+const summary = {
+  id: summaryId,
+  pollId,
+  slotId,
+  revieweeId: 'qa-a',
+  scoreTotal: 17,
+  ratingCount: 2,
+  lastRatingId: ratingId,
+  updatedAt: createdAt,
 }
 
 const tests: TestDefinition[] = [
@@ -215,6 +256,49 @@ const tests: TestDefinition[] = [
   {
     label: 'metadati immutabili modificati',
     testCase: updateCase(fiveSets, forbiddenUpdate, 'DENY'),
+  },
+  {
+    label: 'referto leggibile da un altro membro',
+    testCase: readCase(path, oneSet, 'ALLOW', outsiderId),
+  },
+  {
+    label: 'referto non leggibile senza autenticazione',
+    testCase: readCase(path, oneSet, 'DENY'),
+  },
+  {
+    label: 'media aggregata leggibile da un membro',
+    testCase: readCase(
+      `/databases/(default)/documents/matchRatingSummaries/${summaryId}`,
+      summary,
+      'ALLOW',
+      outsiderId,
+    ),
+  },
+  {
+    label: 'media aggregata non leggibile senza autenticazione',
+    testCase: readCase(
+      `/databases/(default)/documents/matchRatingSummaries/${summaryId}`,
+      summary,
+      'DENY',
+    ),
+  },
+  {
+    label: 'voto individuale non leggibile da un membro estraneo',
+    testCase: readCase(
+      `/databases/(default)/documents/matchRatings/${ratingId}`,
+      rating,
+      'DENY',
+      outsiderId,
+    ),
+  },
+  {
+    label: 'voto individuale leggibile dal destinatario',
+    testCase: readCase(
+      `/databases/(default)/documents/matchRatings/${ratingId}`,
+      rating,
+      'ALLOW',
+      'qa-a',
+    ),
   },
 ]
 
@@ -293,4 +377,6 @@ if (failures.length > 0) {
   process.exit(1)
 }
 
-console.log(`PASS: ${tests.length} casi semantici del referto superati, incluso il limite di cinque set.`)
+console.log(
+  `PASS: ${tests.length} casi semantici superati per referti, aggregati e voti privati.`,
+)

@@ -4,6 +4,7 @@ import { useAuth } from '../AuthContext'
 import type {
   MatchRatingRecord,
   MatchRatingResponse,
+  MatchRatingSummary,
   MatchRatingSubmission,
   MatchReport,
   MatchSetInput,
@@ -13,6 +14,7 @@ import type {
 } from '../types'
 import {
   getNextMatchRatingPromptAt,
+  getOtherPlayedMatches,
   getPendingMatchRatingPrompts,
   getPlayerMatches,
   getSlotEndsAt,
@@ -39,6 +41,7 @@ import { repository } from '../lib/repository'
 import { slotElementId, type SlotNavigationTarget } from '../lib/slotNavigation'
 import { Brand } from './Brand'
 import { CreatePollModal } from './CreatePollModal'
+import { GroupMatchesPage } from './GroupMatchesPage'
 import { MatchRatingModal } from './MatchRatingModal'
 import { MatchReportModal } from './MatchReportModal'
 import { MyMatchesPage } from './MyMatchesPage'
@@ -50,15 +53,17 @@ import { ProfileModal } from './ProfileModal'
 import { PullToRefresh } from './PullToRefresh'
 
 type FeedFilter = PollSlotFilter
-type DashboardView = 'feed' | 'matches' | 'notifications'
+type DashboardView = 'feed' | 'matches' | 'group-matches' | 'notifications'
 
 const PERSONAL_MATCHES_HASH = '#i-miei-match'
+const GROUP_MATCHES_HASH = '#gli-altri-match'
 const NOTIFICATION_HISTORY_HASH = '#notifiche'
 const INITIAL_DATA_TIMEOUT_MS = 6_000
 const INITIAL_DATA_AUTO_RETRIES = 2
 
 function dashboardViewFromLocation(): DashboardView {
   if (window.location.hash === PERSONAL_MATCHES_HASH) return 'matches'
+  if (window.location.hash === GROUP_MATCHES_HASH) return 'group-matches'
   if (window.location.hash === NOTIFICATION_HISTORY_HASH) return 'notifications'
   return 'feed'
 }
@@ -110,6 +115,11 @@ export function Dashboard() {
   const [receivedRatingsLoaded, setReceivedRatingsLoaded] = useState(false)
   const [matchReports, setMatchReports] = useState<MatchReport[]>([])
   const [matchReportsLoaded, setMatchReportsLoaded] = useState(false)
+  const [groupRatingSummaries, setGroupRatingSummaries] = useState<MatchRatingSummary[]>([])
+  const [groupMatchReports, setGroupMatchReports] = useState<MatchReport[]>([])
+  const [groupRatingSummariesLoaded, setGroupRatingSummariesLoaded] = useState(false)
+  const [groupMatchReportsLoaded, setGroupMatchReportsLoaded] = useState(false)
+  const [groupMatchesError, setGroupMatchesError] = useState<string | null>(null)
   const [reportMatch, setReportMatch] = useState<PlayerMatch | null>(null)
   const [notificationHistory, setNotificationHistory] = useState<NotificationHistoryItem[]>([])
   const [notificationHistoryLoaded, setNotificationHistoryLoaded] = useState(!hasRemoteBackend)
@@ -311,6 +321,42 @@ export function Dashboard() {
   }, [ratingReviewerId])
 
   useEffect(() => {
+    if (dashboardView !== 'group-matches') return
+
+    let ratingSummariesFailed = false
+    let matchReportsFailed = false
+    const clearGroupDataError = () => {
+      if (!ratingSummariesFailed && !matchReportsFailed) setGroupMatchesError(null)
+    }
+    const showGroupDataError = () => {
+      setGroupMatchesError('Non siamo riusciti a recuperare tutti i voti e i risultati del gruppo.')
+    }
+    const stopRatingSummaries = repository.subscribeMatchRatingSummaries((summaries) => {
+      setGroupRatingSummaries(summaries)
+      setGroupRatingSummariesLoaded(true)
+      clearGroupDataError()
+    }, () => {
+      ratingSummariesFailed = true
+      showGroupDataError()
+      setGroupRatingSummariesLoaded(true)
+    })
+    const stopMatchReports = repository.subscribeAllMatchReports((reports) => {
+      setGroupMatchReports(reports)
+      setGroupMatchReportsLoaded(true)
+      clearGroupDataError()
+    }, () => {
+      matchReportsFailed = true
+      showGroupDataError()
+      setGroupMatchReportsLoaded(true)
+    })
+
+    return () => {
+      stopRatingSummaries()
+      stopMatchReports()
+    }
+  }, [dashboardView])
+
+  useEffect(() => {
     if (!toast) return
     const timer = window.setTimeout(() => setToast(null), 4200)
     return () => window.clearTimeout(timer)
@@ -421,6 +467,19 @@ export function Dashboard() {
     },
     [matchNameMembers, matchReports, now, polls, receivedRatings, user],
   )
+  const groupMatches = useMemo(
+    () => {
+      if (!user) return []
+      return getOtherPlayedMatches(
+        polls,
+        user.id,
+        now,
+        groupRatingSummaries,
+        groupMatchReports,
+      ).map((match) => resolvePlayerMatchNames(matchNameMembers, match))
+    },
+    [groupMatchReports, groupRatingSummaries, matchNameMembers, now, polls, user],
+  )
   const unreadNotifications = useMemo(
     () => unreadNotificationCount(notificationHistory),
     [notificationHistory],
@@ -512,6 +571,31 @@ export function Dashboard() {
   }
   const closePlayerMatches = () => {
     if (window.history.state?.bandejaView === 'matches') {
+      window.history.back()
+      return
+    }
+
+    const url = new URL(window.location.href)
+    url.hash = ''
+    window.history.replaceState(window.history.state, '', url)
+    setDashboardView('feed')
+  }
+  const openGroupMatches = () => {
+    setAccountOpen(false)
+    setGroupRatingSummariesLoaded(false)
+    setGroupMatchReportsLoaded(false)
+    setGroupMatchesError(null)
+    setDashboardView('group-matches')
+    if (window.location.hash === GROUP_MATCHES_HASH) return
+    const url = new URL(window.location.href)
+    url.hash = GROUP_MATCHES_HASH
+    const currentState = typeof window.history.state === 'object' && window.history.state
+      ? window.history.state
+      : {}
+    window.history.pushState({ ...currentState, bandejaView: 'group-matches' }, '', url)
+  }
+  const closeGroupMatches = () => {
+    if (window.history.state?.bandejaView === 'group-matches') {
       window.history.back()
       return
     }
@@ -635,6 +719,10 @@ export function Dashboard() {
                   <History size={16} />
                   <span>I miei match <small>Partite passate e future</small></span>
                 </button>
+                <button type="button" onClick={openGroupMatches}>
+                  <UsersRound size={16} />
+                  <span>Gli altri match <small>Pagellini e risultati del gruppo</small></span>
+                </button>
                 {hasRemoteBackend && (
                   <button type="button" onClick={() => {
                     setAccountOpen(false)
@@ -712,6 +800,14 @@ export function Dashboard() {
           onBack={closePlayerMatches}
           onSelectMatch={showPlayerMatchOnBoard}
           onEditReport={setReportMatch}
+        />
+      ) : dashboardView === 'group-matches' ? (
+        <GroupMatchesPage
+          matches={groupMatches}
+          members={matchNameMembers}
+          loading={loading || !groupRatingSummariesLoaded || !groupMatchReportsLoaded}
+          error={groupMatchesError}
+          onBack={closeGroupMatches}
         />
       ) : dashboardView === 'notifications' ? (
         <NotificationHistoryPage

@@ -105,6 +105,60 @@ service cloud.firestore {
         && getAfter(/databases/$(database)/documents/matchRatingResponses/$(request.resource.data.responseId)).data.closedAt == request.resource.data.createdAt;
     }
 
+    function validMatchRatingSummary(summaryId) {
+      let rating = getAfter(
+        /databases/$(database)/documents/matchRatings/$(request.resource.data.lastRatingId)
+      );
+      return request.resource.data.keys().hasOnly([
+          'id', 'pollId', 'slotId', 'revieweeId',
+          'scoreTotal', 'ratingCount', 'lastRatingId', 'updatedAt'
+        ])
+        && request.resource.data.id == summaryId
+        && summaryId == request.resource.data.pollId + '__'
+          + request.resource.data.slotId + '__' + request.resource.data.revieweeId
+        && request.resource.data.pollId is string
+        && request.resource.data.slotId is string
+        && request.resource.data.revieweeId is string
+        && request.resource.data.scoreTotal is int
+        && request.resource.data.scoreTotal >= 1
+        && request.resource.data.ratingCount is int
+        && request.resource.data.ratingCount >= 1
+        && request.resource.data.lastRatingId is string
+        && request.resource.data.updatedAt is int
+        && existsAfter(
+          /databases/$(database)/documents/matchRatings/$(request.resource.data.lastRatingId)
+        )
+        && rating.data.id == request.resource.data.lastRatingId
+        && rating.data.pollId == request.resource.data.pollId
+        && rating.data.slotId == request.resource.data.slotId
+        && rating.data.revieweeId == request.resource.data.revieweeId
+        && rating.data.reviewerId == request.auth.uid
+        && rating.data.createdAt == request.resource.data.updatedAt;
+    }
+
+    function validMatchRatingSummaryCreate(summaryId) {
+      let rating = getAfter(
+        /databases/$(database)/documents/matchRatings/$(request.resource.data.lastRatingId)
+      );
+      return validMatchRatingSummary(summaryId)
+        && request.resource.data.scoreTotal == rating.data.score
+        && request.resource.data.ratingCount == 1;
+    }
+
+    function validMatchRatingSummaryUpdate(summaryId) {
+      let rating = getAfter(
+        /databases/$(database)/documents/matchRatings/$(request.resource.data.lastRatingId)
+      );
+      return validMatchRatingSummary(summaryId)
+        && request.resource.data.pollId == resource.data.pollId
+        && request.resource.data.slotId == resource.data.slotId
+        && request.resource.data.revieweeId == resource.data.revieweeId
+        && request.resource.data.lastRatingId != resource.data.lastRatingId
+        && request.resource.data.updatedAt >= resource.data.updatedAt
+        && request.resource.data.scoreTotal == resource.data.scoreTotal + rating.data.score
+        && request.resource.data.ratingCount == resource.data.ratingCount + 1;
+    }
+
     function validMatchReportSet(set, participantIds) {
       let playerIds = [
         set.teamA[0].userId,
@@ -368,10 +422,15 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    match /matchRatingSummaries/{summaryId} {
+      allow read: if isMember();
+      allow create: if isMember() && validMatchRatingSummaryCreate(summaryId);
+      allow update: if isMember() && validMatchRatingSummaryUpdate(summaryId);
+      allow delete: if false;
+    }
+
     match /matchReports/{reportId} {
-      allow get: if isMember()
-        && (resource == null || request.auth.uid in resource.data.participantIds);
-      allow list: if isMember() && request.auth.uid in resource.data.participantIds;
+      allow read: if isMember();
       allow create: if isMember()
         && validMatchReport(reportId)
         && request.resource.data.createdBy == request.auth.uid

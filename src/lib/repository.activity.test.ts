@@ -1,5 +1,11 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import type { MatchRatingPrompt, MatchRatingRecord, PadelPoll, SessionUser } from '../types'
+import type {
+  MatchRatingPrompt,
+  MatchRatingRecord,
+  MatchRatingSummary,
+  PadelPoll,
+  SessionUser,
+} from '../types'
 import type { LocalActivityEvent, LocalSlotView } from './activity'
 import { repository } from './repository'
 
@@ -132,5 +138,18 @@ describe('repository activity log in demo mode', () => {
 
     expect(ratings).toHaveLength(1)
     expect(ratings[0]).toMatchObject({ revieweeId: 'ale', score: 8 })
+
+    let summaries: MatchRatingSummary[] = []
+    const unsubscribeSummaries = repository.subscribeMatchRatingSummaries((records) => {
+      summaries = records
+    }, vi.fn())
+    unsubscribeSummaries()
+
+    expect(summaries).toContainEqual(expect.objectContaining({
+      id: 'poll-guest__slot-guest__ale',
+      revieweeId: 'ale',
+      scoreTotal: 8,
+      ratingCount: 1,
+    }))
   })
 })

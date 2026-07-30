@@ -1,7 +1,13 @@
 import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, vi } from 'vitest'
-import type { MatchRatingRecord, MatchReport, MemberProfile, PadelPoll } from '../types'
+import type {
+  MatchRatingRecord,
+  MatchRatingSummary,
+  MatchReport,
+  MemberProfile,
+  PadelPoll,
+} from '../types'
 import type { NotificationDelivery } from '../lib/notificationHistory'
 import { repository } from '../lib/repository'
 import { slotElementId } from '../lib/slotNavigation'
@@ -22,6 +28,7 @@ const dashboardTestState = vi.hoisted(() => {
     polls: [] as PadelPoll[],
     members: [] as MemberProfile[],
     ratings: [] as MatchRatingRecord[],
+    ratingSummaries: [] as MatchRatingSummary[],
     reports: [] as MatchReport[],
     deliveries: [defaultDelivery] as NotificationDelivery[],
     defaultDelivery,
@@ -81,7 +88,15 @@ vi.mock('../lib/repository', () => ({
       listener(dashboardTestState.ratings)
       return vi.fn()
     },
+    subscribeMatchRatingSummaries: (listener: (summaries: MatchRatingSummary[]) => void) => {
+      listener(dashboardTestState.ratingSummaries)
+      return vi.fn()
+    },
     subscribeMatchReports: (_userId: string, listener: (reports: MatchReport[]) => void) => {
+      listener(dashboardTestState.reports)
+      return vi.fn()
+    },
+    subscribeAllMatchReports: (listener: (reports: MatchReport[]) => void) => {
       listener(dashboardTestState.reports)
       return vi.fn()
     },
@@ -100,6 +115,7 @@ describe('menu account', () => {
     dashboardTestState.polls = []
     dashboardTestState.members = []
     dashboardTestState.ratings = []
+    dashboardTestState.ratingSummaries = []
     dashboardTestState.reports = []
     dashboardTestState.deliveries = [dashboardTestState.defaultDelivery]
     dashboardTestState.pollSubscriptionMode = 'success'
@@ -142,6 +158,65 @@ describe('menu account', () => {
     expect(window.location.hash).toBe('#i-miei-match')
     expect(screen.getByRole('heading', { name: 'I miei match' })).toBeInTheDocument()
     expect(document.querySelector('.pull-refresh')).toBeInTheDocument()
+
+    act(() => {
+      window.history.replaceState({}, '', '/')
+      window.dispatchEvent(new PopStateEvent('popstate'))
+    })
+
+    expect(screen.getByRole('heading', { name: /Mettiamo in campo/ })).toBeInTheDocument()
+  })
+
+  it('apre Gli altri match e carica soltanto allora le medie aggregate del gruppo', async () => {
+    dashboardTestState.members = [
+      { id: 'ale', displayName: 'Ale', email: 'ale@example.test', createdAt: 1 },
+      { id: 'baru', displayName: 'Baru', email: 'baru@example.test', createdAt: 1 },
+      { id: 'luca', displayName: 'Luca', email: 'luca@example.test', createdAt: 1 },
+      { id: 'teo', displayName: 'Teo', email: 'teo@example.test', createdAt: 1 },
+    ]
+    dashboardTestState.polls = [{
+      id: 'poll-group',
+      title: 'Vecchio titolo',
+      targetWeekStart: '2020-07-27',
+      createdBy: 'ale',
+      createdByName: 'Ale',
+      createdAt: 1,
+      updatedAt: 1,
+      status: 'closed',
+      slots: [{
+        id: 'slot-group',
+        startsAt: '2020-07-29T16:00:00.000Z',
+        durationMinutes: 90,
+        venue: 'Oasi Boschetto',
+        bookedAt: 1,
+        signups: dashboardTestState.members.map((member, index) => ({
+          id: `signup-${member.id}`,
+          userId: member.id,
+          displayName: member.displayName,
+          joinedAt: index + 1,
+        })),
+      }],
+    }]
+    dashboardTestState.ratingSummaries = [{
+      id: 'poll-group__slot-group__ale',
+      pollId: 'poll-group',
+      slotId: 'slot-group',
+      revieweeId: 'ale',
+      scoreTotal: 17,
+      ratingCount: 2,
+      lastRatingId: 'rating-2',
+      updatedAt: 2,
+    }]
+    const user = userEvent.setup()
+    render(<Dashboard />)
+
+    await user.click(screen.getByRole('button', { name: 'Apri menu account di Jury' }))
+    await user.click(screen.getByRole('button', { name: /Gli altri match/ }))
+
+    expect(window.location.hash).toBe('#gli-altri-match')
+    expect(screen.getByRole('heading', { name: 'Gli altri match' })).toBeInTheDocument()
+    expect(screen.getByText('Padel · 27 lug – 2 ago 2020')).toBeInTheDocument()
+    expect(screen.getByLabelText('Ale: media 8,5 su 10 da 2 voti')).toBeInTheDocument()
 
     act(() => {
       window.history.replaceState({}, '', '/')

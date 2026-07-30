@@ -99,7 +99,18 @@ describe('repository remoto delle pagelle', () => {
 
     expect(firestoreMocks.runTransaction).not.toHaveBeenCalled()
     expect(firestoreMocks.writeBatch).toHaveBeenCalledOnce()
-    expect(firestoreMocks.batch.set).toHaveBeenCalledTimes(4)
+    expect(firestoreMocks.batch.set).toHaveBeenCalledTimes(7)
+    expect(firestoreMocks.batch.set).toHaveBeenCalledWith(
+      'matchRatingSummaries/poll-1__slot-1__ale',
+      expect.objectContaining({
+        id: 'poll-1__slot-1__ale',
+        pollId: 'poll-1',
+        slotId: 'slot-1',
+        revieweeId: 'ale',
+        lastRatingId: 'poll-1__slot-1__jury__ale',
+      }),
+      { merge: true },
+    )
     expect(firestoreMocks.batch.set).toHaveBeenLastCalledWith(
       'matchRatingResponses/poll-1__slot-1__jury',
       response,

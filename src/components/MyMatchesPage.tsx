@@ -11,9 +11,10 @@ import {
   Plus,
   Star,
 } from 'lucide-react'
-import { DEFAULT_VENUE, groupMatchReportSetsByTeams } from '../lib/domain'
+import { DEFAULT_VENUE } from '../lib/domain'
 import { formatRatingAverage, slotDateParts } from '../lib/format'
-import type { MatchReportPlayer, PlayerMatch, PlayerMatchLists } from '../types'
+import type { PlayerMatch, PlayerMatchLists } from '../types'
+import { MatchReportScoreboard } from './MatchReportScoreboard'
 
 interface MyMatchesPageProps {
   matches: PlayerMatchLists
@@ -32,10 +33,6 @@ interface MatchListProps {
   past?: boolean
   onSelectMatch?: (match: PlayerMatch) => void
   onEditReport?: (match: PlayerMatch) => void
-}
-
-function matchTeamLabel(team: MatchReportPlayer[]): string {
-  return team.map((player) => player.displayName).join(' + ')
 }
 
 function MatchItem({
@@ -58,7 +55,6 @@ function MatchItem({
     ? formatRatingAverage(receivedRating.average)
     : null
   const report = past ? match.report : undefined
-  const reportGroups = report ? groupMatchReportSetsByTeams(report.sets) : []
 
   return (
     <article className={`personal-match ${booked ? 'personal-match--booked' : 'personal-match--pending'} ${onSelect ? 'personal-match--interactive' : ''}`}>
@@ -117,55 +113,7 @@ function MatchItem({
               </div>
             </div>
             {report && (
-              <div className="personal-match__report-groups">
-                {reportGroups.map((group, groupIndex) => {
-                  const teamALabel = matchTeamLabel(group.teamA)
-                  const teamBLabel = matchTeamLabel(group.teamB)
-                  return (
-                    <div className="personal-match__report-group" key={group.key}>
-                      {reportGroups.length > 1 && (
-                        <small className="personal-match__report-group-label">
-                          Formazione {groupIndex + 1}
-                        </small>
-                      )}
-                      <table aria-label={`Formazione ${groupIndex + 1}: ${teamALabel} contro ${teamBLabel}`}>
-                        <colgroup>
-                          <col />
-                          {group.sets.map((set) => <col className="personal-match__report-score-column" key={set.setId} />)}
-                        </colgroup>
-                        <thead>
-                          <tr>
-                            <th scope="col">Squadra</th>
-                            {group.sets.map((set) => (
-                              <th scope="col" key={set.setId} title={`Set ${set.setNumber}`}>
-                                S{set.setNumber}
-                              </th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          <tr>
-                            <th scope="row">{teamALabel}</th>
-                            {group.sets.map((set) => (
-                              <td className={set.scoreA > set.scoreB ? 'is-winner' : ''} key={set.setId}>
-                                {set.scoreA}
-                              </td>
-                            ))}
-                          </tr>
-                          <tr>
-                            <th scope="row">{teamBLabel}</th>
-                            {group.sets.map((set) => (
-                              <td className={set.scoreB > set.scoreA ? 'is-winner' : ''} key={set.setId}>
-                                {set.scoreB}
-                              </td>
-                            ))}
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-                  )
-                })}
-              </div>
+              <MatchReportScoreboard report={report} />
             )}
           </div>
           <button

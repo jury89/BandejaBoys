@@ -3,11 +3,13 @@ import {
   addGuestSignup,
   addSlotToPoll,
   addSignup,
+  aggregateMatchRatingSummaries,
   defaultSlotForWeek,
   groupMatchReportSetsByTeams,
   getMatchPairings,
   getMatchRatingResponseId,
   getNextMatchRatingPromptAt,
+  getOtherPlayedMatches,
   getPendingMatchRatingPrompts,
   getPlayerMatches,
   getReserves,
@@ -555,6 +557,117 @@ describe('partite personali', () => {
     )
 
     expect(result.past[0].receivedRating).toEqual({ average: 8.5, count: 2 })
+  })
+})
+
+describe('partite giocate dagli altri', () => {
+  const rating = (
+    reviewerId: string,
+    revieweeId: string,
+    score: number,
+    createdAt: number,
+  ): MatchRatingRecord => ({
+    id: `poll-group__slot-other__${reviewerId}__${revieweeId}`,
+    responseId: `poll-group__slot-other__${reviewerId}`,
+    pollId: 'poll-group',
+    pollTitle: 'Padel del gruppo',
+    slotId: 'slot-other',
+    sessionStartsAt: '2026-07-27T18:30:00.000Z',
+    sessionEndedAt: 1,
+    reviewerId,
+    reviewerName: reviewerId,
+    revieweeId,
+    revieweeName: revieweeId,
+    score,
+    createdAt,
+  })
+
+  it('aggrega i voti senza conservare chi li ha assegnati', () => {
+    expect(aggregateMatchRatingSummaries([
+      rating('a', 'b', 8, 100),
+      rating('c', 'b', 9, 200),
+      rating('a', 'd', 11, 300),
+    ])).toEqual([
+      {
+        id: 'poll-group__slot-other__b',
+        pollId: 'poll-group',
+        slotId: 'slot-other',
+        revieweeId: 'b',
+        scoreTotal: 17,
+        ratingCount: 2,
+        lastRatingId: 'poll-group__slot-other__c__b',
+        updatedAt: 200,
+      },
+    ])
+  })
+
+  it('mostra soltanto match prenotati e conclusi senza il titolare corrente', () => {
+    const otherSlot: PadelSlot = {
+      ...slot(['a', 'b', 'c', 'd'].map((id, index) => signup(id, index + 1))),
+      id: 'slot-other',
+      startsAt: '2026-07-27T18:30:00.000Z',
+      bookedAt: 1,
+    }
+    const reserveSlot: PadelSlot = {
+      ...slot([
+        ...['e', 'f', 'g', 'h'].map((id, index) => signup(id, index + 1)),
+        signup('jury', 5, 'reserve'),
+      ]),
+      id: 'slot-reserve',
+      startsAt: '2026-07-26T18:30:00.000Z',
+      bookedAt: 1,
+    }
+    const report = makeMatchReport({
+      pollId: 'poll-group',
+      pollTitle: 'Padel del gruppo',
+      slot: otherSlot,
+    }, member('a'), [
+      { teamAUserIds: ['a', 'b'], scoreA: 6, scoreB: 4 },
+    ], undefined, 100)
+    const poll: PadelPoll = {
+      id: 'poll-group',
+      title: 'Titolo storico',
+      targetWeekStart: '2026-07-27',
+      createdBy: 'a',
+      createdByName: 'A',
+      createdAt: 1,
+      updatedAt: 1,
+      status: 'closed',
+      slots: [
+        otherSlot,
+        reserveSlot,
+        {
+          ...otherSlot,
+          id: 'slot-with-jury',
+          signups: ['jury', 'b', 'c', 'd'].map((id, index) => signup(id, index + 1)),
+        },
+        { ...otherSlot, id: 'slot-unbooked', bookedAt: undefined },
+        { ...otherSlot, id: 'slot-ongoing', startsAt: '2026-07-28T11:30:00.000Z' },
+        { ...otherSlot, id: 'slot-incomplete', signups: [signup('a', 1)] },
+      ],
+    }
+    const summaries = aggregateMatchRatingSummaries([
+      rating('a', 'b', 8, 100),
+      rating('c', 'b', 9, 200),
+    ])
+
+    const result = getOtherPlayedMatches(
+      [poll],
+      'jury',
+      Date.parse('2026-07-28T12:00:00.000Z'),
+      summaries,
+      [report],
+    )
+
+    expect(result.map((match) => match.slot.id)).toEqual(['slot-other', 'slot-reserve'])
+    expect(result[0].pollTitle).toBe('Padel · 27 lug – 2 ago 2026')
+    expect(result[0].report).toEqual(report)
+    expect(result[0].playerRatings).toContainEqual({
+      userId: 'b',
+      average: 8.5,
+      count: 2,
+    })
+    expect(result[0].playerRatings).toContainEqual({ userId: 'a', count: 0 })
   })
 })
 

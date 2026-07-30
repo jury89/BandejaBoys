@@ -84,6 +84,27 @@ export interface PlayerMatchLists {
   past: PlayerMatch[]
 }
 
+export interface MatchRatingSummary {
+  id: string
+  pollId: string
+  slotId: string
+  revieweeId: string
+  scoreTotal: number
+  ratingCount: number
+  lastRatingId: string
+  updatedAt: number
+}
+
+export interface GroupMatchPlayerRating {
+  userId: string
+  average?: number
+  count: number
+}
+
+export interface GroupMatch extends PlayerMatch {
+  playerRatings: GroupMatchPlayerRating[]
+}
+
 export interface SlotInput {
   startsAt: string
   durationMinutes: number
