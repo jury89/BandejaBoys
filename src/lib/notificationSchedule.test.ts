@@ -788,6 +788,14 @@ describe('notifiche FantaBandeja', () => {
       .toMatchObject({ recipientUserIds: ['manager'] })
   })
 
+  it('non apre né segnala cambi rosa mentre il round è sospeso', () => {
+    expect(collectFantasyNotifications(
+      [{ ...fantasyRound, status: 'pending' }],
+      [{ ...fantasyEntry, rosterKey: 'stale-roster' }],
+      NOW,
+    )).toEqual([])
+  })
+
   it('manda il piazzamento personale quando il round è calcolato', () => {
     const scored: FantasyRound = {
       ...fantasyRound,

@@ -121,4 +121,12 @@ describe('FantaBandeja', () => {
     expect(screen.getByText('Ale + Luigi')).toBeInTheDocument()
     expect(screen.getByText('La tua')).toBeInTheDocument()
   })
+
+  it('nasconde un round sospeso invece di mostrarne la rosa obsoleta', () => {
+    renderPage({ rounds: [{ ...round, status: 'pending' }] })
+
+    expect(screen.getByText('Spogliatoi ancora vuoti')).toBeInTheDocument()
+    expect(screen.queryByLabelText('I quattro titolari disponibili')).not.toBeInTheDocument()
+    expect(screen.queryByText('Round annullato')).not.toBeInTheDocument()
+  })
 })

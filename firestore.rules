@@ -261,7 +261,7 @@ service cloud.firestore {
         && request.resource.data.participants is list
         && request.resource.data.participants.size() == 4
         && request.resource.data.rosterKey is string
-        && request.resource.data.status in ['open', 'scored', 'void']
+        && request.resource.data.status in ['pending', 'open', 'scored', 'void']
         && request.resource.data.createdAt is int
         && request.resource.data.updatedAt is int
         && request.resource.data.updatedAt >= request.resource.data.createdAt;

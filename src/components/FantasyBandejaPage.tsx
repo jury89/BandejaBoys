@@ -591,16 +591,20 @@ export function FantasyBandejaPage({
   onSave,
 }: FantasyBandejaPageProps) {
   const [rulesOpen, setRulesOpen] = useState(false)
-  const orderedRounds = useMemo(
-    () => [...rounds].sort((left, right) => left.locksAt - right.locksAt),
+  const visibleRounds = useMemo(
+    () => rounds.filter((round) => round.status !== 'pending'),
     [rounds],
+  )
+  const orderedRounds = useMemo(
+    () => [...visibleRounds].sort((left, right) => left.locksAt - right.locksAt),
+    [visibleRounds],
   )
   const openRounds = orderedRounds.filter((round) => round.status === 'open' && now < round.locksAt)
   const lockedRounds = orderedRounds.filter((round) => round.status === 'open' && now >= round.locksAt)
   const finishedRounds = [...orderedRounds]
     .filter((round) => round.status === 'scored' || round.status === 'void')
     .sort((left, right) => right.locksAt - left.locksAt)
-  const leaderboard = getFantasyLeaderboard(rounds)
+  const leaderboard = getFantasyLeaderboard(visibleRounds)
 
   return (
     <main className="dashboard fantasy-page">
@@ -650,7 +654,7 @@ export function FantasyBandejaPage({
           <CircleAlert size={24} />
           <div><strong>FantaBandeja non disponibile</strong><p>{error}</p></div>
         </div>
-      ) : rounds.length === 0 ? (
+      ) : visibleRounds.length === 0 ? (
         <section className="fantasy-empty">
           <Trophy size={34} />
           <p className="eyebrow">Spogliatoi ancora vuoti</p>

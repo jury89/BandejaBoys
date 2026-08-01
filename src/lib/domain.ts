@@ -903,6 +903,14 @@ function voidFantasyRound(
   }
 }
 
+function suspendFantasyRound(round: FantasyRound, now: number): FantasyRound {
+  return {
+    ...round,
+    status: 'pending',
+    updatedAt: now,
+  }
+}
+
 function fantasyCandidateChanged(
   round: FantasyRound,
   candidate: FantasyRoundCandidate,
@@ -936,12 +944,23 @@ export function reconcileFantasyRounds(
   ]))
   const existingById = new Map(existingRounds.map((round) => [round.id, round]))
 
-  const reconciled = existingRounds.map((round) => {
-    if (round.status !== 'open') return round
+  const reconciled: FantasyRound[] = existingRounds.map((round) => {
     const candidate = candidates.get(round.id)
 
-    if (now < round.locksAt) {
+    if (round.status === 'pending') {
       if (!candidate || candidate.locksAt <= now) return round
+      return {
+        ...round,
+        ...candidate,
+        status: 'open',
+        updatedAt: now,
+      }
+    }
+    if (round.status !== 'open') return round
+
+    if (now < round.locksAt) {
+      if (!candidate) return suspendFantasyRound(round, now)
+      if (candidate.locksAt <= now) return round
       return fantasyCandidateChanged(round, candidate)
         ? { ...round, ...candidate, updatedAt: now }
         : round
