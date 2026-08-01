@@ -1,6 +1,7 @@
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { FantasyEntry, FantasyRound, MemberProfile, SessionUser } from '../types'
+import styles from '../styles.css?raw'
 import { FantasyBandejaPage } from './FantasyBandejaPage'
 
 const now = new Date('2026-08-03T12:00:00.000Z').getTime()
@@ -84,6 +85,20 @@ describe('FantaBandeja', () => {
       captainId: 'd',
     })
     expect(screen.getByText('Scelta segreta fino al via')).toBeInTheDocument()
+  })
+
+  it('mantiene lime entrambi i giocatori selezionati anche quando l’ultimo resta in hover', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    const court = screen.getByLabelText('I quattro titolari disponibili')
+
+    await user.click(within(court).getByRole('button', { name: /Ale/i }))
+    await user.click(within(court).getByRole('button', { name: /Baru/i }))
+
+    const selectedPlayers = within(court).getAllByRole('button', { pressed: true })
+    expect(selectedPlayers).toHaveLength(2)
+    selectedPlayers.forEach((player) => expect(player).toHaveClass('is-selected'))
+    expect(styles).toContain('.fantasy-player:not(.is-selected):hover:not(:disabled)')
   })
 
   it('non fa giocare uno dei quattro titolari', () => {

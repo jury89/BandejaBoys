@@ -5554,7 +5554,7 @@ p {
   transition: background-color 150ms ease, color 150ms ease, box-shadow 150ms ease;
 }
 
-.fantasy-player:hover:not(:disabled) {
+.fantasy-player:not(.is-selected):hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.1);
 }
 
