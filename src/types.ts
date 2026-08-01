@@ -217,7 +217,7 @@ export interface MatchReport {
   updatedAt: number
 }
 
-export type FantasyRoundStatus = 'open' | 'scored' | 'void'
+export type FantasyRoundStatus = 'pending' | 'open' | 'scored' | 'void'
 
 export interface FantasyRoundPlayer {
   userId: string

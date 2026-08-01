@@ -262,6 +262,54 @@ describe('round FantaBandeja', () => {
     expect(updatedRound.participantIds).toEqual(['a', 'b', 'c', 'e'])
     expect(fantasyEntryIsCurrent(updatedRound, saved)).toBe(false)
   })
+
+  it('sospende un round incompleto senza annullarlo e lo riapre con la rosa corrente', () => {
+    const originalRound = roundFixture()
+    const saved = makeFantasyEntry(
+      originalRound,
+      user('manager', 'Mister'),
+      { playerIds: ['a', 'd'], captainId: 'a' },
+      undefined,
+      now + 1,
+    )
+    const incompleteSlot = bookedSlot({ signups: bookedSlot().signups.slice(0, 3) })
+    const suspended = reconcileFantasyRounds(
+      [pollWith(incompleteSlot)],
+      [originalRound],
+      [saved],
+      [],
+      [],
+      now + 2,
+    )[0]
+
+    expect(suspended).toMatchObject({
+      status: 'pending',
+      participantIds: ['a', 'b', 'c', 'd'],
+    })
+    expect(suspended.status).not.toBe('void')
+
+    const restoredSlot = bookedSlot({
+      signups: bookedSlot().signups.map((signup) => (
+        signup.userId === 'd'
+          ? { ...signup, id: 'signup-e', userId: 'e', displayName: 'E' }
+          : signup
+      )),
+    })
+    const restored = reconcileFantasyRounds(
+      [pollWith(restoredSlot)],
+      [suspended],
+      [saved],
+      [],
+      [],
+      now + 3,
+    )[0]
+
+    expect(restored).toMatchObject({
+      status: 'open',
+      participantIds: ['a', 'b', 'c', 'e'],
+    })
+    expect(fantasyEntryIsCurrent(restored, saved)).toBe(false)
+  })
 })
 
 describe('punteggio FantaBandeja', () => {
