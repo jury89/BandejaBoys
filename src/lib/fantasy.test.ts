@@ -8,7 +8,9 @@ import type {
 } from '../types'
 import {
   FANTASY_DEFAULT_RATING,
+  FANTASY_MVP_LEAGUE_POINTS,
   FANTASY_SETTLEMENT_DELAY_MS,
+  FANTASY_STARTER_LEAGUE_POINTS,
   fantasyEntryIsCurrent,
   fantasySelectionError,
   getFantasyLeaderboard,
@@ -459,7 +461,9 @@ describe('punteggio FantaBandeja', () => {
       })),
     }
 
-    expect(getFantasyLeaderboard([first, second])).toEqual([
+    const leaderboard = getFantasyLeaderboard([first, second])
+
+    expect(leaderboard).toEqual(expect.arrayContaining([
       expect.objectContaining({
         managerId: 'manager-x',
         leaguePoints: 8,
@@ -474,6 +478,48 @@ describe('punteggio FantaBandeja', () => {
         roundsPlayed: 2,
         rank: 2,
       }),
-    ])
+      expect.objectContaining({
+        managerId: 'd',
+        leaguePoints: FANTASY_MVP_LEAGUE_POINTS * 2,
+        rawFantasyPoints: 22,
+        roundsPlayed: 2,
+        rank: 3,
+      }),
+      expect.objectContaining({
+        managerId: 'a',
+        leaguePoints: FANTASY_STARTER_LEAGUE_POINTS * 2,
+        rawFantasyPoints: 19,
+        roundsPlayed: 2,
+        rank: 4,
+      }),
+    ]))
+  })
+
+  it('applica i punti dei titolari anche ai round storici già materializzati', () => {
+    const historicalRound = scoreFantasyRound(
+      roundFixture(),
+      [entry('manager-x', ['a', 'd'], 'd')],
+      reportFixture(),
+      ratings,
+      locksAt + FANTASY_SETTLEMENT_DELAY_MS,
+    )
+
+    const leaderboard = getFantasyLeaderboard([historicalRound])
+
+    expect(leaderboard.find((row) => row.managerId === 'd')).toEqual(
+      expect.objectContaining({
+        leaguePoints: FANTASY_MVP_LEAGUE_POINTS,
+        rawFantasyPoints: 11,
+        roundsPlayed: 1,
+      }),
+    )
+    ;['a', 'b', 'c'].forEach((userId) => {
+      expect(leaderboard.find((row) => row.managerId === userId)).toEqual(
+        expect.objectContaining({
+          leaguePoints: FANTASY_STARTER_LEAGUE_POINTS,
+          roundsPlayed: 1,
+        }),
+      )
+    })
   })
 })

@@ -24,6 +24,8 @@ import type {
   SessionUser,
 } from '../types'
 import {
+  FANTASY_MVP_LEAGUE_POINTS,
+  FANTASY_STARTER_LEAGUE_POINTS,
   fantasyEntryIsCurrent,
   getFantasyLeaderboard,
 } from '../lib/domain'
@@ -163,7 +165,9 @@ function FantasyRulesModal({ onClose }: { onClose: () => void }) {
               <h3>Scala la classifica</h3>
               <p>
                 I primi tre del round ricevono 5, 3 e 1 punto. La classifica
-                generale somma i punti ottenuti in tutte le partite.
+                generale somma i punti ottenuti in tutte le partite. Chi gioca
+                in campo riceve {FANTASY_STARTER_LEAGUE_POINTS} punti;
+                {' '}l’MVP ne riceve {FANTASY_MVP_LEAGUE_POINTS}.
               </p>
             </div>
           </li>

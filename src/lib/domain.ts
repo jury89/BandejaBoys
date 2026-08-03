@@ -43,6 +43,8 @@ export const MAX_MATCH_SET_SCORE = 99
 export const FANTASY_SETTLEMENT_DELAY_MS = 48 * 60 * 60 * 1000
 export const FANTASY_DEFAULT_RATING = 6
 export const FANTASY_MIN_RATINGS = 2
+export const FANTASY_STARTER_LEAGUE_POINTS = 2
+export const FANTASY_MVP_LEAGUE_POINTS = 3
 
 const LOCAL_DATE_TIME_PATTERN = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,3}))?)?$/
 const romeDateTimeFormatter = new Intl.DateTimeFormat('en-GB', {
@@ -1005,21 +1007,55 @@ export function reconcileFantasyRounds(
 
 export function getFantasyLeaderboard(rounds: FantasyRound[]): FantasyLeaderboardRow[] {
   const rows = new Map<string, Omit<FantasyLeaderboardRow, 'rank'>>()
+
+  const addContribution = ({
+    managerId,
+    managerName,
+    leaguePoints,
+    wins,
+    rawFantasyPoints,
+  }: Omit<FantasyLeaderboardRow, 'rank' | 'roundsPlayed'>) => {
+    const current = rows.get(managerId)
+    rows.set(managerId, {
+      managerId,
+      managerName,
+      leaguePoints: (current?.leaguePoints ?? 0) + leaguePoints,
+      wins: (current?.wins ?? 0) + wins,
+      rawFantasyPoints: roundTo(
+        (current?.rawFantasyPoints ?? 0) + rawFantasyPoints,
+        2,
+      ),
+      roundsPlayed: (current?.roundsPlayed ?? 0) + 1,
+    })
+  }
+
   rounds
     .filter((round) => round.status === 'scored')
-    .flatMap((round) => round.standings ?? [])
-    .forEach((standing) => {
-      const current = rows.get(standing.managerId)
-      rows.set(standing.managerId, {
-        managerId: standing.managerId,
-        managerName: standing.managerName,
-        leaguePoints: (current?.leaguePoints ?? 0) + standing.leaguePoints,
-        wins: (current?.wins ?? 0) + (standing.rank === 1 ? 1 : 0),
-        rawFantasyPoints: roundTo(
-          (current?.rawFantasyPoints ?? 0) + standing.totalScore,
-          2,
-        ),
-        roundsPlayed: (current?.roundsPlayed ?? 0) + 1,
+    .forEach((round) => {
+      ;(round.standings ?? []).forEach((standing) => {
+        addContribution({
+          managerId: standing.managerId,
+          managerName: standing.managerName,
+          leaguePoints: standing.leaguePoints,
+          wins: standing.rank === 1 ? 1 : 0,
+          rawFantasyPoints: standing.totalScore,
+        })
+      })
+
+      const scoresByPlayer = new Map(
+        (round.playerScores ?? []).map((score) => [score.userId, score]),
+      )
+      round.participants.forEach((participant) => {
+        const score = scoresByPlayer.get(participant.userId)
+        addContribution({
+          managerId: participant.userId,
+          managerName: participant.displayName,
+          leaguePoints: score?.isMvp
+            ? FANTASY_MVP_LEAGUE_POINTS
+            : FANTASY_STARTER_LEAGUE_POINTS,
+          wins: 0,
+          rawFantasyPoints: score?.fantasyScore ?? 0,
+        })
       })
     })
 
