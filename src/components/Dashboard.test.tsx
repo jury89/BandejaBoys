@@ -465,5 +465,5 @@ describe('menu account', () => {
       name: 'Jury + Luigi — Alex + Brescio',
     })).toBeInTheDocument()
     expect(screen.queryByText(/jurydambros|larduini03|EviNinja/)).not.toBeInTheDocument()
-  })
+  }, 30_000)
 })

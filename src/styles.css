@@ -1727,15 +1727,15 @@ p {
 
 .guest-remove-action {
   display: inline-grid;
-  width: 23px;
-  height: 23px;
-  flex: 0 0 23px;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
   place-items: center;
   padding: 0;
-  border: 1px solid rgba(255, 255, 255, 0.6);
+  border: 1px solid #e2b7c0;
   border-radius: 50%;
-  background: rgba(4, 54, 71, 0.5);
-  color: var(--white);
+  background: #fff4f6;
+  color: var(--danger);
   cursor: pointer;
 }
 
@@ -1837,9 +1837,9 @@ p {
 }
 
 .guest-remove-action--reserve {
-  width: 21px;
-  height: 21px;
-  flex-basis: 21px;
+  width: 28px;
+  height: 28px;
+  flex-basis: 28px;
   border-color: #e2b7c0;
   background: #fff4f6;
   color: var(--danger);

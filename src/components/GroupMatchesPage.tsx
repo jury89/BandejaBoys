@@ -7,7 +7,7 @@ import {
   Star,
   UsersRound,
 } from 'lucide-react'
-import { DEFAULT_VENUE, getStarters } from '../lib/domain'
+import { DEFAULT_VENUE, getStarters, isGuestSignup } from '../lib/domain'
 import { formatRatingAverage, slotDateParts } from '../lib/format'
 import type { GroupMatch, MemberProfile } from '../types'
 import { MatchReportScoreboard } from './MatchReportScoreboard'
@@ -88,7 +88,7 @@ function GroupMatchCard({
                   />
                   <div className="group-match__player-copy">
                     <strong>{signup.displayName}</strong>
-                    <small>{averageLabel ? ratingCountLabel(rating?.count ?? 0) : signup.isGuest ? 'Ospite' : 'Non votato'}</small>
+                    <small>{averageLabel ? ratingCountLabel(rating?.count ?? 0) : isGuestSignup(signup) ? 'Ospite' : 'Non votato'}</small>
                   </div>
                   <span className={`group-match__player-score ${averageLabel ? 'has-rating' : ''}`} aria-label={ratingLabel}>
                     {averageLabel ? <Star size={13} fill="currentColor" aria-hidden="true" /> : null}

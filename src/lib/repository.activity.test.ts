@@ -19,6 +19,13 @@ const user: SessionUser = {
   createdAt: 1,
 }
 
+const alex: SessionUser = {
+  id: 'alex',
+  displayName: 'Alex',
+  email: 'alex@example.test',
+  createdAt: 2,
+}
+
 function polls(): PadelPoll[] {
   return JSON.parse(localStorage.getItem(POLLS_KEY) ?? '[]') as PadelPoll[]
 }
@@ -71,7 +78,7 @@ describe('repository activity log in demo mode', () => {
 
     const withGuest = await repository.addGuest(poll.id, slot.id, user, 'Ciccio', 'starter')
     const guest = withGuest.slots[0].signups.find((signup) => signup.isGuest)
-    await repository.removeGuest(poll.id, slot.id, user, guest!.id)
+    await repository.removeGuest(poll.id, slot.id, alex, guest!.id)
 
     expect(activity().events.slice(-2)).toMatchObject([
       {
@@ -81,7 +88,7 @@ describe('repository activity log in demo mode', () => {
       },
       {
         type: 'guest_removed',
-        actorId: 'jury',
+        actorId: 'alex',
         details: { guestName: 'Ciccio', role: 'starter' },
       },
     ])
