@@ -118,6 +118,12 @@ export function guestNameError(displayName: string): string | null {
   return null
 }
 
+export function isGuestSignup(signup: Signup): boolean {
+  return signup.isGuest === true
+    || Boolean(signup.addedBy)
+    || /^guest[_-]/.test(signup.userId)
+}
+
 export function makeId(prefix = 'id'): string {
   const random = globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2)
   return `${prefix}_${random}`
@@ -203,7 +209,7 @@ function getRatingPromptForSlot(
   if (!Number.isFinite(dueAt)) return null
 
   const teammates = starters
-    .filter((signup) => signup.userId !== reviewerId && !signup.isGuest)
+    .filter((signup) => signup.userId !== reviewerId && !isGuestSignup(signup))
     .map((signup) => ({ userId: signup.userId, displayName: signup.displayName }))
   if (teammates.length === 0) return null
 
@@ -612,7 +618,7 @@ function fantasyRoundCandidate(poll: PadelPoll, slot: PadelSlot): FantasyRoundCa
   if (
     !slot.bookedAt
     || starters.length !== MAX_STARTERS
-    || starters.some((signup) => signup.isGuest)
+    || starters.some(isGuestSignup)
     || !Number.isFinite(locksAt)
     || !Number.isFinite(slotEndsAt)
   ) {
@@ -1204,7 +1210,7 @@ export function removeSignup(slot: PadelSlot, userId: string): PadelSlot {
 }
 
 export function removeGuestSignup(slot: PadelSlot, signupId: string): PadelSlot {
-  const guest = slot.signups.find((signup) => signup.id === signupId && signup.isGuest)
+  const guest = slot.signups.find((signup) => signup.id === signupId && isGuestSignup(signup))
   if (!guest) throw new Error('Ospite non trovato.')
   return removeSignup(slot, guest.userId)
 }

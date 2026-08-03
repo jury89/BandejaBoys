@@ -14,7 +14,6 @@ import {
   PhoneCall,
   Trash2,
   UserRoundPlus,
-  X,
 } from 'lucide-react'
 import type { MemberProfile, PadelPoll, PadelSlot, SessionUser, Signup, SignupRole } from '../types'
 import {
@@ -22,6 +21,7 @@ import {
   getReserves,
   getSlotPhase,
   getStarters,
+  isGuestSignup,
   isStarter,
   MAX_STARTERS,
 } from '../lib/domain'
@@ -284,12 +284,12 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
                   <span className="court-player__name">
                     <strong>{memberName(signup.userId, signup.displayName)}</strong>
                     {signup.userId === user.id && <small>Tu</small>}
-                    {signup.isGuest && <small className="guest-pass">Ospite</small>}
+                    {isGuestSignup(signup) && <small className="guest-pass">Ospite</small>}
                     {signup.substitutedFor && (
                       <small>per {memberName(signup.substitutedFor.userId, signup.substitutedFor.displayName)}</small>
                     )}
                   </span>
-                  {!disabled && signup.isGuest && (
+                  {!disabled && isGuestSignup(signup) && (
                     <button
                       className="guest-remove-action guest-remove-action--court"
                       type="button"
@@ -298,7 +298,7 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
                       title={`Rimuovi ${signup.displayName}`}
                       aria-label={`Rimuovi l’ospite ${signup.displayName} dallo slot`}
                     >
-                      <X size={13} />
+                      <Trash2 size={14} />
                     </button>
                   )}
                 </>
@@ -329,8 +329,8 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
                 )}
                 <strong>{memberName(reserve.userId, reserve.displayName)}</strong>
                 {reserve.userId === user.id && <small>Tu</small>}
-                {reserve.isGuest && <small className="guest-pass guest-pass--reserve">Ospite</small>}
-                {!disabled && reserve.isGuest && (
+                {isGuestSignup(reserve) && <small className="guest-pass guest-pass--reserve">Ospite</small>}
+                {!disabled && isGuestSignup(reserve) && (
                   <button
                     className="guest-remove-action guest-remove-action--reserve"
                     type="button"
@@ -339,7 +339,7 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
                     title={`Rimuovi ${reserve.displayName}`}
                     aria-label={`Rimuovi l’ospite ${reserve.displayName} dallo slot`}
                   >
-                    <X size={13} />
+                    <Trash2 size={14} />
                   </button>
                 )}
               </li>

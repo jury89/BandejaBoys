@@ -18,6 +18,7 @@ import {
   getUpcomingPolls,
   guestNameError,
   isBookingCandidate,
+  isGuestSignup,
   makeMatchReport,
   makePoll,
   matchSetInputsError,
@@ -132,6 +133,22 @@ describe('ordine adesioni', () => {
 
     expect(getStarters(updated).map((entry) => entry.userId)).toEqual(['a', 'b', 'c', 'reserve'])
     expect(updated.signups.some((entry) => entry.isGuest)).toBe(false)
+  })
+
+  it('riconosce e rimuove un ospite legacy anche senza il flag isGuest', () => {
+    const legacyGuest: Signup = {
+      id: 'signup-legacy',
+      userId: 'guest_legacy',
+      displayName: 'Ospite legacy',
+      joinedAt: 1,
+      role: 'starter',
+      addedBy: 'luigi',
+      addedByName: 'Luigi',
+    }
+
+    expect(isGuestSignup(legacyGuest)).toBe(true)
+    expect(isGuestSignup(signup('member', 2))).toBe(false)
+    expect(removeGuestSignup(slot([legacyGuest]), legacyGuest.id).signups).toEqual([])
   })
 
   it('permette di scegliere la riserva anche quando ci sono posti da titolare', () => {

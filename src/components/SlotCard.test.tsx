@@ -516,16 +516,15 @@ describe('azioni dello slot', () => {
     })
   })
 
-  it('permette a un membro di rimuovere un ospite', async () => {
+  it('permette a un membro di rimuovere un ospite aggiunto da un altro membro', async () => {
     const guestSignup = {
       id: 'signup-guest',
       userId: 'guest-ciccio',
       displayName: 'Ciccio',
       joinedAt: 2,
       role: 'starter' as const,
-      isGuest: true,
-      addedBy: user.id,
-      addedByName: user.displayName,
+      addedBy: 'luigi',
+      addedByName: 'Luigi',
     }
     const guestSlot = { ...slot, signups: [guestSignup] }
     const updatedPoll = { ...poll, slots: [{ ...guestSlot, signups: [] }] }

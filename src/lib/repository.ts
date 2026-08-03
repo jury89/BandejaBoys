@@ -48,6 +48,7 @@ import {
   aggregateMatchRatingSummaries,
   getMatchRatingSummaryId,
   getStarters,
+  isGuestSignup,
   makeFantasyEntry,
   makeMatchReport,
   makeId,
@@ -507,7 +508,7 @@ function remoteRepository(): PadelRepository {
           const previous = slotById(before, slotId)
           const updated = slotById(after, slotId)
           const previousIds = new Set(previous?.signups.map((signup) => signup.id))
-          const guest = updated?.signups.find((signup) => signup.isGuest && !previousIds.has(signup.id))
+          const guest = updated?.signups.find((signup) => isGuestSignup(signup) && !previousIds.has(signup.id))
           return updated && guest
             ? makeActivityEvent('guest_added', actor, after, updated, {
               guestName: guest.displayName,
@@ -524,7 +525,7 @@ function remoteRepository(): PadelRepository {
         (poll) => updateSlot(poll, slotId, (slot) => removeGuestSignup(slot, signupId)),
         (before) => {
           const previous = slotById(before, slotId)
-          const guest = previous?.signups.find((signup) => signup.id === signupId && signup.isGuest)
+          const guest = previous?.signups.find((signup) => signup.id === signupId && isGuestSignup(signup))
           return previous && guest
             ? makeActivityEvent('guest_removed', actor, before, previous, {
               guestName: guest.displayName,
@@ -1075,7 +1076,7 @@ function localRepository(): PadelRepository {
           const previous = slotById(before, slotId)
           const updated = slotById(after, slotId)
           const previousIds = new Set(previous?.signups.map((signup) => signup.id))
-          const guest = updated?.signups.find((signup) => signup.isGuest && !previousIds.has(signup.id))
+          const guest = updated?.signups.find((signup) => isGuestSignup(signup) && !previousIds.has(signup.id))
           return updated && guest
             ? makeActivityEvent('guest_added', actor, after, updated, {
               guestName: guest.displayName,
@@ -1092,7 +1093,7 @@ function localRepository(): PadelRepository {
         (poll) => updateSlot(poll, slotId, (slot) => removeGuestSignup(slot, signupId)),
         (before) => {
           const previous = slotById(before, slotId)
-          const guest = previous?.signups.find((signup) => signup.id === signupId && signup.isGuest)
+          const guest = previous?.signups.find((signup) => signup.id === signupId && isGuestSignup(signup))
           return previous && guest
             ? makeActivityEvent('guest_removed', actor, before, previous, {
               guestName: guest.displayName,

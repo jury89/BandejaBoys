@@ -13,6 +13,7 @@ import {
   getMatchRatingDueAt,
   getMatchRatingResponseId,
   getStarters,
+  isGuestSignup,
   fantasyEntryIsCurrent,
   padelDateTimeToTimestamp,
 } from './domain'
@@ -391,7 +392,7 @@ export function collectScheduledNotifications(
     for (const slot of poll.slots) {
       const startsAt = padelDateTimeToTimestamp(slot.startsAt)
       const starters = getStarters(slot)
-      const registeredStarters = starters.filter((signup) => !signup.isGuest)
+      const registeredStarters = starters.filter((signup) => !isGuestSignup(signup))
       const recipientUserIds = Array.from(new Set(
         registeredStarters.map((signup) => signup.userId),
       ))
@@ -497,7 +498,7 @@ export function collectScheduledNotifications(
           id: `match-rating:${poll.id}:${slot.id}:${slot.startsAt}`,
           kind: 'match-rating',
           title: 'È ora di dare i voti',
-          body: starters.some((signup) => signup.isGuest)
+          body: starters.some(isGuestSignup)
             ? 'Com’è andata in campo? Valuta la prestazione dei compagni registrati.'
             : 'Com’è andata in campo? Valuta la prestazione dei tuoi tre compagni.',
           url: `/?ratePoll=${encodeURIComponent(poll.id)}&rateSlot=${encodeURIComponent(slot.id)}`,
