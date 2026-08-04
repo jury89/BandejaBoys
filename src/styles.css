@@ -5929,16 +5929,40 @@ p {
   gap: 7px;
 }
 
-.fantasy-player-scores > div {
-  display: grid;
+.fantasy-player-score {
   min-width: 0;
+  border: 1px solid #d7e4e7;
+  background: #f5f9fa;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.fantasy-player-score.is-expanded {
+  border-color: #7bbbae;
+  box-shadow: inset 3px 0 0 var(--court);
+}
+
+.fantasy-player-score__toggle {
+  display: grid;
+  width: 100%;
   min-height: 52px;
   align-items: center;
   padding: 7px 9px;
-  grid-template-columns: 32px minmax(0, 1fr) auto auto;
+  grid-template-columns: 32px minmax(0, 1fr) auto auto 18px;
   gap: 7px;
-  border: 1px solid #d7e4e7;
-  background: #f5f9fa;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.fantasy-player-score__toggle:hover {
+  background: #eef6f7;
+}
+
+.fantasy-player-score__toggle:focus-visible {
+  outline: 2px solid var(--court);
+  outline-offset: -3px;
 }
 
 .fantasy-player-scores .avatar {
@@ -5947,33 +5971,139 @@ p {
   font-size: 0.62rem;
 }
 
-.fantasy-player-scores p {
+.fantasy-player-score__identity {
   display: flex;
   min-width: 0;
   flex-direction: column;
-  margin: 0;
 }
 
-.fantasy-player-scores p strong {
+.fantasy-player-score__identity strong {
   overflow: hidden;
   font-size: 0.58rem;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.fantasy-player-scores p span {
+.fantasy-player-score__identity small {
   color: var(--muted);
   font-size: 0.47rem;
 }
 
-.fantasy-player-scores > div > strong {
+.fantasy-player-score__total {
   color: var(--court);
   font-family: var(--display);
   font-size: 1rem;
 }
 
-.fantasy-player-scores > div > svg {
+.fantasy-player-score__toggle > svg:not(.fantasy-player-score__chevron) {
   color: var(--pending);
+}
+
+.fantasy-player-score__chevron {
+  color: #78909a;
+  transition: transform 160ms ease;
+}
+
+.fantasy-player-score.is-expanded .fantasy-player-score__chevron {
+  transform: rotate(180deg);
+}
+
+.fantasy-player-score__details {
+  padding: 11px 12px 12px;
+  border-top: 1px dashed #bfd4d9;
+  background: #edf6f5;
+}
+
+.fantasy-player-score__formula {
+  display: grid;
+  align-items: center;
+  margin: 0 0 10px;
+  grid-template-columns: repeat(3, minmax(36px, auto)) 13px minmax(46px, auto);
+  gap: 5px;
+  color: var(--deep);
+  font-family: var(--display);
+  font-size: 0.92rem;
+  line-height: 1;
+}
+
+.fantasy-player-score__formula > * {
+  display: grid;
+  min-height: 31px;
+  place-items: center;
+  border: 1px solid #c8dde1;
+  background: var(--white);
+  font: inherit;
+  font-style: normal;
+}
+
+.fantasy-player-score__formula em {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+}
+
+.fantasy-player-score__formula strong {
+  border-color: #b3dd35;
+  background: var(--ball);
+}
+
+.fantasy-player-score__details dl {
+  display: grid;
+  margin: 0;
+  gap: 1px;
+  background: #d4e5e5;
+}
+
+.fantasy-player-score__details dl > div {
+  display: grid;
+  min-width: 0;
+  align-items: center;
+  padding: 8px 9px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 9px;
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.fantasy-player-score__details dt {
+  min-width: 0;
+  color: var(--ink);
+  font-size: 0.52rem;
+  font-weight: 900;
+}
+
+.fantasy-player-score__details dt small {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 0.44rem;
+  font-weight: 600;
+}
+
+.fantasy-player-score__details dd {
+  margin: 0;
+  color: var(--deep);
+  font-family: var(--display);
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+.fantasy-player-score__details > footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 9px;
+  padding-top: 8px;
+  border-top: 2px solid var(--deep);
+  color: var(--deep);
+  font-size: 0.5rem;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.fantasy-player-score__details > footer strong {
+  font-family: var(--display);
+  font-size: 1.12rem;
 }
 
 .fantasy-result--void {
