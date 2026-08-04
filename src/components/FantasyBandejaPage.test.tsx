@@ -147,4 +147,47 @@ describe('FantaBandeja', () => {
     expect(screen.queryByLabelText('I quattro titolari disponibili')).not.toBeInTheDocument()
     expect(screen.queryByText('Round annullato')).not.toBeInTheDocument()
   })
+
+  it('espande il conteggio di un giocatore mostrando voto e modificatori', async () => {
+    const user = userEvent.setup()
+    const scoredRound: FantasyRound = {
+      ...round,
+      status: 'scored',
+      playerScores: [{
+        userId: 'a',
+        displayName: 'Ale',
+        baseRating: 5,
+        ratingCount: 3,
+        usedDefaultRating: false,
+        setWins: 2,
+        setLosses: 1,
+        gameDifference: 1,
+        resultBonus: 1.5,
+        differenceBonus: 0,
+        fantasyScore: 6.5,
+        isMvp: false,
+      }],
+      standings: [],
+      settledAt: round.settlesAt,
+    }
+    renderPage({ rounds: [scoredRound], now: round.settlesAt + 1 })
+
+    const toggle = screen.getByRole('button', { name: 'Mostra il calcolo del punteggio di Ale' })
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+
+    await user.click(toggle)
+
+    expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    const breakdown = screen.getByRole('region', { name: 'Calcolo punteggio di Ale' })
+    expect(within(breakdown).getByLabelText('Calcolo: 5 +1,5 0 uguale 6,5')).toBeInTheDocument()
+    expect(within(breakdown).getByText('Voto base')).toBeInTheDocument()
+    expect(within(breakdown).getByText('3 pagelle ricevute')).toBeInTheDocument()
+    expect(within(breakdown).getByText('2 vinti · 1 perso')).toBeInTheDocument()
+    expect(within(breakdown).getAllByText('+1,5')).toHaveLength(2)
+    expect(within(breakdown).getByText('Differenza totale +1')).toBeInTheDocument()
+    expect(styles).toContain('.fantasy-player-score.is-expanded')
+
+    await user.click(toggle)
+    expect(screen.queryByRole('region', { name: 'Calcolo punteggio di Ale' })).not.toBeInTheDocument()
+  })
 })

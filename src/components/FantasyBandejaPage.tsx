@@ -4,6 +4,7 @@ import {
   BookOpenText,
   CalendarDays,
   Check,
+  ChevronDown,
   CircleAlert,
   Clock3,
   Crown,
@@ -17,6 +18,7 @@ import {
 import type {
   FantasyEntry,
   FantasyLeaderboardRow,
+  FantasyPlayerScore,
   FantasyRound,
   FantasyRoundPlayer,
   FantasySelectionInput,
@@ -524,21 +526,118 @@ function RoundResult({
       )}
       <div className="fantasy-player-scores">
         {(round.playerScores ?? []).map((score) => (
-          <div key={score.userId}>
-            <PlayerAvatar player={score} members={members} />
-            <p>
-              <strong>{resolveMemberName(members, score.userId, score.displayName)}</strong>
-              <span>
-                Pagella {score.baseRating.toLocaleString('it-IT', { maximumFractionDigits: 2 })}
-                {score.usedDefaultRating && ' d’ufficio'}
-              </span>
-            </p>
-            <strong>{score.fantasyScore.toLocaleString('it-IT', { maximumFractionDigits: 2 })}</strong>
-            {score.isMvp && <Sparkles size={15} aria-label="MVP" />}
-          </div>
+          <FantasyPlayerScoreRow
+            key={score.userId}
+            roundId={round.id}
+            score={score}
+            members={members}
+          />
         ))}
       </div>
     </article>
+  )
+}
+
+function fantasyNumber(value: number): string {
+  return value.toLocaleString('it-IT', { maximumFractionDigits: 2 })
+}
+
+function fantasyModifier(value: number): string {
+  if (value > 0) return `+${fantasyNumber(value)}`
+  if (value < 0) return `−${fantasyNumber(Math.abs(value))}`
+  return '0'
+}
+
+function setRecord(score: FantasyPlayerScore): string {
+  const won = `${score.setWins} ${score.setWins === 1 ? 'vinto' : 'vinti'}`
+  const lost = `${score.setLosses} ${score.setLosses === 1 ? 'perso' : 'persi'}`
+  return `${won} · ${lost}`
+}
+
+function ratingSource(score: FantasyPlayerScore): string {
+  if (score.usedDefaultRating) {
+    return `Voto d’ufficio · ${score.ratingCount} ${score.ratingCount === 1 ? 'pagella ricevuta' : 'pagelle ricevute'}`
+  }
+  return `${score.ratingCount} pagelle ricevute`
+}
+
+function FantasyPlayerScoreRow({
+  roundId,
+  score,
+  members,
+}: {
+  roundId: string
+  score: FantasyPlayerScore
+  members: MemberProfile[]
+}) {
+  const [expanded, setExpanded] = useState(false)
+  const playerName = resolveMemberName(members, score.userId, score.displayName)
+  const detailId = `fantasy-score-${roundId}-${score.userId}`
+  const formulaLabel = [
+    `Calcolo: ${fantasyNumber(score.baseRating)}`,
+    fantasyModifier(score.resultBonus),
+    fantasyModifier(score.differenceBonus),
+    `uguale ${fantasyNumber(score.fantasyScore)}`,
+  ].join(' ')
+
+  return (
+    <div className={`fantasy-player-score ${expanded ? 'is-expanded' : ''}`}>
+      <button
+        className="fantasy-player-score__toggle"
+        type="button"
+        aria-expanded={expanded}
+        aria-controls={detailId}
+        aria-label={`${expanded ? 'Nascondi' : 'Mostra'} il calcolo del punteggio di ${playerName}`}
+        onClick={() => setExpanded((current) => !current)}
+      >
+        <PlayerAvatar player={score} members={members} />
+        <span className="fantasy-player-score__identity">
+          <strong>{playerName}</strong>
+          <small>
+            Pagella {fantasyNumber(score.baseRating)}
+            {score.usedDefaultRating && ' d’ufficio'}
+          </small>
+        </span>
+        <strong className="fantasy-player-score__total">{fantasyNumber(score.fantasyScore)}</strong>
+        {score.isMvp && <Sparkles size={15} aria-label="MVP" />}
+        <ChevronDown className="fantasy-player-score__chevron" size={16} aria-hidden="true" />
+      </button>
+
+      {expanded && (
+        <div
+          className="fantasy-player-score__details"
+          id={detailId}
+          role="region"
+          aria-label={`Calcolo punteggio di ${playerName}`}
+        >
+          <p className="fantasy-player-score__formula" aria-label={formulaLabel}>
+            <span>{fantasyNumber(score.baseRating)}</span>
+            <small>{fantasyModifier(score.resultBonus)}</small>
+            <small>{fantasyModifier(score.differenceBonus)}</small>
+            <em>=</em>
+            <strong>{fantasyNumber(score.fantasyScore)}</strong>
+          </p>
+          <dl>
+            <div>
+              <dt>Voto base<small>{ratingSource(score)}</small></dt>
+              <dd>{fantasyNumber(score.baseRating)}</dd>
+            </div>
+            <div>
+              <dt>Bilancio set<small>{setRecord(score)}</small></dt>
+              <dd>{fantasyModifier(score.resultBonus)}</dd>
+            </div>
+            <div>
+              <dt>Bonus differenza game<small>Differenza totale {fantasyModifier(score.gameDifference)}</small></dt>
+              <dd>{fantasyModifier(score.differenceBonus)}</dd>
+            </div>
+          </dl>
+          <footer>
+            <span>Totale FantaBandeja</span>
+            <strong>{fantasyNumber(score.fantasyScore)}</strong>
+          </footer>
+        </div>
+      )}
+    </div>
   )
 }
 
