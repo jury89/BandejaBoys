@@ -65,7 +65,8 @@ describe('FantaBandeja', () => {
     expect(within(dialog).getByText('Punteggio giocatore')).toBeInTheDocument()
     expect(within(dialog).getByText(/chi gioca in campo riceve 2 punti/i)).toBeInTheDocument()
     expect(within(dialog).getByText(/l’MVP ne riceve 3/i)).toBeInTheDocument()
-    expect(within(dialog).getByText(/48 ore dopo la fine/i)).toBeInTheDocument()
+    expect(within(dialog).getByText(/Dopo 24 ore il risultato/i)).toBeInTheDocument()
+    expect(within(dialog).getByText(/A 48 ore il round si chiude comunque/i)).toBeInTheDocument()
 
     await user.click(within(dialog).getByRole('button', { name: 'Chiudi' }))
     expect(screen.queryByRole('dialog', { name: 'Come si gioca' })).not.toBeInTheDocument()
