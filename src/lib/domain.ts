@@ -40,6 +40,7 @@ export const GUEST_NAME_MAX_LENGTH = 40
 export const MATCH_RATING_DELAY_MS = 0
 export const MAX_MATCH_SETS = 5
 export const MAX_MATCH_SET_SCORE = 99
+export const FANTASY_EARLY_SETTLEMENT_DELAY_MS = 24 * 60 * 60 * 1000
 export const FANTASY_SETTLEMENT_DELAY_MS = 48 * 60 * 60 * 1000
 export const FANTASY_DEFAULT_RATING = 6
 export const FANTASY_MIN_RATINGS = 2
@@ -981,9 +982,26 @@ export function reconcileFantasyRounds(
     ) {
       return voidFantasyRound(round, 'La formazione è cambiata al momento del blocco.', now)
     }
-    if (now < round.settlesAt) return round
 
     const report = reportsByRound.get(round.id)
+    const earlySettlementAt = round.slotEndsAt + FANTASY_EARLY_SETTLEMENT_DELAY_MS
+    const summariesByPlayer = new Map(
+      ratingSummaries
+        .filter((summary) => summary.pollId === round.pollId && summary.slotId === round.slotId)
+        .map((summary) => [summary.revieweeId, summary]),
+    )
+    const ratingsAreComplete = round.participantIds.every((userId) => {
+      const summary = summariesByPlayer.get(userId)
+      return Boolean(
+        summary
+        && Number.isFinite(summary.scoreTotal)
+        && Number.isInteger(summary.ratingCount)
+        && summary.ratingCount >= FANTASY_MIN_RATINGS
+      )
+    })
+    const canSettleEarly = now >= earlySettlementAt && Boolean(report) && ratingsAreComplete
+    if (now < round.settlesAt && !canSettleEarly) return round
+
     if (!report) {
       return voidFantasyRound(round, 'Il referto non è stato inserito entro 48 ore.', now)
     }

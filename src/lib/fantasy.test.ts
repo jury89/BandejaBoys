@@ -8,6 +8,7 @@ import type {
 } from '../types'
 import {
   FANTASY_DEFAULT_RATING,
+  FANTASY_EARLY_SETTLEMENT_DELAY_MS,
   FANTASY_MVP_LEAGUE_POINTS,
   FANTASY_SETTLEMENT_DELAY_MS,
   FANTASY_STARTER_LEAGUE_POINTS,
@@ -404,15 +405,20 @@ describe('punteggio FantaBandeja', () => {
     ])
   })
 
-  it('chiude dopo 48 ore con il referto e annulla il round se il referto manca', () => {
+  it('chiude dopo 24 ore quando referto e pagelle sono completi', () => {
     const round = roundFixture()
+    const completeRatings = ratings.map((summary) => (
+      summary.revieweeId === 'c'
+        ? { ...summary, scoreTotal: 12, ratingCount: 2 }
+        : summary
+    ))
     const beforeSettlement = reconcileFantasyRounds(
       [pollWith()],
       [round],
       [],
-      ratings,
+      completeRatings,
       [reportFixture()],
-      round.settlesAt - 1,
+      round.slotEndsAt + FANTASY_EARLY_SETTLEMENT_DELAY_MS - 1,
     )
     expect(beforeSettlement[0].status).toBe('open')
 
@@ -420,11 +426,48 @@ describe('punteggio FantaBandeja', () => {
       [pollWith()],
       [round],
       [entry('manager', ['a', 'd'], 'd')],
-      ratings,
+      completeRatings,
+      [reportFixture()],
+      round.slotEndsAt + FANTASY_EARLY_SETTLEMENT_DELAY_MS,
+    )
+    expect(scored[0].status).toBe('scored')
+  })
+
+  it('attende 48 ore se manca una pagella completa e mantiene il referto come fallback', () => {
+    const round = roundFixture()
+    const incompleteRatings = ratings.filter((summary) => summary.revieweeId !== 'd')
+    const afterTwentyFourHours = reconcileFantasyRounds(
+      [pollWith()],
+      [round],
+      [],
+      incompleteRatings,
+      [reportFixture()],
+      round.slotEndsAt + FANTASY_EARLY_SETTLEMENT_DELAY_MS,
+    )
+    expect(afterTwentyFourHours[0].status).toBe('open')
+
+    const scoredWithDefault = reconcileFantasyRounds(
+      [pollWith()],
+      [round],
+      [],
+      incompleteRatings,
       [reportFixture()],
       round.settlesAt,
     )
-    expect(scored[0].status).toBe('scored')
+    expect(scoredWithDefault[0]).toMatchObject({
+      status: 'scored',
+      playerScores: expect.arrayContaining([
+        expect.objectContaining({
+          userId: 'd',
+          baseRating: FANTASY_DEFAULT_RATING,
+          usedDefaultRating: true,
+        }),
+      ]),
+    })
+  })
+
+  it('annulla dopo 48 ore se il referto manca', () => {
+    const round = roundFixture()
 
     const voided = reconcileFantasyRounds(
       [pollWith()],

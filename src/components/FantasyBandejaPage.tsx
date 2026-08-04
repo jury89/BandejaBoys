@@ -203,8 +203,9 @@ function FantasyRulesModal({ onClose }: { onClose: () => void }) {
 
         <p className="fantasy-rulebook__note">
           <Clock3 size={18} />
-          Il risultato viene calcolato 48 ore dopo la fine. Se manca il referto
-          dei set, il round viene annullato.
+          Dopo 24 ore il risultato viene calcolato se ci sono il referto e almeno
+          due pagelle per giocatore. A 48 ore il round si chiude comunque; senza
+          referto viene annullato.
         </p>
       </div>
     </Modal>
@@ -453,7 +454,7 @@ function LockedRound({
           ))}
         </ol>
       )}
-      <footer><Clock3 size={15} /> Calcolo definitivo 48 ore dopo la partita.</footer>
+      <footer><Clock3 size={15} /> Calcolo da 24 ore con referto e pagelle completi.</footer>
     </article>
   )
 }
