@@ -722,7 +722,6 @@ export function fantasyEntryIsCurrent(
     entry
     && entry.roundId === round.id
     && entry.rosterKey === round.rosterKey
-    && entry.locksAt === round.locksAt
     && !round.participantIds.includes(entry.managerId)
     && entry.playerIds.length === 2
     && entry.playerIds[0] !== entry.playerIds[1]

@@ -785,7 +785,24 @@ describe('notifiche FantaBandeja', () => {
     const notifications = collectFantasyNotifications([changed], [fantasyEntry], NOW)
 
     expect(notifications.find((notification) => notification.kind === 'fantasy-roster-changed'))
-      .toMatchObject({ recipientUserIds: ['manager'] })
+      .toMatchObject({
+        id: `fantasy-roster-changed:${changed.id}:${changed.rosterKey}`,
+        recipientUserIds: ['manager'],
+      })
+  })
+
+  it('non segnala un cambio titolari quando cambia soltanto l’orario', () => {
+    const moved = {
+      ...fantasyRound,
+      slotStartsAt: '2026-07-27T20:30',
+      slotEndsAt: fantasyRound.slotEndsAt + 30 * 60 * 1000,
+      locksAt: fantasyRound.locksAt + 30 * 60 * 1000,
+      settlesAt: fantasyRound.settlesAt + 30 * 60 * 1000,
+    }
+    const notifications = collectFantasyNotifications([moved], [fantasyEntry], NOW)
+
+    expect(notifications.find((notification) => notification.kind === 'fantasy-roster-changed'))
+      .toBeUndefined()
   })
 
   it('non apre né segnala cambi rosa mentre il round è sospeso', () => {
