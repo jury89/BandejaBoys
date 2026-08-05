@@ -235,7 +235,7 @@ describe('round FantaBandeja', () => {
     )).toContain('bloccate')
   })
 
-  it('invalida una giocata quando cambia la formazione o l’orario', () => {
+  it('invalida una giocata quando cambia uno dei titolari', () => {
     const originalRound = roundFixture()
     const saved = makeFantasyEntry(
       originalRound,
@@ -264,6 +264,34 @@ describe('round FantaBandeja', () => {
 
     expect(updatedRound.participantIds).toEqual(['a', 'b', 'c', 'e'])
     expect(fantasyEntryIsCurrent(updatedRound, saved)).toBe(false)
+  })
+
+  it('mantiene valida una giocata quando cambia soltanto l’orario', () => {
+    const originalRound = roundFixture()
+    const saved = makeFantasyEntry(
+      originalRound,
+      user('manager', 'Mister'),
+      { playerIds: ['a', 'b'], captainId: 'a' },
+      undefined,
+      now + 1,
+    )
+    const movedStartsAt = '2026-08-04T18:00:00.000Z'
+    const updatedRound = reconcileFantasyRounds(
+      [pollWith(bookedSlot({ startsAt: movedStartsAt }))],
+      [originalRound],
+      [saved],
+      [],
+      [],
+      now + 2,
+    )[0]
+
+    expect(updatedRound).toMatchObject({
+      slotStartsAt: movedStartsAt,
+      participantIds: originalRound.participantIds,
+      rosterKey: originalRound.rosterKey,
+    })
+    expect(updatedRound.locksAt).not.toBe(saved.locksAt)
+    expect(fantasyEntryIsCurrent(updatedRound, saved)).toBe(true)
   })
 
   it('sospende un round incompleto senza annullarlo e lo riapre con la rosa corrente', () => {

@@ -324,7 +324,7 @@ export function collectFantasyNotifications(
       ))
       if (staleManagerIds.length > 0) {
         notifications.push({
-          id: `fantasy-roster-changed:${round.id}:${round.rosterKey}:${round.locksAt}`,
+          id: `fantasy-roster-changed:${round.id}:${round.rosterKey}`,
           kind: 'fantasy-roster-changed',
           title: 'Formazione cambiata',
           body: 'È cambiato uno dei quattro titolari: aggiorna la tua coppia FantaBandeja prima dell’inizio.',
