@@ -466,4 +466,48 @@ describe('menu account', () => {
     })).toBeInTheDocument()
     expect(screen.queryByText(/jurydambros|larduini03|EviNinja/)).not.toBeInTheDocument()
   }, 30_000)
+
+  it('apre direttamente il referto indicato dal deep link per un titolare', async () => {
+    dashboardTestState.members = [
+      { id: 'jury', displayName: 'Jury', email: 'jury@example.test', createdAt: 1 },
+      { id: 'luigi', displayName: 'Luigi', email: 'luigi@example.test', createdAt: 1 },
+      { id: 'alex', displayName: 'Alex', email: 'alex@example.test', createdAt: 1 },
+      { id: 'brescio', displayName: 'Brescio', email: 'brescio@example.test', createdAt: 1 },
+    ]
+    dashboardTestState.polls = [{
+      id: 'poll-deep-link',
+      title: 'Padel · prossima settimana',
+      targetWeekStart: '2020-07-27',
+      createdBy: 'jury',
+      createdByName: 'Jury',
+      createdAt: 1,
+      updatedAt: 1,
+      status: 'closed',
+      slots: [{
+        id: 'slot-deep-link',
+        startsAt: '2020-07-29T16:00:00.000Z',
+        durationMinutes: 90,
+        venue: 'Oasi Boschetto',
+        bookedAt: 1,
+        signups: dashboardTestState.members.map((member, index) => ({
+          id: `signup-${member.id}`,
+          userId: member.id,
+          displayName: member.displayName,
+          joinedAt: index + 1,
+        })),
+      }],
+    }]
+    window.history.replaceState(
+      {},
+      '',
+      '/?reportPoll=poll-deep-link&reportSlot=slot-deep-link#i-miei-match',
+    )
+
+    render(<Dashboard />)
+
+    expect(await screen.findByRole('heading', { name: 'Com’è finita?' }))
+      .toBeInTheDocument()
+    expect(window.location.search).toBe('')
+    expect(window.location.hash).toBe('#i-miei-match')
+  }, 30_000)
 })

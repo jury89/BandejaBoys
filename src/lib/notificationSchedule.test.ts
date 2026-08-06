@@ -181,6 +181,21 @@ describe('pianificazione notifiche', () => {
     })
   })
 
+  it('mantiene un deep link operativo personalizzato e gli aggiunge il refresh univoco', () => {
+    expect(createTestNotification(
+      'jury',
+      'run-47',
+      'Inserisci il risultato',
+      'standard',
+      'Referto mancante',
+      '/?reportPoll=poll-1&reportSlot=slot-1#i-miei-match',
+    )).toMatchObject({
+      title: 'Referto mancante',
+      body: 'Inserisci il risultato',
+      url: '/?reportPoll=poll-1&reportSlot=slot-1&_pushRefresh=run-47#i-miei-match',
+    })
+  })
+
   it('manda una frase motivazionale personale il lunedì mattina a ogni utente', () => {
     const mondayMorning = Date.parse('2026-07-27T06:33:00.000Z')
     const schedule = {

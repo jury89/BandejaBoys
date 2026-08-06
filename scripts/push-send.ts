@@ -20,12 +20,14 @@ Uso interattivo:
 Uso con argomenti:
   npm run push:send -- Tommy --title "Forza Tommy" --message "Rimettiti presto!"
   npm run push:send -- --to Luigi --title "Padel" --message "Chiama il campo" --yes
+  npm run push:send -- --uid UID --title "Risultato" --message "Inserisci il referto" --url "/?reportPoll=POLL&reportSlot=SLOT#i-miei-match" --yes
 
 Opzioni:
   --to <nome>             Destinatario, senza distinzione tra maiuscole e minuscole
   --uid <uid>             UID Firebase, utile se due persone hanno lo stesso nome
   --title <titolo>        Titolo della push, massimo 80 caratteri
   --message <messaggio>   Testo della push, massimo 240 caratteri
+  --url <percorso>        Link interno da aprire al tocco (default: bacheca)
   --project <id>          Project ID (default: bandeja-boys)
   --database <id>         Database ID (default: (default))
   --dry-run               Mostra l’anteprima senza inviare
@@ -120,11 +122,12 @@ function sendViaGitHub(
   recipient: PushRecipient,
   title: string,
   message: string,
+  url: string | undefined,
   wait: boolean,
 ) {
   const dispatchOutput = execFileSync(
     'gh',
-    buildWorkflowDispatchArgs(recipient, title, message),
+    buildWorkflowDispatchArgs(recipient, title, message, url),
     { encoding: 'utf8' },
   ).trim()
   const run = extractRun(dispatchOutput)
@@ -188,6 +191,7 @@ async function run() {
     console.log(`  Destinatario: ${recipient.displayName} (${deviceLabel(recipient.deviceCount)})`)
     console.log(`  Titolo: ${content.title}`)
     console.log(`  Messaggio: ${content.message}`)
+    if (options.url) console.log(`  Link: ${options.url}`)
 
     if (options.dryRun) {
       console.log('\nSimulazione completata: nessuna notifica inviata.')
@@ -202,7 +206,7 @@ async function run() {
       }
     }
 
-    sendViaGitHub(recipient, content.title, content.message, options.wait)
+    sendViaGitHub(recipient, content.title, content.message, options.url, options.wait)
   } finally {
     prompt?.close()
     await firestore.terminate()

@@ -38,6 +38,11 @@ import {
   notificationEventFromSearch,
   removeNotificationEventFromCurrentUrl,
 } from '../lib/notificationRead'
+import {
+  MATCH_REPORT_POLL_QUERY_PARAM,
+  MATCH_REPORT_SLOT_QUERY_PARAM,
+  matchReportTargetFromSearch,
+} from '../lib/notificationUrl'
 import { notificationStateLabel, usePushNotifications } from '../lib/notifications'
 import { RATING_TEST_QUERY_PARAM, isRatingTestRequested, makeRatingTestPrompt } from '../lib/ratingTest'
 import { repository } from '../lib/repository'
@@ -147,6 +152,10 @@ export function Dashboard() {
     const slotId = parameters.get('rateSlot')
     return pollId && slotId ? { pollId, slotId } : null
   })
+  const [requestedMatchReport] = useState(
+    () => matchReportTargetFromSearch(window.location.search),
+  )
+  const requestedMatchReportHandledRef = useRef(false)
   const [requestedNotificationEvent] = useState(
     () => notificationEventFromSearch(window.location.search),
   )
@@ -528,6 +537,40 @@ export function Dashboard() {
     },
     [matchNameMembers, matchReports, now, polls, receivedRatings, user],
   )
+
+  useEffect(() => {
+    if (
+      !requestedMatchReport
+      || requestedMatchReportHandledRef.current
+      || loading
+      || !receivedRatingsLoaded
+      || !matchReportsLoaded
+    ) return
+
+    const requested = playerMatches.past.find((match) => (
+      match.pollId === requestedMatchReport.pollId
+      && match.slot.id === requestedMatchReport.slotId
+    ))
+    requestedMatchReportHandledRef.current = true
+    const openTimer = requested
+      ? window.setTimeout(() => setReportMatch(requested), 0)
+      : undefined
+
+    const url = new URL(window.location.href)
+    url.searchParams.delete(MATCH_REPORT_POLL_QUERY_PARAM)
+    url.searchParams.delete(MATCH_REPORT_SLOT_QUERY_PARAM)
+    window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`)
+
+    return () => {
+      if (openTimer !== undefined) window.clearTimeout(openTimer)
+    }
+  }, [
+    loading,
+    matchReportsLoaded,
+    playerMatches,
+    receivedRatingsLoaded,
+    requestedMatchReport,
+  ])
   const groupMatches = useMemo(
     () => {
       if (!user) return []

@@ -18,6 +18,7 @@ import {
   padelDateTimeToTimestamp,
 } from './domain'
 import { pollWeekTitle } from './format'
+import { addPushRefreshParameter, normalizeInternalNotificationUrl } from './notificationUrl'
 import {
   type MotherNamesByUserId,
   personalizeMotivationalMessageWithMotherName,
@@ -263,17 +264,19 @@ export function createTestNotification(
   message?: string,
   mode: TestNotificationMode = 'standard',
   title?: string,
+  url?: string,
 ): ScheduledNotification {
   const recipient = userId.trim()
   const identifier = eventId.trim()
   const customBody = message?.trim()
   const customTitle = title?.trim()
+  const customUrl = normalizeInternalNotificationUrl(url)
   if (!recipient || !identifier) throw new Error('Destinatario o identificativo del test mancante.')
   if (customBody && customBody.length > 240) throw new Error('Il messaggio di test supera i 240 caratteri.')
   if (customTitle && customTitle.length > 80) throw new Error('Il titolo del test supera gli 80 caratteri.')
 
   const isMatchRatingTest = mode === 'match-rating'
-  const refreshParameter = `_pushRefresh=${encodeURIComponent(identifier)}`
+  const defaultUrl = isMatchRatingTest ? '/?ratingTest=1' : '/'
 
   return {
     id: `test:${identifier}`,
@@ -284,9 +287,7 @@ export function createTestNotification(
     body: customBody || (isMatchRatingTest
       ? 'Tocca per aprire la pagella di collaudo. Nessun voto verrà salvato.'
       : 'Se leggi questo messaggio, le notifiche funzionano correttamente.'),
-    url: isMatchRatingTest
-      ? `/?ratingTest=1&${refreshParameter}`
-      : `/?${refreshParameter}`,
+    url: addPushRefreshParameter(customUrl || defaultUrl, identifier),
     tag: `${isMatchRatingTest ? 'test-rating' : 'test'}-${identifier}`,
     ttlSeconds: 10 * 60,
     recipientUserIds: [recipient],

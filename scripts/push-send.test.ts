@@ -20,11 +20,14 @@ describe('push send CLI', () => {
       'Forza Tommy',
       '--message',
       'Rimettiti presto!',
+      '--url',
+      '/?reportPoll=poll-1&reportSlot=slot-1#i-miei-match',
       '--yes',
     ], {})).toMatchObject({
       to: 'Tommy',
       title: 'Forza Tommy',
       message: 'Rimettiti presto!',
+      url: '/?reportPoll=poll-1&reportSlot=slot-1#i-miei-match',
       projectId: 'bandeja-boys',
       databaseId: '(default)',
       yes: true,
@@ -54,6 +57,16 @@ describe('push send CLI', () => {
     expect(() => validatePushContent('Titolo', 'x'.repeat(241))).toThrow('240 caratteri')
   })
 
+  it('accetta soltanto link interni all’app', () => {
+    expect(parsePushSendOptions(['--url', '/#i-miei-match'], {})).toMatchObject({
+      url: '/#i-miei-match',
+    })
+    expect(() => parsePushSendOptions(['--url', 'https://example.com'], {}))
+      .toThrow('percorso interno')
+    expect(() => parsePushSendOptions(['--url', '//example.com'], {}))
+      .toThrow('percorso interno')
+  })
+
   it('costruisce il dispatch senza usare una shell', () => {
     expect(buildWorkflowDispatchArgs(
       recipients[0],
@@ -74,5 +87,14 @@ describe('push send CLI', () => {
       '-f',
       'test_mode=standard',
     ])
+  })
+
+  it('passa il deep link interno al workflow', () => {
+    expect(buildWorkflowDispatchArgs(
+      recipients[0],
+      'Inserite il risultato',
+      'Compilate il referto.',
+      '/?reportPoll=poll-1&reportSlot=slot-1#i-miei-match',
+    )).toContain('test_url=/?reportPoll=poll-1&reportSlot=slot-1#i-miei-match')
   })
 })

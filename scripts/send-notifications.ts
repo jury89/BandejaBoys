@@ -53,6 +53,7 @@ const testUserId = process.env.TEST_NOTIFICATION_USER_ID?.trim()
 const testNotificationId = process.env.TEST_NOTIFICATION_ID?.trim()
 const testNotificationTitle = process.env.TEST_NOTIFICATION_TITLE?.trim()
 const testNotificationMessage = process.env.TEST_NOTIFICATION_MESSAGE?.trim()
+const testNotificationUrl = process.env.TEST_NOTIFICATION_URL?.trim()
 const testNotificationMode = process.env.TEST_NOTIFICATION_MODE?.trim() === 'pagelle'
   ? 'match-rating' as const
   : 'standard' as const
@@ -62,6 +63,7 @@ if (!apiKey || !notifierEmail || !notifierPassword) throw new Error('Credenziali
 if (!publicKey || !privateKey) throw new Error('VAPID keys mancanti.')
 if (testNotificationMessage && !testUserId) throw new Error('Un messaggio manuale richiede il destinatario.')
 if (testNotificationTitle && !testUserId) throw new Error('Un titolo manuale richiede il destinatario.')
+if (testNotificationUrl && !testUserId) throw new Error('Un link manuale richiede il destinatario.')
 if (testNotificationMode === 'match-rating' && !testUserId) {
   throw new Error('Il collaudo pagelle richiede il destinatario.')
 }
@@ -180,6 +182,7 @@ const notifications = testUserId
       testNotificationMessage,
       testNotificationMode,
       testNotificationTitle,
+      testNotificationUrl,
     )]
   : [
       ...collectScheduledNotifications(polls, now, ratingResponses, {
