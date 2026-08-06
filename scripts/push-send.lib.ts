@@ -1,3 +1,5 @@
+import { normalizeInternalNotificationUrl } from '../src/lib/notificationUrl'
+
 export const DEFAULT_PUSH_TITLE = 'Bandeja Boys'
 export const MAX_PUSH_TITLE_LENGTH = 80
 export const MAX_PUSH_MESSAGE_LENGTH = 240
@@ -13,6 +15,7 @@ export interface PushSendOptions {
   uid?: string
   title?: string
   message?: string
+  url?: string
   projectId: string
   databaseId: string
   yes: boolean
@@ -45,6 +48,7 @@ export function parsePushSendOptions(
   let uid: string | undefined
   let title: string | undefined
   let message: string | undefined
+  let url: string | undefined
   let projectId = environment.FIREBASE_PROJECT_ID
     || environment.GOOGLE_CLOUD_PROJECT
     || environment.GCLOUD_PROJECT
@@ -94,6 +98,11 @@ export function parsePushSendOptions(
       index += 1
       continue
     }
+    if (option === '--url') {
+      url = readOptionValue(args, index, option)
+      index += 1
+      continue
+    }
     if (option === '--project') {
       projectId = readOptionValue(args, index, option)
       index += 1
@@ -121,6 +130,7 @@ export function parsePushSendOptions(
     uid: uid?.trim(),
     title: validateText(title, 'Il titolo', MAX_PUSH_TITLE_LENGTH),
     message: validateText(message, 'Il messaggio', MAX_PUSH_MESSAGE_LENGTH),
+    url: normalizeInternalNotificationUrl(url),
     projectId: projectId.trim(),
     databaseId: databaseId.trim(),
     yes,
@@ -171,8 +181,9 @@ export function buildWorkflowDispatchArgs(
   recipient: PushRecipient,
   title: string,
   message: string,
+  url?: string,
 ) {
-  return [
+  const args = [
     'workflow',
     'run',
     'notifications.yml',
@@ -187,4 +198,6 @@ export function buildWorkflowDispatchArgs(
     '-f',
     'test_mode=standard',
   ]
+  if (url) args.push('-f', `test_url=${normalizeInternalNotificationUrl(url)}`)
+  return args
 }
