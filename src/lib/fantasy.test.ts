@@ -10,6 +10,7 @@ import {
   FANTASY_DEFAULT_RATING,
   FANTASY_EARLY_SETTLEMENT_DELAY_MS,
   FANTASY_MVP_LEAGUE_POINTS,
+  FANTASY_MISSING_REPORT_VOID_REASON,
   FANTASY_SETTLEMENT_DELAY_MS,
   FANTASY_STARTER_LEAGUE_POINTS,
   fantasyEntryIsCurrent,
@@ -507,8 +508,57 @@ describe('punteggio FantaBandeja', () => {
     )
     expect(voided[0]).toMatchObject({
       status: 'void',
-      voidReason: 'Il referto non è stato inserito entro 48 ore.',
+      voidReason: FANTASY_MISSING_REPORT_VOID_REASON,
     })
+  })
+
+  it('ricalcola un round annullato quando il referto viene inserito dopo 48 ore', () => {
+    const round = roundFixture()
+    const voided = reconcileFantasyRounds(
+      [pollWith()],
+      [round],
+      [],
+      ratings,
+      [],
+      round.settlesAt,
+    )[0]
+    const lateSettlementAt = round.settlesAt + 20 * 60 * 1000
+
+    const recovered = reconcileFantasyRounds(
+      [pollWith()],
+      [voided],
+      [entry('manager', ['a', 'd'], 'd')],
+      ratings,
+      [reportFixture()],
+      lateSettlementAt,
+    )[0]
+
+    expect(recovered).toMatchObject({
+      status: 'scored',
+      settledAt: lateSettlementAt,
+      standings: [expect.objectContaining({ managerId: 'manager' })],
+    })
+    expect(recovered.voidReason).toBeUndefined()
+  })
+
+  it('non riapre un round annullato per un motivo diverso', () => {
+    const round = {
+      ...roundFixture(),
+      status: 'void' as const,
+      settledAt: locksAt,
+      voidReason: 'La formazione è cambiata al momento del blocco.',
+    }
+
+    const reconciled = reconcileFantasyRounds(
+      [pollWith()],
+      [round],
+      [],
+      ratings,
+      [reportFixture()],
+      locksAt + 1,
+    )[0]
+
+    expect(reconciled).toEqual(round)
   })
 
   it('costruisce la classifica generale con punti, vittorie e punteggio grezzo', () => {
