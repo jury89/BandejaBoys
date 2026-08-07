@@ -46,6 +46,7 @@ export const FANTASY_DEFAULT_RATING = 6
 export const FANTASY_MIN_RATINGS = 2
 export const FANTASY_STARTER_LEAGUE_POINTS = 2
 export const FANTASY_MVP_LEAGUE_POINTS = 3
+export const FANTASY_MISSING_REPORT_VOID_REASON = 'Il referto non è stato inserito entro 48 ore.'
 
 const LOCAL_DATE_TIME_PATTERN = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,3}))?)?$/
 const romeDateTimeFormatter = new Intl.DateTimeFormat('en-GB', {
@@ -835,13 +836,7 @@ export function scoreFantasyRound(
   ratingSummaries: MatchRatingSummary[],
   now = Date.now(),
 ): FantasyRound {
-  const reportParticipantIds = new Set(report.participantIds)
-  if (
-    report.pollId !== round.pollId
-    || report.slotId !== round.slotId
-    || reportParticipantIds.size !== round.participantIds.length
-    || round.participantIds.some((userId) => !reportParticipantIds.has(userId))
-  ) {
+  if (!matchReportMatchesFantasyRound(round, report)) {
     throw new Error('Il referto non corrisponde alla formazione bloccata del round.')
   }
 
@@ -887,7 +882,7 @@ export function scoreFantasyRound(
     }
   })
 
-  return {
+  const scoredRound: FantasyRound = {
     ...round,
     status: 'scored',
     playerScores,
@@ -895,6 +890,16 @@ export function scoreFantasyRound(
     settledAt: now,
     updatedAt: now,
   }
+  delete scoredRound.voidReason
+  return scoredRound
+}
+
+function matchReportMatchesFantasyRound(round: FantasyRound, report: MatchReport): boolean {
+  const reportParticipantIds = new Set(report.participantIds)
+  return report.pollId === round.pollId
+    && report.slotId === round.slotId
+    && reportParticipantIds.size === round.participantIds.length
+    && round.participantIds.every((userId) => reportParticipantIds.has(userId))
 }
 
 function voidFantasyRound(
@@ -955,6 +960,18 @@ export function reconcileFantasyRounds(
   const reconciled: FantasyRound[] = existingRounds.map((round) => {
     const candidate = candidates.get(round.id)
 
+    if (round.status === 'void' && round.voidReason === FANTASY_MISSING_REPORT_VOID_REASON) {
+      const lateReport = reportsByRound.get(round.id)
+      if (!lateReport || !matchReportMatchesFantasyRound(round, lateReport)) return round
+      return scoreFantasyRound(
+        round,
+        entries.filter((entry) => entry.roundId === round.id),
+        lateReport,
+        ratingSummaries,
+        now,
+      )
+    }
+
     if (round.status === 'pending') {
       if (!candidate || candidate.locksAt <= now) return round
       return {
@@ -1002,7 +1019,7 @@ export function reconcileFantasyRounds(
     if (now < round.settlesAt && !canSettleEarly) return round
 
     if (!report) {
-      return voidFantasyRound(round, 'Il referto non è stato inserito entro 48 ore.', now)
+      return voidFantasyRound(round, FANTASY_MISSING_REPORT_VOID_REASON, now)
     }
     return scoreFantasyRound(
       round,
