@@ -72,6 +72,49 @@ describe('FantaBandeja', () => {
     expect(screen.queryByRole('dialog', { name: 'Come si gioca' })).not.toBeInTheDocument()
   })
 
+  it('separa prossimi round, classifica e risultati in tre viste navigabili', async () => {
+    const user = userEvent.setup()
+    const scoredRound: FantasyRound = {
+      ...round,
+      id: 'poll-past__slot-past',
+      pollId: 'poll-past',
+      slotId: 'slot-past',
+      slotStartsAt: '2026-07-30T16:30:00.000Z',
+      slotEndsAt: now - 90 * 60_000,
+      locksAt: now - 180 * 60_000,
+      settlesAt: now - 60_000,
+      status: 'scored',
+      standings: [{
+        managerId: 'manager',
+        managerName: 'Jury',
+        playerIds: ['a', 'b'],
+        captainId: 'a',
+        totalScore: 18,
+        captainRating: 7,
+        baseRatingTotal: 13,
+        rank: 1,
+        leaguePoints: 5,
+      }],
+      playerScores: [],
+      settledAt: now - 30_000,
+    }
+    renderPage({ rounds: [round, scoredRound] })
+
+    const playTab = screen.getByRole('tab', { name: /Gioca/i })
+    expect(playTab).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByText('Schiera la coppia')).toBeInTheDocument()
+    expect(screen.queryByText('Classifica generale')).not.toBeInTheDocument()
+    expect(screen.queryByText('Risultati dei round')).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('tab', { name: /Classifica/i }))
+    expect(screen.getByText('Classifica generale')).toBeInTheDocument()
+    expect(screen.queryByLabelText('I quattro titolari disponibili')).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('tab', { name: /Risultati/i }))
+    expect(screen.getByText('Risultati dei round')).toBeInTheDocument()
+    expect(screen.queryByText('Classifica generale')).not.toBeInTheDocument()
+  })
+
   it('permette a uno spettatore di scegliere due giocatori e il capitano', async () => {
     const user = userEvent.setup()
     const { onSave } = renderPage()
