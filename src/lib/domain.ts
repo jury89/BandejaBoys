@@ -1,6 +1,7 @@
 import type {
   CreatePollInput,
   FantasyEntry,
+  FantasyLeaderboardContribution,
   FantasyLeaderboardRow,
   FantasyPlayerScore,
   FantasyRound,
@@ -1051,21 +1052,27 @@ export function getFantasyLeaderboard(rounds: FantasyRound[]): FantasyLeaderboar
   const addContribution = ({
     managerId,
     managerName,
-    leaguePoints,
     wins,
-    rawFantasyPoints,
-  }: Omit<FantasyLeaderboardRow, 'rank' | 'roundsPlayed'>) => {
+    contribution,
+  }: {
+    managerId: string
+    managerName: string
+    wins: number
+    contribution: FantasyLeaderboardContribution
+  }) => {
     const current = rows.get(managerId)
     rows.set(managerId, {
       managerId,
       managerName,
-      leaguePoints: (current?.leaguePoints ?? 0) + leaguePoints,
+      leaguePoints: (current?.leaguePoints ?? 0) + contribution.leaguePoints,
       wins: (current?.wins ?? 0) + wins,
       rawFantasyPoints: roundTo(
-        (current?.rawFantasyPoints ?? 0) + rawFantasyPoints,
+        (current?.rawFantasyPoints ?? 0) + contribution.rawFantasyPoints,
         2,
       ),
       roundsPlayed: (current?.roundsPlayed ?? 0) + 1,
+      contributions: [...(current?.contributions ?? []), contribution]
+        .sort((left, right) => right.playedAt - left.playedAt || left.roundId.localeCompare(right.roundId)),
     })
   }
 
@@ -1076,9 +1083,16 @@ export function getFantasyLeaderboard(rounds: FantasyRound[]): FantasyLeaderboar
         addContribution({
           managerId: standing.managerId,
           managerName: standing.managerName,
-          leaguePoints: standing.leaguePoints,
           wins: standing.rank === 1 ? 1 : 0,
-          rawFantasyPoints: standing.totalScore,
+          contribution: {
+            roundId: round.id,
+            pollTitle: round.pollTitle,
+            playedAt: round.locksAt,
+            source: 'formation',
+            leaguePoints: standing.leaguePoints,
+            rawFantasyPoints: standing.totalScore,
+            rank: standing.rank,
+          },
         })
       })
 
@@ -1090,11 +1104,17 @@ export function getFantasyLeaderboard(rounds: FantasyRound[]): FantasyLeaderboar
         addContribution({
           managerId: participant.userId,
           managerName: participant.displayName,
-          leaguePoints: score?.isMvp
-            ? FANTASY_MVP_LEAGUE_POINTS
-            : FANTASY_STARTER_LEAGUE_POINTS,
           wins: 0,
-          rawFantasyPoints: score?.fantasyScore ?? 0,
+          contribution: {
+            roundId: round.id,
+            pollTitle: round.pollTitle,
+            playedAt: round.locksAt,
+            source: score?.isMvp ? 'mvp' : 'starter',
+            leaguePoints: score?.isMvp
+              ? FANTASY_MVP_LEAGUE_POINTS
+              : FANTASY_STARTER_LEAGUE_POINTS,
+            rawFantasyPoints: score?.fantasyScore ?? 0,
+          },
         })
       })
     })

@@ -5307,7 +5307,7 @@ p {
   color: var(--court);
 }
 
-.fantasy-leaderboard ol,
+.fantasy-leaderboard > ol,
 .fantasy-result__standings,
 .fantasy-entry-list {
   display: flex;
@@ -5317,47 +5317,73 @@ p {
   list-style: none;
 }
 
-.fantasy-leaderboard li {
-  display: grid;
-  min-height: 60px;
-  align-items: center;
-  padding: 10px 14px;
-  grid-template-columns: 34px minmax(0, 1fr) auto;
-  gap: 12px;
+.fantasy-leaderboard__row {
+  overflow: hidden;
   border-top: 1px solid #d2e4e3;
   background: rgba(255, 255, 255, 0.5);
 }
 
-.fantasy-leaderboard li:first-child {
+.fantasy-leaderboard__row:first-child {
   border-top: 0;
 }
 
-.fantasy-leaderboard li.is-mine {
+.fantasy-leaderboard__row.is-mine {
   background: var(--white);
   box-shadow: inset 4px 0 0 var(--court);
 }
 
-.fantasy-leaderboard li > strong:first-child {
+.fantasy-leaderboard__toggle {
+  display: grid;
+  width: 100%;
+  min-height: 60px;
+  align-items: center;
+  padding: 10px 14px;
+  grid-template-columns: 34px minmax(0, 1fr) auto 18px;
+  gap: 12px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.fantasy-leaderboard__toggle:hover {
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.fantasy-leaderboard__toggle:focus-visible {
+  position: relative;
+  outline: 2px solid var(--court);
+  outline-offset: -3px;
+}
+
+.fantasy-leaderboard__toggle > strong:first-child {
   color: var(--court);
   font-family: var(--display);
   font-size: 1.5rem;
 }
 
-.fantasy-leaderboard li > div {
+.fantasy-leaderboard__identity {
+  display: block;
   min-width: 0;
 }
 
-.fantasy-leaderboard li p {
+.fantasy-leaderboard__identity > span {
   display: flex;
   align-items: center;
   gap: 7px;
-  margin: 0;
+}
+
+.fantasy-leaderboard__identity > span > strong {
+  overflow: hidden;
   color: var(--ink);
   font-size: 0.72rem;
   font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.fantasy-leaderboard li p small,
+.fantasy-leaderboard__identity > span > small,
 .fantasy-result__standings li p small {
   padding: 2px 5px;
   background: var(--ball);
@@ -5367,7 +5393,7 @@ p {
   text-transform: uppercase;
 }
 
-.fantasy-leaderboard li span {
+.fantasy-leaderboard__identity > small {
   display: block;
   overflow: hidden;
   margin-top: 2px;
@@ -5377,17 +5403,99 @@ p {
   white-space: nowrap;
 }
 
-.fantasy-leaderboard li > strong:last-child {
+.fantasy-leaderboard__toggle > strong:last-of-type {
   color: var(--deep);
   font-family: var(--display);
   font-size: 1.45rem;
 }
 
-.fantasy-leaderboard li > strong:last-child small {
+.fantasy-leaderboard__toggle > strong:last-of-type small {
   margin-left: 2px;
   font-family: 'Manrope Variable', Manrope, sans-serif;
   font-size: 0.48rem;
   text-transform: uppercase;
+}
+
+.fantasy-leaderboard__chevron {
+  color: #78909a;
+  transition: transform 160ms ease;
+}
+
+.fantasy-leaderboard__row.is-expanded .fantasy-leaderboard__chevron {
+  transform: rotate(180deg);
+}
+
+.fantasy-leaderboard__details {
+  padding: 12px 14px 15px 60px;
+  border-top: 1px dashed #bfd4d9;
+  background: #f8fcfb;
+}
+
+.fantasy-leaderboard__sum {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 10px;
+  color: var(--muted);
+  font-size: 0.62rem;
+  font-weight: 800;
+}
+
+.fantasy-leaderboard__sum strong {
+  color: var(--deep);
+  font-family: var(--display);
+  font-size: 0.92rem;
+}
+
+.fantasy-leaderboard__details ul {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  gap: 7px;
+  list-style: none;
+}
+
+.fantasy-leaderboard__details li {
+  display: grid;
+  min-width: 0;
+  align-items: center;
+  padding: 9px 10px;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+  gap: 9px;
+  border: 1px solid #d4e4e4;
+  background: var(--white);
+}
+
+.fantasy-leaderboard__details li > svg {
+  color: var(--court);
+}
+
+.fantasy-leaderboard__details li > span {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.fantasy-leaderboard__details li > span strong {
+  color: var(--ink);
+  font-size: 0.62rem;
+}
+
+.fantasy-leaderboard__details li > span small {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.55rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fantasy-leaderboard__details li > strong {
+  color: var(--court);
+  font-family: var(--display);
+  font-size: 0.98rem;
 }
 
 .fantasy-leaderboard__empty {
@@ -6906,14 +7014,24 @@ p {
     border-left-width: 5px;
   }
 
-  .fantasy-leaderboard li {
+  .fantasy-leaderboard__toggle {
     padding-inline: 9px;
-    grid-template-columns: 25px minmax(0, 1fr) auto;
+    grid-template-columns: 25px minmax(0, 1fr) auto 18px;
     gap: 8px;
   }
 
-  .fantasy-leaderboard li span {
-    font-size: 0.75rem;
+  .fantasy-leaderboard__details {
+    padding-inline: 9px;
+  }
+
+  .fantasy-leaderboard__sum {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .fantasy-leaderboard__details li > span small {
+    white-space: normal;
   }
 
   .fantasy-round-card__header {
@@ -7353,7 +7471,8 @@ p {
   .fantasy-page__error p,
   .fantasy-empty > p:last-child,
   .fantasy-leaderboard__empty,
-  .fantasy-leaderboard li span,
+  .fantasy-leaderboard__identity > small,
+  .fantasy-leaderboard__details li > span small,
   .fantasy-round-card__match p,
   .fantasy-round-card__deadline span,
   .fantasy-round-card__instructions,
@@ -7377,7 +7496,7 @@ p {
 }
 
 .fantasy-page :is(
-  .fantasy-leaderboard li p,
+  .fantasy-leaderboard__identity > span > strong,
   .fantasy-round-card__match h3,
   .fantasy-entry-list li > div strong,
   .fantasy-result__standings li > div p,
@@ -7387,7 +7506,7 @@ p {
 }
 
 .fantasy-page :is(
-  .fantasy-leaderboard li p small,
+  .fantasy-leaderboard__identity > span > small,
   .fantasy-entry-list li > div strong small,
   .fantasy-player-score__details dt small
 ) {

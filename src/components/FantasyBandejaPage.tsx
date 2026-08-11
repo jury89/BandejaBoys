@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 import type {
   FantasyEntry,
+  FantasyLeaderboardContribution,
   FantasyLeaderboardRow,
   FantasyPlayerScore,
   FantasyRound,
@@ -713,23 +714,86 @@ function Leaderboard({
       {rows.length > 0 ? (
         <ol>
           {rows.map((row) => (
-            <li key={row.managerId} className={row.managerId === user.id ? 'is-mine' : ''}>
-              <strong>{row.rank}</strong>
-              <div>
-                <p>
-                  {resolveMemberName(members, row.managerId, row.managerName)}
-                  {row.managerId === user.id && <small>Tu</small>}
-                </p>
-                <span>{row.wins} vittorie · {row.roundsPlayed} round · {row.rawFantasyPoints.toLocaleString('it-IT', { maximumFractionDigits: 2 })} fantasy pt</span>
-              </div>
-              <strong>{row.leaguePoints}<small>pt</small></strong>
-            </li>
+            <LeaderboardRow
+              key={row.managerId}
+              row={row}
+              isCurrentUser={row.managerId === user.id}
+              displayName={resolveMemberName(members, row.managerId, row.managerName)}
+            />
           ))}
         </ol>
       ) : (
         <p className="fantasy-leaderboard__empty">La classifica nascerà con il primo round calcolato.</p>
       )}
     </section>
+  )
+}
+
+function contributionLabel(contribution: FantasyLeaderboardContribution): string {
+  if (contribution.source === 'mvp') return 'MVP in campo · bonus presenza'
+  if (contribution.source === 'starter') return 'Titolare in campo · bonus presenza'
+  return `${contribution.rank}° posto · ${fantasyNumber(contribution.rawFantasyPoints)} fantasy pt`
+}
+
+function LeaderboardRow({
+  row,
+  isCurrentUser,
+  displayName,
+}: {
+  row: FantasyLeaderboardRow
+  isCurrentUser: boolean
+  displayName: string
+}) {
+  const [expanded, setExpanded] = useState(false)
+  const detailsId = `fantasy-leaderboard-details-${row.managerId.replace(/[^a-zA-Z0-9_-]/g, '-')}`
+
+  return (
+    <li className={`fantasy-leaderboard__row${isCurrentUser ? ' is-mine' : ''}${expanded ? ' is-expanded' : ''}`}>
+      <button
+        className="fantasy-leaderboard__toggle"
+        type="button"
+        aria-expanded={expanded}
+        aria-controls={detailsId}
+        aria-label={`${expanded ? 'Nascondi' : 'Mostra'} dettaglio punti di ${displayName}`}
+        onClick={() => setExpanded((value) => !value)}
+      >
+        <strong>{row.rank}</strong>
+        <span className="fantasy-leaderboard__identity">
+          <span>
+            <strong>{displayName}</strong>
+            {isCurrentUser && <small>Tu</small>}
+          </span>
+          <small>{row.wins} vittorie · {row.roundsPlayed} round · {fantasyNumber(row.rawFantasyPoints)} fantasy pt</small>
+        </span>
+        <strong>{row.leaguePoints}<small>pt</small></strong>
+        <ChevronDown className="fantasy-leaderboard__chevron" size={18} aria-hidden="true" />
+      </button>
+      {expanded && (
+        <div
+          id={detailsId}
+          className="fantasy-leaderboard__details"
+          role="region"
+          aria-label={`Dettaglio punti di ${displayName}`}
+        >
+          <p className="fantasy-leaderboard__sum">
+            <span>Totale campionato</span>
+            <strong>{row.contributions.map(({ leaguePoints }) => leaguePoints).join(' + ')} = {row.leaguePoints} pt</strong>
+          </p>
+          <ul>
+            {row.contributions.map((contribution) => (
+              <li key={`${contribution.roundId}:${contribution.source}`}>
+                <CalendarDays size={18} aria-hidden="true" />
+                <span>
+                  <strong>{sentenceCase(matchFormatter.format(new Date(contribution.playedAt)))}</strong>
+                  <small>{contribution.pollTitle} · {contributionLabel(contribution)}</small>
+                </span>
+                <strong>+{contribution.leaguePoints} pt</strong>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </li>
   )
 }
 
@@ -764,12 +828,12 @@ export function FantasyBandejaPage({
     .filter((round) => round.status === 'scored' || round.status === 'void')
     .sort((left, right) => right.locksAt - left.locksAt)
   const leaderboard = getFantasyLeaderboard(visibleRounds)
-  const upcomingRoundsCount = openRounds.length + lockedRounds.length
+  const resultRoundsCount = lockedRounds.length + finishedRounds.length
   const visibleFinishedRounds = finishedRounds.slice(0, visibleResultCount)
   const remainingResultsCount = Math.max(0, finishedRounds.length - visibleFinishedRounds.length)
-  const defaultView: FantasyView = upcomingRoundsCount > 0
+  const defaultView: FantasyView = openRounds.length > 0
     ? 'play'
-    : finishedRounds.length > 0
+    : resultRoundsCount > 0
       ? 'results'
       : 'leaderboard'
   const activeView = selectedView ?? defaultView
@@ -841,7 +905,7 @@ export function FantasyBandejaPage({
           onKeyDown={(event) => handleTabKeyDown(event, 'play')}
         >
           <CalendarDays size={20} />
-          <span><strong>Partite</strong><small>Da schierare e in calcolo</small></span>
+          <span><strong>Partite</strong><small>Formazioni aperte</small></span>
           <em aria-label={`${openRounds.length} formazioni aperte`}>{openRounds.length}</em>
         </button>
         <button
@@ -873,8 +937,8 @@ export function FantasyBandejaPage({
           onKeyDown={(event) => handleTabKeyDown(event, 'results')}
         >
           <ShieldCheck size={20} />
-          <span><strong>Risultati</strong><small>Round conclusi</small></span>
-          <em>{finishedRounds.length}</em>
+          <span><strong>Risultati</strong><small>In calcolo e conclusi</small></span>
+          <em>{resultRoundsCount}</em>
         </button>
       </nav>
 
@@ -908,57 +972,33 @@ export function FantasyBandejaPage({
               role="tabpanel"
               aria-labelledby="fantasy-tab-play"
             >
-              {upcomingRoundsCount === 0 ? (
+              {openRounds.length === 0 ? (
                 <section className="fantasy-empty fantasy-empty--section">
                   <CalendarDays size={34} />
                   <p className="eyebrow">Nessuna formazione aperta</p>
-                  <h2>Il prossimo round non è ancora pronto.</h2>
-                  <p>Quando una partita avrà quattro titolari e il campo prenotato, la troverai qui.</p>
+                  <h2>Non ci sono coppie da schierare.</h2>
+                  <p>I round già iniziati passano nei Risultati; la prossima formazione comparirà qui.</p>
                 </section>
               ) : (
-                <>
-                  {openRounds.length > 0 && (
-                    <section className="fantasy-section" aria-labelledby="fantasy-open-title">
-                      <header className="fantasy-section__heading">
-                        <div><p className="eyebrow">Mercato aperto</p><h2 id="fantasy-open-title">Schiera la coppia</h2></div>
-                        <strong>{openRounds.length}</strong>
-                      </header>
-                      <div className="fantasy-round-list">
-                        {openRounds.map((round) => (
-                          <FantasyRoundCard
-                            key={`${round.id}:${round.rosterKey}:${round.locksAt}:${ownEntries[round.id]?.updatedAt ?? 0}`}
-                            round={round}
-                            savedEntry={ownEntries[round.id]}
-                            members={members}
-                            user={user}
-                            now={now}
-                            onSave={onSave}
-                          />
-                        ))}
-                      </div>
-                    </section>
-                  )}
-
-                  {lockedRounds.length > 0 && (
-                    <section className="fantasy-section" aria-labelledby="fantasy-locked-title">
-                      <header className="fantasy-section__heading">
-                        <div><p className="eyebrow">In campo</p><h2 id="fantasy-locked-title">Round in calcolo</h2></div>
-                        <LockKeyhole size={22} />
-                      </header>
-                      <div className="fantasy-round-list fantasy-round-list--compact">
-                        {lockedRounds.map((round) => (
-                          <LockedRound
-                            key={round.id}
-                            round={round}
-                            entries={roundEntries[round.id]}
-                            members={members}
-                            user={user}
-                          />
-                        ))}
-                      </div>
-                    </section>
-                  )}
-                </>
+                <section className="fantasy-section" aria-labelledby="fantasy-open-title">
+                  <header className="fantasy-section__heading">
+                    <div><p className="eyebrow">Mercato aperto</p><h2 id="fantasy-open-title">Schiera la coppia</h2></div>
+                    <strong>{openRounds.length}</strong>
+                  </header>
+                  <div className="fantasy-round-list">
+                    {openRounds.map((round) => (
+                      <FantasyRoundCard
+                        key={`${round.id}:${round.rosterKey}:${round.locksAt}:${ownEntries[round.id]?.updatedAt ?? 0}`}
+                        round={round}
+                        savedEntry={ownEntries[round.id]}
+                        members={members}
+                        user={user}
+                        now={now}
+                        onSave={onSave}
+                      />
+                    ))}
+                  </div>
+                </section>
               )}
             </div>
           )}
@@ -981,33 +1021,57 @@ export function FantasyBandejaPage({
               role="tabpanel"
               aria-labelledby="fantasy-tab-results"
             >
-              {finishedRounds.length > 0 ? (
-                <section className="fantasy-section" aria-labelledby="fantasy-results-title">
-                  <header className="fantasy-section__heading">
-                    <div><p className="eyebrow">Archivio</p><h2 id="fantasy-results-title">Risultati dei round</h2></div>
-                    <strong>{finishedRounds.length}</strong>
-                  </header>
-                  <div className="fantasy-round-list fantasy-round-list--compact">
-                    {visibleFinishedRounds.map((round, index) => (
-                      <RoundResult
-                        key={round.id}
-                        round={round}
-                        members={members}
-                        user={user}
-                        defaultExpanded={index === 0}
-                      />
-                    ))}
-                  </div>
-                  {remainingResultsCount > 0 && (
-                    <button
-                      className="button button--ghost fantasy-results__more"
-                      type="button"
-                      onClick={() => setVisibleResultCount((count) => count + INITIAL_VISIBLE_RESULTS)}
-                    >
-                      Mostra altri {Math.min(INITIAL_VISIBLE_RESULTS, remainingResultsCount)} round
-                    </button>
+              {resultRoundsCount > 0 ? (
+                <>
+                  {lockedRounds.length > 0 && (
+                    <section className="fantasy-section" aria-labelledby="fantasy-locked-title">
+                      <header className="fantasy-section__heading">
+                        <div><p className="eyebrow">Risultato in corso</p><h2 id="fantasy-locked-title">Round in calcolo</h2></div>
+                        <LockKeyhole size={22} />
+                      </header>
+                      <div className="fantasy-round-list fantasy-round-list--compact">
+                        {lockedRounds.map((round) => (
+                          <LockedRound
+                            key={round.id}
+                            round={round}
+                            entries={roundEntries[round.id]}
+                            members={members}
+                            user={user}
+                          />
+                        ))}
+                      </div>
+                    </section>
                   )}
-                </section>
+
+                  {finishedRounds.length > 0 && (
+                    <section className="fantasy-section" aria-labelledby="fantasy-results-title">
+                      <header className="fantasy-section__heading">
+                        <div><p className="eyebrow">Archivio</p><h2 id="fantasy-results-title">Risultati dei round</h2></div>
+                        <strong>{finishedRounds.length}</strong>
+                      </header>
+                      <div className="fantasy-round-list fantasy-round-list--compact">
+                        {visibleFinishedRounds.map((round, index) => (
+                          <RoundResult
+                            key={round.id}
+                            round={round}
+                            members={members}
+                            user={user}
+                            defaultExpanded={index === 0}
+                          />
+                        ))}
+                      </div>
+                      {remainingResultsCount > 0 && (
+                        <button
+                          className="button button--ghost fantasy-results__more"
+                          type="button"
+                          onClick={() => setVisibleResultCount((count) => count + INITIAL_VISIBLE_RESULTS)}
+                        >
+                          Mostra altri {Math.min(INITIAL_VISIBLE_RESULTS, remainingResultsCount)} round
+                        </button>
+                      )}
+                    </section>
+                  )}
+                </>
               ) : (
                 <section className="fantasy-empty fantasy-empty--section">
                   <ShieldCheck size={34} />

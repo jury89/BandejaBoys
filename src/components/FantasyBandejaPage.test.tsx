@@ -144,12 +144,39 @@ describe('FantaBandeja', () => {
     expect(resultsTab).toHaveFocus()
   })
 
-  it('distingue le formazioni aperte dai round già in calcolo', () => {
+  it('porta i round in calcolo in cima ai risultati e lascia Partite alle formazioni aperte', async () => {
+    const user = userEvent.setup()
     renderPage({ now: round.locksAt + 1 })
 
-    expect(screen.getByRole('tab', { name: /Partite/i })).toHaveAttribute('aria-selected', 'true')
+    const resultsTab = screen.getByRole('tab', { name: /Risultati/i })
+    expect(resultsTab).toHaveAttribute('aria-selected', 'true')
+    expect(resultsTab).toHaveTextContent('1')
     expect(screen.getByLabelText('0 formazioni aperte')).toHaveTextContent('0')
     expect(screen.getByText('Round in calcolo')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('tab', { name: /Partite/i }))
+    expect(screen.getByText('Non ci sono coppie da schierare.')).toBeInTheDocument()
+    expect(screen.queryByText('Round in calcolo')).not.toBeInTheDocument()
+  })
+
+  it('mostra i round in calcolo prima dello storico nella tab Risultati', async () => {
+    const user = userEvent.setup()
+    const lockedRound = { ...round, id: 'locked', locksAt: now - 1 }
+    const scoredRound: FantasyRound = {
+      ...round,
+      id: 'scored',
+      status: 'scored',
+      locksAt: now - 86_400_000,
+      standings: [],
+      playerScores: [],
+      settledAt: now - 80_000_000,
+    }
+    renderPage({ rounds: [lockedRound, scoredRound] })
+
+    await user.click(screen.getByRole('tab', { name: /Risultati/i }))
+    const inProgressTitle = screen.getByText('Round in calcolo')
+    const historyTitle = screen.getByText('Risultati dei round')
+    expect(inProgressTitle.compareDocumentPosition(historyTitle) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
   it('permette di riprovare dopo un errore di caricamento', async () => {
@@ -278,6 +305,57 @@ describe('FantaBandeja', () => {
 
     await user.click(toggle)
     expect(screen.queryByRole('region', { name: 'Calcolo punteggio di Ale' })).not.toBeInTheDocument()
+  })
+
+  it('espande ogni nome in classifica mostrando la somma dei punti round per round', async () => {
+    const user = userEvent.setup()
+    const scoredRound: FantasyRound = {
+      ...round,
+      status: 'scored',
+      standings: [{
+        managerId: 'manager',
+        managerName: 'Jury',
+        playerIds: ['a', 'b'],
+        captainId: 'a',
+        totalScore: 18,
+        captainRating: 7,
+        baseRatingTotal: 13,
+        rank: 1,
+        leaguePoints: 5,
+      }],
+      playerScores: [{
+        userId: 'a',
+        displayName: 'Ale',
+        baseRating: 7,
+        ratingCount: 3,
+        usedDefaultRating: false,
+        setWins: 2,
+        setLosses: 1,
+        gameDifference: 3,
+        resultBonus: 1.5,
+        differenceBonus: 0.5,
+        fantasyScore: 9,
+        isMvp: true,
+      }],
+      settledAt: round.settlesAt,
+    }
+    renderPage({ rounds: [scoredRound], now: round.settlesAt + 1 })
+
+    await user.click(screen.getByRole('tab', { name: /Classifica/i }))
+    const managerToggle = screen.getByRole('button', { name: 'Mostra dettaglio punti di Jury' })
+    expect(managerToggle).toHaveAttribute('aria-expanded', 'false')
+    await user.click(managerToggle)
+
+    const managerDetails = screen.getByRole('region', { name: 'Dettaglio punti di Jury' })
+    expect(managerToggle).toHaveAttribute('aria-expanded', 'true')
+    expect(within(managerDetails).getByText('5 = 5 pt')).toBeInTheDocument()
+    expect(within(managerDetails).getByText(/1° posto · 18 fantasy pt/)).toBeInTheDocument()
+
+    const playerToggle = screen.getByRole('button', { name: 'Mostra dettaglio punti di Ale' })
+    await user.click(playerToggle)
+    const playerDetails = screen.getByRole('region', { name: 'Dettaglio punti di Ale' })
+    expect(within(playerDetails).getByText('3 = 3 pt')).toBeInTheDocument()
+    expect(within(playerDetails).getByText(/MVP in campo · bonus presenza/)).toBeInTheDocument()
   })
 
   it('collassa lo storico, apre il round più recente e carica i risultati a gruppi', async () => {
