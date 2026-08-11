@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import {
   ArrowLeft,
   BookOpenText,
@@ -46,6 +46,7 @@ interface FantasyBandejaPageProps {
   loading: boolean
   error: string | null
   onBack: () => void
+  onRetry: () => void
   onSave: (roundId: string, input: FantasySelectionInput) => Promise<void>
 }
 
@@ -59,6 +60,9 @@ interface FantasyRoundCardProps {
 }
 
 type FantasyView = 'play' | 'leaderboard' | 'results'
+
+const FANTASY_VIEWS: FantasyView[] = ['play', 'leaderboard', 'results']
+const INITIAL_VISIBLE_RESULTS = 4
 
 const matchFormatter = new Intl.DateTimeFormat('it-IT', {
   weekday: 'long',
@@ -467,74 +471,119 @@ function RoundResult({
   round,
   members,
   user,
+  defaultExpanded = false,
 }: {
   round: FantasyRound
   members: MemberProfile[]
   user: SessionUser
+  defaultExpanded?: boolean
 }) {
+  const [expanded, setExpanded] = useState(defaultExpanded)
+  const detailsId = `fantasy-result-details-${round.id.replace(/[^a-zA-Z0-9_-]/g, '-')}`
+  const toggleLabel = `${expanded ? 'Nascondi' : 'Mostra'} il risultato di ${matchDate(round)}`
+
   if (round.status === 'void') {
     return (
-      <article className="fantasy-result fantasy-result--void">
-        <header><CircleAlert size={22} /><div><p>Round annullato</p><h3>{matchDate(round)}</h3></div></header>
-        <p>{round.voidReason || 'Il round non poteva essere calcolato.'}</p>
+      <article className={`fantasy-result fantasy-result--void ${expanded ? 'is-expanded' : ''}`}>
+        <button
+          className="fantasy-result__toggle fantasy-result__toggle--void"
+          type="button"
+          aria-expanded={expanded}
+          aria-controls={detailsId}
+          aria-label={toggleLabel}
+          onClick={() => setExpanded((current) => !current)}
+        >
+          <CircleAlert size={22} />
+          <div><p>Round annullato</p><h3>{matchDate(round)}</h3></div>
+          <ChevronDown className="fantasy-result__chevron" size={20} aria-hidden="true" />
+        </button>
+        <div id={detailsId} className="fantasy-result__details" hidden={!expanded}>
+          <p>{round.voidReason || 'Il round non poteva essere calcolato.'}</p>
+        </div>
       </article>
     )
   }
 
+  const winner = round.standings?.find((standing) => standing.rank === 1) ?? round.standings?.[0]
+  const ownStanding = round.standings?.find((standing) => standing.managerId === user.id)
+  const winnerName = winner
+    ? resolveMemberName(members, winner.managerId, winner.managerName)
+    : null
+
   return (
-    <article className="fantasy-result">
-      <header className="fantasy-result__header">
-        <div>
-          <p className="eyebrow">Classifica di giornata</p>
-          <h3>{matchDate(round)}</h3>
-          <span>{round.pollTitle}</span>
+    <article className={`fantasy-result ${expanded ? 'is-expanded' : ''}`}>
+      <button
+        className="fantasy-result__toggle"
+        type="button"
+        aria-expanded={expanded}
+        aria-controls={detailsId}
+        aria-label={toggleLabel}
+        onClick={() => setExpanded((current) => !current)}
+      >
+        <div className="fantasy-result__header">
+          <div>
+            <p className="eyebrow">Classifica di giornata</p>
+            <h3>{matchDate(round)}</h3>
+            <span>{round.pollTitle}</span>
+          </div>
+          <Trophy size={23} aria-hidden="true" />
         </div>
-        <Trophy size={23} />
-      </header>
-      {(round.standings?.length ?? 0) > 0 ? (
-        <ol className="fantasy-result__standings">
-          {round.standings?.map((standing) => (
-            <li key={standing.managerId} className={standing.managerId === user.id ? 'is-mine' : ''}>
-              <strong className="fantasy-result__rank">{standing.rank}</strong>
-              <div>
-                <p>
-                  {resolveMemberName(members, standing.managerId, standing.managerName)}
-                  {standing.managerId === user.id && <small>Tu</small>}
+        <div className="fantasy-result__summary">
+          <span><Trophy size={16} aria-hidden="true" /> {winnerName ? `Vince ${winnerName}` : 'Nessuna formazione valida'}</span>
+          {ownStanding && (
+            <span>
+              Tu: {fantasyNumber(ownStanding.totalScore)} punti · +{ownStanding.leaguePoints} campionato
+            </span>
+          )}
+        </div>
+        <ChevronDown className="fantasy-result__chevron" size={20} aria-hidden="true" />
+      </button>
+      <div id={detailsId} className="fantasy-result__details" hidden={!expanded}>
+        {(round.standings?.length ?? 0) > 0 ? (
+          <ol className="fantasy-result__standings">
+            {round.standings?.map((standing) => (
+              <li key={standing.managerId} className={standing.managerId === user.id ? 'is-mine' : ''}>
+                <strong className="fantasy-result__rank">{standing.rank}</strong>
+                <div>
+                  <p>
+                    {resolveMemberName(members, standing.managerId, standing.managerName)}
+                    {standing.managerId === user.id && <small>Tu</small>}
+                  </p>
+                  <span>
+                    {standing.playerIds.map((playerId) => resolveMemberName(
+                      members,
+                      playerId,
+                      round.participants.find((player) => player.userId === playerId)?.displayName ?? playerId,
+                    )).join(' + ')}
+                    {' · '}
+                    <Crown size={13} />
+                    {resolveMemberName(
+                      members,
+                      standing.captainId,
+                      round.participants.find((player) => player.userId === standing.captainId)?.displayName ?? standing.captainId,
+                    )}
+                  </span>
+                </div>
+                <p className="fantasy-result__points">
+                  <strong>{standing.totalScore.toLocaleString('it-IT', { maximumFractionDigits: 2 })}</strong>
+                  <span>+{standing.leaguePoints} pt</span>
                 </p>
-                <span>
-                  {standing.playerIds.map((playerId) => resolveMemberName(
-                    members,
-                    playerId,
-                    round.participants.find((player) => player.userId === playerId)?.displayName ?? playerId,
-                  )).join(' + ')}
-                  {' · '}
-                  <Crown size={13} />
-                  {resolveMemberName(
-                    members,
-                    standing.captainId,
-                    round.participants.find((player) => player.userId === standing.captainId)?.displayName ?? standing.captainId,
-                  )}
-                </span>
-              </div>
-              <p className="fantasy-result__points">
-                <strong>{standing.totalScore.toLocaleString('it-IT', { maximumFractionDigits: 2 })}</strong>
-                <span>+{standing.leaguePoints} pt</span>
-              </p>
-            </li>
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <p className="fantasy-result__empty">Nessuna formazione valida è stata schierata.</p>
+        )}
+        <div className="fantasy-player-scores">
+          {(round.playerScores ?? []).map((score) => (
+            <FantasyPlayerScoreRow
+              key={score.userId}
+              roundId={round.id}
+              score={score}
+              members={members}
+            />
           ))}
-        </ol>
-      ) : (
-        <p className="fantasy-result__empty">Nessuna formazione valida è stata schierata.</p>
-      )}
-      <div className="fantasy-player-scores">
-        {(round.playerScores ?? []).map((score) => (
-          <FantasyPlayerScoreRow
-            key={score.userId}
-            roundId={round.id}
-            score={score}
-            members={members}
-          />
-        ))}
+        </div>
       </div>
     </article>
   )
@@ -694,10 +743,13 @@ export function FantasyBandejaPage({
   loading,
   error,
   onBack,
+  onRetry,
   onSave,
 }: FantasyBandejaPageProps) {
   const [rulesOpen, setRulesOpen] = useState(false)
   const [selectedView, setSelectedView] = useState<FantasyView | null>(null)
+  const [visibleResultCount, setVisibleResultCount] = useState(INITIAL_VISIBLE_RESULTS)
+  const tabRefs = useRef<Array<HTMLButtonElement | null>>([])
   const visibleRounds = useMemo(
     () => rounds.filter((round) => round.status !== 'pending'),
     [rounds],
@@ -712,8 +764,10 @@ export function FantasyBandejaPage({
     .filter((round) => round.status === 'scored' || round.status === 'void')
     .sort((left, right) => right.locksAt - left.locksAt)
   const leaderboard = getFantasyLeaderboard(visibleRounds)
-  const playableRoundsCount = openRounds.length + lockedRounds.length
-  const defaultView: FantasyView = playableRoundsCount > 0
+  const upcomingRoundsCount = openRounds.length + lockedRounds.length
+  const visibleFinishedRounds = finishedRounds.slice(0, visibleResultCount)
+  const remainingResultsCount = Math.max(0, finishedRounds.length - visibleFinishedRounds.length)
+  const defaultView: FantasyView = upcomingRoundsCount > 0
     ? 'play'
     : finishedRounds.length > 0
       ? 'results'
@@ -721,6 +775,23 @@ export function FantasyBandejaPage({
   const activeView = selectedView ?? defaultView
 
   const chooseView = (view: FantasyView) => setSelectedView(view)
+  const focusViewTab = (view: FantasyView) => {
+    chooseView(view)
+    tabRefs.current[FANTASY_VIEWS.indexOf(view)]?.focus()
+  }
+  const handleTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>, view: FantasyView) => {
+    const currentIndex = FANTASY_VIEWS.indexOf(view)
+    let targetIndex: number | null = null
+
+    if (event.key === 'ArrowRight') targetIndex = (currentIndex + 1) % FANTASY_VIEWS.length
+    if (event.key === 'ArrowLeft') targetIndex = (currentIndex - 1 + FANTASY_VIEWS.length) % FANTASY_VIEWS.length
+    if (event.key === 'Home') targetIndex = 0
+    if (event.key === 'End') targetIndex = FANTASY_VIEWS.length - 1
+    if (targetIndex === null) return
+
+    event.preventDefault()
+    focusViewTab(FANTASY_VIEWS[targetIndex])
+  }
 
   return (
     <main className="dashboard fantasy-page">
@@ -758,39 +829,48 @@ export function FantasyBandejaPage({
 
       <nav className="fantasy-hub-nav" aria-label="Sezioni FantaBandeja" role="tablist">
         <button
+          ref={(node) => { tabRefs.current[0] = node }}
           id="fantasy-tab-play"
           type="button"
           role="tab"
           aria-selected={activeView === 'play'}
           aria-controls="fantasy-panel-play"
+          tabIndex={activeView === 'play' ? 0 : -1}
           className={activeView === 'play' ? 'is-active' : ''}
           onClick={() => chooseView('play')}
+          onKeyDown={(event) => handleTabKeyDown(event, 'play')}
         >
           <CalendarDays size={20} />
-          <span><strong>Gioca</strong><small>Prossimi round</small></span>
-          <em>{playableRoundsCount}</em>
+          <span><strong>Partite</strong><small>Da schierare e in calcolo</small></span>
+          <em aria-label={`${openRounds.length} formazioni aperte`}>{openRounds.length}</em>
         </button>
         <button
+          ref={(node) => { tabRefs.current[1] = node }}
           id="fantasy-tab-leaderboard"
           type="button"
           role="tab"
           aria-selected={activeView === 'leaderboard'}
           aria-controls="fantasy-panel-leaderboard"
+          tabIndex={activeView === 'leaderboard' ? 0 : -1}
           className={activeView === 'leaderboard' ? 'is-active' : ''}
           onClick={() => chooseView('leaderboard')}
+          onKeyDown={(event) => handleTabKeyDown(event, 'leaderboard')}
         >
           <Trophy size={20} />
           <span><strong>Classifica</strong><small>Campionato</small></span>
           <em>{leaderboard.length}</em>
         </button>
         <button
+          ref={(node) => { tabRefs.current[2] = node }}
           id="fantasy-tab-results"
           type="button"
           role="tab"
           aria-selected={activeView === 'results'}
           aria-controls="fantasy-panel-results"
+          tabIndex={activeView === 'results' ? 0 : -1}
           className={activeView === 'results' ? 'is-active' : ''}
           onClick={() => chooseView('results')}
+          onKeyDown={(event) => handleTabKeyDown(event, 'results')}
         >
           <ShieldCheck size={20} />
           <span><strong>Risultati</strong><small>Round conclusi</small></span>
@@ -803,7 +883,14 @@ export function FantasyBandejaPage({
       ) : error ? (
         <div className="fantasy-page__error" role="alert">
           <CircleAlert size={24} />
-          <div><strong>FantaBandeja non disponibile</strong><p>{error}</p></div>
+          <div>
+            <strong>FantaBandeja non disponibile</strong>
+            <p>{error}</p>
+            <div className="fantasy-page__error-actions">
+              <button className="button button--primary" type="button" onClick={onRetry}>Riprova</button>
+              <button className="button button--ghost" type="button" onClick={onBack}>Torna alla bacheca</button>
+            </div>
+          </div>
         </div>
       ) : visibleRounds.length === 0 ? (
         <section className="fantasy-empty">
@@ -821,7 +908,7 @@ export function FantasyBandejaPage({
               role="tabpanel"
               aria-labelledby="fantasy-tab-play"
             >
-              {playableRoundsCount === 0 ? (
+              {upcomingRoundsCount === 0 ? (
                 <section className="fantasy-empty fantasy-empty--section">
                   <CalendarDays size={34} />
                   <p className="eyebrow">Nessuna formazione aperta</p>
@@ -901,10 +988,25 @@ export function FantasyBandejaPage({
                     <strong>{finishedRounds.length}</strong>
                   </header>
                   <div className="fantasy-round-list fantasy-round-list--compact">
-                    {finishedRounds.map((round) => (
-                      <RoundResult key={round.id} round={round} members={members} user={user} />
+                    {visibleFinishedRounds.map((round, index) => (
+                      <RoundResult
+                        key={round.id}
+                        round={round}
+                        members={members}
+                        user={user}
+                        defaultExpanded={index === 0}
+                      />
                     ))}
                   </div>
+                  {remainingResultsCount > 0 && (
+                    <button
+                      className="button button--ghost fantasy-results__more"
+                      type="button"
+                      onClick={() => setVisibleResultCount((count) => count + INITIAL_VISIBLE_RESULTS)}
+                    >
+                      Mostra altri {Math.min(INITIAL_VISIBLE_RESULTS, remainingResultsCount)} round
+                    </button>
+                  )}
                 </section>
               ) : (
                 <section className="fantasy-empty fantasy-empty--section">

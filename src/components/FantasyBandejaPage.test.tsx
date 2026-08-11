@@ -35,6 +35,7 @@ const round: FantasyRound = {
 
 function renderPage(overrides: Partial<Parameters<typeof FantasyBandejaPage>[0]> = {}) {
   const onSave = vi.fn().mockResolvedValue(undefined)
+  const onRetry = vi.fn()
   render(
     <FantasyBandejaPage
       rounds={[round]}
@@ -46,11 +47,12 @@ function renderPage(overrides: Partial<Parameters<typeof FantasyBandejaPage>[0]>
       loading={false}
       error={null}
       onBack={vi.fn()}
+      onRetry={onRetry}
       onSave={onSave}
       {...overrides}
     />,
   )
-  return { onSave }
+  return { onRetry, onSave }
 }
 
 describe('FantaBandeja', () => {
@@ -100,8 +102,9 @@ describe('FantaBandeja', () => {
     }
     renderPage({ rounds: [round, scoredRound] })
 
-    const playTab = screen.getByRole('tab', { name: /Gioca/i })
+    const playTab = screen.getByRole('tab', { name: /Partite/i })
     expect(playTab).toHaveAttribute('aria-selected', 'true')
+    expect(playTab).toHaveAttribute('tabindex', '0')
     expect(screen.getByText('Schiera la coppia')).toBeInTheDocument()
     expect(screen.queryByText('Classifica generale')).not.toBeInTheDocument()
     expect(screen.queryByText('Risultati dei round')).not.toBeInTheDocument()
@@ -113,6 +116,49 @@ describe('FantaBandeja', () => {
     await user.click(screen.getByRole('tab', { name: /Risultati/i }))
     expect(screen.getByText('Risultati dei round')).toBeInTheDocument()
     expect(screen.queryByText('Classifica generale')).not.toBeInTheDocument()
+  })
+
+  it('naviga le tab con frecce, Home ed End secondo il pattern ARIA', async () => {
+    const user = userEvent.setup()
+    renderPage()
+
+    const playTab = screen.getByRole('tab', { name: /Partite/i })
+    playTab.focus()
+    await user.keyboard('{ArrowRight}')
+
+    const leaderboardTab = screen.getByRole('tab', { name: /Classifica/i })
+    expect(leaderboardTab).toHaveFocus()
+    expect(leaderboardTab).toHaveAttribute('aria-selected', 'true')
+    expect(playTab).toHaveAttribute('tabindex', '-1')
+
+    await user.keyboard('{End}')
+    const resultsTab = screen.getByRole('tab', { name: /Risultati/i })
+    expect(resultsTab).toHaveFocus()
+    expect(resultsTab).toHaveAttribute('aria-selected', 'true')
+
+    await user.keyboard('{Home}')
+    expect(playTab).toHaveFocus()
+    expect(playTab).toHaveAttribute('aria-selected', 'true')
+
+    await user.keyboard('{ArrowLeft}')
+    expect(resultsTab).toHaveFocus()
+  })
+
+  it('distingue le formazioni aperte dai round già in calcolo', () => {
+    renderPage({ now: round.locksAt + 1 })
+
+    expect(screen.getByRole('tab', { name: /Partite/i })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByLabelText('0 formazioni aperte')).toHaveTextContent('0')
+    expect(screen.getByText('Round in calcolo')).toBeInTheDocument()
+  })
+
+  it('permette di riprovare dopo un errore di caricamento', async () => {
+    const user = userEvent.setup()
+    const { onRetry } = renderPage({ error: 'Connessione non disponibile.' })
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Connessione non disponibile.')
+    await user.click(screen.getByRole('button', { name: 'Riprova' }))
+    expect(onRetry).toHaveBeenCalledOnce()
   })
 
   it('permette a uno spettatore di scegliere due giocatori e il capitano', async () => {
@@ -232,5 +278,54 @@ describe('FantaBandeja', () => {
 
     await user.click(toggle)
     expect(screen.queryByRole('region', { name: 'Calcolo punteggio di Ale' })).not.toBeInTheDocument()
+  })
+
+  it('collassa lo storico, apre il round più recente e carica i risultati a gruppi', async () => {
+    const user = userEvent.setup()
+    const scoredRounds = Array.from({ length: 6 }, (_, index): FantasyRound => ({
+      ...round,
+      id: `poll-${index}__slot-${index}`,
+      pollId: `poll-${index}`,
+      slotId: `slot-${index}`,
+      pollTitle: `Round storico ${index + 1}`,
+      locksAt: now - (index + 1) * 86_400_000,
+      slotEndsAt: now - (index + 1) * 86_400_000 + 5_400_000,
+      status: 'scored',
+      standings: [{
+        managerId: 'manager',
+        managerName: 'Jury',
+        playerIds: ['a', 'b'],
+        captainId: 'a',
+        totalScore: 18 - index,
+        captainRating: 7,
+        baseRatingTotal: 13,
+        rank: 1,
+        leaguePoints: 5,
+      }],
+      playerScores: [],
+      settledAt: now - index * 86_400_000,
+    }))
+    renderPage({ rounds: scoredRounds })
+
+    const resultToggles = screen.getAllByRole('button', { name: /il risultato di/i })
+    expect(resultToggles).toHaveLength(4)
+    expect(resultToggles[0]).toHaveAttribute('aria-expanded', 'true')
+    expect(resultToggles[1]).toHaveAttribute('aria-expanded', 'false')
+    expect(within(resultToggles[0]).getByText('Vince Jury')).toBeInTheDocument()
+    expect(within(resultToggles[0]).getByText('Tu: 18 punti · +5 campionato')).toBeInTheDocument()
+
+    await user.click(resultToggles[1])
+    expect(resultToggles[1]).toHaveAttribute('aria-expanded', 'true')
+
+    await user.click(screen.getByRole('button', { name: 'Mostra altri 2 round' }))
+    expect(screen.getAllByRole('button', { name: /il risultato di/i })).toHaveLength(6)
+    expect(screen.queryByRole('button', { name: /Mostra altri/i })).not.toBeInTheDocument()
+  })
+
+  it('mantiene una soglia leggibile per metadati e controlli mobile', () => {
+    expect(styles).toContain('--muted: #526b75')
+    expect(styles).toContain('.fantasy-result__toggle')
+    expect(styles).toContain('font-size: 0.75rem')
+    expect(styles).toContain('min-height: 44px')
   })
 })
