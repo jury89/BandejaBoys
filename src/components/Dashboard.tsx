@@ -136,6 +136,7 @@ export function Dashboard() {
   const [fantasyOwnEntries, setFantasyOwnEntries] = useState<Record<string, FantasyEntry | undefined>>({})
   const [fantasyRoundEntries, setFantasyRoundEntries] = useState<Record<string, FantasyEntry[]>>({})
   const [fantasyError, setFantasyError] = useState<string | null>(null)
+  const [fantasySubscriptionAttempt, setFantasySubscriptionAttempt] = useState(0)
   const [reportMatch, setReportMatch] = useState<PlayerMatch | null>(null)
   const [notificationHistory, setNotificationHistory] = useState<NotificationHistoryItem[]>([])
   const [notificationHistoryLoaded, setNotificationHistoryLoaded] = useState(!hasRemoteBackend)
@@ -386,7 +387,7 @@ export function Dashboard() {
       setFantasyRoundsLoaded(true)
       setFantasyError('Non siamo riusciti a recuperare i round FantaBandeja.')
     })
-  }, [dashboardView])
+  }, [dashboardView, fantasySubscriptionAttempt])
 
   useEffect(() => {
     if (dashboardView !== 'fantasy' || !user || !fantasyRoundsLoaded) return
@@ -420,7 +421,7 @@ export function Dashboard() {
     })
 
     return () => subscriptions.forEach((unsubscribe) => unsubscribe())
-  }, [dashboardView, fantasyRounds, fantasyRoundsLoaded, now, user])
+  }, [dashboardView, fantasyRounds, fantasyRoundsLoaded, fantasySubscriptionAttempt, now, user])
 
   useEffect(() => {
     if (!toast) return
@@ -722,6 +723,13 @@ export function Dashboard() {
       : {}
     window.history.pushState({ ...currentState, bandejaView: 'fantasy' }, '', url)
   }
+  const retryFantasyData = () => {
+    setFantasyRoundsLoaded(false)
+    setFantasyError(null)
+    setFantasyOwnEntries({})
+    setFantasyRoundEntries({})
+    setFantasySubscriptionAttempt((attempt) => attempt + 1)
+  }
   const closeFantasy = () => {
     if (window.history.state?.bandejaView === 'fantasy') {
       window.history.back()
@@ -960,6 +968,7 @@ export function Dashboard() {
           loading={!fantasyRoundsLoaded}
           error={fantasyError}
           onBack={closeFantasy}
+          onRetry={retryFantasyData}
           onSave={saveFantasyEntry}
         />
       ) : dashboardView === 'notifications' ? (
