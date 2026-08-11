@@ -575,6 +575,7 @@ describe('punteggio FantaBandeja', () => {
     const second = {
       ...first,
       id: 'poll-2__slot-2',
+      locksAt: first.locksAt + 1,
       standings: first.standings?.map((standing) => ({
         ...standing,
         rank: standing.managerId === 'manager-y' ? 1 : 2,
@@ -614,6 +615,30 @@ describe('punteggio FantaBandeja', () => {
         rank: 4,
       }),
     ]))
+
+    const managerX = leaderboard.find((row) => row.managerId === 'manager-x')!
+    expect(managerX.contributions).toEqual([
+      expect.objectContaining({
+        roundId: 'poll-2__slot-2',
+        source: 'formation',
+        rank: 2,
+        leaguePoints: 3,
+      }),
+      expect.objectContaining({
+        roundId: first.id,
+        source: 'formation',
+        rank: 1,
+        leaguePoints: 5,
+      }),
+    ])
+    expect(leaderboard.find((row) => row.managerId === 'd')?.contributions).toEqual([
+      expect.objectContaining({ source: 'mvp', leaguePoints: FANTASY_MVP_LEAGUE_POINTS }),
+      expect.objectContaining({ source: 'mvp', leaguePoints: FANTASY_MVP_LEAGUE_POINTS }),
+    ])
+    leaderboard.forEach((row) => {
+      expect(row.contributions.reduce((total, contribution) => total + contribution.leaguePoints, 0))
+        .toBe(row.leaguePoints)
+    })
   })
 
   it('applica i punti dei titolari anche ai round storici già materializzati', () => {

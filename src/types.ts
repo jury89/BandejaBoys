@@ -297,5 +297,16 @@ export interface FantasyLeaderboardRow {
   wins: number
   rawFantasyPoints: number
   roundsPlayed: number
+  contributions: FantasyLeaderboardContribution[]
   rank: number
+}
+
+export interface FantasyLeaderboardContribution {
+  roundId: string
+  pollTitle: string
+  playedAt: number
+  source: 'formation' | 'starter' | 'mvp'
+  leaguePoints: number
+  rawFantasyPoints: number
+  rank?: number
 }
