@@ -68,6 +68,25 @@ describe('repository activity log in demo mode', () => {
     expect(activity().events.every((event) => Number.isFinite(event.occurredAt))).toBe(true)
   })
 
+  it('salva la nuova settimana quando l’ultimo slot viene spostato insieme agli altri', async () => {
+    await repository.createPoll({
+      targetWeekStart: '2027-01-04',
+      slots: [
+        { startsAt: '2027-01-05T19:30', durationMinutes: 90 },
+        { startsAt: '2027-01-06T19:30', durationMinutes: 90 },
+      ],
+    }, user)
+    const poll = polls()[0]
+
+    await repository.rescheduleSlot(poll.id, poll.slots[0].id, '2026-12-29T19:30', user)
+    await repository.rescheduleSlot(poll.id, poll.slots[1].id, '2026-12-30T19:30', user)
+
+    expect(polls()[0]).toMatchObject({
+      targetWeekStart: '2026-12-28',
+      title: 'Padel · 28 dic 2026 – 3 gen 2027',
+    })
+  })
+
   it('registra chi aggiunge e rimuove un ospite', async () => {
     await repository.createPoll({
       targetWeekStart: '2027-01-04',

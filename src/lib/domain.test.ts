@@ -929,6 +929,41 @@ describe('stato slot e creazione sondaggio', () => {
     expect(() => rescheduleSlot(current, booked.id, later.startsAt)).toThrow('Esiste già uno slot')
   })
 
+  it('riallinea settimana e titolo quando tutti gli slot vengono spostati nella stessa nuova settimana', () => {
+    const current: PadelPoll = {
+      id: 'poll-1',
+      title: 'Padel · 31 ago – 6 set 2026',
+      targetWeekStart: '2026-08-31',
+      createdBy: 'brescio',
+      createdByName: 'brescio',
+      createdAt: 1,
+      updatedAt: 1,
+      status: 'open',
+      slots: [
+        { ...slot(), id: 'slot-1', startsAt: '2026-09-01T16:30:00.000Z' },
+        { ...slot(), id: 'slot-2', startsAt: '2026-09-02T16:30:00.000Z' },
+        { ...slot(), id: 'slot-3', startsAt: '2026-09-03T16:30:00.000Z' },
+      ],
+    }
+
+    const first = rescheduleSlot(current, 'slot-1', '2026-08-25T18:30')
+    const second = rescheduleSlot(first, 'slot-2', '2026-08-26T18:30')
+    const updated = rescheduleSlot(second, 'slot-3', '2026-08-27T18:30')
+
+    expect(first).toMatchObject({
+      targetWeekStart: '2026-08-31',
+      title: 'Padel · 31 ago – 6 set 2026',
+    })
+    expect(second).toMatchObject({
+      targetWeekStart: '2026-08-31',
+      title: 'Padel · 31 ago – 6 set 2026',
+    })
+    expect(updated).toMatchObject({
+      targetWeekStart: '2026-08-24',
+      title: 'Padel · 24 ago – 30 ago 2026',
+    })
+  })
+
   it('elimina uno slot preservando gli altri e impedisce di lasciare un sondaggio vuoto', () => {
     const first = slot([signup('a', 1)])
     const second = { ...slot(), id: 'slot-2', startsAt: '2026-07-30T19:30:00.000Z' }
