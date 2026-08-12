@@ -5,9 +5,9 @@ import {
   toDateTimeInput,
 } from './domain'
 import type { PadelPoll, PadelSlot } from '../types'
-import { pollWeekTitle } from './format'
 
 const CALENDAR_TIME_ZONE = 'Europe/Rome'
+const CALENDAR_EVENT_TITLE = 'Padel'
 const APP_URL = 'https://bandeja-boys.web.app'
 const CALENDAR_TIME_ZONE_COMPONENT = [
   'BEGIN:VTIMEZONE',
@@ -55,19 +55,15 @@ function escapeCalendarText(value: string) {
     .replace(/;/g, '\\;')
 }
 
-function calendarTitle(poll: PadelPoll) {
-  return pollWeekTitle(poll.targetWeekStart)
-}
-
 function calendarDescription(slot: PadelSlot) {
   return getSlotPhase(slot) === 'booked'
     ? 'Campo prenotato. Ritrovo per la partita di padel dei Bandeja Boys.'
     : 'Orario indicativo: verrà confermato quando il campo sarà prenotato.'
 }
 
-function calendarEventData(poll: PadelPoll, slot: PadelSlot) {
+function calendarEventData(slot: PadelSlot) {
   return {
-    title: calendarTitle(poll),
+    title: CALENDAR_EVENT_TITLE,
     description: calendarDescription(slot),
     startsAt: normalizeLocalDateTime(slot.startsAt),
     endsAt: addMinutesToLocalDateTime(slot.startsAt, slot.durationMinutes),
@@ -75,7 +71,7 @@ function calendarEventData(poll: PadelPoll, slot: PadelSlot) {
 }
 
 export function buildSlotCalendar(poll: PadelPoll, slot: PadelSlot, now = Date.now()) {
-  const event = calendarEventData(poll, slot)
+  const event = calendarEventData(slot)
   const confirmed = getSlotPhase(slot) === 'booked'
 
   return [
@@ -96,6 +92,16 @@ export function buildSlotCalendar(poll: PadelPoll, slot: PadelSlot, now = Date.n
     `DESCRIPTION:${escapeCalendarText(event.description)}`,
     `STATUS:${confirmed ? 'CONFIRMED' : 'TENTATIVE'}`,
     `URL:${APP_URL}`,
+    'BEGIN:VALARM',
+    'TRIGGER:-P1D',
+    'ACTION:DISPLAY',
+    'DESCRIPTION:Padel domani',
+    'END:VALARM',
+    'BEGIN:VALARM',
+    'TRIGGER:-PT1H',
+    'ACTION:DISPLAY',
+    'DESCRIPTION:Padel tra un\'ora',
+    'END:VALARM',
     'END:VEVENT',
     'END:VCALENDAR',
     '',
