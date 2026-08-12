@@ -274,6 +274,8 @@ function remoteRepository(): PadelRepository {
       const poll = { id: snapshot.id, ...snapshot.data() } as PadelPoll
       const updated = mutate(poll)
       transaction.update(reference, {
+        title: updated.title,
+        targetWeekStart: updated.targetWeekStart,
         slots: updated.slots,
         status: updated.status,
         updatedAt: updated.updatedAt,

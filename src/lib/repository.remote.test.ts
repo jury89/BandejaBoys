@@ -1,5 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { FantasyRound, MatchRatingPrompt, PlayerMatch, SessionUser } from '../types'
+import type {
+  FantasyRound,
+  MatchRatingPrompt,
+  PadelPoll,
+  PlayerMatch,
+  SessionUser,
+} from '../types'
 
 const firestoreMocks = vi.hoisted(() => {
   const batch = {
@@ -9,11 +15,17 @@ const firestoreMocks = vi.hoisted(() => {
   const transaction = {
     get: vi.fn(),
     set: vi.fn(),
+    update: vi.fn(),
   }
   return {
     batch,
     transaction,
-    doc: vi.fn((_database: unknown, ...segments: string[]) => segments.join('/')),
+    collection: vi.fn((_database: unknown, ...segments: string[]) => segments.join('/')),
+    doc: vi.fn((databaseOrCollection: unknown, ...segments: string[]) => (
+      segments.length === 0 && typeof databaseOrCollection === 'string'
+        ? `${databaseOrCollection}/generated`
+        : segments.join('/')
+    )),
     runTransaction: vi.fn((_database: unknown, operation: (current: typeof transaction) => unknown) => (
       operation(transaction)
     )),
@@ -30,6 +42,7 @@ vi.mock('firebase/firestore', async (importOriginal) => {
   const original = await importOriginal<typeof import('firebase/firestore')>()
   return {
     ...original,
+    collection: firestoreMocks.collection,
     doc: firestoreMocks.doc,
     runTransaction: firestoreMocks.runTransaction,
     writeBatch: firestoreMocks.writeBatch,
@@ -143,6 +156,41 @@ describe('repository remoto delle pagelle', () => {
         { scoreA: 3, scoreB: 6 },
       ],
     })
+  })
+
+  it('persiste settimana e titolo riallineati nella transazione di modifica slot', async () => {
+    const poll: PadelPoll = {
+      id: 'poll-1',
+      title: 'Padel · 31 ago – 6 set 2026',
+      targetWeekStart: '2026-08-31',
+      createdBy: reviewer.id,
+      createdByName: reviewer.displayName,
+      createdAt: 1,
+      updatedAt: 1,
+      status: 'open',
+      slots: [{
+        id: 'slot-1',
+        startsAt: '2026-09-01T16:30:00.000Z',
+        durationMinutes: 90,
+        venue: '',
+        signups: [],
+      }],
+    }
+    firestoreMocks.transaction.get.mockResolvedValue({
+      exists: () => true,
+      id: poll.id,
+      data: () => poll,
+    })
+
+    await repository.rescheduleSlot(poll.id, poll.slots[0].id, '2026-08-25T18:30', reviewer)
+
+    expect(firestoreMocks.transaction.update).toHaveBeenCalledWith(
+      'polls/poll-1',
+      expect.objectContaining({
+        targetWeekStart: '2026-08-24',
+        title: 'Padel · 24 ago – 30 ago 2026',
+      }),
+    )
   })
 
   it('salva la formazione fantasy leggendo round e giocata nella stessa transazione', async () => {

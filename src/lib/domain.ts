@@ -1357,9 +1357,24 @@ export function rescheduleSlot(
     (slot) => ({ ...slot, startsAt: normalizedStartsAt }),
     updatedAt,
   )
-  return {
+  return syncPollWeekToSlots({
     ...updated,
     slots: [...updated.slots].sort((left, right) => left.startsAt.localeCompare(right.startsAt)),
+  })
+}
+
+function syncPollWeekToSlots(poll: PadelPoll): PadelPoll {
+  const weekStarts = new Set(poll.slots.map((slot) => (
+    mondayOfWeek(toDateInput(new Date(slot.startsAt)))
+  )))
+  if (weekStarts.size !== 1 || weekStarts.has(null)) return poll
+
+  const targetWeekStart = [...weekStarts][0]
+  if (!targetWeekStart) return poll
+  return {
+    ...poll,
+    title: pollWeekTitle(targetWeekStart),
+    targetWeekStart,
   }
 }
 

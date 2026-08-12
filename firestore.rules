@@ -399,8 +399,10 @@ service cloud.firestore {
       allow update: if isMember()
         && request.resource.data.createdBy == resource.data.createdBy
         && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.title is string
+        && request.resource.data.targetWeekStart is string
         && request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['slots', 'status', 'updatedAt']);
+          .hasOnly(['title', 'targetWeekStart', 'slots', 'status', 'updatedAt']);
       allow delete: if isMember() && resource.data.createdBy == request.auth.uid;
     }
 
