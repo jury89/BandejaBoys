@@ -17,7 +17,7 @@ import {
   fantasyEntryIsCurrent,
   padelDateTimeToTimestamp,
 } from './domain'
-import { pollWeekTitle } from './format'
+import { slotWeekTitle } from './format'
 import { addPushRefreshParameter, normalizeInternalNotificationUrl } from './notificationUrl'
 import {
   type MotherNamesByUserId,
@@ -178,7 +178,7 @@ function collectNewSlotNotifications(poll: PadelPoll, now: number): ScheduledNot
     ))
     const body = group.length === 1
       ? `C’è un nuovo slot disponibile: ${formatSession(first.startsAt)}. Segna se ci sei.`
-      : `Ci sono ${group.length} nuovi slot disponibili per “${pollWeekTitle(poll.targetWeekStart)}”. Segna quando ci sei.`
+      : `Ci sono ${group.length} nuovi slot disponibili per “${slotWeekTitle(first.startsAt)}”. Segna quando ci sei.`
 
     return [{
       id: `new-slots:${poll.id}:${first.id}`,

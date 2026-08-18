@@ -16,6 +16,7 @@ import {
   getSlotPhase,
   getStarters,
   getUpcomingPolls,
+  getUpcomingSlotWeeks,
   guestNameError,
   isBookingCandidate,
   isGuestSignup,
@@ -359,6 +360,39 @@ describe('referto dei set', () => {
 })
 
 describe('ordine e visibilità dei sondaggi', () => {
+  it('raggruppa al volo gli slot della stessa settimana anche se arrivano da documenti diversi', () => {
+    const firstPoll: PadelPoll = {
+      id: 'poll-first',
+      title: 'Titolo storico errato',
+      targetWeekStart: '2026-08-10',
+      createdBy: 'jury',
+      createdByName: 'Jury',
+      createdAt: 1,
+      updatedAt: 1,
+      status: 'open',
+      slots: [{ ...slot(), id: 'monday', startsAt: '2026-08-17T16:30:00.000Z' }],
+    }
+    const secondPoll: PadelPoll = {
+      ...firstPoll,
+      id: 'poll-second',
+      createdBy: 'luigi',
+      createdByName: 'Luigi',
+      slots: [{ ...slot(), id: 'sunday', startsAt: '2026-08-23T07:00:00.000Z' }],
+    }
+
+    const groups = getUpcomingSlotWeeks(
+      [secondPoll, firstPoll],
+      new Date('2026-08-16T12:00:00.000Z').getTime(),
+    )
+
+    expect(groups).toHaveLength(1)
+    expect(groups[0]).toMatchObject({ id: 'week-2026-08-17', weekStart: '2026-08-17' })
+    expect(groups[0].entries.map(({ poll, slot: item }) => [poll.id, item.id])).toEqual([
+      ['poll-first', 'monday'],
+      ['poll-second', 'sunday'],
+    ])
+  })
+
   it('mostra prima il sondaggio con lo slot futuro più vicino', () => {
     const nearPoll: PadelPoll = {
       id: 'poll-near',
@@ -929,7 +963,7 @@ describe('stato slot e creazione sondaggio', () => {
     expect(() => rescheduleSlot(current, booked.id, later.startsAt)).toThrow('Esiste già uno slot')
   })
 
-  it('riallinea settimana e titolo quando tutti gli slot vengono spostati nella stessa nuova settimana', () => {
+  it('lascia la settimana fuori dalla modifica e la deriva dalla nuova data dello slot', () => {
     const current: PadelPoll = {
       id: 'poll-1',
       title: 'Padel · 31 ago – 6 set 2026',
@@ -950,21 +984,17 @@ describe('stato slot e creazione sondaggio', () => {
     const second = rescheduleSlot(first, 'slot-2', '2026-08-26T18:30')
     const updated = rescheduleSlot(second, 'slot-3', '2026-08-27T18:30')
 
-    expect(first).toMatchObject({
-      targetWeekStart: '2026-08-31',
-      title: 'Padel · 31 ago – 6 set 2026',
-    })
-    expect(second).toMatchObject({
-      targetWeekStart: '2026-08-31',
-      title: 'Padel · 31 ago – 6 set 2026',
-    })
     expect(updated).toMatchObject({
-      targetWeekStart: '2026-08-24',
-      title: 'Padel · 24 ago – 30 ago 2026',
+      targetWeekStart: '2026-08-31',
+      title: 'Padel · 31 ago – 6 set 2026',
     })
+    expect(getUpcomingSlotWeeks(
+      [updated],
+      new Date('2026-08-24T12:00:00.000Z').getTime(),
+    ).map((group) => group.weekStart)).toEqual(['2026-08-24'])
   })
 
-  it('elimina uno slot preservando gli altri e impedisce di lasciare un sondaggio vuoto', () => {
+  it('elimina uno slot preservando gli altri e consente di rimuovere anche l’ultimo', () => {
     const first = slot([signup('a', 1)])
     const second = { ...slot(), id: 'slot-2', startsAt: '2026-07-30T19:30:00.000Z' }
     const current: PadelPoll = {
@@ -984,7 +1014,7 @@ describe('stato slot e creazione sondaggio', () => {
     expect(updated.updatedAt).toBe(99)
     expect(updated.slots).toEqual([second])
     expect(current.slots).toHaveLength(2)
-    expect(() => removeSlotFromPoll(updated, second.id)).toThrow('almeno uno slot')
+    expect(removeSlotFromPoll(updated, second.id).slots).toEqual([])
     expect(() => removeSlotFromPoll(current, 'slot-assente')).toThrow('Slot non trovato')
   })
 

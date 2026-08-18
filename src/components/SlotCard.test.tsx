@@ -360,7 +360,7 @@ describe('azioni dello slot', () => {
     expect(confirm).toHaveBeenCalledWith(expect.stringContaining('annullarlo direttamente con l’Oasi Boschetto'))
   })
 
-  it('protegge l’unico slot rimasto nel sondaggio', () => {
+  it('permette di eliminare anche l’unico slot rimasto nel gruppo tecnico', () => {
     render(
       <SlotCard
         poll={poll}
@@ -373,7 +373,7 @@ describe('azioni dello slot', () => {
       />,
     )
 
-    expect(screen.getByRole('button', { name: /Elimina lo slot/ })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /Elimina lo slot/ })).toBeEnabled()
   })
 
   it('permette di scegliere il ruolo e aggiorna subito la formazione da titolare', async () => {

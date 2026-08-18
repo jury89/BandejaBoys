@@ -64,7 +64,7 @@ import {
 } from './domain'
 import { getLocalProfiles, USERS_EVENT } from './auth'
 import { firestore, hasRemoteBackend } from './firebase'
-import { mondayOfWeek, pollWeekTitle } from './format'
+import { mondayOfWeek, pollWeekTitle, slotWeekTitle, weekStartForDateTime } from './format'
 import type { NotificationDelivery } from './notificationHistory'
 
 export interface PadelRepository {
@@ -178,6 +178,37 @@ function slotById(poll: PadelPoll, slotId: string): PadelSlot | undefined {
   return poll.slots.find((slot) => slot.id === slotId)
 }
 
+function normalizePollWeek(poll: PadelPoll): PadelPoll {
+  const firstSlot = [...(poll.slots ?? [])].sort(
+    (left, right) => left.startsAt.localeCompare(right.startsAt),
+  )[0]
+  const derivedWeekStart = firstSlot ? weekStartForDateTime(firstSlot.startsAt) : null
+  const legacyWeekStart = mondayOfWeek(poll.targetWeekStart)
+  const targetWeekStart = derivedWeekStart ?? legacyWeekStart ?? ''
+
+  return {
+    ...poll,
+    title: targetWeekStart ? pollWeekTitle(targetWeekStart) : poll.title || 'Padel',
+    targetWeekStart,
+    slots: poll.slots ?? [],
+  }
+}
+
+function storedPollData(poll: Omit<PadelPoll, 'id'>) {
+  return {
+    createdBy: poll.createdBy,
+    createdByName: poll.createdByName,
+    createdAt: poll.createdAt,
+    updatedAt: poll.updatedAt,
+    status: poll.status,
+    slots: poll.slots,
+  }
+}
+
+function storedLocalPollData(poll: PadelPoll) {
+  return { id: poll.id, ...storedPollData(poll) }
+}
+
 function signupRole(slot: PadelSlot, userId: string): SignupRole {
   return getStarters(slot).some((signup) => signup.userId === userId) ? 'starter' : 'reserve'
 }
@@ -271,11 +302,9 @@ function remoteRepository(): PadelRepository {
     return runTransaction(db, async (transaction) => {
       const snapshot = await transaction.get(reference)
       if (!snapshot.exists()) throw new Error('Sondaggio non trovato.')
-      const poll = { id: snapshot.id, ...snapshot.data() } as PadelPoll
+      const poll = normalizePollWeek({ id: snapshot.id, ...snapshot.data() } as PadelPoll)
       const updated = mutate(poll)
       transaction.update(reference, {
-        title: updated.title,
-        targetWeekStart: updated.targetWeekStart,
         slots: updated.slots,
         status: updated.status,
         updatedAt: updated.updatedAt,
@@ -290,7 +319,9 @@ function remoteRepository(): PadelRepository {
     subscribePolls(listener, onError) {
       return onSnapshot(
         query(collection(db, 'polls'), orderBy('createdAt', 'desc')),
-        (snapshot) => listener(snapshot.docs.map((item) => ({ id: item.id, ...item.data() }) as PadelPoll)),
+        (snapshot) => listener(snapshot.docs.map((item) => (
+          normalizePollWeek({ id: item.id, ...item.data() } as PadelPoll)
+        ))),
         onError,
       )
     },
@@ -444,7 +475,7 @@ function remoteRepository(): PadelRepository {
       const reference = doc(collection(db, 'polls'))
       const poll = { id: reference.id, ...data }
       const batch = writeBatch(db)
-      batch.set(reference, data)
+      batch.set(reference, storedPollData(data))
       pollCreationEvents(poll, creator).forEach((activity) => {
         batch.set(doc(collection(db, 'activityEvents')), {
           ...activity,
@@ -618,7 +649,7 @@ function remoteRepository(): PadelRepository {
       await runTransaction(db, async (transaction) => {
         const snapshot = await transaction.get(reference)
         if (!snapshot.exists()) throw new Error('Sondaggio non trovato.')
-        const poll = { id: snapshot.id, ...snapshot.data() } as PadelPoll
+        const poll = normalizePollWeek({ id: snapshot.id, ...snapshot.data() } as PadelPoll)
         transaction.delete(reference)
         setRemoteActivity(db, transaction, makeActivityEvent('poll_deleted', actor, poll, undefined, {
           slotCount: poll.slots.length,
@@ -632,7 +663,7 @@ function remoteRepository(): PadelRepository {
         if (snapshot.exists()) {
           const current = snapshot.data() as { viewCount?: number }
           transaction.update(reference, {
-            pollTitle: poll.title,
+            pollTitle: slotWeekTitle(slot.startsAt),
             slotStartsAt: slot.startsAt,
             viewerName: viewer.displayName,
             lastViewedAt: serverTimestamp(),
@@ -642,7 +673,7 @@ function remoteRepository(): PadelRepository {
         }
         transaction.set(reference, {
           pollId: poll.id,
-          pollTitle: poll.title,
+          pollTitle: slotWeekTitle(slot.startsAt),
           slotId: slot.id,
           slotStartsAt: slot.startsAt,
           viewerId: viewer.id,
@@ -807,7 +838,7 @@ function seedPolls(): PadelPoll[] {
 function readLocalPolls(): PadelPoll[] {
   try {
     const stored = localStorage.getItem(LOCAL_POLLS_KEY)
-    if (stored) return JSON.parse(stored) as PadelPoll[]
+    if (stored) return (JSON.parse(stored) as PadelPoll[]).map(normalizePollWeek)
   } catch {
     // A fresh demo dataset is safer than blocking the UI on malformed local data.
   }
@@ -817,7 +848,7 @@ function readLocalPolls(): PadelPoll[] {
 }
 
 function writeLocalPolls(polls: PadelPoll[]) {
-  localStorage.setItem(LOCAL_POLLS_KEY, JSON.stringify(polls))
+  localStorage.setItem(LOCAL_POLLS_KEY, JSON.stringify(polls.map(storedLocalPollData)))
   window.dispatchEvent(new Event(POLLS_EVENT))
 }
 
@@ -1198,7 +1229,7 @@ function localRepository(): PadelRepository {
       if (index >= 0) {
         store.views[index] = {
           ...store.views[index],
-          pollTitle: poll.title,
+          pollTitle: slotWeekTitle(slot.startsAt),
           slotStartsAt: slot.startsAt,
           viewerName: viewer.displayName,
           lastViewedAt: now,
@@ -1208,7 +1239,7 @@ function localRepository(): PadelRepository {
         store.views.push({
           id,
           pollId: poll.id,
-          pollTitle: poll.title,
+          pollTitle: slotWeekTitle(slot.startsAt),
           slotId: slot.id,
           slotStartsAt: slot.startsAt,
           viewerId: viewer.id,

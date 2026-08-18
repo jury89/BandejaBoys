@@ -101,6 +101,24 @@ describe('repository remoto delle pagelle', () => {
     })
   })
 
+  it('crea documenti di slot senza salvare una settimana', async () => {
+    await repository.createPoll({
+      targetWeekStart: '2026-08-17',
+      slots: [{ startsAt: '2026-08-18T18:30', durationMinutes: 90 }],
+    }, reviewer)
+
+    const pollWrite = firestoreMocks.batch.set.mock.calls.find(([reference]) => (
+      reference === 'polls/generated'
+    ))
+    expect(pollWrite).toBeDefined()
+    expect(pollWrite?.[1]).toEqual(expect.objectContaining({
+      createdBy: reviewer.id,
+      slots: [expect.objectContaining({ startsAt: '2026-08-18T16:30:00.000Z' })],
+    }))
+    expect(pollWrite?.[1]).not.toHaveProperty('targetWeekStart')
+    expect(pollWrite?.[1]).not.toHaveProperty('title')
+  })
+
   it('salva risposta e voti in un batch atomico senza letture transazionali', async () => {
     const response = await repository.submitMatchRatings(prompt, reviewer, [
       { userId: 'ale', displayName: 'Ale', score: 8 },
@@ -158,7 +176,7 @@ describe('repository remoto delle pagelle', () => {
     })
   })
 
-  it('persiste settimana e titolo riallineati nella transazione di modifica slot', async () => {
+  it('persiste soltanto lo slot modificato senza una settimana strutturale', async () => {
     const poll: PadelPoll = {
       id: 'poll-1',
       title: 'Padel · 31 ago – 6 set 2026',
@@ -184,13 +202,13 @@ describe('repository remoto delle pagelle', () => {
 
     await repository.rescheduleSlot(poll.id, poll.slots[0].id, '2026-08-25T18:30', reviewer)
 
-    expect(firestoreMocks.transaction.update).toHaveBeenCalledWith(
-      'polls/poll-1',
-      expect.objectContaining({
-        targetWeekStart: '2026-08-24',
-        title: 'Padel · 24 ago – 30 ago 2026',
-      }),
-    )
+    expect(firestoreMocks.transaction.update).toHaveBeenCalledOnce()
+    const update = firestoreMocks.transaction.update.mock.calls[0][1]
+    expect(update).toEqual(expect.objectContaining({
+      slots: [expect.objectContaining({ startsAt: '2026-08-25T16:30:00.000Z' })],
+    }))
+    expect(update).not.toHaveProperty('targetWeekStart')
+    expect(update).not.toHaveProperty('title')
   })
 
   it('salva la formazione fantasy leggendo round e giocata nella stessa transazione', async () => {

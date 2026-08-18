@@ -71,17 +71,17 @@ export function CreatePollModal({ user, onClose, onCreate, onDone }: CreatePollM
     try {
       const slotInputs = slots.map(({ startsAt, durationMinutes }) => ({ startsAt, durationMinutes }))
       await onCreate({ targetWeekStart: weekStart, slots: slotInputs }, user)
-      onDone('Sondaggio creato. È ora di raccogliere le adesioni.')
+      onDone('Slot pubblicati. È ora di raccogliere le adesioni.')
       onClose()
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Non è stato possibile creare il sondaggio.')
+      setError(caught instanceof Error ? caught.message : 'Non è stato possibile pubblicare gli slot.')
     } finally {
       setBusy(false)
     }
   }
 
   return (
-    <Modal title="Prepara il prossimo sondaggio" eyebrow="Nuova settimana" onClose={onClose} size="wide">
+    <Modal title="Prepara i prossimi slot" eyebrow="Nuova settimana" onClose={onClose} size="wide">
       <form onSubmit={submit} className="poll-form">
         <div className="poll-form__basics">
           <label className="field">
@@ -161,7 +161,7 @@ export function CreatePollModal({ user, onClose, onCreate, onDone }: CreatePollM
         <footer className="modal__actions">
           <button className="button button--ghost" type="button" onClick={onClose}>Annulla</button>
           <button className="button button--primary" type="submit" disabled={busy}>
-            <CalendarPlus size={18} /> {busy ? 'Creazione…' : 'Pubblica sondaggio'}
+            <CalendarPlus size={18} /> {busy ? 'Pubblicazione…' : 'Pubblica slot'}
           </button>
         </footer>
       </form>

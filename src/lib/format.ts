@@ -23,6 +23,12 @@ const dateFormatter = new Intl.DateTimeFormat('it-IT', {
   month: 'long',
   timeZone: PADEL_TIME_ZONE,
 })
+const dateInputFormatter = new Intl.DateTimeFormat('en-CA', {
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  timeZone: PADEL_TIME_ZONE,
+})
 const shortDayMonthFormatter = new Intl.DateTimeFormat('it-IT', {
   day: 'numeric',
   month: 'short',
@@ -99,6 +105,20 @@ export function pollWeekTitle(weekStart: string): string {
 export function mondayOfWeek(value: string): string | null {
   const monday = mondayDateFromInput(value)
   return monday ? dateInputValue(monday) : null
+}
+
+export function weekStartForDateTime(value: string): string | null {
+  const localDate = /^(\d{4}-\d{2}-\d{2})T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?$/.exec(value)?.[1]
+  if (localDate) return mondayOfWeek(localDate)
+
+  const instant = new Date(value)
+  if (Number.isNaN(instant.getTime())) return null
+  return mondayOfWeek(dateInputFormatter.format(instant))
+}
+
+export function slotWeekTitle(startsAt: string): string {
+  const weekStart = weekStartForDateTime(startsAt)
+  return weekStart ? pollWeekTitle(weekStart) : 'Padel'
 }
 
 export function firstName(displayName: string): string {

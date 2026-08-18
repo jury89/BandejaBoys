@@ -15,6 +15,7 @@
     "db:get": "tsx scripts/firestore-read.ts get",
     "db:query": "tsx scripts/firestore-read.ts query",
     "db:backfill-match-rating-summaries": "tsx scripts/backfill-match-rating-summaries.ts",
+    "db:migrate-derived-slot-weeks": "tsx scripts/migrate-derived-slot-weeks.ts",
     "mother-names:list": "tsx scripts/mother-names.ts list",
     "mother-names:set": "tsx scripts/mother-names.ts set",
     "push:send": "tsx scripts/push-send.ts",

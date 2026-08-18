@@ -392,17 +392,14 @@ service cloud.firestore {
       allow read: if isMember() || isNotifier();
       allow create: if isMember()
         && request.resource.data.createdBy == request.auth.uid
-        && request.resource.data.title is string
         && request.resource.data.slots is list
         && request.resource.data.slots.size() > 0
         && request.resource.data.slots.size() <= 14;
       allow update: if isMember()
         && request.resource.data.createdBy == resource.data.createdBy
         && request.resource.data.createdAt == resource.data.createdAt
-        && request.resource.data.title is string
-        && request.resource.data.targetWeekStart is string
         && request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['title', 'targetWeekStart', 'slots', 'status', 'updatedAt']);
+          .hasOnly(['slots', 'status', 'updatedAt']);
       allow delete: if isMember() && resource.data.createdBy == request.auth.uid;
     }
 

@@ -1,9 +1,9 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import type { MemberProfile, PadelPoll, SessionUser } from '../types'
+import type { MemberProfile, PadelPoll, SessionUser, SlotWeekGroup } from '../types'
 import { PollCard } from './PollCard'
 
-vi.mock('../lib/repository', () => ({ repository: {} }))
+vi.mock('../lib/repository', () => ({ repository: { createPoll: vi.fn() } }))
 
 const user: SessionUser = {
   id: 'jury',
@@ -32,12 +32,52 @@ const poll: PadelPoll = {
   }],
 }
 
+const group: SlotWeekGroup = {
+  id: 'week-2099-01-05',
+  weekStart: '2099-01-05',
+  entries: [{ poll, slot: poll.slots[0] }],
+}
+
 describe('sondaggio collassabile', () => {
+  it('mostra insieme slot della stessa settimana provenienti da documenti diversi', () => {
+    const secondPoll: PadelPoll = {
+      ...poll,
+      id: 'poll-2',
+      createdBy: 'luigi',
+      createdByName: 'Luigi',
+      slots: [{
+        ...poll.slots[0],
+        id: 'slot-2',
+        startsAt: '2099-01-10T20:30',
+      }],
+    }
+
+    render(
+      <PollCard
+        group={{
+          ...group,
+          entries: [
+            group.entries[0],
+            { poll: secondPoll, slot: secondPoll.slots[0] },
+          ],
+        }}
+        user={user}
+        members={members}
+        onPollChange={vi.fn()}
+        onNotify={vi.fn()}
+        onError={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByText('Proposti da Jury, Luigi')).toBeInTheDocument()
+    expect(screen.getByText('2 slot')).toBeInTheDocument()
+  })
+
   it('nasconde e ripristina tutti gli slot lasciando visibile l’intestazione', async () => {
     const interaction = userEvent.setup()
     render(
       <PollCard
-        poll={poll}
+        group={group}
         user={user}
         members={members}
         onPollChange={vi.fn()}

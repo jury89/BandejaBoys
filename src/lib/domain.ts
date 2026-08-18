@@ -29,8 +29,9 @@ import type {
   SignupRole,
   SlotInput,
   SlotPhase,
+  SlotWeekGroup,
 } from '../types'
-import { mondayOfWeek, PADEL_TIME_ZONE, pollWeekTitle } from './format'
+import { mondayOfWeek, PADEL_TIME_ZONE, pollWeekTitle, slotWeekTitle, weekStartForDateTime } from './format'
 
 export const MAX_STARTERS = 4
 export const MAX_SLOTS = 14
@@ -219,7 +220,7 @@ function getRatingPromptForSlot(
   return {
     id: getMatchRatingResponseId(poll.id, slot.id, reviewerId),
     pollId: poll.id,
-    pollTitle: poll.title,
+    pollTitle: slotWeekTitle(slot.startsAt),
     slotId: slot.id,
     sessionStartsAt: slot.startsAt,
     sessionEndedAt: dueAt - MATCH_RATING_DELAY_MS,
@@ -472,7 +473,7 @@ export function getPlayerMatches(
       const startsAt = padelDateTimeToTimestamp(slot.startsAt)
       return {
         pollId: poll.id,
-        pollTitle: pollWeekTitle(poll.targetWeekStart),
+        pollTitle: slotWeekTitle(slot.startsAt),
         slot,
         startsAt,
         endsAt: getSlotEndsAt(slot),
@@ -542,7 +543,7 @@ export function getOtherPlayedMatches(
   return polls
     .flatMap((poll) => poll.slots.map((slot) => ({
       pollId: poll.id,
-      pollTitle: pollWeekTitle(poll.targetWeekStart),
+      pollTitle: slotWeekTitle(slot.startsAt),
       slot,
       startsAt: padelDateTimeToTimestamp(slot.startsAt),
       endsAt: getSlotEndsAt(slot),
@@ -636,7 +637,7 @@ function fantasyRoundCandidate(poll: PadelPoll, slot: PadelSlot): FantasyRoundCa
   return {
     id: getFantasyRoundId(poll.id, slot.id),
     pollId: poll.id,
-    pollTitle: pollWeekTitle(poll.targetWeekStart),
+    pollTitle: slotWeekTitle(slot.startsAt),
     slotId: slot.id,
     slotStartsAt: slot.startsAt,
     slotEndsAt,
@@ -1163,6 +1164,39 @@ export function getUpcomingPolls(polls: PadelPoll[], now = Date.now()): PadelPol
     })
 }
 
+export function getUpcomingSlotWeeks(polls: PadelPoll[], now = Date.now()): SlotWeekGroup[] {
+  const groups = new Map<string, SlotWeekGroup>()
+
+  polls.forEach((poll) => {
+    poll.slots.forEach((slot) => {
+      const endsAt = getSlotEndsAt(slot)
+      if (!Number.isFinite(endsAt) || endsAt <= now) return
+
+      const weekStart = weekStartForDateTime(slot.startsAt)
+      if (!weekStart) return
+
+      const group = groups.get(weekStart) ?? {
+        id: `week-${weekStart}`,
+        weekStart,
+        entries: [],
+      }
+      group.entries.push({ poll, slot })
+      groups.set(weekStart, group)
+    })
+  })
+
+  return [...groups.values()]
+    .map((group) => ({
+      ...group,
+      entries: [...group.entries].sort((left, right) => (
+        left.slot.startsAt.localeCompare(right.slot.startsAt)
+        || left.poll.createdAt - right.poll.createdAt
+        || left.slot.id.localeCompare(right.slot.id)
+      )),
+    }))
+    .sort((left, right) => left.weekStart.localeCompare(right.weekStart))
+}
+
 export function setSlotBooking(
   slot: PadelSlot,
   bookedBy: Pick<SessionUser, 'id' | 'displayName'> | null,
@@ -1329,10 +1363,6 @@ export function removeSlotFromPoll(
   updatedAt = Date.now(),
 ): PadelPoll {
   if (!poll.slots.some((slot) => slot.id === slotId)) throw new Error('Slot non trovato.')
-  if (poll.slots.length === 1) {
-    throw new Error('Un sondaggio deve avere almeno uno slot.')
-  }
-
   return {
     ...poll,
     slots: poll.slots.filter((slot) => slot.id !== slotId),
@@ -1357,24 +1387,9 @@ export function rescheduleSlot(
     (slot) => ({ ...slot, startsAt: normalizedStartsAt }),
     updatedAt,
   )
-  return syncPollWeekToSlots({
+  return {
     ...updated,
     slots: [...updated.slots].sort((left, right) => left.startsAt.localeCompare(right.startsAt)),
-  })
-}
-
-function syncPollWeekToSlots(poll: PadelPoll): PadelPoll {
-  const weekStarts = new Set(poll.slots.map((slot) => (
-    mondayOfWeek(toDateInput(new Date(slot.startsAt)))
-  )))
-  if (weekStarts.size !== 1 || weekStarts.has(null)) return poll
-
-  const targetWeekStart = [...weekStarts][0]
-  if (!targetWeekStart) return poll
-  return {
-    ...poll,
-    title: pollWeekTitle(targetWeekStart),
-    targetWeekStart,
   }
 }
 
