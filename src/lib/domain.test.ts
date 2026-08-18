@@ -18,6 +18,7 @@ import {
   getUpcomingPolls,
   getUpcomingSlotWeeks,
   guestNameError,
+  hasExistingSlotAtDateTime,
   isBookingCandidate,
   isGuestSignup,
   makeMatchReport,
@@ -865,11 +866,10 @@ describe('stato slot e creazione sondaggio', () => {
     expect(getSlotPhase(booked)).toBe('booked')
   })
 
-  it('normalizza la settimana al lunedì, assegna il titolo, ordina gli slot e rifiuta duplicati', () => {
+  it('deriva la settimana dagli slot, assegna il titolo, ordina gli slot e rifiuta duplicati', () => {
     const creator: SessionUser = member('jury', 'Jury')
     const poll = makePoll(
       {
-        targetWeekStart: '2026-07-29',
         slots: [
           { startsAt: '2026-07-30T20:00', durationMinutes: 90 },
           { startsAt: '2026-07-28T19:30', durationMinutes: 90 },
@@ -892,7 +892,6 @@ describe('stato slot e creazione sondaggio', () => {
 
     expect(() => makePoll(
       {
-        targetWeekStart: '2026-07-27',
         slots: [
           { startsAt: '2026-07-28T19:30', durationMinutes: 90 },
           { startsAt: '2026-07-28T19:30', durationMinutes: 60 },
@@ -907,11 +906,22 @@ describe('stato slot e creazione sondaggio', () => {
 
     expect(() => makePoll(
       {
-        targetWeekStart: '2026-07-27',
         slots: [{ startsAt: '2026-07-28T19:15', durationMinutes: 90 }],
       },
       creator,
     )).toThrow('minuti 00 oppure 30')
+  })
+
+  it('riconosce gli slot esistenti alla stessa data e ora nel fuso di Roma', () => {
+    const existingSlots = [
+      { startsAt: '2026-07-28T17:00:00.000Z' },
+      { startsAt: '2026-12-15T08:30:00.000Z' },
+    ]
+
+    expect(hasExistingSlotAtDateTime('2026-07-28T19:00', existingSlots)).toBe(true)
+    expect(hasExistingSlotAtDateTime('2026-12-15T09:30', existingSlots)).toBe(true)
+    expect(hasExistingSlotAtDateTime('2026-07-28T19:30', existingSlots)).toBe(false)
+    expect(hasExistingSlotAtDateTime('non-una-data', existingSlots)).toBe(false)
   })
 
   it('calcola sempre il lunedì della settimana successiva', () => {

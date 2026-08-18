@@ -1,8 +1,7 @@
 import { useMemo, useRef, useState, type FormEvent } from 'react'
-import { CalendarPlus, CopyPlus, Plus, Trash2 } from 'lucide-react'
-import type { CreatePollInput, SessionUser, SlotInput } from '../types'
-import { defaultSlotForWeek, nextMondayDate } from '../lib/domain'
-import { mondayOfWeek } from '../lib/format'
+import { AlertTriangle, CalendarPlus, CopyPlus, Plus, Trash2 } from 'lucide-react'
+import type { CreatePollInput, PadelSlot, SessionUser, SlotInput } from '../types'
+import { defaultSlotForWeek, hasExistingSlotAtDateTime, nextMondayDate } from '../lib/domain'
 import { Modal } from './Modal'
 import { SlotDateTimeField } from './SlotDateTimeField'
 
@@ -11,6 +10,7 @@ interface CreatePollModalProps {
   onClose: () => void
   onCreate: (input: CreatePollInput, creator: SessionUser) => Promise<void>
   onDone: (message: string) => void
+  existingSlots: ReadonlyArray<Pick<PadelSlot, 'startsAt'>>
 }
 
 interface EditableSlot extends SlotInput {
@@ -26,28 +26,18 @@ function nextDayAtSameTime(value: string) {
   return `${nextDate.toISOString().slice(0, 10)}T${timePart}`
 }
 
-export function CreatePollModal({ user, onClose, onCreate, onDone }: CreatePollModalProps) {
-  const initialWeek = useMemo(() => nextMondayDate(), [])
+export function CreatePollModal({ user, onClose, onCreate, onDone, existingSlots }: CreatePollModalProps) {
+  const initialWeekStart = useMemo(() => nextMondayDate(), [])
   const nextEditorId = useRef(3)
-  const [weekStart, setWeekStart] = useState(initialWeek)
   const [slots, setSlots] = useState<EditableSlot[]>([
-    { editorId: 'slot-1', startsAt: defaultSlotForWeek(initialWeek, 1), durationMinutes: 90 },
-    { editorId: 'slot-2', startsAt: defaultSlotForWeek(initialWeek, 3), durationMinutes: 90 },
+    { editorId: 'slot-1', startsAt: defaultSlotForWeek(initialWeekStart, 1), durationMinutes: 90 },
+    { editorId: 'slot-2', startsAt: defaultSlotForWeek(initialWeekStart, 3), durationMinutes: 90 },
   ])
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
 
   const updateSlotInput = (index: number, patch: Partial<SlotInput>) => {
     setSlots((current) => current.map((slot, itemIndex) => itemIndex === index ? { ...slot, ...patch } : slot))
-  }
-
-  const updateWeek = (value: string) => {
-    const normalizedWeek = mondayOfWeek(value) ?? value
-    setWeekStart(normalizedWeek)
-    setSlots((current) => current.map((slot, index) => ({
-      ...slot,
-      startsAt: defaultSlotForWeek(normalizedWeek, index * 2 + 1),
-    })))
   }
 
   const duplicateSlot = (index: number) => {
@@ -70,7 +60,7 @@ export function CreatePollModal({ user, onClose, onCreate, onDone }: CreatePollM
     setError('')
     try {
       const slotInputs = slots.map(({ startsAt, durationMinutes }) => ({ startsAt, durationMinutes }))
-      await onCreate({ targetWeekStart: weekStart, slots: slotInputs }, user)
+      await onCreate({ slots: slotInputs }, user)
       onDone('Slot pubblicati. È ora di raccogliere le adesioni.')
       onClose()
     } catch (caught) {
@@ -81,15 +71,8 @@ export function CreatePollModal({ user, onClose, onCreate, onDone }: CreatePollM
   }
 
   return (
-    <Modal title="Prepara i prossimi slot" eyebrow="Nuova settimana" onClose={onClose} size="wide">
+    <Modal title="Prepara i prossimi slot" eyebrow="Nuovi slot" onClose={onClose} size="wide">
       <form onSubmit={submit} className="poll-form">
-        <div className="poll-form__basics">
-          <label className="field">
-            <span>Settimana di gioco (lun–dom)</span>
-            <input type="date" value={weekStart} onChange={(event) => updateWeek(event.target.value)} required />
-          </label>
-        </div>
-
         <div className="slot-editor">
           <div className="slot-editor__heading">
             <div>
@@ -99,23 +82,30 @@ export function CreatePollModal({ user, onClose, onCreate, onDone }: CreatePollM
             <button
               className="button button--secondary button--small"
               type="button"
-              onClick={() => setSlots((current) => [
-                ...current,
-                {
-                  editorId: `slot-${nextEditorId.current++}`,
-                  startsAt: defaultSlotForWeek(weekStart, current.length * 2 + 1),
-                  durationMinutes: 90,
-                },
-              ])}
+              onClick={() => setSlots((current) => {
+                const previous = current.at(-1)
+                return [
+                  ...current,
+                  {
+                    editorId: `slot-${nextEditorId.current++}`,
+                    startsAt: previous
+                      ? nextDayAtSameTime(previous.startsAt)
+                      : defaultSlotForWeek(initialWeekStart, 1),
+                    durationMinutes: previous?.durationMinutes ?? 90,
+                  },
+                ]
+              })}
             >
               <Plus size={16} /> Aggiungi slot
             </button>
           </div>
 
           <div className="slot-editor__list">
-            {slots.map((slot, index) => (
+            {slots.map((slot, index) => {
+              const alreadyExists = hasExistingSlotAtDateTime(slot.startsAt, existingSlots)
+              return (
               /* La chiave non dipende dai valori editabili: il controllo nativo mantiene il focus tra gli aggiornamenti. */
-              <div className="slot-editor__row" key={slot.editorId}>
+              <div className={`slot-editor__row ${alreadyExists ? 'slot-editor__row--duplicate' : ''}`} key={slot.editorId}>
                 <span className="slot-editor__number">{String(index + 1).padStart(2, '0')}</span>
                 <SlotDateTimeField
                   value={slot.startsAt}
@@ -152,8 +142,14 @@ export function CreatePollModal({ user, onClose, onCreate, onDone }: CreatePollM
                     <Trash2 size={18} />
                   </button>
                 </div>
+                {alreadyExists && (
+                  <p className="slot-editor__duplicate-warning" role="status">
+                    <AlertTriangle size={16} /> Esiste già uno slot con questa data e ora. Puoi comunque pubblicarlo.
+                  </p>
+                )}
               </div>
-            ))}
+              )
+            })}
           </div>
         </div>
 

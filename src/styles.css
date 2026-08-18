@@ -4483,14 +4483,6 @@ p {
   gap: 24px;
 }
 
-.poll-form__basics {
-  display: grid;
-  width: 100%;
-  min-width: 0;
-  grid-template-columns: 1.4fr 0.8fr;
-  gap: 14px;
-}
-
 .slot-editor {
   width: 100%;
   min-width: 0;
@@ -4537,6 +4529,30 @@ p {
   border: 1px solid #dae5e9;
   border-radius: 9px;
   background: var(--white);
+}
+
+.slot-editor__row--duplicate {
+  border-color: #dc8796;
+}
+
+.slot-editor__duplicate-warning {
+  display: flex;
+  margin: 2px 0 0;
+  padding: 9px 11px;
+  grid-row: 2;
+  grid-column: 1 / -1;
+  align-items: center;
+  gap: 7px;
+  border-radius: 7px;
+  background: #fae9ec;
+  color: #962c3d;
+  font-size: 0.66rem;
+  font-weight: 800;
+  line-height: 1.4;
+}
+
+.slot-editor__duplicate-warning svg {
+  flex: 0 0 auto;
 }
 
 .slot-editor__row > .slot-date-time {
@@ -6903,10 +6919,6 @@ p {
     grid-template-columns: 1fr;
   }
 
-  .poll-form__basics {
-    grid-template-columns: 1fr;
-  }
-
   .slot-editor__heading {
     flex-direction: column;
   }
@@ -6935,6 +6947,10 @@ p {
     grid-column: 3;
     align-self: center;
     flex-direction: row;
+  }
+
+  .slot-editor__duplicate-warning {
+    grid-row: 4;
   }
 
   .notification-callup__backdrop {

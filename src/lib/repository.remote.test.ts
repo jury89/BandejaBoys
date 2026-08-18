@@ -103,7 +103,6 @@ describe('repository remoto delle pagelle', () => {
 
   it('crea documenti di slot senza salvare una settimana', async () => {
     await repository.createPoll({
-      targetWeekStart: '2026-08-17',
       slots: [{ startsAt: '2026-08-18T18:30', durationMinutes: 90 }],
     }, reviewer)
 

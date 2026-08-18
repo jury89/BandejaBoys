@@ -54,7 +54,7 @@ export function PollCard({ group, user, members, slotFilter = 'all', onPollChang
   }
 
   const addSlot = async (input: SlotInput) => {
-    await repository.createPoll({ targetWeekStart: group.weekStart, slots: [input] }, user)
+    await repository.createPoll({ slots: [input] }, user)
   }
 
   return (

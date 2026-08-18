@@ -42,7 +42,6 @@ describe('repository activity log in demo mode', () => {
 
   it('registra creazione, adesione, ritiro e modifica dello slot', async () => {
     await repository.createPoll({
-      targetWeekStart: '2027-01-04',
       slots: [{ startsAt: '2027-01-05T19:30', durationMinutes: 90 }],
     }, user)
     const poll = polls()[0]
@@ -70,7 +69,6 @@ describe('repository activity log in demo mode', () => {
 
   it('salva soltanto gli slot e non persiste la settimana derivata', async () => {
     await repository.createPoll({
-      targetWeekStart: '2027-01-04',
       slots: [
         { startsAt: '2027-01-05T19:30', durationMinutes: 90 },
         { startsAt: '2027-01-06T19:30', durationMinutes: 90 },
@@ -92,7 +90,6 @@ describe('repository activity log in demo mode', () => {
 
   it('registra chi aggiunge e rimuove un ospite', async () => {
     await repository.createPoll({
-      targetWeekStart: '2027-01-04',
       slots: [{ startsAt: '2027-01-05T19:30', durationMinutes: 90 }],
     }, user)
     const poll = polls()[0]
@@ -118,7 +115,6 @@ describe('repository activity log in demo mode', () => {
 
   it('aggrega primo accesso, ultimo accesso e conteggio per utente e slot', async () => {
     await repository.createPoll({
-      targetWeekStart: '2027-01-04',
       slots: [{ startsAt: '2027-01-06T19:30', durationMinutes: 90 }],
     }, user)
     const poll = polls()[0]

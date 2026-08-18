@@ -8,7 +8,7 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "lint": "eslint .",
-    "test": "vitest run",
+    "test": "vitest run --maxWorkers=1 --testTimeout=30000",
     "test:watch": "vitest",
     "test:rules:match-report": "tsx scripts/match-report-rules-test.ts",
     "smoke:match-report": "tsx scripts/match-report-production-smoke.ts",

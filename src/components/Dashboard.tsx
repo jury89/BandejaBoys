@@ -1061,7 +1061,13 @@ export function Dashboard() {
       <footer className="site-footer"><Brand compact /><span>Organizzato fuori. Competitivo dentro.</span></footer>
 
       {createOpen && (
-        <CreatePollModal user={user} onClose={() => setCreateOpen(false)} onCreate={repository.createPoll} onDone={notify} />
+        <CreatePollModal
+          user={user}
+          existingSlots={polls.flatMap((poll) => poll.slots)}
+          onClose={() => setCreateOpen(false)}
+          onCreate={repository.createPoll}
+          onDone={notify}
+        />
       )}
       {profileOpen && (
         <ProfileModal
