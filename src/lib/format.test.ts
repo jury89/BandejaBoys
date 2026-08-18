@@ -3,7 +3,9 @@ import {
   mondayOfWeek,
   pollWeekTitle,
   slotDateParts,
+  slotWeekTitle,
   weekLabel,
+  weekStartForDateTime,
 } from './format'
 
 describe('medie delle pagelle', () => {
@@ -37,6 +39,12 @@ describe('etichette settimanali', () => {
     expect(mondayOfWeek('2026-08-09')).toBe('2026-08-03')
     expect(pollWeekTitle('2026-08-05')).toBe('Padel · 3 ago – 9 ago 2026')
     expect(weekLabel('2026-08-05')).toBe('3 ago — 9 ago')
+  })
+
+  it('ricava la settimana dalla data effettiva dello slot nel fuso di Roma', () => {
+    expect(weekStartForDateTime('2026-08-09T21:30')).toBe('2026-08-03')
+    expect(weekStartForDateTime('2026-08-16T22:30:00.000Z')).toBe('2026-08-17')
+    expect(slotWeekTitle('2026-08-16T22:30:00.000Z')).toBe('Padel · 17 ago – 23 ago 2026')
   })
 
   it('esplicita entrambi gli anni quando la settimana attraversa Capodanno', () => {

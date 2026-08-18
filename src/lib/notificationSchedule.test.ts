@@ -280,7 +280,7 @@ describe('pianificazione notifiche', () => {
       recipientUserIds: null,
       excludedUserIds: ['jury'],
       title: 'Sveglia fagianotto!',
-      body: 'Ci sono 5 nuovi slot disponibili per “Padel · 27 lug – 2 ago 2026”. Segna quando ci sei.',
+      body: 'Ci sono 5 nuovi slot disponibili per “Padel · 20 lug – 26 lug 2026”. Segna quando ci sei.',
     })
   })
 

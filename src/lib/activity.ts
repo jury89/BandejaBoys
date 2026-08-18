@@ -1,4 +1,5 @@
 import type { PadelPoll, PadelSlot, SessionUser } from '../types'
+import { slotWeekTitle } from './format'
 
 export const ACTIVITY_EVENT_TYPES = [
   'poll_created',
@@ -63,7 +64,7 @@ export function makeActivityEvent(
     actorId: actor.id,
     actorName: actor.displayName,
     pollId: poll.id,
-    pollTitle: poll.title,
+    pollTitle: slot ? slotWeekTitle(slot.startsAt) : poll.title,
     ...(slot ? { slotId: slot.id, slotStartsAt: slot.startsAt } : {}),
     details,
   }
@@ -92,7 +93,7 @@ export function mergeLegacySubstitutionEvents(
       actorId: substitution.userId,
       actorName: substitution.displayName,
       pollId: poll.id,
-      pollTitle: poll.title,
+      pollTitle: slotWeekTitle(slot.startsAt),
       slotId: slot.id,
       slotStartsAt: slot.startsAt,
       occurredAt: substitution.at,

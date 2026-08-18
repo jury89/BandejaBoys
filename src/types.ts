@@ -69,6 +69,17 @@ export interface PadelPoll {
   slots: PadelSlot[]
 }
 
+export interface SlotWeekEntry {
+  poll: PadelPoll
+  slot: PadelSlot
+}
+
+export interface SlotWeekGroup {
+  id: string
+  weekStart: string
+  entries: SlotWeekEntry[]
+}
+
 export interface PlayerMatch {
   pollId: string
   pollTitle: string

@@ -22,7 +22,7 @@ import {
   getPlayerMatches,
   getSlotEndsAt,
   getSlotPhase,
-  getUpcomingPolls,
+  getUpcomingSlotWeeks,
   isBookingCandidate,
   DEFAULT_VENUE_PHONE,
 } from '../lib/domain'
@@ -518,7 +518,7 @@ export function Dashboard() {
     return () => window.clearTimeout(timer)
   }, [fantasyRounds, now, polls, ratingResponses, user])
 
-  const upcomingPolls = useMemo(() => getUpcomingPolls(polls, now), [now, polls])
+  const upcomingSlotWeeks = useMemo(() => getUpcomingSlotWeeks(polls, now), [now, polls])
   const matchNameMembers = useMemo(
     () => user
       ? [user, ...members.filter((member) => member.id !== user.id)]
@@ -632,27 +632,31 @@ export function Dashboard() {
   }, [ratingTestOpen])
 
   const stats = useMemo(() => {
-    const openPolls = upcomingPolls.filter((poll) => poll.status === 'open')
-    const slots = openPolls.flatMap((poll) => poll.slots)
+    const openWeeks = upcomingSlotWeeks.filter((group) => (
+      group.entries.some(({ poll }) => poll.status === 'open')
+    ))
+    const slots = openWeeks.flatMap((group) => (
+      group.entries.filter(({ poll }) => poll.status === 'open').map(({ slot }) => slot)
+    ))
     const ready = slots.filter((slot) => getSlotPhase(slot) === 'ready').length
     const booked = slots.filter((slot) => getSlotPhase(slot) === 'booked')
     const nextBooked = booked.sort((left, right) => left.startsAt.localeCompare(right.startsAt))[0]
-    return { open: openPolls.length, ready, nextBooked }
-  }, [upcomingPolls])
+    return { open: openWeeks.length, ready, nextBooked }
+  }, [upcomingSlotWeeks])
 
   if (!user) return null
 
-  const totalSlotCount = upcomingPolls.reduce((total, poll) => total + poll.slots.length, 0)
-  const bookedSlotCount = upcomingPolls.reduce(
-    (total, poll) => total + poll.slots.filter((slot) => getSlotPhase(slot) === 'booked').length,
+  const totalSlotCount = upcomingSlotWeeks.reduce((total, group) => total + group.entries.length, 0)
+  const bookedSlotCount = upcomingSlotWeeks.reduce(
+    (total, group) => total + group.entries.filter(({ slot }) => getSlotPhase(slot) === 'booked').length,
     0,
   )
-  const bookingCandidateSlotCount = upcomingPolls.reduce(
-    (total, poll) => total + poll.slots.filter(isBookingCandidate).length,
+  const bookingCandidateSlotCount = upcomingSlotWeeks.reduce(
+    (total, group) => total + group.entries.filter(({ slot }) => isBookingCandidate(slot)).length,
     0,
   )
-  const visiblePolls = upcomingPolls.filter(
-    (poll) => poll.slots.some((slot) => (
+  const visibleSlotWeeks = upcomingSlotWeeks.filter(
+    (group) => group.entries.some(({ slot }) => (
       feedFilter === 'all'
       || (feedFilter === 'booked' && getSlotPhase(slot) === 'booked')
       || (feedFilter === 'booking' && isBookingCandidate(slot))
@@ -985,14 +989,14 @@ export function Dashboard() {
             <h1>Mettiamo in campo<br />la prossima partita.</h1>
           </div>
           <button className="button button--primary button--large" type="button" onClick={() => setCreateOpen(true)}>
-            <CalendarPlus size={20} /> Nuovo sondaggio
+            <CalendarPlus size={20} /> Nuovi slot
           </button>
         </section>
 
         <section className="scoreboard" aria-label="Riepilogo">
           <div>
             <span className="scoreboard__icon"><UsersRound size={20} /></span>
-            <p><strong>{stats.open}</strong><span>Sondaggi<br />in corso</span></p>
+            <p><strong>{stats.open}</strong><span>Settimane<br />attive</span></p>
           </div>
           <div className={stats.ready > 0 ? 'scoreboard__urgent' : ''}>
             <span className="scoreboard__icon"><BellRing size={20} /></span>
@@ -1028,12 +1032,12 @@ export function Dashboard() {
               <RefreshCw size={18} /> Riprova ora
             </button>
           </section>
-        ) : visiblePolls.length > 0 ? (
+        ) : visibleSlotWeeks.length > 0 ? (
           <div className="poll-feed">
-            {visiblePolls.map((poll) => (
+            {visibleSlotWeeks.map((group) => (
               <PollCard
-                key={poll.id}
-                poll={poll}
+                key={group.id}
+                group={group}
                 user={user}
                 members={members}
                 slotFilter={feedFilter}
@@ -1049,7 +1053,7 @@ export function Dashboard() {
             <p className="eyebrow">Campo libero</p>
             <h2>{currentFeedCopy.emptyHeading}</h2>
             <p>{currentFeedCopy.emptyBody}</p>
-            {feedFilter === 'all' && <button className="button button--primary" type="button" onClick={() => setCreateOpen(true)}><CalendarPlus size={18} /> Crea il primo sondaggio</button>}
+            {feedFilter === 'all' && <button className="button button--primary" type="button" onClick={() => setCreateOpen(true)}><CalendarPlus size={18} /> Crea i primi slot</button>}
           </section>
         )}
       </main>}

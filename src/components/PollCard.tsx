@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { Archive, CalendarDays, CalendarPlus, ChevronDown, ChevronUp, RotateCcw } from 'lucide-react'
-import type { MemberProfile, PadelPoll, SessionUser, SlotInput } from '../types'
+import { CalendarDays, CalendarPlus, ChevronDown, ChevronUp } from 'lucide-react'
+import type { MemberProfile, PadelPoll, SessionUser, SlotInput, SlotWeekGroup } from '../types'
 import { getSlotPhase, isBookingCandidate } from '../lib/domain'
 import { pollWeekTitle } from '../lib/format'
 import { resolveMemberName } from '../lib/memberNames'
@@ -9,7 +9,7 @@ import { AddSlotModal } from './AddSlotModal'
 import { SlotCard } from './SlotCard'
 
 interface PollCardProps {
-  poll: PadelPoll
+  group: SlotWeekGroup
   user: SessionUser
   members: MemberProfile[]
   slotFilter?: PollSlotFilter
@@ -20,46 +20,54 @@ interface PollCardProps {
 
 export type PollSlotFilter = 'all' | 'booking' | 'booked'
 
-export function PollCard({ poll, user, members, slotFilter = 'all', onPollChange, onNotify, onError }: PollCardProps) {
+export function PollCard({ group, user, members, slotFilter = 'all', onPollChange, onNotify, onError }: PollCardProps) {
   const [showAddSlot, setShowAddSlot] = useState(false)
   const [slotsCollapsed, setSlotsCollapsed] = useState(false)
-  const canManage = poll.createdBy === user.id
-  const creatorName = resolveMemberName(members, poll.createdBy, poll.createdByName)
-  const pollTitle = pollWeekTitle(poll.targetWeekStart)
-  const slotsRegionId = `poll-slots-${poll.id}`
-  const visibleSlots = poll.slots.filter((slot) => (
+  const pollTitle = pollWeekTitle(group.weekStart)
+  const slotsRegionId = `slot-week-${group.weekStart}`
+  const visibleEntries = group.entries.filter(({ slot }) => (
     slotFilter === 'all'
     || (slotFilter === 'booked' && getSlotPhase(slot) === 'booked')
     || (slotFilter === 'booking' && isBookingCandidate(slot))
   ))
-
-  const toggleStatus = async () => {
-    try {
-      const next = poll.status === 'open' ? 'closed' : 'open'
-      const updated = await repository.setPollStatus(poll.id, next, user)
-      onPollChange(updated)
-      onNotify(next === 'closed' ? 'Sondaggio archiviato.' : 'Sondaggio riaperto.')
-    } catch (error) {
-      onError(error instanceof Error ? error.message : 'Non è stato possibile aggiornare il sondaggio.')
-    }
+  const creatorNames = Array.from(new Set(group.entries.map(({ poll, slot }) => (
+    resolveMemberName(
+      members,
+      slot.createdBy ?? poll.createdBy,
+      slot.createdByName ?? poll.createdByName,
+    )
+  ))))
+  const creatorCopy = creatorNames.length === 1
+    ? `Proposto da ${creatorNames[0]}`
+    : `Proposti da ${creatorNames.join(', ')}`
+  const allClosed = group.entries.every(({ poll }) => poll.status === 'closed')
+  const modalPoll: PadelPoll = {
+    id: group.id,
+    title: pollTitle,
+    targetWeekStart: group.weekStart,
+    createdBy: user.id,
+    createdByName: user.displayName,
+    createdAt: group.entries[0]?.poll.createdAt ?? 0,
+    updatedAt: group.entries[0]?.poll.updatedAt ?? 0,
+    status: 'open',
+    slots: group.entries.map(({ slot }) => slot),
   }
 
   const addSlot = async (input: SlotInput) => {
-    const updated = await repository.addSlot(poll.id, input, user)
-    onPollChange(updated)
+    await repository.createPoll({ targetWeekStart: group.weekStart, slots: [input] }, user)
   }
 
   return (
     <>
-      <section className={`poll-card ${poll.status === 'closed' ? 'poll-card--closed' : ''}`}>
+      <section className={`poll-card ${allClosed ? 'poll-card--closed' : ''}`}>
         <header className="poll-card__header">
           <div className="poll-card__identity">
-            <p className="poll-card__week"><CalendarDays size={14} /> Sondaggio settimanale</p>
+            <p className="poll-card__week"><CalendarDays size={14} /> Settimana di gioco</p>
             <h2>{pollTitle}</h2>
             <p className="poll-card__meta">
-              <span>Creato da {creatorName}</span>
+              <span>{creatorCopy}</span>
               <span aria-hidden="true">·</span>
-              <strong>{visibleSlots.length} slot</strong>
+              <strong>{visibleEntries.length} slot</strong>
               <span aria-hidden="true">·</span>
               <button
                 className="poll-card__collapse"
@@ -75,32 +83,21 @@ export function PollCard({ poll, user, members, slotFilter = 'all', onPollChange
             </p>
           </div>
           <div className="poll-card__actions">
-            {poll.status === 'open' && slotFilter !== 'booked' && (
+            {!allClosed && slotFilter !== 'booked' && (
               <button
                 className="button button--secondary button--small poll-card__action"
                 type="button"
                 aria-label="Aggiungi uno slot"
                 onClick={() => setShowAddSlot(true)}
-                disabled={poll.slots.length >= 14}
+                disabled={group.entries.length >= 14}
               >
                 <CalendarPlus size={16} />
                 <span className="poll-card__action-label">Aggiungi slot</span>
               </button>
             )}
-            {canManage && (
-              <button
-                className="button button--ghost button--small poll-card__action"
-                type="button"
-                aria-label={poll.status === 'open' ? 'Archivia sondaggio' : 'Riapri sondaggio'}
-                onClick={toggleStatus}
-              >
-                {poll.status === 'open' ? <Archive size={16} /> : <RotateCcw size={16} />}
-                <span className="poll-card__action-label">{poll.status === 'open' ? 'Archivia' : 'Riapri'}</span>
-              </button>
-            )}
           </div>
         </header>
-        {poll.status === 'closed' && <div className="closed-banner">Sondaggio chiuso · puoi ancora consultare l’ordine delle adesioni</div>}
+        {allClosed && <div className="closed-banner">Slot archiviati · puoi ancora consultare l’ordine delle adesioni</div>}
         {!slotsCollapsed && (
           <div
             id={slotsRegionId}
@@ -108,9 +105,9 @@ export function PollCard({ poll, user, members, slotFilter = 'all', onPollChange
             role="region"
             aria-label={`Slot di ${pollTitle}`}
           >
-            {visibleSlots.map((slot) => (
+            {visibleEntries.map(({ poll, slot }) => (
               <SlotCard
-                key={slot.id}
+                key={`${poll.id}:${slot.id}`}
                 poll={poll}
                 slot={slot}
                 user={user}
@@ -126,7 +123,7 @@ export function PollCard({ poll, user, members, slotFilter = 'all', onPollChange
       </section>
       {showAddSlot && (
         <AddSlotModal
-          poll={poll}
+          poll={modalPoll}
           onClose={() => setShowAddSlot(false)}
           onSave={addSlot}
           onDone={onNotify}

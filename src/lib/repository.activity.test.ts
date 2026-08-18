@@ -68,7 +68,7 @@ describe('repository activity log in demo mode', () => {
     expect(activity().events.every((event) => Number.isFinite(event.occurredAt))).toBe(true)
   })
 
-  it('salva la nuova settimana quando l’ultimo slot viene spostato insieme agli altri', async () => {
+  it('salva soltanto gli slot e non persiste la settimana derivata', async () => {
     await repository.createPoll({
       targetWeekStart: '2027-01-04',
       slots: [
@@ -81,10 +81,13 @@ describe('repository activity log in demo mode', () => {
     await repository.rescheduleSlot(poll.id, poll.slots[0].id, '2026-12-29T19:30', user)
     await repository.rescheduleSlot(poll.id, poll.slots[1].id, '2026-12-30T19:30', user)
 
-    expect(polls()[0]).toMatchObject({
-      targetWeekStart: '2026-12-28',
-      title: 'Padel · 28 dic 2026 – 3 gen 2027',
-    })
+    const stored = polls()[0]
+    expect(stored).not.toHaveProperty('targetWeekStart')
+    expect(stored).not.toHaveProperty('title')
+    expect(stored.slots.map((slot) => slot.startsAt)).toEqual([
+      '2026-12-29T18:30:00.000Z',
+      '2026-12-30T18:30:00.000Z',
+    ])
   })
 
   it('registra chi aggiunge e rimuove un ospite', async () => {

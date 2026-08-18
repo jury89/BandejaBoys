@@ -28,7 +28,7 @@ describe('editor degli slot', () => {
     expect(screen.getByLabelText('Settimana di gioco (lun–dom)')).toHaveValue('2026-08-03')
     expect(screen.getAllByLabelText('Data')[0]).toHaveValue('2026-08-04')
     expect(screen.getAllByLabelText('Data')[1]).toHaveValue('2026-08-06')
-    fireEvent.click(screen.getByRole('button', { name: 'Pubblica sondaggio' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Pubblica slot' }))
 
     await waitFor(() => expect(onCreate).toHaveBeenCalledWith(
       expect.objectContaining({ targetWeekStart: '2026-08-03' }),

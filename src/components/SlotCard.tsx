@@ -231,8 +231,8 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
                   className="slot-card__icon-action slot-card__icon-action--delete"
                   type="button"
                   onClick={deleteSlot}
-                  disabled={busy || poll.slots.length === 1}
-                  title={poll.slots.length === 1 ? 'Aggiungi un altro slot prima di eliminare questo.' : 'Elimina slot'}
+                  disabled={busy}
+                  title="Elimina slot"
                   aria-label={`Elimina lo slot di ${date.full} alle ${date.time}`}
                 >
                   <Trash2 size={15} />
