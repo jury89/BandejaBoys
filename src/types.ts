@@ -123,7 +123,6 @@ export interface SlotInput {
 }
 
 export interface CreatePollInput {
-  targetWeekStart: string
   slots: SlotInput[]
 }
 

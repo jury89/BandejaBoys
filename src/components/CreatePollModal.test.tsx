@@ -10,11 +10,12 @@ const user: SessionUser = {
 }
 
 describe('editor degli slot', () => {
-  it('non richiede un nome e crea il sondaggio dalla settimana scelta', async () => {
+  it('crea gli slot dalle singole date senza richiedere nome o settimana', async () => {
     const onCreate = vi.fn().mockResolvedValue(undefined)
     render(
       <CreatePollModal
         user={user}
+        existingSlots={[]}
         onClose={vi.fn()}
         onCreate={onCreate}
         onDone={vi.fn()}
@@ -22,25 +23,24 @@ describe('editor degli slot', () => {
     )
 
     expect(screen.queryByLabelText('Nome del sondaggio')).not.toBeInTheDocument()
-    fireEvent.change(screen.getByLabelText('Settimana di gioco (lun–dom)'), {
-      target: { value: '2026-08-05' },
-    })
-    expect(screen.getByLabelText('Settimana di gioco (lun–dom)')).toHaveValue('2026-08-03')
-    expect(screen.getAllByLabelText('Data')[0]).toHaveValue('2026-08-04')
-    expect(screen.getAllByLabelText('Data')[1]).toHaveValue('2026-08-06')
+    expect(screen.queryByLabelText('Settimana di gioco (lun–dom)')).not.toBeInTheDocument()
+    fireEvent.change(screen.getAllByLabelText('Data')[0], { target: { value: '2026-08-25' } })
     fireEvent.click(screen.getByRole('button', { name: 'Pubblica slot' }))
 
-    await waitFor(() => expect(onCreate).toHaveBeenCalledWith(
-      expect.objectContaining({ targetWeekStart: '2026-08-03' }),
-      user,
-    ))
+    await waitFor(() => expect(onCreate).toHaveBeenCalledWith(expect.objectContaining({
+      slots: expect.arrayContaining([
+        expect.objectContaining({ startsAt: expect.stringContaining('2026-08-25T') }),
+      ]),
+    }), user))
     expect(onCreate.mock.calls[0][0]).not.toHaveProperty('title')
+    expect(onCreate.mock.calls[0][0]).not.toHaveProperty('targetWeekStart')
   })
 
   it('mantiene il focus sul selettore dei minuti dopo una modifica', () => {
     render(
       <CreatePollModal
         user={user}
+        existingSlots={[]}
         onClose={vi.fn()}
         onCreate={vi.fn()}
         onDone={vi.fn()}
@@ -60,6 +60,7 @@ describe('editor degli slot', () => {
     render(
       <CreatePollModal
         user={user}
+        existingSlots={[]}
         onClose={vi.fn()}
         onCreate={vi.fn()}
         onDone={vi.fn()}
@@ -78,5 +79,34 @@ describe('editor degli slot', () => {
     expect(screen.getAllByLabelText('Minuti')[1]).toHaveValue('00')
     expect(screen.getAllByLabelText('Durata')[1]).toHaveValue('120')
     expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
+  })
+
+  it('avvisa ogni slot già esistente senza impedirne la pubblicazione', async () => {
+    const onCreate = vi.fn().mockResolvedValue(undefined)
+    render(
+      <CreatePollModal
+        user={user}
+        existingSlots={[
+          { startsAt: '2026-07-28T17:00:00.000Z' },
+          { startsAt: '2026-07-30T18:30:00.000Z' },
+        ]}
+        onClose={vi.fn()}
+        onCreate={onCreate}
+        onDone={vi.fn()}
+      />,
+    )
+
+    fireEvent.change(screen.getAllByLabelText('Data')[0], { target: { value: '2026-07-28' } })
+    fireEvent.change(screen.getAllByLabelText('Ora')[0], { target: { value: '19' } })
+    fireEvent.change(screen.getAllByLabelText('Minuti')[0], { target: { value: '00' } })
+    fireEvent.change(screen.getAllByLabelText('Data')[1], { target: { value: '2026-07-30' } })
+    fireEvent.change(screen.getAllByLabelText('Ora')[1], { target: { value: '20' } })
+    fireEvent.change(screen.getAllByLabelText('Minuti')[1], { target: { value: '30' } })
+
+    expect(screen.getAllByRole('status')).toHaveLength(2)
+    expect(screen.getAllByText(/Esiste già uno slot con questa data e ora/)).toHaveLength(2)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Pubblica slot' }))
+    await waitFor(() => expect(onCreate).toHaveBeenCalledTimes(1))
   })
 })

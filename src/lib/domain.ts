@@ -103,6 +103,21 @@ export function padelDateTimeToTimestamp(value: string): number {
   return candidate
 }
 
+export function hasExistingSlotAtDateTime(
+  startsAt: string,
+  existingSlots: ReadonlyArray<Pick<PadelSlot, 'startsAt'>>,
+): boolean {
+  const candidateTimestamp = padelDateTimeToTimestamp(startsAt)
+  if (!Number.isFinite(candidateTimestamp)) return false
+
+  const candidateMinute = Math.floor(candidateTimestamp / 60_000)
+  return existingSlots.some((slot) => {
+    const existingTimestamp = padelDateTimeToTimestamp(slot.startsAt)
+    return Number.isFinite(existingTimestamp)
+      && Math.floor(existingTimestamp / 60_000) === candidateMinute
+  })
+}
+
 export function profileNameError(displayName: string): string | null {
   const cleanName = displayName.trim()
   if (/evi/i.test(cleanName)) return 'sei un asino'
@@ -1456,8 +1471,6 @@ export function makePoll(
   creator: SessionUser,
   now = Date.now(),
 ): Omit<PadelPoll, 'id'> {
-  const targetWeekStart = mondayOfWeek(input.targetWeekStart)
-  if (!targetWeekStart) throw new Error('Scegli la settimana di gioco.')
   if (input.slots.length === 0) throw new Error('Aggiungi almeno uno slot.')
   if (input.slots.length > MAX_SLOTS) throw new Error(`Puoi inserire al massimo ${MAX_SLOTS} slot.`)
 
@@ -1465,6 +1478,8 @@ export function makePoll(
   if (new Set(normalizedSlots.map((slot) => slot.startsAt)).size !== normalizedSlots.length) {
     throw new Error('Hai inserito due slot uguali.')
   }
+  const targetWeekStart = weekStartForDateTime(normalizedSlots[0].startsAt)
+  if (!targetWeekStart) throw new Error('Scegli una data valida per lo slot.')
 
   return {
     title: pollWeekTitle(targetWeekStart),
