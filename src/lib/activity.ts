@@ -14,6 +14,7 @@ export const ACTIVITY_EVENT_TYPES = [
   'guest_added',
   'guest_removed',
   'starter_substituted',
+  'slot_roster_admin_updated',
   'slot_booked',
   'slot_unbooked',
 ] as const

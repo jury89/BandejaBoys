@@ -43,6 +43,22 @@ export interface Signup {
   substitutedFor?: SubstitutionNote
 }
 
+export type AdminSlotRosterAction =
+  | {
+    kind: 'add'
+    member: Pick<MemberProfile, 'id' | 'displayName'>
+    role: SignupRole
+  }
+  | {
+    kind: 'remove'
+    signupId: string
+  }
+  | {
+    kind: 'set-role'
+    signupId: string
+    role: SignupRole
+  }
+
 export interface PadelSlot {
   id: string
   startsAt: string

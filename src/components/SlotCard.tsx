@@ -12,6 +12,7 @@ import {
   MapPin,
   PencilLine,
   PhoneCall,
+  ShieldCheck,
   Trash2,
   UserRoundPlus,
 } from 'lucide-react'
@@ -26,12 +27,14 @@ import {
   MAX_STARTERS,
 } from '../lib/domain'
 import { downloadSlotCalendar } from '../lib/calendar'
+import { isSlotAdmin } from '../lib/admin'
 import { slotDateParts } from '../lib/format'
 import { resolveMemberName } from '../lib/memberNames'
 import { repository } from '../lib/repository'
 import { slotViewSessionKey, trackSustainedSlotView } from '../lib/slotViewTracking'
 import { slotElementId } from '../lib/slotNavigation'
 import { EditSlotModal } from './EditSlotModal'
+import { AdminSlotRosterModal } from './AdminSlotRosterModal'
 import { GuestPlayerModal } from './GuestPlayerModal'
 import { ProfileAvatar } from './ProfileAvatar'
 import { SlotActivityModal } from './SlotActivityModal'
@@ -58,6 +61,7 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
   const substitutionTooltipId = useId()
   const cardRef = useRef<HTMLElement>(null)
   const [activityOpen, setActivityOpen] = useState(false)
+  const [adminRosterOpen, setAdminRosterOpen] = useState(false)
   const [guestPlayerOpen, setGuestPlayerOpen] = useState(false)
   const [scheduleOpen, setScheduleOpen] = useState(false)
   const [substitutionOpen, setSubstitutionOpen] = useState(false)
@@ -70,6 +74,7 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
   const PhaseIcon = phaseCopy[phase].icon
   const joined = slot.signups.some((signup) => signup.userId === user.id)
   const userIsStarter = isStarter(slot, user.id)
+  const userIsAdmin = isSlotAdmin(user.id)
   const memberProfile = (userId: string | undefined) =>
     members.find((member) => member.id === userId) ?? (userId === user.id ? user : undefined)
   const memberName = (userId: string | undefined, savedName: string | undefined) =>
@@ -185,6 +190,18 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
             {phaseCopy[phase].label}
           </div>
           <div className="slot-card__management" role="group" aria-label="Azioni dello slot">
+            {userIsAdmin && (
+              <button
+                className="slot-card__icon-action slot-card__icon-action--admin"
+                type="button"
+                onClick={() => setAdminRosterOpen(true)}
+                disabled={busy}
+                title="Gestisci tutti i giocatori"
+                aria-label={`Gestisci i giocatori dello slot di ${date.full} alle ${date.time}`}
+              >
+                <ShieldCheck size={16} />
+              </button>
+            )}
             {!disabled && (
               <button
                 className="slot-card__icon-action slot-card__icon-action--guest"
@@ -443,6 +460,17 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
           slot={slot}
           onClose={() => setScheduleOpen(false)}
           onSave={(startsAt) => syncPoll(() => repository.rescheduleSlot(poll.id, slot.id, startsAt, user))}
+          onDone={onNotify}
+        />
+      )}
+      {adminRosterOpen && (
+        <AdminSlotRosterModal
+          slot={slot}
+          members={members}
+          onClose={() => setAdminRosterOpen(false)}
+          onApply={(action) => syncPoll(
+            () => repository.adminUpdateSlotRoster(poll.id, slot.id, user, action),
+          )}
           onDone={onNotify}
         />
       )}

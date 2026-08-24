@@ -14,6 +14,7 @@ import {
   type Unsubscribe,
 } from 'firebase/firestore'
 import type {
+  AdminSlotRosterAction,
   CreatePollInput,
   FantasyEntry,
   FantasyRound,
@@ -37,6 +38,7 @@ import type {
 import {
   makeActivityEvent,
   slotViewDocumentId,
+  type ActivityDetail,
   type ActivityEventInput,
   type LocalActivityEvent,
   type LocalSlotView,
@@ -45,6 +47,7 @@ import {
   addGuestSignup,
   addSlotToPoll,
   addSignup,
+  applyAdminSlotRosterAction,
   aggregateMatchRatingSummaries,
   getMatchRatingSummaryId,
   getStarters,
@@ -62,6 +65,7 @@ import {
   substituteStarter,
   updateSlot,
 } from './domain'
+import { isSlotAdmin } from './admin'
 import { getLocalProfiles, USERS_EVENT } from './auth'
 import { firestore, hasRemoteBackend } from './firebase'
 import { mondayOfWeek, pollWeekTitle, slotWeekTitle, weekStartForDateTime } from './format'
@@ -131,6 +135,12 @@ export interface PadelRepository {
     slotId: string,
     actor: SessionUser,
     signupId: string,
+  ): Promise<PadelPoll>
+  adminUpdateSlotRoster(
+    pollId: string,
+    slotId: string,
+    actor: SessionUser,
+    action: AdminSlotRosterAction,
   ): Promise<PadelPoll>
   deleteSlot(pollId: string, slotId: string, actor: SessionUser): Promise<PadelPoll>
   rescheduleSlot(
@@ -211,6 +221,38 @@ function storedLocalPollData(poll: PadelPoll) {
 
 function signupRole(slot: PadelSlot, userId: string): SignupRole {
   return getStarters(slot).some((signup) => signup.userId === userId) ? 'starter' : 'reserve'
+}
+
+function adminRosterActivityDetails(
+  slot: PadelSlot,
+  action: AdminSlotRosterAction,
+): Record<string, ActivityDetail> {
+  if (action.kind === 'add') {
+    return {
+      action: 'added',
+      targetUserId: action.member.id,
+      targetName: action.member.displayName,
+      toRole: action.role,
+    }
+  }
+
+  const signup = slot.signups.find((entry) => entry.id === action.signupId)
+  if (!signup) throw new Error('Giocatore non trovato nello slot.')
+  const fromRole = signupRole(slot, signup.userId)
+  return action.kind === 'remove'
+    ? {
+      action: 'removed',
+      targetUserId: signup.userId,
+      targetName: signup.displayName,
+      fromRole,
+    }
+    : {
+      action: 'role_changed',
+      targetUserId: signup.userId,
+      targetName: signup.displayName,
+      fromRole,
+      toRole: action.role,
+    }
 }
 
 function pollCreationEvents(poll: PadelPoll, creator: SessionUser): ActivityEventInput[] {
@@ -566,6 +608,30 @@ function remoteRepository(): PadelRepository {
               role: signupRole(previous, guest.userId),
               joinedAt: guest.joinedAt,
             })
+            : null
+        },
+      )
+    },
+    async adminUpdateSlotRoster(pollId, slotId, actor, action) {
+      if (!isSlotAdmin(actor.id)) throw new Error('Solo l’amministratore può modificare la formazione.')
+      return mutatePoll(
+        pollId,
+        (poll) => updateSlot(
+          poll,
+          slotId,
+          (slot) => applyAdminSlotRosterAction(slot, action),
+        ),
+        (before, after) => {
+          const previous = slotById(before, slotId)
+          const updated = slotById(after, slotId)
+          return previous && updated
+            ? makeActivityEvent(
+              'slot_roster_admin_updated',
+              actor,
+              after,
+              updated,
+              adminRosterActivityDetails(previous, action),
+            )
             : null
         },
       )
@@ -1134,6 +1200,30 @@ function localRepository(): PadelRepository {
               role: signupRole(previous, guest.userId),
               joinedAt: guest.joinedAt,
             })
+            : null
+        },
+      )
+    },
+    async adminUpdateSlotRoster(pollId, slotId, actor, action) {
+      if (!isSlotAdmin(actor.id)) throw new Error('Solo l’amministratore può modificare la formazione.')
+      return mutate(
+        pollId,
+        (poll) => updateSlot(
+          poll,
+          slotId,
+          (slot) => applyAdminSlotRosterAction(slot, action),
+        ),
+        (before, after) => {
+          const previous = slotById(before, slotId)
+          const updated = slotById(after, slotId)
+          return previous && updated
+            ? makeActivityEvent(
+              'slot_roster_admin_updated',
+              actor,
+              after,
+              updated,
+              adminRosterActivityDetails(previous, action),
+            )
             : null
         },
       )

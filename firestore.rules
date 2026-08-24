@@ -16,6 +16,10 @@ service cloud.firestore {
       return signedIn() && !isNotifier();
     }
 
+    function isSlotAdmin() {
+      return isMember() && request.auth.uid == '4VSiYJso4YSWf35Rg8Cp0Q8hVmu2';
+    }
+
     function validAvatar() {
       return !request.resource.data.keys().hasAny(['avatarDataUrl'])
         || (request.resource.data.avatarDataUrl is string
@@ -306,6 +310,7 @@ service cloud.firestore {
           'poll_created', 'poll_archived', 'poll_reopened', 'poll_deleted',
           'slot_created', 'slot_rescheduled', 'slot_deleted',
           'signup_joined', 'signup_left', 'starter_substituted',
+          'slot_roster_admin_updated',
           'guest_added', 'guest_removed',
           'slot_booked', 'slot_unbooked'
         ]
@@ -320,6 +325,7 @@ service cloud.firestore {
         && (!request.resource.data.keys().hasAny(['slotStartsAt'])
           || request.resource.data.slotStartsAt is string)
         && request.resource.data.details is map
+        && (request.resource.data.type != 'slot_roster_admin_updated' || isSlotAdmin())
         && request.resource.data.occurredAt == request.time;
     }
 

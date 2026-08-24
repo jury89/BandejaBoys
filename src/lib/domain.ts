@@ -1,4 +1,5 @@
 import type {
+  AdminSlotRosterAction,
   CreatePollInput,
   FantasyEntry,
   FantasyLeaderboardContribution,
@@ -1260,6 +1261,48 @@ export function addSignup(
       },
     ]),
   }
+}
+
+export function setSignupRole(
+  slot: PadelSlot,
+  signupId: string,
+  role: SignupRole,
+): PadelSlot {
+  const signup = slot.signups.find((entry) => entry.id === signupId)
+  if (!signup) throw new Error('Giocatore non trovato nello slot.')
+
+  const currentRole = getStarters(slot).some((entry) => entry.id === signupId)
+    ? 'starter'
+    : 'reserve'
+  if (currentRole === role) return slot
+  if (role === 'starter' && getStarters(slot).length >= MAX_STARTERS) {
+    throw new Error('Sposta prima un titolare tra le riserve.')
+  }
+
+  return {
+    ...slot,
+    signups: sortSignups(slot.signups.map((entry) => (
+      entry.id === signupId ? { ...entry, role } : entry
+    ))),
+  }
+}
+
+export function applyAdminSlotRosterAction(
+  slot: PadelSlot,
+  action: AdminSlotRosterAction,
+  changedAt = Date.now(),
+): PadelSlot {
+  if (action.kind === 'add') {
+    if (slot.signups.some((signup) => signup.userId === action.member.id)) {
+      throw new Error('Il giocatore è già presente nello slot.')
+    }
+    return addSignup(slot, action.member, changedAt, action.role)
+  }
+
+  const signup = slot.signups.find((entry) => entry.id === action.signupId)
+  if (!signup) throw new Error('Giocatore non trovato nello slot.')
+  if (action.kind === 'remove') return removeSignup(slot, signup.userId)
+  return setSignupRole(slot, signup.id, action.role)
 }
 
 export function addGuestSignup(

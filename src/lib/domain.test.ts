@@ -3,6 +3,7 @@ import {
   addGuestSignup,
   addSlotToPoll,
   addSignup,
+  applyAdminSlotRosterAction,
   aggregateMatchRatingSummaries,
   defaultSlotForWeek,
   groupMatchReportSetsByTeams,
@@ -32,6 +33,7 @@ import {
   removeSlotFromPoll,
   rescheduleSlot,
   setSlotBooking,
+  setSignupRole,
   substituteStarter,
   toDateTimeInput,
 } from './domain'
@@ -195,6 +197,73 @@ describe('ordine adesioni', () => {
     const current = slot(['a', 'b', 'c', 'd'].map((id, index) => signup(id, index, 'starter')))
 
     expect(() => addSignup(current, member('e'), 5, 'starter')).toThrow('quattro posti da titolare')
+  })
+
+  it('permette all’amministratore di spostare un titolare tra le riserve', () => {
+    const current = slot([
+      signup('a', 1, 'starter'),
+      signup('b', 2, 'starter'),
+      signup('c', 3, 'starter'),
+      signup('d', 4, 'starter'),
+    ])
+
+    const updated = setSignupRole(current, 'signup-b', 'reserve')
+
+    expect(getStarters(updated).map((item) => item.userId)).toEqual(['a', 'c', 'd'])
+    expect(getReserves(updated).map((item) => item.userId)).toEqual(['b'])
+  })
+
+  it('permette all’amministratore di promuovere una riserva quando c’è posto', () => {
+    const current = slot([
+      signup('a', 1, 'starter'),
+      signup('b', 2, 'reserve'),
+    ])
+
+    const updated = setSignupRole(current, 'signup-b', 'starter')
+
+    expect(getStarters(updated).map((item) => item.userId)).toEqual(['a', 'b'])
+    expect(getReserves(updated)).toHaveLength(0)
+  })
+
+  it('non permette all’amministratore di superare quattro titolari', () => {
+    const current = slot([
+      signup('a', 1, 'starter'),
+      signup('b', 2, 'starter'),
+      signup('c', 3, 'starter'),
+      signup('d', 4, 'starter'),
+      signup('e', 5, 'reserve'),
+    ])
+
+    expect(() => setSignupRole(current, 'signup-e', 'starter'))
+      .toThrow('Sposta prima un titolare')
+  })
+
+  it('rimuove qualsiasi adesione amministrativa e promuove la prima riserva', () => {
+    const current = slot([
+      signup('a', 1, 'starter'),
+      signup('b', 2, 'starter'),
+      signup('c', 3, 'starter'),
+      signup('d', 4, 'starter'),
+      signup('e', 5, 'reserve'),
+    ])
+
+    const updated = applyAdminSlotRosterAction(current, {
+      kind: 'remove',
+      signupId: 'signup-b',
+    })
+
+    expect(getStarters(updated).map((item) => item.userId)).toEqual(['a', 'c', 'd', 'e'])
+    expect(getReserves(updated)).toHaveLength(0)
+  })
+
+  it('aggiunge amministrativamente un altro membro nel ruolo scelto', () => {
+    const updated = applyAdminSlotRosterAction(slot(), {
+      kind: 'add',
+      member: member('a'),
+      role: 'reserve',
+    }, 42)
+
+    expect(updated.signups[0]).toMatchObject({ userId: 'a', role: 'reserve', joinedAt: 42 })
   })
 })
 
