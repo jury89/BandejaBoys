@@ -6,6 +6,7 @@ import type {
   PlayerMatch,
   SessionUser,
 } from '../types'
+import { SLOT_ADMIN_USER_ID } from './admin'
 
 const firestoreMocks = vi.hoisted(() => {
   const batch = {
@@ -56,6 +57,11 @@ const reviewer: SessionUser = {
   displayName: 'Jury',
   email: 'jury@example.test',
   createdAt: 1,
+}
+
+const admin: SessionUser = {
+  ...reviewer,
+  id: SLOT_ADMIN_USER_ID,
 }
 
 const prompt: MatchRatingPrompt = {
@@ -208,6 +214,51 @@ describe('repository remoto delle pagelle', () => {
     }))
     expect(update).not.toHaveProperty('targetWeekStart')
     expect(update).not.toHaveProperty('title')
+  })
+
+  it('applica la gestione amministrativa della formazione nella transazione del sondaggio', async () => {
+    firestoreMocks.transaction.get.mockResolvedValue({
+      exists: () => true,
+      id: playedMatch.pollId,
+      data: () => playedMatch.slot
+        ? {
+          id: playedMatch.pollId,
+          title: playedMatch.pollTitle,
+          targetWeekStart: '2026-07-27',
+          createdBy: 'ale',
+          createdByName: 'Ale',
+          createdAt: 1,
+          updatedAt: 1,
+          status: 'open',
+          slots: [playedMatch.slot],
+        }
+        : undefined,
+    })
+
+    await repository.adminUpdateSlotRoster(playedMatch.pollId, playedMatch.slot.id, admin, {
+      kind: 'add',
+      member: { id: 'reserve', displayName: 'Riserva' },
+      role: 'reserve',
+    })
+
+    expect(firestoreMocks.transaction.update).toHaveBeenCalledWith(
+      `polls/${playedMatch.pollId}`,
+      expect.objectContaining({
+        slots: [expect.objectContaining({
+          signups: expect.arrayContaining([
+            expect.objectContaining({ userId: 'reserve', role: 'reserve' }),
+          ]),
+        })],
+      }),
+    )
+    expect(firestoreMocks.transaction.set).toHaveBeenCalledWith(
+      'activityEvents/generated',
+      expect.objectContaining({
+        type: 'slot_roster_admin_updated',
+        actorId: admin.id,
+        details: expect.objectContaining({ action: 'added', targetName: 'Riserva' }),
+      }),
+    )
   })
 
   it('salva la formazione fantasy leggendo round e giocata nella stessa transazione', async () => {

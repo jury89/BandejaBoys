@@ -7,6 +7,7 @@ import type {
   SessionUser,
 } from '../types'
 import type { LocalActivityEvent, LocalSlotView } from './activity'
+import { SLOT_ADMIN_USER_ID } from './admin'
 import { repository } from './repository'
 
 const ACTIVITY_KEY = 'bandeja-boys:activity'
@@ -24,6 +25,11 @@ const alex: SessionUser = {
   displayName: 'Alex',
   email: 'alex@example.test',
   createdAt: 2,
+}
+
+const admin: SessionUser = {
+  ...user,
+  id: SLOT_ADMIN_USER_ID,
 }
 
 function polls(): PadelPoll[] {
@@ -65,6 +71,41 @@ describe('repository activity log in demo mode', () => {
       details: { previousStartsAt: '2027-01-05T18:30:00.000Z' },
     })
     expect(activity().events.every((event) => Number.isFinite(event.occurredAt))).toBe(true)
+  })
+
+  it('registra le modifiche amministrative alla formazione e le limita a Jury', async () => {
+    await repository.createPoll({
+      slots: [{ startsAt: '2027-01-05T19:30', durationMinutes: 90 }],
+    }, user)
+    const poll = polls()[0]
+    const slot = poll.slots[0]
+
+    const withAlex = await repository.adminUpdateSlotRoster(poll.id, slot.id, admin, {
+      kind: 'add',
+      member: alex,
+      role: 'starter',
+    })
+    const alexSignup = withAlex.slots[0].signups.find((signup) => signup.userId === alex.id)!
+    await repository.adminUpdateSlotRoster(poll.id, slot.id, admin, {
+      kind: 'set-role',
+      signupId: alexSignup.id,
+      role: 'reserve',
+    })
+    await repository.adminUpdateSlotRoster(poll.id, slot.id, admin, {
+      kind: 'remove',
+      signupId: alexSignup.id,
+    })
+
+    expect(activity().events.slice(-3)).toMatchObject([
+      { type: 'slot_roster_admin_updated', actorId: admin.id, details: { action: 'added', targetName: 'Alex' } },
+      { type: 'slot_roster_admin_updated', actorId: admin.id, details: { action: 'role_changed', toRole: 'reserve' } },
+      { type: 'slot_roster_admin_updated', actorId: admin.id, details: { action: 'removed', targetName: 'Alex' } },
+    ])
+    await expect(repository.adminUpdateSlotRoster(poll.id, slot.id, user, {
+      kind: 'add',
+      member: alex,
+      role: 'reserve',
+    })).rejects.toThrow('Solo l’amministratore')
   })
 
   it('salva soltanto gli slot e non persiste la settimana derivata', async () => {

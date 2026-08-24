@@ -4,6 +4,7 @@ import { SlotCard } from './SlotCard'
 import type { PadelPoll, PadelSlot, SessionUser } from '../types'
 import { DEFAULT_VENUE, setSlotBooking } from '../lib/domain'
 import { repository } from '../lib/repository'
+import { SLOT_ADMIN_USER_ID } from '../lib/admin'
 
 const user: SessionUser = {
   id: 'jury',
@@ -548,5 +549,38 @@ describe('azioni dello slot', () => {
     await waitFor(() => {
       expect(removeGuest).toHaveBeenCalledWith(poll.id, slot.id, user, guestSignup.id)
     })
+  })
+
+  it('mostra i controlli amministrativi soltanto all’amministratore', () => {
+    const { rerender } = render(
+      <SlotCard
+        poll={poll}
+        slot={slot}
+        user={user}
+        members={[user]}
+        onPollChange={vi.fn()}
+        onNotify={vi.fn()}
+        onError={vi.fn()}
+      />,
+    )
+
+    expect(screen.queryByRole('button', { name: /Gestisci i giocatori dello slot/ })).not.toBeInTheDocument()
+
+    const admin = { ...user, id: SLOT_ADMIN_USER_ID }
+    rerender(
+      <SlotCard
+        poll={poll}
+        slot={slot}
+        user={admin}
+        members={[admin, user]}
+        onPollChange={vi.fn()}
+        onNotify={vi.fn()}
+        onError={vi.fn()}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /Gestisci i giocatori dello slot/ }))
+    expect(screen.getByRole('dialog', { name: 'Gestisci giocatori' })).toBeInTheDocument()
+    expect(screen.getByText('Modifica diretta della formazione')).toBeInTheDocument()
   })
 })

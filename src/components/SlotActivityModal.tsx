@@ -10,6 +10,7 @@ import {
   LogOut,
   RefreshCw,
   ScrollText,
+  ShieldCheck,
   UserRound,
   UserRoundPlus,
 } from 'lucide-react'
@@ -29,7 +30,7 @@ interface SlotActivityModalProps {
   onClose: () => void
 }
 
-type ActivityTone = 'created' | 'schedule' | 'joined' | 'left' | 'substitution' | 'booked' | 'unbooked'
+type ActivityTone = 'created' | 'schedule' | 'joined' | 'left' | 'substitution' | 'admin' | 'booked' | 'unbooked'
 
 interface ActivityPresentation {
   title: string
@@ -145,6 +146,23 @@ function activityPresentation(event: LocalActivityEvent): ActivityPresentation {
           : 'Il titolare è stato sostituito.',
         icon: ArrowLeftRight,
         tone: 'substitution',
+      }
+    }
+    case 'slot_roster_admin_updated': {
+      const action = detailString(event, 'action')
+      const targetName = detailString(event, 'targetName') ?? 'Il giocatore'
+      const toRole = detailString(event, 'toRole')
+      const toRoleLabel = toRole === 'reserve' ? 'riserva' : 'titolare'
+      const description = action === 'added'
+        ? `${targetName} è stato aggiunto come ${toRoleLabel}.`
+        : action === 'removed'
+          ? `${targetName} è stato rimosso dallo slot.`
+          : `${targetName} è passato tra i ${toRole === 'starter' ? 'titolari' : 'giocatori di riserva'}.`
+      return {
+        title: 'Formazione modificata dall’amministratore',
+        description,
+        icon: ShieldCheck,
+        tone: 'admin',
       }
     }
     case 'slot_booked':
