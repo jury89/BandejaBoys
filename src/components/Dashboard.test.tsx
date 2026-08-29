@@ -4,8 +4,8 @@ import { afterEach, beforeEach, vi } from 'vitest'
 import type {
   FantasyEntry,
   FantasyRound,
-  MatchMvpResponse,
-  MatchMvpSummary,
+  MatchFeedbackResponse,
+  MatchFeedbackSummary,
   MatchReport,
   MemberProfile,
   PadelPoll,
@@ -29,8 +29,8 @@ const dashboardTestState = vi.hoisted(() => {
   return {
     polls: [] as PadelPoll[],
     members: [] as MemberProfile[],
-    mvpResponses: [] as MatchMvpResponse[],
-    mvpSummaries: [] as MatchMvpSummary[],
+    feedbackResponses: [] as MatchFeedbackResponse[],
+    feedbackSummaries: [] as MatchFeedbackSummary[],
     reports: [] as MatchReport[],
     fantasyRounds: [] as FantasyRound[],
     fantasyEntries: [] as FantasyEntry[],
@@ -84,12 +84,12 @@ vi.mock('../lib/repository', () => ({
       listener(dashboardTestState.members)
       return vi.fn()
     },
-    subscribeMatchMvpResponses: (_userId: string, listener: (responses: MatchMvpResponse[]) => void) => {
-      listener(dashboardTestState.mvpResponses)
+    subscribeMatchFeedbackResponses: (_userId: string, listener: (responses: MatchFeedbackResponse[]) => void) => {
+      listener(dashboardTestState.feedbackResponses)
       return vi.fn()
     },
-    subscribeMatchMvpSummaries: (listener: (summaries: MatchMvpSummary[]) => void) => {
-      listener(dashboardTestState.mvpSummaries)
+    subscribeMatchFeedbackSummaries: (listener: (summaries: MatchFeedbackSummary[]) => void) => {
+      listener(dashboardTestState.feedbackSummaries)
       return vi.fn()
     },
     subscribeMatchReports: (_userId: string, listener: (reports: MatchReport[]) => void) => {
@@ -136,8 +136,8 @@ describe('menu account', () => {
     vi.clearAllMocks()
     dashboardTestState.polls = []
     dashboardTestState.members = []
-    dashboardTestState.mvpResponses = []
-    dashboardTestState.mvpSummaries = []
+    dashboardTestState.feedbackResponses = []
+    dashboardTestState.feedbackSummaries = []
     dashboardTestState.reports = []
     dashboardTestState.fantasyRounds = []
     dashboardTestState.fantasyEntries = []
@@ -221,12 +221,13 @@ describe('menu account', () => {
         })),
       }],
     }]
-    dashboardTestState.mvpSummaries = [{
+    dashboardTestState.feedbackSummaries = [{
       id: 'poll-group__slot-group__ale',
       pollId: 'poll-group',
       slotId: 'slot-group',
       playerId: 'ale',
-      voteCount: 2,
+      scoreUnitsTotal: 30,
+      ratingCount: 2,
       lastResponseId: 'response-2',
       updatedAt: 2,
     }]
@@ -239,7 +240,7 @@ describe('menu account', () => {
     expect(window.location.hash).toBe('#gli-altri-match')
     expect(screen.getByRole('heading', { name: 'Gli altri match' })).toBeInTheDocument()
     expect(screen.getByText('Padel · 27 lug – 2 ago 2020')).toBeInTheDocument()
-    expect(screen.getByLabelText('Ale: MVP con 2 preferenze')).toBeInTheDocument()
+    expect(screen.getByLabelText('Ale: Pavone gonfiato, 2 giudizi')).toBeInTheDocument()
 
     act(() => {
       window.history.replaceState({}, '', '/')

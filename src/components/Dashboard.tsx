@@ -5,8 +5,9 @@ import type {
   FantasyEntry,
   FantasyRound,
   FantasySelectionInput,
-  MatchMvpResponse,
-  MatchMvpSummary,
+  MatchFeedbackLevel,
+  MatchFeedbackResponse,
+  MatchFeedbackSummary,
   MatchReport,
   MatchSetInput,
   MemberProfile,
@@ -14,9 +15,9 @@ import type {
   PlayerMatch,
 } from '../types'
 import {
-  getNextMatchMvpPromptAt,
+  getNextMatchFeedbackPromptAt,
   getOtherPlayedMatches,
-  getPendingMatchMvpPrompts,
+  getPendingMatchFeedbackPrompts,
   getPlayerMatches,
   getSlotEndsAt,
   getSlotPhase,
@@ -42,14 +43,14 @@ import {
   matchReportTargetFromSearch,
 } from '../lib/notificationUrl'
 import { notificationStateLabel, usePushNotifications } from '../lib/notifications'
-import { MVP_TEST_QUERY_PARAM, isMvpTestRequested, makeMvpTestPrompt } from '../lib/mvpTest'
+import { FEEDBACK_TEST_QUERY_PARAM, isFeedbackTestRequested, makeFeedbackTestPrompt } from '../lib/feedbackTest'
 import { repository } from '../lib/repository'
 import { slotElementId, type SlotNavigationTarget } from '../lib/slotNavigation'
 import { Brand } from './Brand'
 import { CreatePollModal } from './CreatePollModal'
 import { FantasyBandejaPage } from './FantasyBandejaPage'
 import { GroupMatchesPage } from './GroupMatchesPage'
-import { MatchMvpModal } from './MatchMvpModal'
+import { MatchFeedbackModal } from './MatchFeedbackModal'
 import { MatchReportModal } from './MatchReportModal'
 import { MyMatchesPage } from './MyMatchesPage'
 import { NotificationCallup } from './NotificationCallup'
@@ -118,10 +119,10 @@ export function Dashboard() {
   const [notificationPanelOpen, setNotificationPanelOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
   const [now, setNow] = useState(() => Date.now())
-  const [mvpResponses, setMvpResponses] = useState<MatchMvpResponse[]>([])
-  const [mvpResponsesLoaded, setMvpResponsesLoaded] = useState(false)
-  const [mvpSummaries, setMvpSummaries] = useState<MatchMvpSummary[]>([])
-  const [mvpSummariesLoaded, setMvpSummariesLoaded] = useState(false)
+  const [feedbackResponses, setFeedbackResponses] = useState<MatchFeedbackResponse[]>([])
+  const [feedbackResponsesLoaded, setFeedbackResponsesLoaded] = useState(false)
+  const [feedbackSummaries, setFeedbackSummaries] = useState<MatchFeedbackSummary[]>([])
+  const [feedbackSummariesLoaded, setFeedbackSummariesLoaded] = useState(false)
   const [matchReports, setMatchReports] = useState<MatchReport[]>([])
   const [matchReportsLoaded, setMatchReportsLoaded] = useState(false)
   const [groupMatchReports, setGroupMatchReports] = useState<MatchReport[]>([])
@@ -137,16 +138,16 @@ export function Dashboard() {
   const [notificationHistory, setNotificationHistory] = useState<NotificationHistoryItem[]>([])
   const [notificationHistoryLoaded, setNotificationHistoryLoaded] = useState(!hasRemoteBackend)
   const [notificationHistoryError, setNotificationHistoryError] = useState<string | null>(null)
-  const [mvpTestOpen, setMvpTestOpen] = useState(() => isMvpTestRequested(window.location.search))
-  const [mvpTestStartedAt] = useState(() => Date.now())
+  const [feedbackTestOpen, setFeedbackTestOpen] = useState(() => isFeedbackTestRequested(window.location.search))
+  const [feedbackTestStartedAt] = useState(() => Date.now())
   const [slotNavigationTarget, setSlotNavigationTarget] = useState<SlotNavigationTarget | null>(null)
   const accountMenuRef = useRef<HTMLDivElement>(null)
   const hasLoadedPollsRef = useRef(false)
   const initialDataRetryCountRef = useRef(0)
-  const [requestedMvp] = useState(() => {
+  const [requestedFeedback] = useState(() => {
     const parameters = new URLSearchParams(window.location.search)
-    const pollId = parameters.get('mvpPoll') ?? parameters.get('ratePoll')
-    const slotId = parameters.get('mvpSlot') ?? parameters.get('rateSlot')
+    const pollId = parameters.get('feedbackPoll') ?? parameters.get('mvpPoll') ?? parameters.get('ratePoll')
+    const slotId = parameters.get('feedbackSlot') ?? parameters.get('mvpSlot') ?? parameters.get('rateSlot')
     return pollId && slotId ? { pollId, slotId } : null
   })
   const [requestedMatchReport] = useState(
@@ -158,7 +159,7 @@ export function Dashboard() {
   )
   const markingNotificationDeliveryIdsRef = useRef(new Set<string>())
   const notifications = usePushNotifications(user)
-  const mvpVoterId = user?.id
+  const feedbackReviewerId = user?.id
   const notificationHistoryUserId = user?.id
   const markNotificationDeliveriesRead = useCallback((
     deliveryIds: string[],
@@ -257,15 +258,15 @@ export function Dashboard() {
   }, [retryDashboardData])
 
   useEffect(() => {
-    if (!mvpVoterId) return
-    return repository.subscribeMatchMvpResponses(mvpVoterId, (responses) => {
-      setMvpResponses(responses)
-      setMvpResponsesLoaded(true)
+    if (!feedbackReviewerId) return
+    return repository.subscribeMatchFeedbackResponses(feedbackReviewerId, (responses) => {
+      setFeedbackResponses(responses)
+      setFeedbackResponsesLoaded(true)
     }, (error) => {
       setToast({ message: error.message, tone: 'error' })
-      setMvpResponsesLoaded(true)
+      setFeedbackResponsesLoaded(true)
     })
-  }, [mvpVoterId])
+  }, [feedbackReviewerId])
 
   useEffect(() => {
     if (!hasRemoteBackend || !notificationHistoryUserId) return
@@ -316,26 +317,26 @@ export function Dashboard() {
   ])
 
   useEffect(() => {
-    if (!mvpVoterId) return
-    return repository.subscribeMatchMvpSummaries((summaries) => {
-      setMvpSummaries(summaries)
-      setMvpSummariesLoaded(true)
+    if (!feedbackReviewerId) return
+    return repository.subscribeMatchFeedbackSummaries((summaries) => {
+      setFeedbackSummaries(summaries)
+      setFeedbackSummariesLoaded(true)
     }, (error) => {
       setToast({ message: error.message, tone: 'error' })
-      setMvpSummariesLoaded(true)
+      setFeedbackSummariesLoaded(true)
     })
-  }, [mvpVoterId])
+  }, [feedbackReviewerId])
 
   useEffect(() => {
-    if (!mvpVoterId) return
-    return repository.subscribeMatchReports(mvpVoterId, (reports) => {
+    if (!feedbackReviewerId) return
+    return repository.subscribeMatchReports(feedbackReviewerId, (reports) => {
       setMatchReports(reports)
       setMatchReportsLoaded(true)
     }, (error) => {
       setToast({ message: error.message, tone: 'error' })
       setMatchReportsLoaded(true)
     })
-  }, [mvpVoterId])
+  }, [feedbackReviewerId])
 
   useEffect(() => {
     if (dashboardView !== 'group-matches') return
@@ -486,14 +487,14 @@ export function Dashboard() {
       .map(getSlotEndsAt)
       .filter((endsAt) => Number.isFinite(endsAt) && endsAt > now)
       .sort((left, right) => left - right)[0]
-    const nextMvpPrompt = user
-      ? getNextMatchMvpPromptAt(polls, mvpResponses, user.id, now)
+    const nextFeedbackPrompt = user
+      ? getNextMatchFeedbackPromptAt(polls, feedbackResponses, user.id, now)
       : null
     const nextFantasyBoundary = fantasyRounds
       .flatMap((round) => [round.locksAt, round.settlesAt])
       .filter((timestamp) => Number.isFinite(timestamp) && timestamp > now)
       .sort((left, right) => left - right)[0]
-    const nextWakeAt = [nextSlotEnd, nextMvpPrompt, nextFantasyBoundary]
+    const nextWakeAt = [nextSlotEnd, nextFeedbackPrompt, nextFantasyBoundary]
       .filter((timestamp): timestamp is number => typeof timestamp === 'number')
       .sort((left, right) => left - right)[0]
     if (!nextWakeAt) return
@@ -501,7 +502,7 @@ export function Dashboard() {
     const delay = Math.min(Math.max(nextWakeAt - Date.now() + 50, 0), 2_147_483_647)
     const timer = window.setTimeout(() => setNow(Date.now()), delay)
     return () => window.clearTimeout(timer)
-  }, [fantasyRounds, mvpResponses, now, polls, user])
+  }, [fantasyRounds, feedbackResponses, now, polls, user])
 
   const upcomingSlotWeeks = useMemo(() => getUpcomingSlotWeeks(polls, now), [now, polls])
   const matchNameMembers = useMemo(
@@ -513,7 +514,7 @@ export function Dashboard() {
   const playerMatches = useMemo(
     () => {
       if (!user) return { upcoming: [], past: [] }
-      const matches = getPlayerMatches(polls, user.id, now, mvpSummaries, matchReports)
+      const matches = getPlayerMatches(polls, user.id, now, feedbackSummaries, matchReports)
       return {
         upcoming: matches.upcoming
           .map((match) => resolvePlayerMatchNames(matchNameMembers, match)),
@@ -521,7 +522,7 @@ export function Dashboard() {
           .map((match) => resolvePlayerMatchNames(matchNameMembers, match)),
       }
     },
-    [matchNameMembers, matchReports, mvpSummaries, now, polls, user],
+    [matchNameMembers, matchReports, feedbackSummaries, now, polls, user],
   )
 
   useEffect(() => {
@@ -529,7 +530,7 @@ export function Dashboard() {
       !requestedMatchReport
       || requestedMatchReportHandledRef.current
       || loading
-      || !mvpSummariesLoaded
+      || !feedbackSummariesLoaded
       || !matchReportsLoaded
     ) return
 
@@ -543,6 +544,8 @@ export function Dashboard() {
       : undefined
 
     const url = new URL(window.location.href)
+    url.searchParams.delete('feedbackPoll')
+    url.searchParams.delete('feedbackSlot')
     url.searchParams.delete(MATCH_REPORT_POLL_QUERY_PARAM)
     url.searchParams.delete(MATCH_REPORT_SLOT_QUERY_PARAM)
     window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`)
@@ -554,7 +557,7 @@ export function Dashboard() {
     loading,
     matchReportsLoaded,
     playerMatches,
-    mvpSummariesLoaded,
+    feedbackSummariesLoaded,
     requestedMatchReport,
   ])
   const groupMatches = useMemo(
@@ -564,19 +567,19 @@ export function Dashboard() {
         polls,
         user.id,
         now,
-        mvpSummaries,
+        feedbackSummaries,
         groupMatchReports,
       ).map((match) => resolvePlayerMatchNames(matchNameMembers, match))
     },
-    [groupMatchReports, matchNameMembers, mvpSummaries, now, polls, user],
+    [groupMatchReports, matchNameMembers, feedbackSummaries, now, polls, user],
   )
   const unreadNotifications = useMemo(
     () => unreadNotificationCount(notificationHistory),
     [notificationHistory],
   )
-  const mvpPrompts = useMemo(() => (
-    user && mvpResponsesLoaded
-      ? getPendingMatchMvpPrompts(polls, mvpResponses, user.id, now)
+  const feedbackPrompts = useMemo(() => (
+    user && feedbackResponsesLoaded
+      ? getPendingMatchFeedbackPrompts(polls, feedbackResponses, user.id, now)
         .map((prompt) => ({
           ...prompt,
           candidates: prompt.candidates.map((candidate) => ({
@@ -585,39 +588,40 @@ export function Dashboard() {
           })),
         }))
       : []
-  ), [members, mvpResponses, mvpResponsesLoaded, now, polls, user])
-  const activeMvpPrompt = useMemo(() => {
-    if (requestedMvp) {
-      const requested = mvpPrompts.find((prompt) => (
-        prompt.pollId === requestedMvp.pollId && prompt.slotId === requestedMvp.slotId
+  ), [members, feedbackResponses, feedbackResponsesLoaded, now, polls, user])
+  const activeFeedbackPrompt = useMemo(() => {
+    if (requestedFeedback) {
+      const requested = feedbackPrompts.find((prompt) => (
+        prompt.pollId === requestedFeedback.pollId && prompt.slotId === requestedFeedback.slotId
       ))
       if (requested) return requested
     }
-    return mvpPrompts[0] ?? null
-  }, [mvpPrompts, requestedMvp])
-  const mvpTestPrompt = useMemo(() => (
-    mvpTestOpen && user
-      ? makeMvpTestPrompt(user, members, mvpTestStartedAt)
+    return feedbackPrompts[0] ?? null
+  }, [feedbackPrompts, requestedFeedback])
+  const feedbackTestPrompt = useMemo(() => (
+    feedbackTestOpen && user
+      ? makeFeedbackTestPrompt(user, members, feedbackTestStartedAt)
       : null
-  ), [members, mvpTestOpen, mvpTestStartedAt, user])
+  ), [members, feedbackTestOpen, feedbackTestStartedAt, user])
 
   useEffect(() => {
-    if (!requestedMvp || !mvpResponsesLoaded || loading) return
+    if (!requestedFeedback || !feedbackResponsesLoaded || loading) return
     const url = new URL(window.location.href)
     url.searchParams.delete('mvpPoll')
     url.searchParams.delete('mvpSlot')
     url.searchParams.delete('ratePoll')
     url.searchParams.delete('rateSlot')
     window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`)
-  }, [loading, mvpResponsesLoaded, requestedMvp])
+  }, [loading, feedbackResponsesLoaded, requestedFeedback])
 
   useEffect(() => {
-    if (!mvpTestOpen) return
+    if (!feedbackTestOpen) return
     const url = new URL(window.location.href)
-    url.searchParams.delete(MVP_TEST_QUERY_PARAM)
+    url.searchParams.delete(FEEDBACK_TEST_QUERY_PARAM)
+    url.searchParams.delete('mvpTest')
     url.searchParams.delete('ratingTest')
     window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`)
-  }, [mvpTestOpen])
+  }, [feedbackTestOpen])
 
   const stats = useMemo(() => {
     const openWeeks = upcomingSlotWeeks.filter((group) => (
@@ -762,22 +766,24 @@ export function Dashboard() {
   const updatePoll = (updatedPoll: PadelPoll) => {
     setPolls((current) => current.map((poll) => poll.id === updatedPoll.id ? updatedPoll : poll))
   }
-  const rememberMvpResponse = (response: MatchMvpResponse) => {
-    setMvpResponses((current) => [
+  const rememberFeedbackResponse = (response: MatchFeedbackResponse) => {
+    setFeedbackResponses((current) => [
       ...current.filter((item) => item.id !== response.id),
       response,
     ])
   }
-  const dismissMvpPrompt = async () => {
-    if (!activeMvpPrompt) return
-    const response = await repository.dismissMatchMvpPrompt(activeMvpPrompt)
-    rememberMvpResponse(response)
+  const dismissFeedbackPrompt = async () => {
+    if (!activeFeedbackPrompt) return
+    const response = await repository.dismissMatchFeedbackPrompt(activeFeedbackPrompt)
+    rememberFeedbackResponse(response)
   }
-  const submitMvp = async (selectedPlayerId: string) => {
-    if (!activeMvpPrompt) return
-    const response = await repository.submitMatchMvp(activeMvpPrompt, user, selectedPlayerId)
-    rememberMvpResponse(response)
-    notify('Scelta MVP salvata nello storico della partita.')
+  const submitFeedback = async (
+    ratings: Array<{ playerId: string; level: MatchFeedbackLevel }>,
+  ) => {
+    if (!activeFeedbackPrompt) return
+    const response = await repository.submitMatchFeedback(activeFeedbackPrompt, user, ratings)
+    rememberFeedbackResponse(response)
+    notify('Giudizi salvati nello storico della partita.')
   }
   const saveMatchReport = async (sets: MatchSetInput[]) => {
     if (!reportMatch) return
@@ -797,12 +803,12 @@ export function Dashboard() {
     setFantasyOwnEntries((current) => ({ ...current, [roundId]: saved }))
     notify('Formazione FantaBandeja salvata e nascosta fino al via.')
   }
-  const dismissMvpTest = async () => {
-    setMvpTestOpen(false)
+  const dismissFeedbackTest = async () => {
+    setFeedbackTestOpen(false)
   }
-  const completeMvpTest = async () => {
-    setMvpTestOpen(false)
-    notify('Collaudo completato: nessuna scelta MVP è stata salvata.')
+  const completeFeedbackTest = async () => {
+    setFeedbackTestOpen(false)
+    notify('Collaudo completato: nessun giudizio è stato salvato.')
   }
 
   return (
@@ -935,7 +941,7 @@ export function Dashboard() {
       {dashboardView === 'matches' ? (
         <MyMatchesPage
           matches={playerMatches}
-          loading={loading || !mvpSummariesLoaded || !matchReportsLoaded}
+          loading={loading || !feedbackSummariesLoaded || !matchReportsLoaded}
           onBack={closePlayerMatches}
           onSelectMatch={showPlayerMatchOnBoard}
           onEditReport={setReportMatch}
@@ -944,7 +950,7 @@ export function Dashboard() {
         <GroupMatchesPage
           matches={groupMatches}
           members={matchNameMembers}
-          loading={loading || !mvpSummariesLoaded || !groupMatchReportsLoaded}
+          loading={loading || !feedbackSummariesLoaded || !groupMatchReportsLoaded}
           error={groupMatchesError}
           onBack={closeGroupMatches}
         />
@@ -1071,23 +1077,23 @@ export function Dashboard() {
           onClose={() => setReportMatch(null)}
           onSave={saveMatchReport}
         />
-      ) : mvpTestPrompt ? (
-        <MatchMvpModal
+      ) : feedbackTestPrompt ? (
+        <MatchFeedbackModal
           testMode
-          key={mvpTestPrompt.id}
-          prompt={mvpTestPrompt}
-          onDismiss={dismissMvpTest}
-          onSubmit={completeMvpTest}
+          key={feedbackTestPrompt.id}
+          prompt={feedbackTestPrompt}
+          onDismiss={dismissFeedbackTest}
+          onSubmit={completeFeedbackTest}
         />
-      ) : activeMvpPrompt && (
-        <MatchMvpModal
-          key={activeMvpPrompt.id}
-          prompt={activeMvpPrompt}
-          onDismiss={dismissMvpPrompt}
-          onSubmit={submitMvp}
+      ) : activeFeedbackPrompt && (
+        <MatchFeedbackModal
+          key={activeFeedbackPrompt.id}
+          prompt={activeFeedbackPrompt}
+          onDismiss={dismissFeedbackPrompt}
+          onSubmit={submitFeedback}
         />
       )}
-      {!reportMatch && !mvpTestPrompt && !activeMvpPrompt && (notifications.shouldPrompt || notificationPanelOpen) && (
+      {!reportMatch && !feedbackTestPrompt && !activeFeedbackPrompt && (notifications.shouldPrompt || notificationPanelOpen) && (
         <NotificationCallup
           state={notifications.state}
           busy={notifications.busy}

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { MemberProfile, SessionUser } from '../types'
-import { isMvpTestRequested, makeMvpTestPrompt } from './mvpTest'
+import { isFeedbackTestRequested, makeFeedbackTestPrompt } from './feedbackTest'
 
 const reviewer: SessionUser = {
   id: 'jury',
@@ -16,15 +16,16 @@ const member = (id: string, displayName = id): MemberProfile => ({
   createdAt: 1,
 })
 
-describe('modalità collaudo MVP', () => {
+describe('modalità collaudo giudizi', () => {
   it('si attiva soltanto con il deep link esplicito', () => {
-    expect(isMvpTestRequested('?mvpTest=1')).toBe(true)
-    expect(isMvpTestRequested('?ratingTest=1')).toBe(true)
-    expect(isMvpTestRequested('?mvpTest=0')).toBe(false)
+    expect(isFeedbackTestRequested('?feedbackTest=1')).toBe(true)
+    expect(isFeedbackTestRequested('?ratingTest=1')).toBe(true)
+    expect(isFeedbackTestRequested('?mvpTest=1')).toBe(true)
+    expect(isFeedbackTestRequested('?feedbackTest=0')).toBe(false)
   })
 
   it('usa tre membri diversi dal revisore senza duplicati', () => {
-    const prompt = makeMvpTestPrompt(reviewer, [
+    const prompt = makeFeedbackTestPrompt(reviewer, [
       reviewer,
       member('ale', 'Ale'),
       member('luca', 'Luca'),
@@ -34,9 +35,9 @@ describe('modalità collaudo MVP', () => {
     ], Date.parse('2026-07-21T18:00:00.000Z'))
 
     expect(prompt).toMatchObject({
-      id: 'mvp-test__jury',
-      pollId: 'mvp-test',
-      voterId: 'jury',
+      id: 'feedback-test__jury',
+      pollId: 'feedback-test',
+      reviewerId: 'jury',
       sessionStartsAt: '2026-07-21T18:00:00.000Z',
     })
     expect(prompt.candidates).toEqual([
@@ -47,12 +48,12 @@ describe('modalità collaudo MVP', () => {
   })
 
   it('completa la scheda con nomi fittizi senza richiedere dati reali', () => {
-    const prompt = makeMvpTestPrompt(reviewer, [member('ale', 'Ale')], 1)
+    const prompt = makeFeedbackTestPrompt(reviewer, [member('ale', 'Ale')], 1)
 
     expect(prompt.candidates).toEqual([
       { userId: 'ale', displayName: 'Ale' },
-      { userId: 'mvp-test-player-2', displayName: 'Compagno test 2' },
-      { userId: 'mvp-test-player-3', displayName: 'Compagno test 3' },
+      { userId: 'feedback-test-player-2', displayName: 'Compagno test 2' },
+      { userId: 'feedback-test-player-3', displayName: 'Compagno test 3' },
     ])
   })
 })

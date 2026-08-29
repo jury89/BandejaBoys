@@ -69,9 +69,9 @@ const NOTIFICATION_OPTIONS: {
     icon: Clock3,
   },
   {
-    key: 'matchMvp',
-    title: 'MVP del match',
-    description: 'Quando è il momento di scegliere il migliore in campo.',
+    key: 'matchFeedback',
+    title: 'Giudizi del match',
+    description: 'Mezz’ora dopo la partita, per assegnare il volatile ai compagni.',
     icon: Trophy,
   },
   {

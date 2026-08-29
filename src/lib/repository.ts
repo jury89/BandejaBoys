@@ -19,9 +19,10 @@ import type {
   FantasyEntry,
   FantasyRound,
   FantasySelectionInput,
-  MatchMvpPrompt,
-  MatchMvpResponse,
-  MatchMvpSummary,
+  MatchFeedbackLevel,
+  MatchFeedbackPrompt,
+  MatchFeedbackResponse,
+  MatchFeedbackSummary,
   MatchReport,
   MatchSetInput,
   MemberProfile,
@@ -46,8 +47,9 @@ import {
   addSlotToPoll,
   addSignup,
   applyAdminSlotRosterAction,
-  aggregateMatchMvpSummaries,
-  getMatchMvpSummaryId,
+  aggregateMatchFeedbackSummaries,
+  getMatchFeedbackDefinition,
+  getMatchFeedbackSummaryId,
   getStarters,
   isGuestSignup,
   makeFantasyEntry,
@@ -72,13 +74,13 @@ import type { NotificationDelivery } from './notificationHistory'
 export interface PadelRepository {
   subscribePolls(listener: (polls: PadelPoll[]) => void, onError: (error: Error) => void): Unsubscribe
   subscribeMembers(listener: (members: MemberProfile[]) => void, onError: (error: Error) => void): Unsubscribe
-  subscribeMatchMvpResponses(
-    voterId: string,
-    listener: (responses: MatchMvpResponse[]) => void,
+  subscribeMatchFeedbackResponses(
+    reviewerId: string,
+    listener: (responses: MatchFeedbackResponse[]) => void,
     onError: (error: Error) => void,
   ): Unsubscribe
-  subscribeMatchMvpSummaries(
-    listener: (summaries: MatchMvpSummary[]) => void,
+  subscribeMatchFeedbackSummaries(
+    listener: (summaries: MatchFeedbackSummary[]) => void,
     onError: (error: Error) => void,
   ): Unsubscribe
   subscribeMatchReports(
@@ -157,12 +159,12 @@ export interface PadelRepository {
   setPollStatus(pollId: string, status: PollStatus, actor: SessionUser): Promise<PadelPoll>
   deletePoll(pollId: string, actor: SessionUser): Promise<void>
   recordSlotView(poll: PadelPoll, slot: PadelSlot, viewer: SessionUser): Promise<void>
-  dismissMatchMvpPrompt(prompt: MatchMvpPrompt): Promise<MatchMvpResponse>
-  submitMatchMvp(
-    prompt: MatchMvpPrompt,
-    voter: SessionUser,
-    selectedPlayerId: string,
-  ): Promise<MatchMvpResponse>
+  dismissMatchFeedbackPrompt(prompt: MatchFeedbackPrompt): Promise<MatchFeedbackResponse>
+  submitMatchFeedback(
+    prompt: MatchFeedbackPrompt,
+    reviewer: SessionUser,
+    ratings: Array<{ playerId: string; level: MatchFeedbackLevel }>,
+  ): Promise<MatchFeedbackResponse>
   saveMatchReport(
     match: PlayerMatch,
     editor: SessionUser,
@@ -272,26 +274,40 @@ function setRemoteActivity(
   })
 }
 
-function makeMvpResponse(
-  prompt: MatchMvpPrompt,
-  status: MatchMvpResponse['status'],
-  selectedPlayerId?: string,
+function makeFeedbackResponse(
+  prompt: MatchFeedbackPrompt,
+  status: MatchFeedbackResponse['status'],
+  ratingInputs: Array<{ playerId: string; level: MatchFeedbackLevel }> = [],
   closedAt = Date.now(),
-): MatchMvpResponse {
-  const selectedPlayer = prompt.candidates.find((candidate) => candidate.userId === selectedPlayerId)
-  if (status === 'submitted' && !selectedPlayer) {
-    throw new Error('Scegli un compagno come MVP della partita.')
+): MatchFeedbackResponse {
+  const inputByPlayer = new Map(ratingInputs.map((rating) => [rating.playerId, rating]))
+  if (
+    status === 'submitted'
+    && (ratingInputs.length !== prompt.candidates.length || inputByPlayer.size !== prompt.candidates.length)
+  ) {
+    throw new Error('Assegna un giudizio a ogni compagno prima di continuare.')
+  }
+  const ratings = prompt.candidates.map((candidate) => {
+    const input = inputByPlayer.get(candidate.userId)
+    if (!input) return null
+    const definition = getMatchFeedbackDefinition(input.level)
+    return {
+      playerId: candidate.userId,
+      playerName: candidate.displayName,
+      level: definition.level,
+      scoreUnits: definition.scoreUnits,
+    }
+  })
+  if (status === 'submitted' && ratings.some((rating) => rating === null)) {
+    throw new Error('Uno dei giudizi non appartiene a questa partita.')
   }
   return {
     id: prompt.id,
     pollId: prompt.pollId,
     slotId: prompt.slotId,
-    voterId: prompt.voterId,
+    reviewerId: prompt.reviewerId,
     status,
-    ...(selectedPlayer ? {
-      selectedPlayerId: selectedPlayer.userId,
-      selectedPlayerName: selectedPlayer.displayName,
-    } : {}),
+    ...(status === 'submitted' ? { ratings: ratings.filter((rating) => rating !== null) } : {}),
     closedAt,
   }
 }
@@ -340,42 +356,67 @@ function remoteRepository(): PadelRepository {
         onError,
       )
     },
-    subscribeMatchMvpResponses(voterId, listener, onError) {
-      let currentResponses: MatchMvpResponse[] = []
-      let legacyClosedResponses: MatchMvpResponse[] = []
+    subscribeMatchFeedbackResponses(reviewerId, listener, onError) {
+      let currentResponses: MatchFeedbackResponse[] = []
+      let legacyMvpResponses: MatchFeedbackResponse[] = []
+      let legacyRatingResponses: MatchFeedbackResponse[] = []
       const emit = () => listener([
-        ...legacyClosedResponses.filter((legacy) => (
+        ...[...legacyMvpResponses, ...legacyRatingResponses].filter((legacy) => (
           !currentResponses.some((response) => response.id === legacy.id)
         )),
         ...currentResponses,
       ])
       const stopCurrent = onSnapshot(
-        query(collection(db, 'matchMvpResponses'), where('voterId', '==', voterId)),
+        query(collection(db, 'matchFeedbackResponses'), where('reviewerId', '==', reviewerId)),
         (snapshot) => {
           currentResponses = snapshot.docs.map((item) => ({
             id: item.id,
             ...item.data(),
-          }) as MatchMvpResponse)
+          }) as MatchFeedbackResponse)
           emit()
         },
         onError,
       )
-      const stopLegacy = onSnapshot(
-        query(collection(db, 'matchRatingResponses'), where('reviewerId', '==', voterId)),
+      const stopLegacyMvp = onSnapshot(
+        query(collection(db, 'matchMvpResponses'), where('voterId', '==', reviewerId)),
         (snapshot) => {
-          legacyClosedResponses = snapshot.docs.map((item) => {
+          legacyMvpResponses = snapshot.docs.map((item) => {
             const data = item.data() as {
               pollId: string
               slotId: string
-              reviewerId: string
-              status: MatchMvpResponse['status']
+              voterId: string
+              status: MatchFeedbackResponse['status']
               closedAt: number
             }
             return {
               id: item.id,
               pollId: data.pollId,
               slotId: data.slotId,
-              voterId: data.reviewerId,
+              reviewerId: data.voterId,
+              status: data.status,
+              closedAt: data.closedAt,
+            }
+          })
+          emit()
+        },
+        onError,
+      )
+      const stopLegacyRatings = onSnapshot(
+        query(collection(db, 'matchRatingResponses'), where('reviewerId', '==', reviewerId)),
+        (snapshot) => {
+          legacyRatingResponses = snapshot.docs.map((item) => {
+            const data = item.data() as {
+              pollId: string
+              slotId: string
+              reviewerId: string
+              status: MatchFeedbackResponse['status']
+              closedAt: number
+            }
+            return {
+              id: item.id,
+              pollId: data.pollId,
+              slotId: data.slotId,
+              reviewerId: data.reviewerId,
               status: data.status,
               closedAt: data.closedAt,
             }
@@ -386,16 +427,17 @@ function remoteRepository(): PadelRepository {
       )
       return () => {
         stopCurrent()
-        stopLegacy()
+        stopLegacyMvp()
+        stopLegacyRatings()
       }
     },
-    subscribeMatchMvpSummaries(listener, onError) {
+    subscribeMatchFeedbackSummaries(listener, onError) {
       return onSnapshot(
-        collection(db, 'matchMvpSummaries'),
+        collection(db, 'matchFeedbackSummaries'),
         (snapshot) => listener(snapshot.docs.map((item) => ({
           id: item.id,
           ...item.data(),
-        }) as MatchMvpSummary)),
+        }) as MatchFeedbackSummary)),
         onError,
       )
     },
@@ -744,31 +786,36 @@ function remoteRepository(): PadelRepository {
         })
       })
     },
-    async dismissMatchMvpPrompt(prompt) {
-      const reference = doc(db, 'matchMvpResponses', prompt.id)
+    async dismissMatchFeedbackPrompt(prompt) {
+      const reference = doc(db, 'matchFeedbackResponses', prompt.id)
       return runTransaction(db, async (transaction) => {
         const snapshot = await transaction.get(reference)
-        if (snapshot.exists()) return { id: snapshot.id, ...snapshot.data() } as MatchMvpResponse
-        const response = makeMvpResponse(prompt, 'dismissed')
+        if (snapshot.exists()) return { id: snapshot.id, ...snapshot.data() } as MatchFeedbackResponse
+        const response = makeFeedbackResponse(prompt, 'dismissed')
         transaction.set(reference, response)
         return response
       })
     },
-    async submitMatchMvp(prompt, voter, selectedPlayerId) {
-      if (prompt.voterId !== voter.id) throw new Error('Questa scelta MVP appartiene a un altro giocatore.')
-      const response = makeMvpResponse(prompt, 'submitted', selectedPlayerId)
-      const responseReference = doc(db, 'matchMvpResponses', prompt.id)
-      const summaryId = getMatchMvpSummaryId(prompt.pollId, prompt.slotId, selectedPlayerId)
+    async submitMatchFeedback(prompt, reviewer, ratings) {
+      if (prompt.reviewerId !== reviewer.id) {
+        throw new Error('Questa scheda appartiene a un altro giocatore.')
+      }
+      const response = makeFeedbackResponse(prompt, 'submitted', ratings)
+      const responseReference = doc(db, 'matchFeedbackResponses', prompt.id)
       const batch = writeBatch(db)
-      batch.set(doc(db, 'matchMvpSummaries', summaryId), {
-        id: summaryId,
-        pollId: prompt.pollId,
-        slotId: prompt.slotId,
-        playerId: selectedPlayerId,
-        voteCount: increment(1),
-        lastResponseId: response.id,
-        updatedAt: response.closedAt,
-      }, { merge: true })
+      response.ratings?.forEach((rating) => {
+        const summaryId = getMatchFeedbackSummaryId(prompt.pollId, prompt.slotId, rating.playerId)
+        batch.set(doc(db, 'matchFeedbackSummaries', summaryId), {
+          id: summaryId,
+          pollId: prompt.pollId,
+          slotId: prompt.slotId,
+          playerId: rating.playerId,
+          scoreUnitsTotal: increment(rating.scoreUnits),
+          ratingCount: increment(1),
+          lastResponseId: response.id,
+          updatedAt: response.closedAt,
+        }, { merge: true })
+      })
       batch.set(responseReference, response)
       await batch.commit()
       return response
@@ -808,8 +855,9 @@ function remoteRepository(): PadelRepository {
 
 const LOCAL_POLLS_KEY = 'bandeja-boys:polls'
 const POLLS_EVENT = 'bandeja-boys:polls-changed'
-const LOCAL_MATCH_MVP_KEY = 'bandeja-boys:match-mvp'
-const MATCH_MVP_EVENT = 'bandeja-boys:match-mvp-changed'
+const LOCAL_MATCH_FEEDBACK_KEY = 'bandeja-boys:match-feedback'
+const MATCH_FEEDBACK_EVENT = 'bandeja-boys:match-feedback-changed'
+const LEGACY_LOCAL_MATCH_MVP_KEY = 'bandeja-boys:match-mvp'
 const LEGACY_LOCAL_MATCH_RATINGS_KEY = 'bandeja-boys:match-ratings'
 const LOCAL_MATCH_REPORTS_KEY = 'bandeja-boys:match-reports'
 const MATCH_REPORTS_EVENT = 'bandeja-boys:match-reports-changed'
@@ -817,8 +865,8 @@ const LOCAL_FANTASY_KEY = 'bandeja-boys:fantasy'
 const FANTASY_EVENT = 'bandeja-boys:fantasy-changed'
 const LOCAL_ACTIVITY_KEY = 'bandeja-boys:activity'
 
-interface LocalMatchMvpStore {
-  responses: MatchMvpResponse[]
+interface LocalMatchFeedbackStore {
+  responses: MatchFeedbackResponse[]
 }
 
 interface LocalActivityStore {
@@ -901,48 +949,57 @@ function writeLocalPolls(polls: PadelPoll[]) {
   window.dispatchEvent(new Event(POLLS_EVENT))
 }
 
-function readLocalMatchMvpStore(): LocalMatchMvpStore {
+function readLocalMatchFeedbackStore(): LocalMatchFeedbackStore {
   try {
-    const stored = localStorage.getItem(LOCAL_MATCH_MVP_KEY)
-    if (stored) return JSON.parse(stored) as LocalMatchMvpStore
+    const stored = localStorage.getItem(LOCAL_MATCH_FEEDBACK_KEY)
+    if (stored) return JSON.parse(stored) as LocalMatchFeedbackStore
   } catch {
     // Malformed demo data must not block the MVP prompt.
   }
   return { responses: [] }
 }
 
-function readLegacyLocalClosedResponses(voterId?: string): MatchMvpResponse[] {
-  try {
-    const stored = localStorage.getItem(LEGACY_LOCAL_MATCH_RATINGS_KEY)
-    if (!stored) return []
-    const legacy = JSON.parse(stored) as {
+function readLegacyLocalClosedResponses(reviewerId?: string): MatchFeedbackResponse[] {
+  const readLegacy = (key: string, reviewerField: 'reviewerId' | 'voterId') => {
+    try {
+      const stored = localStorage.getItem(key)
+      if (!stored) return []
+      const legacy = JSON.parse(stored) as {
       responses?: Array<{
         id: string
         pollId: string
         slotId: string
-        reviewerId: string
-        status: MatchMvpResponse['status']
+        reviewerId?: string
+        voterId?: string
+        status: MatchFeedbackResponse['status']
         closedAt: number
       }>
+      }
+      return (legacy.responses ?? []).flatMap((response) => {
+        const legacyReviewerId = response[reviewerField]
+        if (!legacyReviewerId || (reviewerId && legacyReviewerId !== reviewerId)) return []
+        return [{
+          id: response.id,
+          pollId: response.pollId,
+          slotId: response.slotId,
+          reviewerId: legacyReviewerId,
+          status: response.status,
+          closedAt: response.closedAt,
+        } satisfies MatchFeedbackResponse]
+      })
+    } catch {
+      return []
     }
-    return (legacy.responses ?? [])
-      .filter((response) => !voterId || response.reviewerId === voterId)
-      .map((response) => ({
-        id: response.id,
-        pollId: response.pollId,
-        slotId: response.slotId,
-        voterId: response.reviewerId,
-        status: response.status,
-        closedAt: response.closedAt,
-      }))
-  } catch {
-    return []
   }
+  return [
+    ...readLegacy(LEGACY_LOCAL_MATCH_MVP_KEY, 'voterId'),
+    ...readLegacy(LEGACY_LOCAL_MATCH_RATINGS_KEY, 'reviewerId'),
+  ]
 }
 
-function writeLocalMatchMvpStore(store: LocalMatchMvpStore) {
-  localStorage.setItem(LOCAL_MATCH_MVP_KEY, JSON.stringify(store))
-  window.dispatchEvent(new Event(MATCH_MVP_EVENT))
+function writeLocalMatchFeedbackStore(store: LocalMatchFeedbackStore) {
+  localStorage.setItem(LOCAL_MATCH_FEEDBACK_KEY, JSON.stringify(store))
+  window.dispatchEvent(new Event(MATCH_FEEDBACK_EVENT))
 }
 
 function readLocalMatchReports(): MatchReport[] {
@@ -981,8 +1038,8 @@ function reconcileLocalFantasyStore(): LocalFantasyStore {
     readLocalPolls(),
     current.rounds,
     current.entries,
-    aggregateMatchMvpSummaries(readLocalMatchMvpStore().responses),
-    [...readLegacyLocalClosedResponses(), ...readLocalMatchMvpStore().responses],
+    aggregateMatchFeedbackSummaries(readLocalMatchFeedbackStore().responses),
+    [...readLegacyLocalClosedResponses(), ...readLocalMatchFeedbackStore().responses],
     readLocalMatchReports(),
   )
   const next = { ...current, rounds }
@@ -1050,26 +1107,28 @@ function localRepository(): PadelRepository {
       notify()
       return () => window.removeEventListener(USERS_EVENT, notify)
     },
-    subscribeMatchMvpResponses(voterId, listener) {
+    subscribeMatchFeedbackResponses(reviewerId, listener) {
       const notify = () => {
-        const current = readLocalMatchMvpStore().responses.filter((response) => response.voterId === voterId)
+        const current = readLocalMatchFeedbackStore().responses.filter(
+          (response) => response.reviewerId === reviewerId,
+        )
         const currentIds = new Set(current.map((response) => response.id))
         listener([
-          ...readLegacyLocalClosedResponses(voterId).filter((response) => !currentIds.has(response.id)),
+          ...readLegacyLocalClosedResponses(reviewerId).filter((response) => !currentIds.has(response.id)),
           ...current,
         ])
       }
-      window.addEventListener(MATCH_MVP_EVENT, notify)
+      window.addEventListener(MATCH_FEEDBACK_EVENT, notify)
       notify()
-      return () => window.removeEventListener(MATCH_MVP_EVENT, notify)
+      return () => window.removeEventListener(MATCH_FEEDBACK_EVENT, notify)
     },
-    subscribeMatchMvpSummaries(listener) {
+    subscribeMatchFeedbackSummaries(listener) {
       const notify = () => listener(
-        aggregateMatchMvpSummaries(readLocalMatchMvpStore().responses),
+        aggregateMatchFeedbackSummaries(readLocalMatchFeedbackStore().responses),
       )
-      window.addEventListener(MATCH_MVP_EVENT, notify)
+      window.addEventListener(MATCH_FEEDBACK_EVENT, notify)
       notify()
-      return () => window.removeEventListener(MATCH_MVP_EVENT, notify)
+      return () => window.removeEventListener(MATCH_FEEDBACK_EVENT, notify)
     },
     subscribeMatchReports(participantId, listener) {
       const notify = () => listener(
@@ -1087,7 +1146,7 @@ function localRepository(): PadelRepository {
     },
     subscribeFantasyRounds(listener) {
       const notify = () => listener(reconcileLocalFantasyStore().rounds)
-      const events = [FANTASY_EVENT, POLLS_EVENT, MATCH_MVP_EVENT, MATCH_REPORTS_EVENT]
+      const events = [FANTASY_EVENT, POLLS_EVENT, MATCH_FEEDBACK_EVENT, MATCH_REPORTS_EVENT]
       events.forEach((eventName) => window.addEventListener(eventName, notify))
       notify()
       return () => events.forEach((eventName) => window.removeEventListener(eventName, notify))
@@ -1351,22 +1410,24 @@ function localRepository(): PadelRepository {
       }
       localStorage.setItem(LOCAL_ACTIVITY_KEY, JSON.stringify(store))
     },
-    async dismissMatchMvpPrompt(prompt) {
-      const store = readLocalMatchMvpStore()
+    async dismissMatchFeedbackPrompt(prompt) {
+      const store = readLocalMatchFeedbackStore()
       const existing = store.responses.find((response) => response.id === prompt.id)
       if (existing) return existing
-      const response = makeMvpResponse(prompt, 'dismissed')
-      writeLocalMatchMvpStore({ responses: [...store.responses, response] })
+      const response = makeFeedbackResponse(prompt, 'dismissed')
+      writeLocalMatchFeedbackStore({ responses: [...store.responses, response] })
       return response
     },
-    async submitMatchMvp(prompt, voter, selectedPlayerId) {
-      const store = readLocalMatchMvpStore()
+    async submitMatchFeedback(prompt, reviewer, ratings) {
+      const store = readLocalMatchFeedbackStore()
       if (store.responses.some((response) => response.id === prompt.id)) {
         throw new Error('Questa scheda è già stata chiusa.')
       }
-      if (prompt.voterId !== voter.id) throw new Error('Questa scelta MVP appartiene a un altro giocatore.')
-      const response = makeMvpResponse(prompt, 'submitted', selectedPlayerId)
-      writeLocalMatchMvpStore({ responses: [...store.responses, response] })
+      if (prompt.reviewerId !== reviewer.id) {
+        throw new Error('Questa scheda appartiene a un altro giocatore.')
+      }
+      const response = makeFeedbackResponse(prompt, 'submitted', ratings)
+      writeLocalMatchFeedbackStore({ responses: [...store.responses, response] })
       return response
     },
     async saveMatchReport(match, editor, sets) {

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type {
   FantasyRound,
-  MatchMvpPrompt,
+  MatchFeedbackPrompt,
   PadelPoll,
   PlayerMatch,
   SessionUser,
@@ -64,7 +64,7 @@ const admin: SessionUser = {
   id: SLOT_ADMIN_USER_ID,
 }
 
-const prompt: MatchMvpPrompt = {
+const prompt: MatchFeedbackPrompt = {
   id: 'poll-1__slot-1__jury',
   pollId: 'poll-1',
   pollTitle: 'Padel del lunedì',
@@ -72,7 +72,7 @@ const prompt: MatchMvpPrompt = {
   sessionStartsAt: '2026-07-27T18:30',
   sessionEndedAt: 100,
   dueAt: 200,
-  voterId: voter.id,
+  reviewerId: voter.id,
   candidates: [
     { userId: 'ale', displayName: 'Ale' },
     { userId: 'luca', displayName: 'Luca' },
@@ -124,33 +124,43 @@ describe('repository remoto della scelta MVP', () => {
     expect(pollWrite?.[1]).not.toHaveProperty('title')
   })
 
-  it('salva risposta e aggregato MVP in un batch atomico senza letture transazionali', async () => {
-    const response = await repository.submitMatchMvp(prompt, voter, 'ale')
+  it('salva risposta e tre aggregati dei giudizi in un batch atomico senza letture transazionali', async () => {
+    const response = await repository.submitMatchFeedback(prompt, voter, [
+      { playerId: 'ale', level: 5 },
+      { playerId: 'luca', level: 3 },
+      { playerId: 'teo', level: 1 },
+    ])
 
     expect(firestoreMocks.runTransaction).not.toHaveBeenCalled()
     expect(firestoreMocks.writeBatch).toHaveBeenCalledOnce()
-    expect(firestoreMocks.batch.set).toHaveBeenCalledTimes(2)
+    expect(firestoreMocks.batch.set).toHaveBeenCalledTimes(4)
     expect(firestoreMocks.batch.set).toHaveBeenCalledWith(
-      'matchMvpSummaries/poll-1__slot-1__ale',
+      'matchFeedbackSummaries/poll-1__slot-1__ale',
       expect.objectContaining({
         id: 'poll-1__slot-1__ale',
         pollId: 'poll-1',
         slotId: 'slot-1',
         playerId: 'ale',
+        scoreUnitsTotal: expect.anything(),
+        ratingCount: expect.anything(),
         lastResponseId: 'poll-1__slot-1__jury',
       }),
       { merge: true },
     )
     expect(firestoreMocks.batch.set).toHaveBeenLastCalledWith(
-      'matchMvpResponses/poll-1__slot-1__jury',
+      'matchFeedbackResponses/poll-1__slot-1__jury',
       response,
     )
     expect(firestoreMocks.batch.commit).toHaveBeenCalledOnce()
     expect(response).toMatchObject({
       id: prompt.id,
-      voterId: voter.id,
+      reviewerId: voter.id,
       status: 'submitted',
-      selectedPlayerId: 'ale',
+      ratings: [
+        expect.objectContaining({ playerId: 'ale', level: 5, scoreUnits: 18 }),
+        expect.objectContaining({ playerId: 'luca', level: 3, scoreUnits: 12 }),
+        expect.objectContaining({ playerId: 'teo', level: 1, scoreUnits: 8 }),
+      ],
     })
   })
 

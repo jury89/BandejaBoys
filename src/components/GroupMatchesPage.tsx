@@ -1,13 +1,13 @@
 import {
   ArrowLeft,
+  Bird,
   CalendarCheck2,
   ClipboardList,
   Clock3,
   MapPin,
-  Trophy,
   UsersRound,
 } from 'lucide-react'
-import { DEFAULT_VENUE, getStarters, isGuestSignup } from '../lib/domain'
+import { DEFAULT_VENUE, getMatchFeedbackDefinition, getStarters, isGuestSignup } from '../lib/domain'
 import { slotDateParts } from '../lib/format'
 import type { GroupMatch, MemberProfile } from '../types'
 import { MatchReportScoreboard } from './MatchReportScoreboard'
@@ -19,10 +19,6 @@ interface GroupMatchesPageProps {
   loading: boolean
   error: string | null
   onBack: () => void
-}
-
-function mvpVoteCountLabel(count: number): string {
-  return count === 1 ? '1 preferenza' : `${count} preferenze`
 }
 
 function GroupMatchCard({
@@ -59,21 +55,24 @@ function GroupMatchCard({
       </div>
 
       <div className="group-match__content">
-        <section className="group-match__panel group-match__ratings" aria-label="Scelta MVP dei giocatori">
+        <section className="group-match__panel group-match__ratings" aria-label="Giudizi ricevuti dai giocatori">
           <header className="group-match__panel-heading">
             <span aria-hidden="true"><UsersRound size={18} /></span>
             <div>
-              <small>Voto del gruppo</small>
-              <strong>MVP della partita</strong>
+              <small>Giudizi del gruppo</small>
+              <strong>La voliera del match</strong>
             </div>
           </header>
           <div className="group-match__players">
             {starters.map((signup) => {
               const member = memberById.get(signup.userId)
-              const mvp = match.playerMvpVotes.find((item) => item.userId === signup.userId)
-              const mvpLabel = mvp?.isWinner
-                ? `${signup.displayName}: MVP con ${mvpVoteCountLabel(mvp.votes)}`
-                : `${signup.displayName}: ${mvpVoteCountLabel(mvp?.votes ?? 0)}`
+              const feedback = match.playerFeedback.find((item) => item.userId === signup.userId)
+              const definition = feedback && feedback.ratingCount > 0
+                ? getMatchFeedbackDefinition(feedback.level)
+                : null
+              const feedbackLabel = definition
+                ? `${signup.displayName}: ${definition.label}, ${feedback?.ratingCount} giudizi`
+                : `${signup.displayName}: nessun giudizio`
 
               return (
                 <div className="group-match__player" key={signup.id}>
@@ -85,11 +84,11 @@ function GroupMatchCard({
                   />
                   <div className="group-match__player-copy">
                     <strong>{signup.displayName}</strong>
-                    <small>{isGuestSignup(signup) ? 'Ospite' : mvp?.isWinner ? 'MVP' : mvpVoteCountLabel(mvp?.votes ?? 0)}</small>
+                    <small>{isGuestSignup(signup) ? 'Ospite' : definition?.label ?? 'Nessun giudizio'}</small>
                   </div>
-                  <span className={`group-match__player-score ${mvp?.isWinner ? 'has-rating' : ''}`} aria-label={mvpLabel}>
-                    {mvp?.isWinner ? <Trophy size={13} aria-hidden="true" /> : null}
-                    <strong>{mvp?.votes ?? 0}</strong>
+                  <span className={`group-match__player-score ${definition ? 'has-rating' : ''}`} aria-label={feedbackLabel}>
+                    {definition ? <Bird size={13} aria-hidden="true" /> : null}
+                    <strong>{feedback?.ratingCount ?? 0}</strong>
                   </span>
                 </div>
               )

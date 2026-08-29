@@ -34,13 +34,13 @@ service cloud.firestore {
         || (request.resource.data.notificationPreferences is map
           && request.resource.data.notificationPreferences.keys().hasOnly([
             'mondayMotivation', 'newSlots', 'slotReady', 'starterSubstitution', 'bookingReminder7d',
-            'reminder24h', 'reminder2h', 'matchMvp', 'matchRating', 'fantasy'
+            'reminder24h', 'reminder2h', 'matchFeedback', 'matchMvp', 'matchRating', 'fantasy'
           ])
           && request.resource.data.notificationPreferences.keys().hasAll([
             'mondayMotivation', 'newSlots', 'slotReady', 'bookingReminder7d',
             'reminder24h', 'reminder2h'
           ])
-          && request.resource.data.notificationPreferences.keys().hasAny(['matchMvp', 'matchRating'])
+          && request.resource.data.notificationPreferences.keys().hasAny(['matchFeedback', 'matchMvp', 'matchRating'])
           && request.resource.data.notificationPreferences.mondayMotivation is bool
           && request.resource.data.notificationPreferences.newSlots is bool
           && request.resource.data.notificationPreferences.slotReady is bool
@@ -49,6 +49,8 @@ service cloud.firestore {
           && request.resource.data.notificationPreferences.bookingReminder7d is bool
           && request.resource.data.notificationPreferences.reminder24h is bool
           && request.resource.data.notificationPreferences.reminder2h is bool
+          && (!request.resource.data.notificationPreferences.keys().hasAny(['matchFeedback'])
+            || request.resource.data.notificationPreferences.matchFeedback is bool)
           && (!request.resource.data.notificationPreferences.keys().hasAny(['matchMvp'])
             || request.resource.data.notificationPreferences.matchMvp is bool)
           && (!request.resource.data.notificationPreferences.keys().hasAny(['matchRating'])
@@ -73,34 +75,74 @@ service cloud.firestore {
         && validNotificationPreferences();
     }
 
-    function validMatchMvpResponse(responseId) {
+    function validMatchFeedbackRating(rating) {
+      return rating is map
+        && rating.keys().hasOnly(['playerId', 'playerName', 'level', 'scoreUnits'])
+        && rating.playerId is string
+        && rating.playerId != request.auth.uid
+        && rating.playerName is string
+        && rating.playerName.size() >= 2
+        && rating.playerName.size() <= 40
+        && rating.level is int
+        && rating.level >= 1
+        && rating.level <= 5
+        && rating.scoreUnits is int
+        && ((rating.level == 1 && rating.scoreUnits == 8)
+          || (rating.level == 2 && rating.scoreUnits == 10)
+          || (rating.level == 3 && rating.scoreUnits == 12)
+          || (rating.level == 4 && rating.scoreUnits == 15)
+          || (rating.level == 5 && rating.scoreUnits == 18));
+    }
+
+    function validMatchFeedbackRatings(ratings) {
+      return ratings is list
+        && ratings.size() >= 1
+        && ratings.size() <= 3
+        && validMatchFeedbackRating(ratings[0])
+        && (ratings.size() < 2 || validMatchFeedbackRating(ratings[1]))
+        && (ratings.size() < 3 || validMatchFeedbackRating(ratings[2]))
+        && (ratings.size() < 2 || ratings[0].playerId != ratings[1].playerId)
+        && (ratings.size() < 3 || (ratings[0].playerId != ratings[2].playerId
+          && ratings[1].playerId != ratings[2].playerId));
+    }
+
+    function feedbackResponseHasRating(response, playerId, scoreUnits) {
+      return response.data.ratings.size() >= 1
+          && response.data.ratings[0].playerId == playerId
+          && response.data.ratings[0].scoreUnits == scoreUnits
+        || response.data.ratings.size() >= 2
+          && response.data.ratings[1].playerId == playerId
+          && response.data.ratings[1].scoreUnits == scoreUnits
+        || response.data.ratings.size() >= 3
+          && response.data.ratings[2].playerId == playerId
+          && response.data.ratings[2].scoreUnits == scoreUnits;
+    }
+
+    function validMatchFeedbackResponse(responseId) {
       let isSubmitted = request.resource.data.status == 'submitted';
       return request.resource.data.keys().hasOnly([
-          'id', 'pollId', 'slotId', 'voterId', 'status',
-          'selectedPlayerId', 'selectedPlayerName', 'closedAt'
+          'id', 'pollId', 'slotId', 'reviewerId', 'status', 'ratings', 'closedAt'
         ])
         && request.resource.data.id == responseId
         && responseId == request.resource.data.pollId + '__' + request.resource.data.slotId + '__' + request.auth.uid
         && request.resource.data.pollId is string
         && request.resource.data.slotId is string
-        && request.resource.data.voterId == request.auth.uid
+        && request.resource.data.reviewerId == request.auth.uid
         && request.resource.data.status in ['dismissed', 'submitted']
         && request.resource.data.closedAt is number
         && (isSubmitted
-          ? (request.resource.data.keys().hasAll(['selectedPlayerId', 'selectedPlayerName'])
-            && request.resource.data.selectedPlayerId is string
-            && request.resource.data.selectedPlayerId != request.auth.uid
-            && request.resource.data.selectedPlayerName is string)
-          : !request.resource.data.keys().hasAny(['selectedPlayerId', 'selectedPlayerName']));
+          ? (request.resource.data.keys().hasAll(['ratings'])
+            && validMatchFeedbackRatings(request.resource.data.ratings))
+          : !request.resource.data.keys().hasAny(['ratings']));
     }
 
-    function validMatchMvpSummary(summaryId) {
+    function validMatchFeedbackSummary(summaryId) {
       let response = getAfter(
-        /databases/$(database)/documents/matchMvpResponses/$(request.resource.data.lastResponseId)
+        /databases/$(database)/documents/matchFeedbackResponses/$(request.resource.data.lastResponseId)
       );
       return request.resource.data.keys().hasOnly([
           'id', 'pollId', 'slotId', 'playerId',
-          'voteCount', 'lastResponseId', 'updatedAt'
+          'scoreUnitsTotal', 'ratingCount', 'lastResponseId', 'updatedAt'
         ])
         && request.resource.data.id == summaryId
         && summaryId == request.resource.data.pollId + '__'
@@ -108,34 +150,52 @@ service cloud.firestore {
         && request.resource.data.pollId is string
         && request.resource.data.slotId is string
         && request.resource.data.playerId is string
-        && request.resource.data.voteCount is int
-        && request.resource.data.voteCount >= 1
+        && request.resource.data.scoreUnitsTotal is int
+        && request.resource.data.scoreUnitsTotal >= 8
+        && request.resource.data.ratingCount is int
+        && request.resource.data.ratingCount >= 1
         && request.resource.data.lastResponseId is string
         && request.resource.data.updatedAt is int
         && existsAfter(
-          /databases/$(database)/documents/matchMvpResponses/$(request.resource.data.lastResponseId)
+          /databases/$(database)/documents/matchFeedbackResponses/$(request.resource.data.lastResponseId)
         )
         && response.data.status == 'submitted'
         && response.data.pollId == request.resource.data.pollId
         && response.data.slotId == request.resource.data.slotId
-        && response.data.selectedPlayerId == request.resource.data.playerId
-        && response.data.voterId == request.auth.uid
+        && response.data.reviewerId == request.auth.uid
         && response.data.closedAt == request.resource.data.updatedAt;
     }
 
-    function validMatchMvpSummaryCreate(summaryId) {
-      return validMatchMvpSummary(summaryId)
-        && request.resource.data.voteCount == 1;
+    function validMatchFeedbackSummaryCreate(summaryId) {
+      let response = getAfter(
+        /databases/$(database)/documents/matchFeedbackResponses/$(request.resource.data.lastResponseId)
+      );
+      return validMatchFeedbackSummary(summaryId)
+        && request.resource.data.ratingCount == 1
+        && feedbackResponseHasRating(
+          response,
+          request.resource.data.playerId,
+          request.resource.data.scoreUnitsTotal
+        );
     }
 
-    function validMatchMvpSummaryUpdate(summaryId) {
-      return validMatchMvpSummary(summaryId)
+    function validMatchFeedbackSummaryUpdate(summaryId) {
+      let response = getAfter(
+        /databases/$(database)/documents/matchFeedbackResponses/$(request.resource.data.lastResponseId)
+      );
+      return validMatchFeedbackSummary(summaryId)
         && request.resource.data.pollId == resource.data.pollId
         && request.resource.data.slotId == resource.data.slotId
         && request.resource.data.playerId == resource.data.playerId
         && request.resource.data.lastResponseId != resource.data.lastResponseId
         && request.resource.data.updatedAt >= resource.data.updatedAt
-        && request.resource.data.voteCount == resource.data.voteCount + 1;
+        && request.resource.data.ratingCount == resource.data.ratingCount + 1
+        && request.resource.data.scoreUnitsTotal > resource.data.scoreUnitsTotal
+        && feedbackResponseHasRating(
+          response,
+          request.resource.data.playerId,
+          request.resource.data.scoreUnitsTotal - resource.data.scoreUnitsTotal
+        );
     }
 
     function validMatchReportSet(set, participantIds) {
@@ -309,7 +369,7 @@ service cloud.firestore {
         && request.resource.data.eventId is string
         && request.resource.data.kind in [
           'new-slots', 'slot-ready', 'starter-substitution', 'booking-reminder-7d',
-          'reminder-24h', 'reminder-2h', 'match-rating', 'match-mvp',
+          'reminder-24h', 'reminder-2h', 'match-rating', 'match-mvp', 'match-feedback',
           'monday-motivation', 'fantasy-open', 'fantasy-roster-changed',
           'fantasy-result', 'test'
         ]
@@ -473,16 +533,26 @@ service cloud.firestore {
       allow create, update, delete: if false;
     }
 
+    match /matchFeedbackResponses/{responseId} {
+      allow read: if isNotifier() || (isMember() && resource.data.reviewerId == request.auth.uid);
+      allow create: if isMember() && validMatchFeedbackResponse(responseId);
+      allow update, delete: if false;
+    }
+
     match /matchMvpResponses/{responseId} {
       allow read: if isNotifier() || (isMember() && resource.data.voterId == request.auth.uid);
-      allow create: if isMember() && validMatchMvpResponse(responseId);
-      allow update, delete: if false;
+      allow create, update, delete: if false;
     }
 
     match /matchMvpSummaries/{summaryId} {
       allow read: if isMember() || isNotifier();
-      allow create: if isMember() && validMatchMvpSummaryCreate(summaryId);
-      allow update: if isMember() && validMatchMvpSummaryUpdate(summaryId);
+      allow create, update, delete: if false;
+    }
+
+    match /matchFeedbackSummaries/{summaryId} {
+      allow read: if isMember() || isNotifier();
+      allow create: if isMember() && validMatchFeedbackSummaryCreate(summaryId);
+      allow update: if isMember() && validMatchFeedbackSummaryUpdate(summaryId);
       allow delete: if false;
     }
 

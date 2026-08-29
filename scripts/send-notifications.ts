@@ -16,8 +16,8 @@ import webpush, { type PushSubscription } from 'web-push'
 import type {
   FantasyEntry,
   FantasyRound,
-  MatchMvpResponse,
-  MatchMvpSummary,
+  MatchFeedbackResponse,
+  MatchFeedbackSummary,
   MatchReport,
   MemberProfile,
   PadelPoll,
@@ -54,8 +54,8 @@ const testNotificationId = process.env.TEST_NOTIFICATION_ID?.trim()
 const testNotificationTitle = process.env.TEST_NOTIFICATION_TITLE?.trim()
 const testNotificationMessage = process.env.TEST_NOTIFICATION_MESSAGE?.trim()
 const testNotificationUrl = process.env.TEST_NOTIFICATION_URL?.trim()
-const testNotificationMode = ['mvp', 'pagelle'].includes(process.env.TEST_NOTIFICATION_MODE?.trim() ?? '')
-  ? 'match-mvp' as const
+const testNotificationMode = ['feedback', 'mvp', 'pagelle'].includes(process.env.TEST_NOTIFICATION_MODE?.trim() ?? '')
+  ? 'feedback' as const
   : 'standard' as const
 const origin = 'https://bandeja-boys.web.app'
 
@@ -64,8 +64,8 @@ if (!publicKey || !privateKey) throw new Error('VAPID keys mancanti.')
 if (testNotificationMessage && !testUserId) throw new Error('Un messaggio manuale richiede il destinatario.')
 if (testNotificationTitle && !testUserId) throw new Error('Un titolo manuale richiede il destinatario.')
 if (testNotificationUrl && !testUserId) throw new Error('Un link manuale richiede il destinatario.')
-if (testNotificationMode === 'match-mvp' && !testUserId) {
-  throw new Error('Il collaudo MVP richiede il destinatario.')
+if (testNotificationMode === 'feedback' && !testUserId) {
+  throw new Error('Il collaudo dei giudizi richiede il destinatario.')
 }
 
 const app = initializeApp({ apiKey, authDomain: `${projectId}.firebaseapp.com`, projectId })
@@ -78,24 +78,26 @@ const motherNamesReference = doc(db, 'notificationContent', 'motherNames')
 const [
   pollSnapshot,
   subscriptionSnapshot,
-  mvpResponseSnapshot,
+  feedbackResponseSnapshot,
+  legacyMvpResponseSnapshot,
   legacyRatingResponseSnapshot,
   motivationSnapshot,
   motherNamesSnapshot,
   userSnapshot,
   fantasyRoundSnapshot,
-  mvpSummarySnapshot,
+  feedbackSummarySnapshot,
   matchReportSnapshot,
 ] = await Promise.all([
   getDocs(collection(db, 'polls')),
   getDocs(collection(db, 'pushSubscriptions')),
+  getDocs(collection(db, 'matchFeedbackResponses')),
   getDocs(collection(db, 'matchMvpResponses')),
   getDocs(collection(db, 'matchRatingResponses')),
   getDoc(motivationReference),
   getDoc(motherNamesReference),
   getDocs(collection(db, 'users')),
   getDocs(collection(db, 'fantasyRounds')),
-  getDocs(collection(db, 'matchMvpSummaries')),
+  getDocs(collection(db, 'matchFeedbackSummaries')),
   getDocs(collection(db, 'matchReports')),
 ])
 
@@ -105,31 +107,50 @@ const subscriptions = subscriptionSnapshot.docs.map((item) => ({
   reference: item.ref,
   data: item.data() as StoredPushSubscription,
 }))
-const currentMvpResponses = mvpResponseSnapshot.docs.map((item) => ({
+const currentFeedbackResponses = feedbackResponseSnapshot.docs.map((item) => ({
   id: item.id,
   ...item.data(),
-}) as MatchMvpResponse)
-const currentMvpResponseIds = new Set(currentMvpResponses.map((response) => response.id))
-const legacyClosedResponses = legacyRatingResponseSnapshot.docs
-  .filter((item) => !currentMvpResponseIds.has(item.id))
-  .map((item) => {
+}) as MatchFeedbackResponse)
+const currentFeedbackResponseIds = new Set(currentFeedbackResponses.map((response) => response.id))
+const legacyMvpClosedResponses = legacyMvpResponseSnapshot.docs.map((item) => {
+  const data = item.data() as {
+    pollId: string
+    slotId: string
+    voterId: string
+    status: MatchFeedbackResponse['status']
+    closedAt: number
+  }
+  return {
+    id: item.id,
+    pollId: data.pollId,
+    slotId: data.slotId,
+    reviewerId: data.voterId,
+    status: data.status,
+    closedAt: data.closedAt,
+  } satisfies MatchFeedbackResponse
+})
+const legacyRatingClosedResponses = legacyRatingResponseSnapshot.docs.map((item) => {
     const data = item.data() as {
       pollId: string
       slotId: string
       reviewerId: string
-      status: MatchMvpResponse['status']
+      status: MatchFeedbackResponse['status']
       closedAt: number
     }
     return {
       id: item.id,
       pollId: data.pollId,
       slotId: data.slotId,
-      voterId: data.reviewerId,
+      reviewerId: data.reviewerId,
       status: data.status,
       closedAt: data.closedAt,
-    } satisfies MatchMvpResponse
+    } satisfies MatchFeedbackResponse
   })
-const mvpResponses = [...legacyClosedResponses, ...currentMvpResponses]
+const feedbackResponses = [
+  ...[...legacyMvpClosedResponses, ...legacyRatingClosedResponses]
+    .filter((response) => !currentFeedbackResponseIds.has(response.id)),
+  ...currentFeedbackResponses,
+]
 const existingFantasyRounds = fantasyRoundSnapshot.docs.map((item) => ({
   id: item.id,
   ...item.data(),
@@ -141,10 +162,10 @@ const fantasyEntries = (await Promise.all(existingFantasyRounds.map(async (round
     ...item.data(),
   }) as FantasyEntry)
 }))).flat()
-const mvpSummaries = mvpSummarySnapshot.docs.map((item) => ({
+const feedbackSummaries = feedbackSummarySnapshot.docs.map((item) => ({
   id: item.id,
   ...item.data(),
-}) as MatchMvpSummary)
+}) as MatchFeedbackSummary)
 const matchReports = matchReportSnapshot.docs.map((item) => ({
   id: item.id,
   ...item.data(),
@@ -186,8 +207,8 @@ const fantasyRounds = reconcileFantasyRounds(
   polls,
   existingFantasyRounds,
   fantasyEntries,
-  mvpSummaries,
-  mvpResponses,
+  feedbackSummaries,
+  feedbackResponses,
   matchReports,
   now,
 )
@@ -209,7 +230,7 @@ const notifications = testUserId
       testNotificationUrl,
     )]
   : [
-      ...collectScheduledNotifications(polls, now, mvpResponses, {
+      ...collectScheduledNotifications(polls, now, feedbackResponses, {
         messages: motivationalMessages,
         recipientUserIds: motivationRecipientUserIds,
         motherNamesByUserId,

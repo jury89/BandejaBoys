@@ -27,10 +27,11 @@ import type {
   SessionUser,
 } from '../types'
 import {
-  FANTASY_MVP_LEAGUE_POINTS,
   FANTASY_STARTER_LEAGUE_POINTS,
+  FANTASY_TOP_PERFORMER_LEAGUE_POINTS,
   fantasyEntryIsCurrent,
   getFantasyLeaderboard,
+  getMatchFeedbackDefinition,
 } from '../lib/domain'
 import { PADEL_TIME_ZONE } from '../lib/format'
 import { resolveMemberName } from '../lib/memberNames'
@@ -176,7 +177,7 @@ function FantasyRulesModal({ onClose }: { onClose: () => void }) {
                 I primi tre del round ricevono 5, 3 e 1 punto. La classifica
                 generale somma i punti ottenuti in tutte le partite. Chi gioca
                 in campo riceve {FANTASY_STARTER_LEAGUE_POINTS} punti;
-                {' '}l’MVP ne riceve {FANTASY_MVP_LEAGUE_POINTS}.
+                {' '}chi ottiene il giudizio medio migliore ne riceve {FANTASY_TOP_PERFORMER_LEAGUE_POINTS}.
               </p>
             </div>
           </li>
@@ -193,7 +194,7 @@ function FantasyRulesModal({ onClose }: { onClose: () => void }) {
           <dl>
             <div>
               <dt>Base</dt>
-              <dd>Ogni titolare parte da 6 punti.</dd>
+              <dd>La media dei giudizi ricevuti determina il punteggio base; senza giudizi vale Fagiano spaesato.</dd>
             </div>
             <div>
               <dt>Risultato</dt>
@@ -204,12 +205,8 @@ function FantasyRulesModal({ onClose }: { onClose: () => void }) {
               <dd>+0,5 a chi condivide la miglior differenza game positiva.</dd>
             </div>
             <div>
-              <dt>MVP</dt>
-              <dd>+1 al giocatore con più preferenze; il bonus vale anche in caso di ex aequo.</dd>
-            </div>
-            <div>
               <dt>Capitano</dt>
-              <dd>Punteggio ×1,5 e altri +2 se è uno degli MVP del match.</dd>
+              <dd>Punteggio ×1,5 e altri +2 se ha ricevuto il giudizio medio migliore.</dd>
             </div>
           </dl>
         </section>
@@ -217,7 +214,7 @@ function FantasyRulesModal({ onClose }: { onClose: () => void }) {
         <p className="fantasy-rulebook__note">
           <Clock3 size={18} />
           Dopo 24 ore il risultato viene calcolato se ci sono il referto e tutte
-          le scelte MVP chiuse. A 48 ore il round si chiude comunque; senza
+          le schede dei giudizi chiuse. A 48 ore il round si chiude comunque; senza
           referto viene annullato.
         </p>
       </div>
@@ -467,7 +464,7 @@ function LockedRound({
           ))}
         </ol>
       )}
-      <footer><Clock3 size={15} /> Calcolo da 24 ore con referto e scelte MVP chiuse.</footer>
+      <footer><Clock3 size={15} /> Calcolo da 24 ore con referto e giudizi chiusi.</footer>
     </article>
   )
 }
@@ -622,6 +619,12 @@ function mvpVoteSource(score: FantasyPlayerScore): string {
   return `${votes} ${votes === 1 ? 'preferenza ricevuta' : 'preferenze ricevute'}`
 }
 
+function feedbackSource(score: FantasyPlayerScore): string {
+  const definition = getMatchFeedbackDefinition(score.feedbackLevel ?? 3)
+  if (score.usedDefaultRating) return `${definition.label} d’ufficio`
+  return `${definition.label} · ${score.ratingCount} ${score.ratingCount === 1 ? 'giudizio' : 'giudizi'}`
+}
+
 function FantasyPlayerScoreRow({
   roundId,
   score,
@@ -635,6 +638,7 @@ function FantasyPlayerScoreRow({
   const playerName = resolveMemberName(members, score.userId, score.displayName)
   const detailId = `fantasy-score-${roundId}-${score.userId}`
   const usesMvpScoring = score.scoringModel === 'mvp-v2'
+  const usesFeedbackScoring = score.scoringModel === 'feedback-v3'
   const modifiers = [score.resultBonus, score.differenceBonus]
   if (usesMvpScoring) modifiers.push(score.mvpBonus ?? 0)
   const formulaLabel = [
@@ -657,13 +661,17 @@ function FantasyPlayerScoreRow({
         <span className="fantasy-player-score__identity">
           <strong>{playerName}</strong>
           <small>
-            {usesMvpScoring
+            {usesFeedbackScoring
+              ? feedbackSource(score)
+              : usesMvpScoring
               ? `Base ${fantasyNumber(score.baseRating)} · ${mvpVoteSource(score)}`
               : `Pagella ${fantasyNumber(score.baseRating)}${score.usedDefaultRating ? ' d’ufficio' : ''}`}
           </small>
         </span>
         <strong className="fantasy-player-score__total">{fantasyNumber(score.fantasyScore)}</strong>
-        {score.isMvp && <Sparkles size={15} aria-label="MVP" />}
+        {(score.isTopPerformer || score.isMvp) && (
+          <Sparkles size={15} aria-label={score.isTopPerformer ? 'Miglior giudizio medio' : 'MVP'} />
+        )}
         <ChevronDown className="fantasy-player-score__chevron" size={16} aria-hidden="true" />
       </button>
 
@@ -684,7 +692,14 @@ function FantasyPlayerScoreRow({
           </p>
           <dl>
             <div>
-              <dt>{usesMvpScoring ? 'Base comune' : 'Voto base'}<small>{usesMvpScoring ? 'Uguale per tutti i titolari' : ratingSource(score)}</small></dt>
+              <dt>
+                {usesFeedbackScoring ? 'Giudizio base' : usesMvpScoring ? 'Base comune' : 'Voto base'}
+                <small>
+                  {usesFeedbackScoring
+                    ? feedbackSource(score)
+                    : usesMvpScoring ? 'Uguale per tutti i titolari' : ratingSource(score)}
+                </small>
+              </dt>
               <dd>{fantasyNumber(score.baseRating)}</dd>
             </div>
             <div>
@@ -749,6 +764,7 @@ function Leaderboard({
 }
 
 function contributionLabel(contribution: FantasyLeaderboardContribution): string {
+  if (contribution.source === 'top-performer') return 'Miglior giudizio medio · bonus presenza'
   if (contribution.source === 'mvp') return 'MVP in campo · bonus presenza'
   if (contribution.source === 'starter') return 'Titolare in campo · bonus presenza'
   return `${contribution.rank}° posto · ${fantasyNumber(contribution.rawFantasyPoints)} fantasy pt`

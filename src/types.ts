@@ -8,8 +8,9 @@ export interface NotificationPreferences {
   bookingReminder7d: boolean
   reminder24h: boolean
   reminder2h: boolean
-  matchMvp: boolean
-  /** Legacy preference retained only while older saved profiles are normalized. */
+  matchFeedback: boolean
+  /** Legacy preferences retained only while older saved profiles are normalized. */
+  matchMvp?: boolean
   matchRating?: boolean
   fantasy: boolean
 }
@@ -103,9 +104,9 @@ export interface PlayerMatch {
   pollTitle: string
   slot: PadelSlot
   report?: MatchReport
-  receivedMvp?: {
-    votes: number
-    isWinner: boolean
+  receivedFeedback?: {
+    level: MatchFeedbackLevel
+    ratingCount: number
   }
 }
 
@@ -114,24 +115,27 @@ export interface PlayerMatchLists {
   past: PlayerMatch[]
 }
 
-export interface MatchMvpSummary {
+export type MatchFeedbackLevel = 1 | 2 | 3 | 4 | 5
+
+export interface MatchFeedbackSummary {
   id: string
   pollId: string
   slotId: string
   playerId: string
-  voteCount: number
+  scoreUnitsTotal: number
+  ratingCount: number
   lastResponseId: string
   updatedAt: number
 }
 
-export interface GroupMatchPlayerMvp {
+export interface GroupMatchPlayerFeedback {
   userId: string
-  votes: number
-  isWinner: boolean
+  level: MatchFeedbackLevel
+  ratingCount: number
 }
 
 export interface GroupMatch extends PlayerMatch {
-  playerMvpVotes: GroupMatchPlayerMvp[]
+  playerFeedback: GroupMatchPlayerFeedback[]
 }
 
 export interface SlotInput {
@@ -145,14 +149,14 @@ export interface CreatePollInput {
 
 export type SlotPhase = 'collecting' | 'ready' | 'booked'
 
-export type MatchMvpResponseStatus = 'dismissed' | 'submitted'
+export type MatchFeedbackResponseStatus = 'dismissed' | 'submitted'
 
-export interface MatchMvpCandidate {
+export interface MatchFeedbackCandidate {
   userId: string
   displayName: string
 }
 
-export interface MatchMvpPrompt {
+export interface MatchFeedbackPrompt {
   id: string
   pollId: string
   pollTitle: string
@@ -160,18 +164,24 @@ export interface MatchMvpPrompt {
   sessionStartsAt: string
   sessionEndedAt: number
   dueAt: number
-  voterId: string
-  candidates: MatchMvpCandidate[]
+  reviewerId: string
+  candidates: MatchFeedbackCandidate[]
 }
 
-export interface MatchMvpResponse {
+export interface MatchFeedbackRating {
+  playerId: string
+  playerName: string
+  level: MatchFeedbackLevel
+  scoreUnits: number
+}
+
+export interface MatchFeedbackResponse {
   id: string
   pollId: string
   slotId: string
-  voterId: string
-  status: MatchMvpResponseStatus
-  selectedPlayerId?: string
-  selectedPlayerName?: string
+  reviewerId: string
+  status: MatchFeedbackResponseStatus
+  ratings?: MatchFeedbackRating[]
   closedAt: number
 }
 
@@ -234,10 +244,11 @@ export interface FantasyRoundPlayer {
 }
 
 export interface FantasyPlayerScore extends FantasyRoundPlayer {
-  scoringModel?: 'ratings-v1' | 'mvp-v2'
+  scoringModel?: 'ratings-v1' | 'mvp-v2' | 'feedback-v3'
   baseRating: number
   ratingCount: number
   usedDefaultRating: boolean
+  feedbackLevel?: MatchFeedbackLevel
   mvpVotes?: number
   mvpBonus?: number
   setWins: number
@@ -247,6 +258,7 @@ export interface FantasyPlayerScore extends FantasyRoundPlayer {
   differenceBonus: number
   fantasyScore: number
   isMvp: boolean
+  isTopPerformer?: boolean
 }
 
 export interface FantasyRoundStanding {
@@ -317,7 +329,7 @@ export interface FantasyLeaderboardContribution {
   roundId: string
   pollTitle: string
   playedAt: number
-  source: 'formation' | 'starter' | 'mvp'
+  source: 'formation' | 'starter' | 'mvp' | 'top-performer'
   leaguePoints: number
   rawFantasyPoints: number
   rank?: number

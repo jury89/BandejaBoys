@@ -206,15 +206,14 @@ const forbiddenUpdate = {
   ...validUpdate,
   pollTitle: 'Titolo alterato',
 }
-const mvpResponseId = `${reportId}__${userId}`
-const mvpResponse = {
-  id: mvpResponseId,
+const feedbackResponseId = `${reportId}__${userId}`
+const feedbackResponse = {
+  id: feedbackResponseId,
   pollId,
   slotId,
-  voterId: userId,
+  reviewerId: userId,
   status: 'submitted',
-  selectedPlayerId: 'qa-a',
-  selectedPlayerName: 'Player A',
+  ratings: [{ playerId: 'qa-a', playerName: 'Player A', level: 4, scoreUnits: 15 }],
   closedAt: createdAt,
 }
 const summaryId = `${reportId}__qa-a`
@@ -223,8 +222,9 @@ const summary = {
   pollId,
   slotId,
   playerId: 'qa-a',
-  voteCount: 2,
-  lastResponseId: mvpResponseId,
+  scoreUnitsTotal: 30,
+  ratingCount: 2,
+  lastResponseId: feedbackResponseId,
   updatedAt: createdAt,
 }
 const fantasyRoundPath = `/databases/(default)/documents/fantasyRounds/${reportId}`
@@ -287,36 +287,36 @@ const tests: TestDefinition[] = [
     testCase: readCase(path, oneSet, 'DENY'),
   },
   {
-    label: 'risultato MVP aggregato leggibile da un membro',
+    label: 'giudizio aggregato leggibile da un membro',
     testCase: readCase(
-      `/databases/(default)/documents/matchMvpSummaries/${summaryId}`,
+      `/databases/(default)/documents/matchFeedbackSummaries/${summaryId}`,
       summary,
       'ALLOW',
       outsiderId,
     ),
   },
   {
-    label: 'risultato MVP aggregato non leggibile senza autenticazione',
+    label: 'giudizio aggregato non leggibile senza autenticazione',
     testCase: readCase(
-      `/databases/(default)/documents/matchMvpSummaries/${summaryId}`,
+      `/databases/(default)/documents/matchFeedbackSummaries/${summaryId}`,
       summary,
       'DENY',
     ),
   },
   {
-    label: 'scelta MVP individuale non leggibile da un membro estraneo',
+    label: 'giudizio individuale non leggibile da un membro estraneo',
     testCase: readCase(
-      `/databases/(default)/documents/matchMvpResponses/${mvpResponseId}`,
-      mvpResponse,
+      `/databases/(default)/documents/matchFeedbackResponses/${feedbackResponseId}`,
+      feedbackResponse,
       'DENY',
       outsiderId,
     ),
   },
   {
-    label: 'scelta MVP individuale leggibile dal votante',
+    label: 'giudizio individuale leggibile dal revisore',
     testCase: readCase(
-      `/databases/(default)/documents/matchMvpResponses/${mvpResponseId}`,
-      mvpResponse,
+      `/databases/(default)/documents/matchFeedbackResponses/${feedbackResponseId}`,
+      feedbackResponse,
       'ALLOW',
       userId,
     ),
@@ -433,5 +433,5 @@ if (failures.length > 0) {
 }
 
 console.log(
-  `PASS: ${tests.length} casi semantici superati per referti, aggregati MVP e scelte private.`,
+  `PASS: ${tests.length} casi semantici superati per referti, giudizi aggregati e scelte private.`,
 )
