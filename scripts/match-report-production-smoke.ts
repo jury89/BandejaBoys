@@ -56,6 +56,8 @@ const adminDb = new AdminFirestore({ projectId: config.projectId })
 
 let userId: string | undefined
 let observerUserId: string | undefined
+let pollId: string | undefined
+let fantasyRoundId: string | undefined
 let reportId: string | undefined
 let responseId: string | undefined
 let summaryId: string | undefined
@@ -73,7 +75,7 @@ try {
     createdAt: Date.now(),
   })
 
-  const pollId = `qa-poll-${suffix}`
+  pollId = `qa-poll-${suffix}`
   const slotId = `qa-slot-${suffix}`
   reportId = `${pollId}__${slotId}`
   const participants = [
@@ -174,6 +176,123 @@ try {
     throw new Error('La modifica non è stata riletta correttamente.')
   }
 
+  stage = 'preparazione riallineamento atomico round fantasy'
+  fantasyRoundId = `${pollId}__${slotId}`
+  const locksAt = Date.now() + 24 * 60 * 60_000
+  const slotStartsAt = new Date(locksAt).toISOString()
+  const slotEndsAt = locksAt + 90 * 60_000
+  const fantasyUpdatedAt = Date.now()
+  const replacement = { userId: `qa-d-${suffix}`, displayName: 'Player D' }
+  const replacementParticipants = [...participants.slice(0, 3), replacement]
+  const replacementParticipantIds = replacementParticipants.map((participant) => participant.userId)
+  const fantasyPoll = {
+    id: pollId,
+    createdBy: userId,
+    createdByName: 'Codex QA',
+    createdAt: fantasyUpdatedAt,
+    updatedAt: fantasyUpdatedAt,
+    status: 'open',
+    slots: [{
+      id: slotId,
+      startsAt: slotStartsAt,
+      durationMinutes: 90,
+      venue: 'Oasi Boschetto',
+      bookedAt: fantasyUpdatedAt,
+      bookedBy: userId,
+      bookedByName: 'Codex QA',
+      signups: participants.map((participant, index) => ({
+        id: `signup-${index}`,
+        userId: participant.userId,
+        displayName: participant.displayName,
+        joinedAt: fantasyUpdatedAt + index,
+        role: 'starter',
+      })),
+    }],
+  }
+  const fantasyRound = {
+    id: fantasyRoundId,
+    pollId,
+    pollTitle: 'Padel · collaudo produzione',
+    slotId,
+    slotStartsAt,
+    slotEndsAt,
+    locksAt,
+    settlesAt: slotEndsAt + 48 * 60 * 60_000,
+    participantIds,
+    participants,
+    rosterKey: JSON.stringify(participantIds),
+    status: 'open',
+    createdAt: fantasyUpdatedAt,
+    updatedAt: fantasyUpdatedAt,
+  }
+  await Promise.all([
+    adminDb.doc(`polls/${pollId}`).set(fantasyPoll),
+    adminDb.doc(`fantasyRounds/${fantasyRoundId}`).set(fantasyRound),
+  ])
+
+  stage = 'protezione del round fantasy senza modifica atomica dello slot'
+  const fantasyRoundReference = doc(clientDb, 'fantasyRounds', fantasyRoundId)
+  try {
+    await runTransaction(clientDb, async (transaction) => {
+      const roundSnapshot = await transaction.get(fantasyRoundReference)
+      if (!roundSnapshot.exists()) throw new Error('Round fantasy temporaneo assente.')
+      transaction.set(fantasyRoundReference, {
+        ...roundSnapshot.data(),
+        participantIds: replacementParticipantIds,
+        participants: replacementParticipants,
+        rosterKey: JSON.stringify(replacementParticipantIds),
+        updatedAt: fantasyUpdatedAt + 1,
+      })
+    })
+    throw new Error('Il round fantasy è stato modificato senza riallineare lo slot.')
+  } catch (error) {
+    const code = typeof error === 'object' && error && 'code' in error
+      ? String(error.code)
+      : ''
+    if (!code.includes('permission-denied')) throw error
+  }
+
+  stage = 'riallineamento atomico round fantasy'
+  const pollReference = doc(clientDb, 'polls', pollId)
+  const synchronizedAt = fantasyUpdatedAt + 1
+  await runTransaction(clientDb, async (transaction) => {
+    const [pollSnapshot, roundSnapshot] = await Promise.all([
+      transaction.get(pollReference),
+      transaction.get(fantasyRoundReference),
+    ])
+    if (!pollSnapshot.exists() || !roundSnapshot.exists()) {
+      throw new Error('Poll o round fantasy temporaneo assente.')
+    }
+    const synchronizedSignups = replacementParticipants.map((participant, index) => ({
+      id: `signup-${index}`,
+      userId: participant.userId,
+      displayName: participant.displayName,
+      joinedAt: fantasyUpdatedAt + index,
+      role: 'starter',
+    }))
+    transaction.update(pollReference, {
+      slots: [{ ...pollSnapshot.data().slots[0], signups: synchronizedSignups }],
+      updatedAt: synchronizedAt,
+    })
+    transaction.set(fantasyRoundReference, {
+      ...roundSnapshot.data(),
+      participantIds: replacementParticipantIds,
+      participants: replacementParticipants,
+      rosterKey: JSON.stringify(replacementParticipantIds),
+      updatedAt: synchronizedAt,
+    })
+  })
+
+  stage = 'verifica riallineamento atomico round fantasy'
+  const synchronizedRound = await getDoc(fantasyRoundReference)
+  if (
+    !synchronizedRound.exists()
+    || synchronizedRound.data().participantIds.join(',') !== replacementParticipantIds.join(',')
+    || synchronizedRound.data().updatedAt !== synchronizedAt
+  ) {
+    throw new Error('Il round fantasy non è stato riallineato con lo slot.')
+  }
+
   stage = 'creazione giudizio e risultato aggregato'
   responseId = `${pollId}__${slotId}__${userId}`
   summaryId = `${pollId}__${slotId}__${participants[1].userId}`
@@ -247,7 +366,7 @@ try {
   }
 
   console.log(
-    'PASS: referto condiviso, giudizio aggregato e risposta individuale riservata verificati in produzione.',
+    'PASS: referto condiviso, round fantasy atomico e giudizi verificati in produzione.',
   )
 } catch (error) {
   const code = typeof error === 'object' && error && 'code' in error
@@ -257,6 +376,10 @@ try {
   console.error(`FAIL allo stage "${stage}": ${code} — ${message}`)
   process.exitCode = 1
 } finally {
+  if (fantasyRoundId) {
+    await adminDb.doc(`fantasyRounds/${fantasyRoundId}`).delete().catch(() => undefined)
+  }
+  if (pollId) await adminDb.doc(`polls/${pollId}`).delete().catch(() => undefined)
   if (reportId) await adminDb.doc(`matchReports/${reportId}`).delete().catch(() => undefined)
   if (summaryId) {
     await adminDb.doc(`matchFeedbackSummaries/${summaryId}`).delete().catch(() => undefined)

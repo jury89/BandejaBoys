@@ -244,6 +244,16 @@ const fantasyRound = {
   createdAt,
   updatedAt: createdAt,
 }
+const updatedFantasyRound = {
+  ...fantasyRound,
+  participantIds: [userId, 'qa-a', 'qa-b', 'qa-e'],
+  participants: [participants[0], participants[1], participants[2], {
+    userId: 'qa-e',
+    displayName: 'Player E',
+  }],
+  rosterKey: JSON.stringify([userId, 'qa-a', 'qa-b', 'qa-e']),
+  updatedAt: createdAt + 1,
+}
 
 const tests: TestDefinition[] = [
   {
@@ -344,6 +354,20 @@ const tests: TestDefinition[] = [
         method: 'create',
         resource: { data: fantasyRound },
       },
+      expressionReportLevel: 'FULL',
+    },
+  },
+  {
+    label: 'notifier può riallineare un round fantasy',
+    testCase: {
+      expectation: 'ALLOW',
+      request: {
+        auth: notifierAuth(),
+        path: fantasyRoundPath,
+        method: 'update',
+        resource: { data: updatedFantasyRound },
+      },
+      resource: { data: fantasyRound },
       expressionReportLevel: 'FULL',
     },
   },

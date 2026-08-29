@@ -304,6 +304,24 @@ service cloud.firestore {
         && request.resource.data.updatedAt >= request.resource.data.createdAt;
     }
 
+    function validMemberFantasyRosterSync(roundId) {
+      let pollPath = /databases/$(database)/documents/polls/$(resource.data.pollId);
+      let pollBefore = get(pollPath);
+      let pollAfter = getAfter(pollPath);
+      return isMember()
+        && resource.data.status in ['open', 'pending']
+        && request.resource.data.status in ['open', 'pending']
+        && request.time.toMillis() < resource.data.locksAt
+        && pollAfter.data.diff(pollBefore.data).affectedKeys().hasAny(['slots'])
+        && pollAfter.data.updatedAt != pollBefore.data.updatedAt
+        && request.resource.data.updatedAt == pollAfter.data.updatedAt
+        && request.resource.data.updatedAt > resource.data.updatedAt
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'participantIds', 'participants', 'rosterKey', 'status', 'updatedAt'
+        ])
+        && validFantasyRound(roundId);
+    }
+
     function validFantasyEntry(roundId, managerId) {
       let round = get(/databases/$(database)/documents/fantasyRounds/$(roundId));
       return request.resource.data.keys().hasOnly([
@@ -576,7 +594,9 @@ service cloud.firestore {
 
     match /fantasyRounds/{roundId} {
       allow read: if isMember() || isNotifier();
-      allow create, update: if isNotifier() && validFantasyRound(roundId);
+      allow create: if isNotifier() && validFantasyRound(roundId);
+      allow update: if (isNotifier() && validFantasyRound(roundId))
+        || validMemberFantasyRosterSync(roundId);
       allow delete: if false;
 
       match /entries/{managerId} {

@@ -98,6 +98,64 @@ const playedMatch: PlayerMatch = {
   },
 }
 
+function futureRosterPoll(): PadelPoll {
+  return {
+    id: 'poll-1',
+    title: 'Padel · 24 ago – 30 ago 2099',
+    targetWeekStart: '2099-08-24',
+    createdBy: 'ale',
+    createdByName: 'Ale',
+    createdAt: 1,
+    updatedAt: 1,
+    status: 'open',
+    slots: [{
+      id: 'slot-1',
+      startsAt: '2099-08-30T07:30:00.000Z',
+      durationMinutes: 90,
+      venue: 'Oasi Boschetto',
+      bookedAt: 1,
+      bookedBy: 'ale',
+      bookedByName: 'Ale',
+      signups: [
+        { id: 'a', userId: 'jury', displayName: 'Jury', joinedAt: 1 },
+        { id: 'b', userId: 'ale', displayName: 'Ale', joinedAt: 2 },
+        { id: 'c', userId: 'luca', displayName: 'Luca', joinedAt: 3 },
+        { id: 'd', userId: 'teo', displayName: 'Teo', joinedAt: 4 },
+        {
+          id: 'e',
+          userId: 'reserve',
+          displayName: 'Riserva',
+          joinedAt: 5,
+          role: 'reserve',
+        },
+      ],
+    }],
+  }
+}
+
+function futureFantasyRound(): FantasyRound {
+  const locksAt = Date.parse('2099-08-30T07:30:00.000Z')
+  return {
+    id: 'poll-1__slot-1',
+    pollId: 'poll-1',
+    pollTitle: 'Padel · 24 ago – 30 ago 2099',
+    slotId: 'slot-1',
+    slotStartsAt: '2099-08-30T07:30:00.000Z',
+    slotEndsAt: locksAt + 90 * 60_000,
+    locksAt,
+    settlesAt: locksAt + 49.5 * 60 * 60_000,
+    participantIds: ['jury', 'ale', 'luca', 'teo'],
+    participants: ['jury', 'ale', 'luca', 'teo'].map((userId) => ({
+      userId,
+      displayName: userId,
+    })),
+    rosterKey: JSON.stringify(['jury', 'ale', 'luca', 'teo']),
+    status: 'open',
+    createdAt: 1,
+    updatedAt: 1,
+  }
+}
+
 describe('repository remoto della scelta MVP', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -266,6 +324,62 @@ describe('repository remoto della scelta MVP', () => {
         details: expect.objectContaining({ action: 'added', targetName: 'Riserva' }),
       }),
     )
+  })
+
+  it('riallinea il round fantasy nella stessa transazione quando cambia un titolare', async () => {
+    const poll = futureRosterPoll()
+    const round = futureFantasyRound()
+    firestoreMocks.transaction.get.mockImplementation(async (reference: string) => {
+      if (reference === `polls/${poll.id}`) {
+        return { exists: () => true, id: poll.id, data: () => poll }
+      }
+      if (reference === `fantasyRounds/${round.id}`) {
+        return { exists: () => true, id: round.id, data: () => round }
+      }
+      return { exists: () => false }
+    })
+
+    const updated = await repository.leaveSlot(poll.id, poll.slots[0].id, voter)
+
+    expect(firestoreMocks.transaction.get).toHaveBeenCalledWith(`polls/${poll.id}`)
+    expect(firestoreMocks.transaction.get).toHaveBeenCalledWith(`fantasyRounds/${round.id}`)
+    const roundWrite = firestoreMocks.transaction.set.mock.calls.find(([reference]) => (
+      reference === `fantasyRounds/${round.id}`
+    ))
+    expect(roundWrite?.[1]).toMatchObject({
+      participantIds: ['ale', 'luca', 'teo', 'reserve'],
+      status: 'open',
+      updatedAt: updated.updatedAt,
+    })
+    expect(updated.slots[0].signups.find((signup) => signup.userId === 'reserve')).toMatchObject({
+      role: 'starter',
+    })
+
+    const lastReadOrder = Math.max(...firestoreMocks.transaction.get.mock.invocationCallOrder)
+    const firstWriteOrder = Math.min(
+      ...firestoreMocks.transaction.update.mock.invocationCallOrder,
+      ...firestoreMocks.transaction.set.mock.invocationCallOrder,
+    )
+    expect(lastReadOrder).toBeLessThan(firstWriteOrder)
+  })
+
+  it('non salva dati parziali se la lettura del round fantasy fallisce', async () => {
+    const poll = futureRosterPoll()
+    const round = futureFantasyRound()
+    firestoreMocks.transaction.get.mockImplementation(async (reference: string) => {
+      if (reference === `polls/${poll.id}`) {
+        return { exists: () => true, id: poll.id, data: () => poll }
+      }
+      if (reference === `fantasyRounds/${round.id}`) {
+        throw new Error('Round non disponibile')
+      }
+      return { exists: () => false }
+    })
+
+    await expect(repository.leaveSlot(poll.id, poll.slots[0].id, voter))
+      .rejects.toThrow('Round non disponibile')
+    expect(firestoreMocks.transaction.update).not.toHaveBeenCalled()
+    expect(firestoreMocks.transaction.set).not.toHaveBeenCalled()
   })
 
   it('salva la formazione fantasy leggendo round e giocata nella stessa transazione', async () => {
