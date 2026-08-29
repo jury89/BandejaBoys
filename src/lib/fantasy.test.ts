@@ -1,7 +1,7 @@
 import type {
   FantasyEntry,
-  MatchMvpResponse,
-  MatchMvpSummary,
+  MatchFeedbackResponse,
+  MatchFeedbackSummary,
   MatchReport,
   PadelPoll,
   PadelSlot,
@@ -10,7 +10,7 @@ import type {
 import {
   FANTASY_BASE_SCORE,
   FANTASY_EARLY_SETTLEMENT_DELAY_MS,
-  FANTASY_MVP_LEAGUE_POINTS,
+  FANTASY_TOP_PERFORMER_LEAGUE_POINTS,
   FANTASY_MISSING_REPORT_VOID_REASON,
   FANTASY_SETTLEMENT_DELAY_MS,
   FANTASY_STARTER_LEAGUE_POINTS,
@@ -113,13 +113,14 @@ function reportFixture(): MatchReport {
   }
 }
 
-const mvpSummaries: MatchMvpSummary[] = [
+const feedbackSummaries: MatchFeedbackSummary[] = [
   {
     id: 'a',
     pollId: 'poll-1',
     slotId: 'slot-1',
     playerId: 'a',
-    voteCount: 1,
+    scoreUnitsTotal: 45,
+    ratingCount: 3,
     lastResponseId: 'ra',
     updatedAt: 1,
   },
@@ -128,8 +129,19 @@ const mvpSummaries: MatchMvpSummary[] = [
     pollId: 'poll-1',
     slotId: 'slot-1',
     playerId: 'b',
-    voteCount: 1,
+    scoreUnitsTotal: 30,
+    ratingCount: 3,
     lastResponseId: 'rb',
+    updatedAt: 1,
+  },
+  {
+    id: 'c',
+    pollId: 'poll-1',
+    slotId: 'slot-1',
+    playerId: 'c',
+    scoreUnitsTotal: 36,
+    ratingCount: 3,
+    lastResponseId: 'rc',
     updatedAt: 1,
   },
   {
@@ -137,20 +149,25 @@ const mvpSummaries: MatchMvpSummary[] = [
     pollId: 'poll-1',
     slotId: 'slot-1',
     playerId: 'd',
-    voteCount: 2,
+    scoreUnitsTotal: 54,
+    ratingCount: 3,
     lastResponseId: 'rd',
     updatedAt: 1,
   },
 ]
 
-const mvpResponses: MatchMvpResponse[] = players.map((voterId, index) => ({
-  id: `poll-1__slot-1__${voterId}`,
+const feedbackResponses: MatchFeedbackResponse[] = players.map((reviewerId) => ({
+  id: `poll-1__slot-1__${reviewerId}`,
   pollId: 'poll-1',
   slotId: 'slot-1',
-  voterId,
+  reviewerId,
   status: 'submitted',
-  selectedPlayerId: index < 2 ? 'd' : index === 2 ? 'a' : 'b',
-  selectedPlayerName: index < 2 ? 'D' : index === 2 ? 'A' : 'B',
+  ratings: players.filter((playerId) => playerId !== reviewerId).map((playerId) => ({
+    playerId,
+    playerName: playerId.toUpperCase(),
+    level: playerId === 'a' ? 4 : playerId === 'b' ? 2 : playerId === 'c' ? 3 : 5,
+    scoreUnits: playerId === 'a' ? 15 : playerId === 'b' ? 10 : playerId === 'c' ? 12 : 18,
+  })),
   closedAt: locksAt + 90 * 60_000,
 }))
 
@@ -348,7 +365,7 @@ describe('round FantaBandeja', () => {
 })
 
 describe('punteggio FantaBandeja', () => {
-  it('somma base comune, risultati, differenza game, capitano e MVP', () => {
+  it('somma giudizio base, risultati, differenza game e capitano', () => {
     const scored = scoreFantasyRound(
       roundFixture(),
       [
@@ -357,35 +374,36 @@ describe('punteggio FantaBandeja', () => {
         entry('manager-z', ['a', 'b'], 'a'),
       ],
       reportFixture(),
-      mvpSummaries,
+      feedbackSummaries,
       locksAt + FANTASY_SETTLEMENT_DELAY_MS,
     )
 
     expect(scored.playerScores).toEqual([
       expect.objectContaining({
         userId: 'a',
-        scoringModel: 'mvp-v2',
-        baseRating: FANTASY_BASE_SCORE,
-        mvpVotes: 1,
+        scoringModel: 'feedback-v3',
+        baseRating: 7.5,
+        feedbackLevel: 4,
         setWins: 2,
         setLosses: 1,
         gameDifference: 1,
         resultBonus: 1.5,
         differenceBonus: 0,
-        fantasyScore: 7.5,
+        fantasyScore: 9,
         isMvp: false,
+        isTopPerformer: false,
       }),
       expect.objectContaining({
         userId: 'b',
-        baseRating: FANTASY_BASE_SCORE,
+        baseRating: 5,
         gameDifference: 3,
         differenceBonus: 0.5,
-        fantasyScore: 8,
+        fantasyScore: 7,
       }),
       expect.objectContaining({
         userId: 'c',
         baseRating: FANTASY_BASE_SCORE,
-        ratingCount: 0,
+        ratingCount: 3,
         usedDefaultRating: false,
         setWins: 0,
         setLosses: 3,
@@ -393,30 +411,31 @@ describe('punteggio FantaBandeja', () => {
       }),
       expect.objectContaining({
         userId: 'd',
-        baseRating: FANTASY_BASE_SCORE,
-        mvpVotes: 2,
-        mvpBonus: 1,
+        baseRating: 9,
+        feedbackLevel: 5,
+        mvpBonus: 0,
         gameDifference: 3,
-        fantasyScore: 9,
-        isMvp: true,
+        fantasyScore: 11,
+        isMvp: false,
+        isTopPerformer: true,
       }),
     ])
     expect(scored.standings).toEqual([
       expect.objectContaining({
         managerId: 'manager-x',
-        totalScore: 23,
+        totalScore: 27.5,
         rank: 1,
         leaguePoints: 5,
       }),
       expect.objectContaining({
         managerId: 'manager-y',
-        totalScore: 21,
+        totalScore: 21.5,
         rank: 2,
         leaguePoints: 3,
       }),
       expect.objectContaining({
         managerId: 'manager-z',
-        totalScore: 19.25,
+        totalScore: 20.5,
         rank: 3,
         leaguePoints: 1,
       }),
@@ -431,7 +450,7 @@ describe('punteggio FantaBandeja', () => {
         entry('manager-y', ['a', 'd'], 'd'),
       ],
       reportFixture(),
-      mvpSummaries,
+      feedbackSummaries,
       locksAt + FANTASY_SETTLEMENT_DELAY_MS,
     )
 
@@ -441,14 +460,14 @@ describe('punteggio FantaBandeja', () => {
     ])
   })
 
-  it('chiude dopo 24 ore quando referto e scelte MVP sono completi', () => {
+  it('chiude dopo 24 ore quando referto e schede dei giudizi sono completi', () => {
     const round = roundFixture()
     const beforeSettlement = reconcileFantasyRounds(
       [pollWith()],
       [round],
       [],
-      mvpSummaries,
-      mvpResponses,
+      feedbackSummaries,
+      feedbackResponses,
       [reportFixture()],
       round.slotEndsAt + FANTASY_EARLY_SETTLEMENT_DELAY_MS - 1,
     )
@@ -458,22 +477,22 @@ describe('punteggio FantaBandeja', () => {
       [pollWith()],
       [round],
       [entry('manager', ['a', 'd'], 'd')],
-      mvpSummaries,
-      mvpResponses,
+      feedbackSummaries,
+      feedbackResponses,
       [reportFixture()],
       round.slotEndsAt + FANTASY_EARLY_SETTLEMENT_DELAY_MS,
     )
     expect(scored[0].status).toBe('scored')
   })
 
-  it('attende 48 ore se manca una scelta MVP e mantiene il referto come fallback', () => {
+  it('attende 48 ore se manca una scheda e usa i giudizi disponibili come fallback', () => {
     const round = roundFixture()
-    const incompleteResponses = mvpResponses.filter((response) => response.voterId !== 'd')
+    const incompleteResponses = feedbackResponses.filter((response) => response.reviewerId !== 'd')
     const afterTwentyFourHours = reconcileFantasyRounds(
       [pollWith()],
       [round],
       [],
-      mvpSummaries,
+      feedbackSummaries,
       incompleteResponses,
       [reportFixture()],
       round.slotEndsAt + FANTASY_EARLY_SETTLEMENT_DELAY_MS,
@@ -484,7 +503,7 @@ describe('punteggio FantaBandeja', () => {
       [pollWith()],
       [round],
       [],
-      mvpSummaries,
+      feedbackSummaries,
       incompleteResponses,
       [reportFixture()],
       round.settlesAt,
@@ -494,8 +513,8 @@ describe('punteggio FantaBandeja', () => {
       playerScores: expect.arrayContaining([
         expect.objectContaining({
           userId: 'd',
-          baseRating: FANTASY_BASE_SCORE,
-          scoringModel: 'mvp-v2',
+          baseRating: 9,
+          scoringModel: 'feedback-v3',
         }),
       ]),
     })
@@ -508,8 +527,8 @@ describe('punteggio FantaBandeja', () => {
       [pollWith()],
       [round],
       [],
-      mvpSummaries,
-      mvpResponses,
+      feedbackSummaries,
+      feedbackResponses,
       [],
       round.settlesAt,
     )
@@ -525,8 +544,8 @@ describe('punteggio FantaBandeja', () => {
       [pollWith()],
       [round],
       [],
-      mvpSummaries,
-      mvpResponses,
+      feedbackSummaries,
+      feedbackResponses,
       [],
       round.settlesAt,
     )[0]
@@ -536,8 +555,8 @@ describe('punteggio FantaBandeja', () => {
       [pollWith()],
       [voided],
       [entry('manager', ['a', 'd'], 'd')],
-      mvpSummaries,
-      mvpResponses,
+      feedbackSummaries,
+      feedbackResponses,
       [reportFixture()],
       lateSettlementAt,
     )[0]
@@ -562,8 +581,8 @@ describe('punteggio FantaBandeja', () => {
       [pollWith()],
       [round],
       [],
-      mvpSummaries,
-      mvpResponses,
+      feedbackSummaries,
+      feedbackResponses,
       [reportFixture()],
       locksAt + 1,
     )[0]
@@ -579,7 +598,7 @@ describe('punteggio FantaBandeja', () => {
         entry('manager-y', ['b', 'd'], 'b'),
       ],
       reportFixture(),
-      mvpSummaries,
+      feedbackSummaries,
       locksAt + FANTASY_SETTLEMENT_DELAY_MS,
     )
     const second = {
@@ -612,17 +631,17 @@ describe('punteggio FantaBandeja', () => {
       }),
       expect.objectContaining({
         managerId: 'd',
-        leaguePoints: FANTASY_MVP_LEAGUE_POINTS * 2,
-        rawFantasyPoints: 18,
+        leaguePoints: FANTASY_TOP_PERFORMER_LEAGUE_POINTS * 2,
+        rawFantasyPoints: 22,
         roundsPlayed: 2,
         rank: 3,
       }),
       expect.objectContaining({
         managerId: 'a',
         leaguePoints: FANTASY_STARTER_LEAGUE_POINTS * 2,
-        rawFantasyPoints: 15,
+        rawFantasyPoints: 18,
         roundsPlayed: 2,
-        rank: 5,
+        rank: 4,
       }),
     ]))
 
@@ -642,8 +661,8 @@ describe('punteggio FantaBandeja', () => {
       }),
     ])
     expect(leaderboard.find((row) => row.managerId === 'd')?.contributions).toEqual([
-      expect.objectContaining({ source: 'mvp', leaguePoints: FANTASY_MVP_LEAGUE_POINTS }),
-      expect.objectContaining({ source: 'mvp', leaguePoints: FANTASY_MVP_LEAGUE_POINTS }),
+      expect.objectContaining({ source: 'top-performer', leaguePoints: FANTASY_TOP_PERFORMER_LEAGUE_POINTS }),
+      expect.objectContaining({ source: 'top-performer', leaguePoints: FANTASY_TOP_PERFORMER_LEAGUE_POINTS }),
     ])
     leaderboard.forEach((row) => {
       expect(row.contributions.reduce((total, contribution) => total + contribution.leaguePoints, 0))
@@ -656,7 +675,7 @@ describe('punteggio FantaBandeja', () => {
       roundFixture(),
       [entry('manager-x', ['a', 'd'], 'd')],
       reportFixture(),
-      mvpSummaries,
+      feedbackSummaries,
       locksAt + FANTASY_SETTLEMENT_DELAY_MS,
     )
 
@@ -664,8 +683,8 @@ describe('punteggio FantaBandeja', () => {
 
     expect(leaderboard.find((row) => row.managerId === 'd')).toEqual(
       expect.objectContaining({
-        leaguePoints: FANTASY_MVP_LEAGUE_POINTS,
-        rawFantasyPoints: 9,
+        leaguePoints: FANTASY_TOP_PERFORMER_LEAGUE_POINTS,
+        rawFantasyPoints: 11,
         roundsPlayed: 1,
       }),
     )

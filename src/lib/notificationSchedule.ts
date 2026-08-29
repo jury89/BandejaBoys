@@ -1,17 +1,16 @@
 import type {
   FantasyEntry,
   FantasyRound,
-  MatchMvpResponse,
+  MatchFeedbackResponse,
   NotificationPreferences,
   PadelPoll,
   PadelSlot,
 } from '../types'
 import {
   DEFAULT_VENUE,
-  MATCH_MVP_DELAY_MS,
   MAX_STARTERS,
-  getMatchMvpDueAt,
-  getMatchMvpResponseId,
+  getMatchFeedbackDueAt,
+  getMatchFeedbackResponseId,
   getStarters,
   isGuestSignup,
   fantasyEntryIsCurrent,
@@ -34,11 +33,11 @@ export const SLOT_READY_NOTIFICATION_WINDOW_MS = DAY_MS
 export const STARTER_SUBSTITUTION_NOTIFICATION_WINDOW_MS = DAY_MS
 export const BOOKING_REMINDER_LEAD_MS = 7 * DAY_MS
 export const BOOKING_REMINDER_WINDOW_MS = DAY_MS
-export const MATCH_MVP_NOTIFICATION_WINDOW_MS = 30 * 60 * 1000
+export const MATCH_FEEDBACK_NOTIFICATION_WINDOW_MS = 30 * 60 * 1000
 export const MONDAY_MOTIVATION_WINDOW_MS = HOUR_MS
 
-export type NotificationKind = 'new-slots' | 'slot-ready' | 'starter-substitution' | 'booking-reminder-7d' | 'reminder-24h' | 'reminder-2h' | 'match-rating' | 'match-mvp' | 'monday-motivation' | 'fantasy-open' | 'fantasy-roster-changed' | 'fantasy-result' | 'test'
-export type TestNotificationMode = 'standard' | 'match-mvp'
+export type NotificationKind = 'new-slots' | 'slot-ready' | 'starter-substitution' | 'booking-reminder-7d' | 'reminder-24h' | 'reminder-2h' | 'match-rating' | 'match-mvp' | 'match-feedback' | 'monday-motivation' | 'fantasy-open' | 'fantasy-roster-changed' | 'fantasy-result' | 'test'
+export type TestNotificationMode = 'standard' | 'feedback' | 'match-mvp'
 
 const NOTIFICATION_PREFERENCE_BY_KIND = {
   'new-slots': 'newSlots',
@@ -47,8 +46,9 @@ const NOTIFICATION_PREFERENCE_BY_KIND = {
   'booking-reminder-7d': 'bookingReminder7d',
   'reminder-24h': 'reminder24h',
   'reminder-2h': 'reminder2h',
-  'match-rating': 'matchMvp',
-  'match-mvp': 'matchMvp',
+  'match-rating': 'matchFeedback',
+  'match-mvp': 'matchFeedback',
+  'match-feedback': 'matchFeedback',
   'monday-motivation': 'mondayMotivation',
   'fantasy-open': 'fantasy',
   'fantasy-roster-changed': 'fantasy',
@@ -276,20 +276,20 @@ export function createTestNotification(
   if (customBody && customBody.length > 240) throw new Error('Il messaggio di test supera i 240 caratteri.')
   if (customTitle && customTitle.length > 80) throw new Error('Il titolo del test supera gli 80 caratteri.')
 
-  const isMatchMvpTest = mode === 'match-mvp'
-  const defaultUrl = isMatchMvpTest ? '/?mvpTest=1' : '/'
+  const isMatchFeedbackTest = mode === 'feedback' || mode === 'match-mvp'
+  const defaultUrl = isMatchFeedbackTest ? '/?feedbackTest=1' : '/'
 
   return {
     id: `test:${identifier}`,
     kind: 'test',
-    title: isMatchMvpTest
-      ? 'TEST · Scegli l’MVP'
+    title: isMatchFeedbackTest
+      ? 'TEST · Apri la voliera'
       : customTitle || (customBody ? 'Bandeja Boys' : 'Test notifiche Bandeja Boys'),
-    body: customBody || (isMatchMvpTest
-      ? 'Tocca per aprire la scelta MVP di collaudo. Nessuna preferenza verrà salvata.'
+    body: customBody || (isMatchFeedbackTest
+      ? 'Tocca per provare i cinque giudizi. Nulla verrà salvato e nessuna partita sarà modificata.'
       : 'Se leggi questo messaggio, le notifiche funzionano correttamente.'),
     url: addPushRefreshParameter(customUrl || defaultUrl, identifier),
-    tag: `${isMatchMvpTest ? 'test-mvp' : 'test'}-${identifier}`,
+    tag: `${isMatchFeedbackTest ? 'test-feedback' : 'test'}-${identifier}`,
     ttlSeconds: 10 * 60,
     recipientUserIds: [recipient],
     excludedUserIds: [],
@@ -382,11 +382,11 @@ export function collectFantasyNotifications(
 export function collectScheduledNotifications(
   polls: PadelPoll[],
   now = Date.now(),
-  mvpResponses: MatchMvpResponse[] = [],
+  feedbackResponses: MatchFeedbackResponse[] = [],
   mondayMotivation?: MondayMotivationSchedule,
 ): ScheduledNotification[] {
   const notifications = collectMondayMotivationNotifications(now, mondayMotivation)
-  const closedMvpPromptIds = new Set(mvpResponses.map((response) => response.id))
+  const closedFeedbackPromptIds = new Set(feedbackResponses.map((response) => response.id))
 
   for (const poll of polls) {
     notifications.push(...collectNewSlotNotifications(poll, now))
@@ -484,29 +484,29 @@ export function collectScheduledNotifications(
       }
 
       if (!slot.bookedAt) continue
-      const pendingMvpRecipientUserIds = recipientUserIds.filter((userId) => !closedMvpPromptIds.has(
-        getMatchMvpResponseId(poll.id, slot.id, userId),
+      const pendingFeedbackRecipientUserIds = recipientUserIds.filter((userId) => !closedFeedbackPromptIds.has(
+        getMatchFeedbackResponseId(poll.id, slot.id, userId),
       ))
-      const mvpDueAt = getMatchMvpDueAt(slot)
+      const feedbackDueAt = getMatchFeedbackDueAt(slot)
 
       if (
         starters.length === MAX_STARTERS
         && registeredStarters.length >= 2
-        && pendingMvpRecipientUserIds.length > 0
-        && now >= mvpDueAt
-        && now < mvpDueAt + MATCH_MVP_NOTIFICATION_WINDOW_MS
+        && pendingFeedbackRecipientUserIds.length > 0
+        && now >= feedbackDueAt
+        && now < feedbackDueAt + MATCH_FEEDBACK_NOTIFICATION_WINDOW_MS
       ) {
         notifications.push({
-          id: `match-mvp:${poll.id}:${slot.id}:${slot.startsAt}`,
-          kind: 'match-mvp',
-          title: 'Chi è stato l’MVP?',
+          id: `match-feedback:${poll.id}:${slot.id}:${slot.startsAt}`,
+          kind: 'match-feedback',
+          title: 'Apri la voliera!',
           body: starters.some(isGuestSignup)
-            ? 'Scegli il migliore in campo tra i compagni registrati.'
-            : 'Scegli il migliore in campo tra i tuoi tre compagni.',
-          url: `/?mvpPoll=${encodeURIComponent(poll.id)}&mvpSlot=${encodeURIComponent(slot.id)}`,
-          tag: `match-mvp-${poll.id}-${slot.id}`,
-          ttlSeconds: Math.floor((MATCH_MVP_NOTIFICATION_WINDOW_MS + MATCH_MVP_DELAY_MS) / 1000),
-          recipientUserIds: pendingMvpRecipientUserIds,
+            ? 'La partita è finita: assegna il volatile ai compagni registrati.'
+            : 'La partita è finita: assegna a ogni compagno il volatile che si è meritato.',
+          url: `/?feedbackPoll=${encodeURIComponent(poll.id)}&feedbackSlot=${encodeURIComponent(slot.id)}`,
+          tag: `match-feedback-${poll.id}-${slot.id}`,
+          ttlSeconds: Math.floor(MATCH_FEEDBACK_NOTIFICATION_WINDOW_MS / 1000),
+          recipientUserIds: pendingFeedbackRecipientUserIds,
           excludedUserIds: [],
         })
       }

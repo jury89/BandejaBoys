@@ -27,11 +27,11 @@ const completeMatch: GroupMatch = {
       joinedAt: index + 1,
     })),
   },
-  playerMvpVotes: [
-    { userId: 'ale', votes: 1, isWinner: false },
-    { userId: 'baru', votes: 1, isWinner: false },
-    { userId: 'luca', votes: 0, isWinner: false },
-    { userId: 'teo', votes: 2, isWinner: true },
+  playerFeedback: [
+    { userId: 'ale', level: 3, ratingCount: 3 },
+    { userId: 'baru', level: 4, ratingCount: 3 },
+    { userId: 'luca', level: 3, ratingCount: 0 },
+    { userId: 'teo', level: 5, ratingCount: 3 },
   ],
   report: {
     id: 'poll-1__slot-1',
@@ -66,7 +66,7 @@ const matchWithoutReport: GroupMatch = {
     id: 'slot-2',
     startsAt: '2026-07-22T16:00:00.000Z',
   },
-  playerMvpVotes: players.map((player) => ({ userId: player.userId, votes: 0, isWinner: false })),
+  playerFeedback: players.map((player) => ({ userId: player.userId, level: 3 as const, ratingCount: 0 })),
   report: undefined,
 }
 
@@ -78,7 +78,7 @@ const members: MemberProfile[] = players.map((player) => ({
 }))
 
 describe('pagina degli altri match', () => {
-  it('mostra MVP, risultati disponibili e stato del referto mancante', async () => {
+  it('mostra giudizi, risultati disponibili e stato del referto mancante', async () => {
     const onBack = vi.fn()
     const user = userEvent.setup()
     render(
@@ -93,8 +93,8 @@ describe('pagina degli altri match', () => {
 
     expect(screen.getByRole('heading', { name: 'Gli altri match' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Partite concluse' })).toBeInTheDocument()
-    expect(screen.getByLabelText('Teo: MVP con 2 preferenze')).toBeInTheDocument()
-    expect(screen.getAllByLabelText('Luca: 0 preferenze')).toHaveLength(2)
+    expect(screen.getByLabelText('Teo: Aquilotto reale, 3 giudizi')).toBeInTheDocument()
+    expect(screen.getAllByLabelText('Luca: nessun giudizio')).toHaveLength(2)
     expect(screen.getByText('1 set registrato')).toBeInTheDocument()
 
     const result = screen.getByRole('table', {

@@ -4,14 +4,14 @@ import {
   addSlotToPoll,
   addSignup,
   applyAdminSlotRosterAction,
-  aggregateMatchMvpSummaries,
+  aggregateMatchFeedbackSummaries,
   defaultSlotForWeek,
   groupMatchReportSetsByTeams,
   getMatchPairings,
-  getMatchMvpResponseId,
-  getNextMatchMvpPromptAt,
+  getMatchFeedbackResponseId,
+  getNextMatchFeedbackPromptAt,
   getOtherPlayedMatches,
-  getPendingMatchMvpPrompts,
+  getPendingMatchFeedbackPrompts,
   getPlayerMatches,
   getReserves,
   getSlotPhase,
@@ -37,7 +37,7 @@ import {
   substituteStarter,
   toDateTimeInput,
 } from './domain'
-import type { MatchMvpResponse, MemberProfile, PadelPoll, PadelSlot, SessionUser, Signup, SignupRole } from '../types'
+import type { MatchFeedbackResponse, MemberProfile, PadelPoll, PadelSlot, SessionUser, Signup, SignupRole } from '../types'
 
 const member = (id: string, displayName = id): MemberProfile => ({
   id,
@@ -646,7 +646,7 @@ describe('partite personali', () => {
     expect(result.upcoming).toEqual([])
   })
 
-  it('mostra quante preferenze MVP ha ricevuto il giocatore e se ha vinto', () => {
+  it('mostra il giudizio verbale ricevuto e quante valutazioni lo compongono', () => {
     const poll = personalPoll()
     poll.slots = [{
       ...slot(['jury', 'a', 'b', 'c'].map((id, index) => signup(id, index))),
@@ -663,43 +663,44 @@ describe('partite personali', () => {
         pollId: poll.id,
         slotId: 'past-rated',
         playerId: 'jury',
-        voteCount: 2,
+        scoreUnitsTotal: 30,
+        ratingCount: 2,
         lastResponseId: 'response-b',
         updatedAt: 1,
       }],
     )
 
-    expect(result.past[0].receivedMvp).toEqual({ votes: 2, isWinner: true })
+    expect(result.past[0].receivedFeedback).toEqual({ level: 4, ratingCount: 2 })
   })
 })
 
 describe('partite giocate dagli altri', () => {
-  const mvpResponse = (
-    voterId: string,
-    selectedPlayerId: string,
+  const feedbackResponse = (
+    reviewerId: string,
+    playerId: string,
     closedAt: number,
-  ): MatchMvpResponse => ({
-    id: `poll-group__slot-other__${voterId}`,
+  ): MatchFeedbackResponse => ({
+    id: `poll-group__slot-other__${reviewerId}`,
     pollId: 'poll-group',
     slotId: 'slot-other',
-    voterId,
+    reviewerId,
     status: 'submitted',
-    selectedPlayerId,
-    selectedPlayerName: selectedPlayerId,
+    ratings: [{ playerId, playerName: playerId, level: 4, scoreUnits: 15 }],
     closedAt,
   })
 
-  it('aggrega le preferenze MVP senza esporre chi le ha assegnate', () => {
-    expect(aggregateMatchMvpSummaries([
-      mvpResponse('a', 'b', 100),
-      mvpResponse('c', 'b', 200),
+  it('aggrega i giudizi senza esporre chi li ha assegnati', () => {
+    expect(aggregateMatchFeedbackSummaries([
+      feedbackResponse('a', 'b', 100),
+      feedbackResponse('c', 'b', 200),
     ])).toEqual([
       {
         id: 'poll-group__slot-other__b',
         pollId: 'poll-group',
         slotId: 'slot-other',
         playerId: 'b',
-        voteCount: 2,
+        scoreUnitsTotal: 30,
+        ratingCount: 2,
         lastResponseId: 'poll-group__slot-other__c',
         updatedAt: 200,
       },
@@ -751,9 +752,9 @@ describe('partite giocate dagli altri', () => {
         { ...otherSlot, id: 'slot-incomplete', signups: [signup('a', 1)] },
       ],
     }
-    const summaries = aggregateMatchMvpSummaries([
-      mvpResponse('a', 'b', 100),
-      mvpResponse('c', 'b', 200),
+    const summaries = aggregateMatchFeedbackSummaries([
+      feedbackResponse('a', 'b', 100),
+      feedbackResponse('c', 'b', 200),
     ])
 
     const result = getOtherPlayedMatches(
@@ -767,16 +768,16 @@ describe('partite giocate dagli altri', () => {
     expect(result.map((match) => match.slot.id)).toEqual(['slot-other', 'slot-reserve'])
     expect(result[0].pollTitle).toBe('Padel · 27 lug – 2 ago 2026')
     expect(result[0].report).toEqual(report)
-    expect(result[0].playerMvpVotes).toContainEqual({
+    expect(result[0].playerFeedback).toContainEqual({
       userId: 'b',
-      votes: 2,
-      isWinner: true,
+      level: 4,
+      ratingCount: 2,
     })
-    expect(result[0].playerMvpVotes).toContainEqual({ userId: 'a', votes: 0, isWinner: false })
+    expect(result[0].playerFeedback).toContainEqual({ userId: 'a', level: 3, ratingCount: 0 })
   })
 })
 
-describe('scelta MVP di fine partita', () => {
+describe('giudizi verbali di fine partita', () => {
   const ratingPoll = (): PadelPoll => ({
     id: 'poll-rating',
     title: 'Padel del martedì',
@@ -805,18 +806,18 @@ describe('scelta MVP di fine partita', () => {
       .toBe(Date.parse('2026-07-28T09:00:00.000Z'))
   })
 
-  it('propone i tre compagni appena finisce un campo prenotato', () => {
+  it('propone i tre compagni trenta minuti dopo la fine di un campo prenotato', () => {
     const polls = [ratingPoll()]
-    const dueAt = Date.parse('2026-07-28T08:30:00.000Z')
+    const dueAt = Date.parse('2026-07-28T09:00:00.000Z')
 
-    expect(getPendingMatchMvpPrompts(polls, [], 'jury', dueAt - 1)).toHaveLength(0)
-    expect(getNextMatchMvpPromptAt(polls, [], 'jury', dueAt - 1)).toBe(dueAt)
+    expect(getPendingMatchFeedbackPrompts(polls, [], 'jury', dueAt - 1)).toHaveLength(0)
+    expect(getNextMatchFeedbackPromptAt(polls, [], 'jury', dueAt - 1)).toBe(dueAt)
 
-    const prompts = getPendingMatchMvpPrompts(polls, [], 'jury', dueAt)
+    const prompts = getPendingMatchFeedbackPrompts(polls, [], 'jury', dueAt)
     expect(prompts).toHaveLength(1)
     expect(prompts[0]).toMatchObject({
       id: 'poll-rating__slot-rating__jury',
-      voterId: 'jury',
+      reviewerId: 'jury',
       sessionEndedAt: Date.parse('2026-07-28T08:30:00.000Z'),
       dueAt,
     })
@@ -825,35 +826,35 @@ describe('scelta MVP di fine partita', () => {
 
   it('non ripropone una scheda già chiusa e ignora riserve o formazioni incomplete', () => {
     const current = ratingPoll()
-    const dueAt = Date.parse('2026-07-28T08:30:00.000Z')
-    const responseId = getMatchMvpResponseId(current.id, current.slots[0].id, 'jury')
+    const dueAt = Date.parse('2026-07-28T09:00:00.000Z')
+    const responseId = getMatchFeedbackResponseId(current.id, current.slots[0].id, 'jury')
 
-    expect(getPendingMatchMvpPrompts([current], [{
+    expect(getPendingMatchFeedbackPrompts([current], [{
       id: responseId,
       pollId: current.id,
       slotId: current.slots[0].id,
-      voterId: 'jury',
+      reviewerId: 'jury',
       status: 'dismissed',
       closedAt: dueAt,
     }], 'jury', dueAt)).toHaveLength(0)
-    expect(getPendingMatchMvpPrompts([current], [], 'reserve', dueAt)).toHaveLength(0)
-    expect(getPendingMatchMvpPrompts([{
+    expect(getPendingMatchFeedbackPrompts([current], [], 'reserve', dueAt)).toHaveLength(0)
+    expect(getPendingMatchFeedbackPrompts([{
       ...current,
       slots: [{ ...current.slots[0], signups: current.slots[0].signups.slice(0, 3) }],
     }], [], 'jury', dueAt)).toHaveLength(0)
   })
 
-  it('lascia scadere una richiesta MVP non completata dopo sette giorni', () => {
+  it('lascia scadere una richiesta non completata dopo sette giorni', () => {
     const current = ratingPoll()
-    const dueAt = Date.parse('2026-07-28T08:30:00.000Z')
+    const dueAt = Date.parse('2026-07-28T09:00:00.000Z')
     const sevenDays = 7 * 24 * 60 * 60 * 1000
 
-    expect(getPendingMatchMvpPrompts([current], [], 'jury', dueAt + sevenDays - 1)).toHaveLength(1)
-    expect(getPendingMatchMvpPrompts([current], [], 'jury', dueAt + sevenDays)).toHaveLength(0)
-    expect(getNextMatchMvpPromptAt([current], [], 'jury', dueAt + sevenDays)).toBeNull()
+    expect(getPendingMatchFeedbackPrompts([current], [], 'jury', dueAt + sevenDays - 1)).toHaveLength(1)
+    expect(getPendingMatchFeedbackPrompts([current], [], 'jury', dueAt + sevenDays)).toHaveLength(0)
+    expect(getNextMatchFeedbackPromptAt([current], [], 'jury', dueAt + sevenDays)).toBeNull()
   })
 
-  it('esclude gli ospiti dalla scelta MVP ma mantiene valido il match da quattro titolari', () => {
+  it('esclude gli ospiti dai giudizi ma mantiene valido il match da quattro titolari', () => {
     const current = ratingPoll()
     current.slots[0].signups[3] = {
       ...current.slots[0].signups[3],
@@ -861,8 +862,8 @@ describe('scelta MVP di fine partita', () => {
       displayName: 'Ciccio',
       isGuest: true,
     }
-    const dueAt = Date.parse('2026-07-28T08:30:00.000Z')
-    const prompt = getPendingMatchMvpPrompts([current], [], 'jury', dueAt)[0]
+    const dueAt = Date.parse('2026-07-28T09:00:00.000Z')
+    const prompt = getPendingMatchFeedbackPrompts([current], [], 'jury', dueAt)[0]
 
     expect(prompt.candidates.map((candidate) => candidate.userId)).toEqual(['ale', 'luca'])
   })

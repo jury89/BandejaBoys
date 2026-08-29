@@ -61,6 +61,8 @@ function notificationPresentation(kind: string): NotificationPresentation {
       return { label: 'Pagelle', icon: Star, tone: 'rating' }
     case 'match-mvp':
       return { label: 'MVP del match', icon: Trophy, tone: 'rating' }
+    case 'match-feedback':
+      return { label: 'Giudizi del match', icon: Star, tone: 'rating' }
     case 'monday-motivation':
       return { label: 'Sveglia del lunedì', icon: BellRing, tone: 'monday' }
     case 'fantasy-open':

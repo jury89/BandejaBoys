@@ -1,6 +1,7 @@
 import {
   ArrowLeft,
   ArrowRight,
+  Bird,
   CalendarCheck2,
   CalendarClock,
   CheckCircle2,
@@ -9,9 +10,8 @@ import {
   MapPin,
   PencilLine,
   Plus,
-  Trophy,
 } from 'lucide-react'
-import { DEFAULT_VENUE } from '../lib/domain'
+import { DEFAULT_VENUE, getMatchFeedbackDefinition } from '../lib/domain'
 import { slotDateParts } from '../lib/format'
 import type { PlayerMatch, PlayerMatchLists } from '../types'
 import { MatchReportScoreboard } from './MatchReportScoreboard'
@@ -50,7 +50,7 @@ function MatchItem({
   const booked = Boolean(match.slot.bookedAt)
   const venue = booked ? (match.slot.venue || DEFAULT_VENUE) : 'Campo da prenotare'
   const status = past ? 'Giocata' : booked ? 'Campo confermato' : 'Da prenotare'
-  const receivedMvp = past ? match.receivedMvp : undefined
+  const receivedFeedback = past ? match.receivedFeedback : undefined
   const report = past ? match.report : undefined
 
   return (
@@ -86,16 +86,14 @@ function MatchItem({
       <div className={`personal-match__status ${booked ? 'is-booked' : 'is-pending'}`}>
         {booked ? <CheckCircle2 size={17} /> : <CalendarClock size={17} />}
         <span>{status}</span>
-        {receivedMvp && (receivedMvp.isWinner || receivedMvp.votes > 0) && (
+        {receivedFeedback && (
           <span
             className="personal-match__rating"
-            aria-label={receivedMvp.isWinner
-              ? `MVP della partita con ${receivedMvp.votes} ${receivedMvp.votes === 1 ? 'preferenza' : 'preferenze'}`
-              : `${receivedMvp.votes} ${receivedMvp.votes === 1 ? 'preferenza MVP ricevuta' : 'preferenze MVP ricevute'}`}
+            aria-label={`${getMatchFeedbackDefinition(receivedFeedback.level).label}, ${receivedFeedback.ratingCount} ${receivedFeedback.ratingCount === 1 ? 'giudizio ricevuto' : 'giudizi ricevuti'}`}
           >
-            <Trophy size={14} aria-hidden="true" />
-            <span>{receivedMvp.isWinner ? 'MVP' : 'Voti MVP'}</span>
-            <strong>{receivedMvp.votes}</strong>
+            <Bird size={14} aria-hidden="true" />
+            <span>{getMatchFeedbackDefinition(receivedFeedback.level).label}</span>
+            <strong>{receivedFeedback.ratingCount}</strong>
           </span>
         )}
         {onSelect && <ArrowRight className="personal-match__open-icon" size={17} aria-hidden="true" />}

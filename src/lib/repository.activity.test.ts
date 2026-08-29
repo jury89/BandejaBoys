@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type {
-  MatchMvpPrompt,
-  MatchMvpSummary,
+  MatchFeedbackPrompt,
+  MatchFeedbackSummary,
   PadelPoll,
   SessionUser,
 } from '../types'
@@ -174,8 +174,8 @@ describe('repository activity log in demo mode', () => {
     expect(activity().views[0].lastViewedAt).toBeGreaterThanOrEqual(activity().views[0].firstViewedAt)
   })
 
-  it('salva la scelta MVP soltanto per un compagno registrato quando nello slot c’è un ospite', async () => {
-    const prompt: MatchMvpPrompt = {
+  it('salva un giudizio per ogni compagno registrato anche quando nello slot c’è un ospite', async () => {
+    const prompt: MatchFeedbackPrompt = {
       id: 'poll-guest__slot-guest__jury',
       pollId: 'poll-guest',
       pollTitle: 'Padel con ospite',
@@ -183,17 +183,20 @@ describe('repository activity log in demo mode', () => {
       sessionStartsAt: '2027-01-05T19:30',
       sessionEndedAt: 100,
       dueAt: 200,
-      voterId: user.id,
+      reviewerId: user.id,
       candidates: [
         { userId: 'ale', displayName: 'Ale' },
         { userId: 'luca', displayName: 'Luca' },
       ],
     }
 
-    await repository.submitMatchMvp(prompt, user, 'ale')
+    await repository.submitMatchFeedback(prompt, user, [
+      { playerId: 'ale', level: 4 },
+      { playerId: 'luca', level: 2 },
+    ])
 
-    let summaries: MatchMvpSummary[] = []
-    const unsubscribeSummaries = repository.subscribeMatchMvpSummaries((records) => {
+    let summaries: MatchFeedbackSummary[] = []
+    const unsubscribeSummaries = repository.subscribeMatchFeedbackSummaries((records) => {
       summaries = records
     }, vi.fn())
     unsubscribeSummaries()
@@ -201,7 +204,8 @@ describe('repository activity log in demo mode', () => {
     expect(summaries).toContainEqual(expect.objectContaining({
       id: 'poll-guest__slot-guest__ale',
       playerId: 'ale',
-      voteCount: 1,
+      scoreUnitsTotal: 15,
+      ratingCount: 1,
     }))
   })
 })

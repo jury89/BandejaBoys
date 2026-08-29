@@ -174,31 +174,36 @@ try {
     throw new Error('La modifica non è stata riletta correttamente.')
   }
 
-  stage = 'creazione scelta e risultato MVP aggregato'
+  stage = 'creazione giudizio e risultato aggregato'
   responseId = `${pollId}__${slotId}__${userId}`
   summaryId = `${pollId}__${slotId}__${participants[1].userId}`
-  const mvpCreatedAt = Date.now()
-  const mvpBatch = writeBatch(clientDb)
-  mvpBatch.set(doc(clientDb, 'matchMvpResponses', responseId), {
+  const feedbackCreatedAt = Date.now()
+  const feedbackBatch = writeBatch(clientDb)
+  feedbackBatch.set(doc(clientDb, 'matchFeedbackResponses', responseId), {
     id: responseId,
     pollId,
     slotId,
-    voterId: userId,
+    reviewerId: userId,
     status: 'submitted',
-    selectedPlayerId: participants[1].userId,
-    selectedPlayerName: participants[1].displayName,
-    closedAt: mvpCreatedAt,
+    ratings: [{
+      playerId: participants[1].userId,
+      playerName: participants[1].displayName,
+      level: 4,
+      scoreUnits: 15,
+    }],
+    closedAt: feedbackCreatedAt,
   })
-  mvpBatch.set(doc(clientDb, 'matchMvpSummaries', summaryId), {
+  feedbackBatch.set(doc(clientDb, 'matchFeedbackSummaries', summaryId), {
     id: summaryId,
     pollId,
     slotId,
     playerId: participants[1].userId,
-    voteCount: increment(1),
+    scoreUnitsTotal: increment(15),
+    ratingCount: increment(1),
     lastResponseId: responseId,
-    updatedAt: mvpCreatedAt,
+    updatedAt: feedbackCreatedAt,
   }, { merge: true })
-  await mvpBatch.commit()
+  await feedbackBatch.commit()
 
   stage = 'creazione membro osservatore'
   const observerCredential = await createUserWithEmailAndPassword(
@@ -220,19 +225,20 @@ try {
     throw new Error('Il membro osservatore non vede il referto condiviso.')
   }
 
-  stage = 'lettura del risultato MVP aggregato'
-  const sharedSummary = await getDoc(doc(clientDb, 'matchMvpSummaries', summaryId))
+  stage = 'lettura del giudizio aggregato'
+  const sharedSummary = await getDoc(doc(clientDb, 'matchFeedbackSummaries', summaryId))
   if (
     !sharedSummary.exists()
-    || sharedSummary.data().voteCount !== 1
+    || sharedSummary.data().ratingCount !== 1
+    || sharedSummary.data().scoreUnitsTotal !== 15
   ) {
-    throw new Error('Il membro osservatore non vede il risultato MVP aggregato corretto.')
+    throw new Error('Il membro osservatore non vede il giudizio aggregato corretto.')
   }
 
-  stage = 'protezione della scelta MVP individuale'
+  stage = 'protezione del giudizio individuale'
   try {
-    await getDoc(doc(clientDb, 'matchMvpResponses', responseId))
-    throw new Error('Il membro osservatore ha letto una scelta MVP individuale.')
+    await getDoc(doc(clientDb, 'matchFeedbackResponses', responseId))
+    throw new Error('Il membro osservatore ha letto un giudizio individuale.')
   } catch (error) {
     const code = typeof error === 'object' && error && 'code' in error
       ? String(error.code)
@@ -241,7 +247,7 @@ try {
   }
 
   console.log(
-    'PASS: referto condiviso, risultato MVP aggregato e scelta individuale riservata verificati in produzione.',
+    'PASS: referto condiviso, giudizio aggregato e risposta individuale riservata verificati in produzione.',
   )
 } catch (error) {
   const code = typeof error === 'object' && error && 'code' in error
@@ -253,10 +259,10 @@ try {
 } finally {
   if (reportId) await adminDb.doc(`matchReports/${reportId}`).delete().catch(() => undefined)
   if (summaryId) {
-    await adminDb.doc(`matchMvpSummaries/${summaryId}`).delete().catch(() => undefined)
+    await adminDb.doc(`matchFeedbackSummaries/${summaryId}`).delete().catch(() => undefined)
   }
   if (responseId) {
-    await adminDb.doc(`matchMvpResponses/${responseId}`).delete().catch(() => undefined)
+    await adminDb.doc(`matchFeedbackResponses/${responseId}`).delete().catch(() => undefined)
   }
   if (userId) await adminDb.doc(`users/${userId}`).delete().catch(() => undefined)
   if (observerUserId) {
