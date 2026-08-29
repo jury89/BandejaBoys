@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { Bird, CalendarCheck2, Check, FlaskConical, Send } from 'lucide-react'
+import { Bird, CalendarCheck2, Check, FlaskConical, Heart, Send } from 'lucide-react'
 import type { MatchFeedbackLevel, MatchFeedbackPrompt } from '../types'
 import { MATCH_FEEDBACK_LEVELS, padelDateTimeToTimestamp } from '../lib/domain'
 import { Modal } from './Modal'
@@ -85,6 +85,11 @@ export function MatchFeedbackModal({
           </div>
           <strong>{selectedCount}/{prompt.candidates.length}</strong>
         </div>
+
+        <p className="match-feedback__generosity">
+          <Heart size={17} aria-hidden="true" />
+          <span><strong>Sii generoso.</strong> Nel dubbio, scegli il volatile più alto.</span>
+        </p>
 
         <div className="match-feedback__players">
           {prompt.candidates.map((candidate, candidateIndex) => (
