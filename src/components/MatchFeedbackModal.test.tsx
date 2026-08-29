@@ -31,6 +31,8 @@ describe('MatchFeedbackModal', () => {
 
     const save = screen.getByRole('button', { name: 'Salva i giudizi' })
     expect(save).toBeDisabled()
+    expect(screen.getByText(/Sii generoso/)).toBeInTheDocument()
+    expect(screen.getByText(/Nel dubbio, scegli il volatile più alto/)).toBeInTheDocument()
     expect(screen.getAllByText('Make Padel Great Again.')).toHaveLength(3)
 
     choose('Ale', 'Fagiano da brodo')

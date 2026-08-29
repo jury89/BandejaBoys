@@ -3779,6 +3779,26 @@ p {
   white-space: nowrap;
 }
 
+.match-feedback__generosity {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: -5px 2px 0;
+  color: #385762;
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.match-feedback__generosity svg {
+  flex: 0 0 auto;
+  color: #df9d00;
+  fill: #fff0a8;
+}
+
+.match-feedback__generosity strong {
+  color: var(--ink);
+}
+
 .match-feedback__players {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
