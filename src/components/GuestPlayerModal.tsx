@@ -56,7 +56,7 @@ export function GuestPlayerModal({
           <span aria-hidden="true"><UserRoundPlus size={22} /></span>
           <p>
             Inseriscilo nello slot senza creare un account. Potrà giocare, ma non riceverà
-            notifiche e non comparirà nelle pagelle.
+            notifiche e non potrà essere scelto come MVP.
           </p>
         </div>
 

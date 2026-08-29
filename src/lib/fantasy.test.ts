@@ -1,13 +1,14 @@
 import type {
   FantasyEntry,
-  MatchRatingSummary,
+  MatchMvpResponse,
+  MatchMvpSummary,
   MatchReport,
   PadelPoll,
   PadelSlot,
   SessionUser,
 } from '../types'
 import {
-  FANTASY_DEFAULT_RATING,
+  FANTASY_BASE_SCORE,
   FANTASY_EARLY_SETTLEMENT_DELAY_MS,
   FANTASY_MVP_LEAGUE_POINTS,
   FANTASY_MISSING_REPORT_VOID_REASON,
@@ -112,48 +113,46 @@ function reportFixture(): MatchReport {
   }
 }
 
-const ratings: MatchRatingSummary[] = [
+const mvpSummaries: MatchMvpSummary[] = [
   {
     id: 'a',
     pollId: 'poll-1',
     slotId: 'slot-1',
-    revieweeId: 'a',
-    scoreTotal: 16,
-    ratingCount: 2,
-    lastRatingId: 'ra',
+    playerId: 'a',
+    voteCount: 1,
+    lastResponseId: 'ra',
     updatedAt: 1,
   },
   {
     id: 'b',
     pollId: 'poll-1',
     slotId: 'slot-1',
-    revieweeId: 'b',
-    scoreTotal: 21,
-    ratingCount: 3,
-    lastRatingId: 'rb',
-    updatedAt: 1,
-  },
-  {
-    id: 'c',
-    pollId: 'poll-1',
-    slotId: 'slot-1',
-    revieweeId: 'c',
-    scoreTotal: 10,
-    ratingCount: 1,
-    lastRatingId: 'rc',
+    playerId: 'b',
+    voteCount: 1,
+    lastResponseId: 'rb',
     updatedAt: 1,
   },
   {
     id: 'd',
     pollId: 'poll-1',
     slotId: 'slot-1',
-    revieweeId: 'd',
-    scoreTotal: 18,
-    ratingCount: 2,
-    lastRatingId: 'rd',
+    playerId: 'd',
+    voteCount: 2,
+    lastResponseId: 'rd',
     updatedAt: 1,
   },
 ]
+
+const mvpResponses: MatchMvpResponse[] = players.map((voterId, index) => ({
+  id: `poll-1__slot-1__${voterId}`,
+  pollId: 'poll-1',
+  slotId: 'slot-1',
+  voterId,
+  status: 'submitted',
+  selectedPlayerId: index < 2 ? 'd' : index === 2 ? 'a' : 'b',
+  selectedPlayerName: index < 2 ? 'D' : index === 2 ? 'A' : 'B',
+  closedAt: locksAt + 90 * 60_000,
+}))
 
 const entry = (
   managerId: string,
@@ -260,6 +259,7 @@ describe('round FantaBandeja', () => {
       [saved],
       [],
       [],
+      [],
       now + 2,
     )[0]
 
@@ -281,6 +281,7 @@ describe('round FantaBandeja', () => {
       [pollWith(bookedSlot({ startsAt: movedStartsAt }))],
       [originalRound],
       [saved],
+      [],
       [],
       [],
       now + 2,
@@ -311,6 +312,7 @@ describe('round FantaBandeja', () => {
       [saved],
       [],
       [],
+      [],
       now + 2,
     )[0]
 
@@ -333,6 +335,7 @@ describe('round FantaBandeja', () => {
       [saved],
       [],
       [],
+      [],
       now + 3,
     )[0]
 
@@ -345,7 +348,7 @@ describe('round FantaBandeja', () => {
 })
 
 describe('punteggio FantaBandeja', () => {
-  it('somma pagelle, risultati, differenza game, capitano e MVP', () => {
+  it('somma base comune, risultati, differenza game, capitano e MVP', () => {
     const scored = scoreFantasyRound(
       roundFixture(),
       [
@@ -354,62 +357,66 @@ describe('punteggio FantaBandeja', () => {
         entry('manager-z', ['a', 'b'], 'a'),
       ],
       reportFixture(),
-      ratings,
+      mvpSummaries,
       locksAt + FANTASY_SETTLEMENT_DELAY_MS,
     )
 
     expect(scored.playerScores).toEqual([
       expect.objectContaining({
         userId: 'a',
-        baseRating: 8,
+        scoringModel: 'mvp-v2',
+        baseRating: FANTASY_BASE_SCORE,
+        mvpVotes: 1,
         setWins: 2,
         setLosses: 1,
         gameDifference: 1,
         resultBonus: 1.5,
         differenceBonus: 0,
-        fantasyScore: 9.5,
+        fantasyScore: 7.5,
         isMvp: false,
       }),
       expect.objectContaining({
         userId: 'b',
-        baseRating: 7,
+        baseRating: FANTASY_BASE_SCORE,
         gameDifference: 3,
         differenceBonus: 0.5,
-        fantasyScore: 9,
+        fantasyScore: 8,
       }),
       expect.objectContaining({
         userId: 'c',
-        baseRating: FANTASY_DEFAULT_RATING,
-        ratingCount: 1,
-        usedDefaultRating: true,
+        baseRating: FANTASY_BASE_SCORE,
+        ratingCount: 0,
+        usedDefaultRating: false,
         setWins: 0,
         setLosses: 3,
         fantasyScore: 5.5,
       }),
       expect.objectContaining({
         userId: 'd',
-        baseRating: 9,
+        baseRating: FANTASY_BASE_SCORE,
+        mvpVotes: 2,
+        mvpBonus: 1,
         gameDifference: 3,
-        fantasyScore: 11,
+        fantasyScore: 9,
         isMvp: true,
       }),
     ])
     expect(scored.standings).toEqual([
       expect.objectContaining({
         managerId: 'manager-x',
-        totalScore: 28,
+        totalScore: 23,
         rank: 1,
         leaguePoints: 5,
       }),
       expect.objectContaining({
         managerId: 'manager-y',
-        totalScore: 24.5,
+        totalScore: 21,
         rank: 2,
         leaguePoints: 3,
       }),
       expect.objectContaining({
         managerId: 'manager-z',
-        totalScore: 23.25,
+        totalScore: 19.25,
         rank: 3,
         leaguePoints: 1,
       }),
@@ -424,7 +431,7 @@ describe('punteggio FantaBandeja', () => {
         entry('manager-y', ['a', 'd'], 'd'),
       ],
       reportFixture(),
-      ratings,
+      mvpSummaries,
       locksAt + FANTASY_SETTLEMENT_DELAY_MS,
     )
 
@@ -434,18 +441,14 @@ describe('punteggio FantaBandeja', () => {
     ])
   })
 
-  it('chiude dopo 24 ore quando referto e pagelle sono completi', () => {
+  it('chiude dopo 24 ore quando referto e scelte MVP sono completi', () => {
     const round = roundFixture()
-    const completeRatings = ratings.map((summary) => (
-      summary.revieweeId === 'c'
-        ? { ...summary, scoreTotal: 12, ratingCount: 2 }
-        : summary
-    ))
     const beforeSettlement = reconcileFantasyRounds(
       [pollWith()],
       [round],
       [],
-      completeRatings,
+      mvpSummaries,
+      mvpResponses,
       [reportFixture()],
       round.slotEndsAt + FANTASY_EARLY_SETTLEMENT_DELAY_MS - 1,
     )
@@ -455,21 +458,23 @@ describe('punteggio FantaBandeja', () => {
       [pollWith()],
       [round],
       [entry('manager', ['a', 'd'], 'd')],
-      completeRatings,
+      mvpSummaries,
+      mvpResponses,
       [reportFixture()],
       round.slotEndsAt + FANTASY_EARLY_SETTLEMENT_DELAY_MS,
     )
     expect(scored[0].status).toBe('scored')
   })
 
-  it('attende 48 ore se manca una pagella completa e mantiene il referto come fallback', () => {
+  it('attende 48 ore se manca una scelta MVP e mantiene il referto come fallback', () => {
     const round = roundFixture()
-    const incompleteRatings = ratings.filter((summary) => summary.revieweeId !== 'd')
+    const incompleteResponses = mvpResponses.filter((response) => response.voterId !== 'd')
     const afterTwentyFourHours = reconcileFantasyRounds(
       [pollWith()],
       [round],
       [],
-      incompleteRatings,
+      mvpSummaries,
+      incompleteResponses,
       [reportFixture()],
       round.slotEndsAt + FANTASY_EARLY_SETTLEMENT_DELAY_MS,
     )
@@ -479,7 +484,8 @@ describe('punteggio FantaBandeja', () => {
       [pollWith()],
       [round],
       [],
-      incompleteRatings,
+      mvpSummaries,
+      incompleteResponses,
       [reportFixture()],
       round.settlesAt,
     )
@@ -488,8 +494,8 @@ describe('punteggio FantaBandeja', () => {
       playerScores: expect.arrayContaining([
         expect.objectContaining({
           userId: 'd',
-          baseRating: FANTASY_DEFAULT_RATING,
-          usedDefaultRating: true,
+          baseRating: FANTASY_BASE_SCORE,
+          scoringModel: 'mvp-v2',
         }),
       ]),
     })
@@ -502,7 +508,8 @@ describe('punteggio FantaBandeja', () => {
       [pollWith()],
       [round],
       [],
-      ratings,
+      mvpSummaries,
+      mvpResponses,
       [],
       round.settlesAt,
     )
@@ -518,7 +525,8 @@ describe('punteggio FantaBandeja', () => {
       [pollWith()],
       [round],
       [],
-      ratings,
+      mvpSummaries,
+      mvpResponses,
       [],
       round.settlesAt,
     )[0]
@@ -528,7 +536,8 @@ describe('punteggio FantaBandeja', () => {
       [pollWith()],
       [voided],
       [entry('manager', ['a', 'd'], 'd')],
-      ratings,
+      mvpSummaries,
+      mvpResponses,
       [reportFixture()],
       lateSettlementAt,
     )[0]
@@ -553,7 +562,8 @@ describe('punteggio FantaBandeja', () => {
       [pollWith()],
       [round],
       [],
-      ratings,
+      mvpSummaries,
+      mvpResponses,
       [reportFixture()],
       locksAt + 1,
     )[0]
@@ -569,7 +579,7 @@ describe('punteggio FantaBandeja', () => {
         entry('manager-y', ['b', 'd'], 'b'),
       ],
       reportFixture(),
-      ratings,
+      mvpSummaries,
       locksAt + FANTASY_SETTLEMENT_DELAY_MS,
     )
     const second = {
@@ -603,16 +613,16 @@ describe('punteggio FantaBandeja', () => {
       expect.objectContaining({
         managerId: 'd',
         leaguePoints: FANTASY_MVP_LEAGUE_POINTS * 2,
-        rawFantasyPoints: 22,
+        rawFantasyPoints: 18,
         roundsPlayed: 2,
         rank: 3,
       }),
       expect.objectContaining({
         managerId: 'a',
         leaguePoints: FANTASY_STARTER_LEAGUE_POINTS * 2,
-        rawFantasyPoints: 19,
+        rawFantasyPoints: 15,
         roundsPlayed: 2,
-        rank: 4,
+        rank: 5,
       }),
     ]))
 
@@ -646,7 +656,7 @@ describe('punteggio FantaBandeja', () => {
       roundFixture(),
       [entry('manager-x', ['a', 'd'], 'd')],
       reportFixture(),
-      ratings,
+      mvpSummaries,
       locksAt + FANTASY_SETTLEMENT_DELAY_MS,
     )
 
@@ -655,7 +665,7 @@ describe('punteggio FantaBandeja', () => {
     expect(leaderboard.find((row) => row.managerId === 'd')).toEqual(
       expect.objectContaining({
         leaguePoints: FANTASY_MVP_LEAGUE_POINTS,
-        rawFantasyPoints: 11,
+        rawFantasyPoints: 9,
         roundsPlayed: 1,
       }),
     )

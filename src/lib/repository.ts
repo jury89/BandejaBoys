@@ -19,11 +19,9 @@ import type {
   FantasyEntry,
   FantasyRound,
   FantasySelectionInput,
-  MatchRatingPrompt,
-  MatchRatingRecord,
-  MatchRatingResponse,
-  MatchRatingSummary,
-  MatchRatingSubmission,
+  MatchMvpPrompt,
+  MatchMvpResponse,
+  MatchMvpSummary,
   MatchReport,
   MatchSetInput,
   MemberProfile,
@@ -48,8 +46,8 @@ import {
   addSlotToPoll,
   addSignup,
   applyAdminSlotRosterAction,
-  aggregateMatchRatingSummaries,
-  getMatchRatingSummaryId,
+  aggregateMatchMvpSummaries,
+  getMatchMvpSummaryId,
   getStarters,
   isGuestSignup,
   makeFantasyEntry,
@@ -74,18 +72,13 @@ import type { NotificationDelivery } from './notificationHistory'
 export interface PadelRepository {
   subscribePolls(listener: (polls: PadelPoll[]) => void, onError: (error: Error) => void): Unsubscribe
   subscribeMembers(listener: (members: MemberProfile[]) => void, onError: (error: Error) => void): Unsubscribe
-  subscribeMatchRatingResponses(
-    reviewerId: string,
-    listener: (responses: MatchRatingResponse[]) => void,
+  subscribeMatchMvpResponses(
+    voterId: string,
+    listener: (responses: MatchMvpResponse[]) => void,
     onError: (error: Error) => void,
   ): Unsubscribe
-  subscribeReceivedMatchRatings(
-    revieweeId: string,
-    listener: (ratings: MatchRatingRecord[]) => void,
-    onError: (error: Error) => void,
-  ): Unsubscribe
-  subscribeMatchRatingSummaries(
-    listener: (summaries: MatchRatingSummary[]) => void,
+  subscribeMatchMvpSummaries(
+    listener: (summaries: MatchMvpSummary[]) => void,
     onError: (error: Error) => void,
   ): Unsubscribe
   subscribeMatchReports(
@@ -164,12 +157,12 @@ export interface PadelRepository {
   setPollStatus(pollId: string, status: PollStatus, actor: SessionUser): Promise<PadelPoll>
   deletePoll(pollId: string, actor: SessionUser): Promise<void>
   recordSlotView(poll: PadelPoll, slot: PadelSlot, viewer: SessionUser): Promise<void>
-  dismissMatchRatingPrompt(prompt: MatchRatingPrompt): Promise<MatchRatingResponse>
-  submitMatchRatings(
-    prompt: MatchRatingPrompt,
-    reviewer: SessionUser,
-    submissions: MatchRatingSubmission[],
-  ): Promise<MatchRatingResponse>
+  dismissMatchMvpPrompt(prompt: MatchMvpPrompt): Promise<MatchMvpResponse>
+  submitMatchMvp(
+    prompt: MatchMvpPrompt,
+    voter: SessionUser,
+    selectedPlayerId: string,
+  ): Promise<MatchMvpResponse>
   saveMatchReport(
     match: PlayerMatch,
     editor: SessionUser,
@@ -279,56 +272,28 @@ function setRemoteActivity(
   })
 }
 
-function makeRatingResponse(
-  prompt: MatchRatingPrompt,
-  status: MatchRatingResponse['status'],
+function makeMvpResponse(
+  prompt: MatchMvpPrompt,
+  status: MatchMvpResponse['status'],
+  selectedPlayerId?: string,
   closedAt = Date.now(),
-): MatchRatingResponse {
+): MatchMvpResponse {
+  const selectedPlayer = prompt.candidates.find((candidate) => candidate.userId === selectedPlayerId)
+  if (status === 'submitted' && !selectedPlayer) {
+    throw new Error('Scegli un compagno come MVP della partita.')
+  }
   return {
     id: prompt.id,
     pollId: prompt.pollId,
     slotId: prompt.slotId,
-    reviewerId: prompt.reviewerId,
+    voterId: prompt.voterId,
     status,
+    ...(selectedPlayer ? {
+      selectedPlayerId: selectedPlayer.userId,
+      selectedPlayerName: selectedPlayer.displayName,
+    } : {}),
     closedAt,
   }
-}
-
-function makeRatingRecords(
-  prompt: MatchRatingPrompt,
-  reviewer: SessionUser,
-  submissions: MatchRatingSubmission[],
-  createdAt = Date.now(),
-): MatchRatingRecord[] {
-  const expectedTeammates = new Set(prompt.teammates.map((teammate) => teammate.userId))
-  const submittedTeammates = new Set(submissions.map((submission) => submission.userId))
-  const isComplete = expectedTeammates.size > 0
-    && expectedTeammates.size <= 3
-    && submissions.length === expectedTeammates.size
-    && submittedTeammates.size === expectedTeammates.size
-    && [...submittedTeammates].every((userId) => expectedTeammates.has(userId))
-  const scoresAreValid = submissions.every((submission) => (
-    Number.isInteger(submission.score) && submission.score >= 1 && submission.score <= 10
-  ))
-  if (!isComplete || !scoresAreValid || prompt.reviewerId !== reviewer.id) {
-    throw new Error('Assegna un voto da 1 a 10 a tutti i compagni registrati.')
-  }
-
-  return submissions.map((submission) => ({
-    id: `${prompt.id}__${submission.userId}`,
-    responseId: prompt.id,
-    pollId: prompt.pollId,
-    pollTitle: prompt.pollTitle,
-    slotId: prompt.slotId,
-    sessionStartsAt: prompt.sessionStartsAt,
-    sessionEndedAt: prompt.sessionEndedAt,
-    reviewerId: reviewer.id,
-    reviewerName: reviewer.displayName,
-    revieweeId: submission.userId,
-    revieweeName: submission.displayName,
-    score: submission.score,
-    createdAt,
-  }))
 }
 
 function remoteRepository(): PadelRepository {
@@ -375,33 +340,62 @@ function remoteRepository(): PadelRepository {
         onError,
       )
     },
-    subscribeMatchRatingResponses(reviewerId, listener, onError) {
-      return onSnapshot(
-        query(collection(db, 'matchRatingResponses'), where('reviewerId', '==', reviewerId)),
-        (snapshot) => listener(snapshot.docs.map((item) => ({
-          id: item.id,
-          ...item.data(),
-        }) as MatchRatingResponse)),
+    subscribeMatchMvpResponses(voterId, listener, onError) {
+      let currentResponses: MatchMvpResponse[] = []
+      let legacyClosedResponses: MatchMvpResponse[] = []
+      const emit = () => listener([
+        ...legacyClosedResponses.filter((legacy) => (
+          !currentResponses.some((response) => response.id === legacy.id)
+        )),
+        ...currentResponses,
+      ])
+      const stopCurrent = onSnapshot(
+        query(collection(db, 'matchMvpResponses'), where('voterId', '==', voterId)),
+        (snapshot) => {
+          currentResponses = snapshot.docs.map((item) => ({
+            id: item.id,
+            ...item.data(),
+          }) as MatchMvpResponse)
+          emit()
+        },
         onError,
       )
-    },
-    subscribeReceivedMatchRatings(revieweeId, listener, onError) {
-      return onSnapshot(
-        query(collection(db, 'matchRatings'), where('revieweeId', '==', revieweeId)),
-        (snapshot) => listener(snapshot.docs.map((item) => ({
-          id: item.id,
-          ...item.data(),
-        }) as MatchRatingRecord)),
+      const stopLegacy = onSnapshot(
+        query(collection(db, 'matchRatingResponses'), where('reviewerId', '==', voterId)),
+        (snapshot) => {
+          legacyClosedResponses = snapshot.docs.map((item) => {
+            const data = item.data() as {
+              pollId: string
+              slotId: string
+              reviewerId: string
+              status: MatchMvpResponse['status']
+              closedAt: number
+            }
+            return {
+              id: item.id,
+              pollId: data.pollId,
+              slotId: data.slotId,
+              voterId: data.reviewerId,
+              status: data.status,
+              closedAt: data.closedAt,
+            }
+          })
+          emit()
+        },
         onError,
       )
+      return () => {
+        stopCurrent()
+        stopLegacy()
+      }
     },
-    subscribeMatchRatingSummaries(listener, onError) {
+    subscribeMatchMvpSummaries(listener, onError) {
       return onSnapshot(
-        collection(db, 'matchRatingSummaries'),
+        collection(db, 'matchMvpSummaries'),
         (snapshot) => listener(snapshot.docs.map((item) => ({
           id: item.id,
           ...item.data(),
-        }) as MatchRatingSummary)),
+        }) as MatchMvpSummary)),
         onError,
       )
     },
@@ -750,42 +744,31 @@ function remoteRepository(): PadelRepository {
         })
       })
     },
-    async dismissMatchRatingPrompt(prompt) {
-      const reference = doc(db, 'matchRatingResponses', prompt.id)
+    async dismissMatchMvpPrompt(prompt) {
+      const reference = doc(db, 'matchMvpResponses', prompt.id)
       return runTransaction(db, async (transaction) => {
         const snapshot = await transaction.get(reference)
-        if (snapshot.exists()) return { id: snapshot.id, ...snapshot.data() } as MatchRatingResponse
-        const response = makeRatingResponse(prompt, 'dismissed')
+        if (snapshot.exists()) return { id: snapshot.id, ...snapshot.data() } as MatchMvpResponse
+        const response = makeMvpResponse(prompt, 'dismissed')
         transaction.set(reference, response)
         return response
       })
     },
-    async submitMatchRatings(prompt, reviewer, submissions) {
-      const records = makeRatingRecords(prompt, reviewer, submissions)
-      const responseReference = doc(db, 'matchRatingResponses', prompt.id)
-      const response = makeRatingResponse(prompt, 'submitted', records[0].createdAt)
+    async submitMatchMvp(prompt, voter, selectedPlayerId) {
+      if (prompt.voterId !== voter.id) throw new Error('Questa scelta MVP appartiene a un altro giocatore.')
+      const response = makeMvpResponse(prompt, 'submitted', selectedPlayerId)
+      const responseReference = doc(db, 'matchMvpResponses', prompt.id)
+      const summaryId = getMatchMvpSummaryId(prompt.pollId, prompt.slotId, selectedPlayerId)
       const batch = writeBatch(db)
-      records.forEach((record) => {
-        batch.set(doc(db, 'matchRatings', record.id), record)
-        batch.set(
-          doc(
-            db,
-            'matchRatingSummaries',
-            getMatchRatingSummaryId(record.pollId, record.slotId, record.revieweeId),
-          ),
-          {
-            id: getMatchRatingSummaryId(record.pollId, record.slotId, record.revieweeId),
-            pollId: record.pollId,
-            slotId: record.slotId,
-            revieweeId: record.revieweeId,
-            scoreTotal: increment(record.score),
-            ratingCount: increment(1),
-            lastRatingId: record.id,
-            updatedAt: record.createdAt,
-          },
-          { merge: true },
-        )
-      })
+      batch.set(doc(db, 'matchMvpSummaries', summaryId), {
+        id: summaryId,
+        pollId: prompt.pollId,
+        slotId: prompt.slotId,
+        playerId: selectedPlayerId,
+        voteCount: increment(1),
+        lastResponseId: response.id,
+        updatedAt: response.closedAt,
+      }, { merge: true })
       batch.set(responseReference, response)
       await batch.commit()
       return response
@@ -825,17 +808,17 @@ function remoteRepository(): PadelRepository {
 
 const LOCAL_POLLS_KEY = 'bandeja-boys:polls'
 const POLLS_EVENT = 'bandeja-boys:polls-changed'
-const LOCAL_MATCH_RATINGS_KEY = 'bandeja-boys:match-ratings'
-const MATCH_RATINGS_EVENT = 'bandeja-boys:match-ratings-changed'
+const LOCAL_MATCH_MVP_KEY = 'bandeja-boys:match-mvp'
+const MATCH_MVP_EVENT = 'bandeja-boys:match-mvp-changed'
+const LEGACY_LOCAL_MATCH_RATINGS_KEY = 'bandeja-boys:match-ratings'
 const LOCAL_MATCH_REPORTS_KEY = 'bandeja-boys:match-reports'
 const MATCH_REPORTS_EVENT = 'bandeja-boys:match-reports-changed'
 const LOCAL_FANTASY_KEY = 'bandeja-boys:fantasy'
 const FANTASY_EVENT = 'bandeja-boys:fantasy-changed'
 const LOCAL_ACTIVITY_KEY = 'bandeja-boys:activity'
 
-interface LocalMatchRatingStore {
-  responses: MatchRatingResponse[]
-  ratings: MatchRatingRecord[]
+interface LocalMatchMvpStore {
+  responses: MatchMvpResponse[]
 }
 
 interface LocalActivityStore {
@@ -918,19 +901,48 @@ function writeLocalPolls(polls: PadelPoll[]) {
   window.dispatchEvent(new Event(POLLS_EVENT))
 }
 
-function readLocalMatchRatingStore(): LocalMatchRatingStore {
+function readLocalMatchMvpStore(): LocalMatchMvpStore {
   try {
-    const stored = localStorage.getItem(LOCAL_MATCH_RATINGS_KEY)
-    if (stored) return JSON.parse(stored) as LocalMatchRatingStore
+    const stored = localStorage.getItem(LOCAL_MATCH_MVP_KEY)
+    if (stored) return JSON.parse(stored) as LocalMatchMvpStore
   } catch {
-    // Malformed demo data must not block the rating prompt.
+    // Malformed demo data must not block the MVP prompt.
   }
-  return { responses: [], ratings: [] }
+  return { responses: [] }
 }
 
-function writeLocalMatchRatingStore(store: LocalMatchRatingStore) {
-  localStorage.setItem(LOCAL_MATCH_RATINGS_KEY, JSON.stringify(store))
-  window.dispatchEvent(new Event(MATCH_RATINGS_EVENT))
+function readLegacyLocalClosedResponses(voterId?: string): MatchMvpResponse[] {
+  try {
+    const stored = localStorage.getItem(LEGACY_LOCAL_MATCH_RATINGS_KEY)
+    if (!stored) return []
+    const legacy = JSON.parse(stored) as {
+      responses?: Array<{
+        id: string
+        pollId: string
+        slotId: string
+        reviewerId: string
+        status: MatchMvpResponse['status']
+        closedAt: number
+      }>
+    }
+    return (legacy.responses ?? [])
+      .filter((response) => !voterId || response.reviewerId === voterId)
+      .map((response) => ({
+        id: response.id,
+        pollId: response.pollId,
+        slotId: response.slotId,
+        voterId: response.reviewerId,
+        status: response.status,
+        closedAt: response.closedAt,
+      }))
+  } catch {
+    return []
+  }
+}
+
+function writeLocalMatchMvpStore(store: LocalMatchMvpStore) {
+  localStorage.setItem(LOCAL_MATCH_MVP_KEY, JSON.stringify(store))
+  window.dispatchEvent(new Event(MATCH_MVP_EVENT))
 }
 
 function readLocalMatchReports(): MatchReport[] {
@@ -969,7 +981,8 @@ function reconcileLocalFantasyStore(): LocalFantasyStore {
     readLocalPolls(),
     current.rounds,
     current.entries,
-    aggregateMatchRatingSummaries(readLocalMatchRatingStore().ratings),
+    aggregateMatchMvpSummaries(readLocalMatchMvpStore().responses),
+    [...readLegacyLocalClosedResponses(), ...readLocalMatchMvpStore().responses],
     readLocalMatchReports(),
   )
   const next = { ...current, rounds }
@@ -1037,29 +1050,26 @@ function localRepository(): PadelRepository {
       notify()
       return () => window.removeEventListener(USERS_EVENT, notify)
     },
-    subscribeMatchRatingResponses(reviewerId, listener) {
-      const notify = () => listener(
-        readLocalMatchRatingStore().responses.filter((response) => response.reviewerId === reviewerId),
-      )
-      window.addEventListener(MATCH_RATINGS_EVENT, notify)
+    subscribeMatchMvpResponses(voterId, listener) {
+      const notify = () => {
+        const current = readLocalMatchMvpStore().responses.filter((response) => response.voterId === voterId)
+        const currentIds = new Set(current.map((response) => response.id))
+        listener([
+          ...readLegacyLocalClosedResponses(voterId).filter((response) => !currentIds.has(response.id)),
+          ...current,
+        ])
+      }
+      window.addEventListener(MATCH_MVP_EVENT, notify)
       notify()
-      return () => window.removeEventListener(MATCH_RATINGS_EVENT, notify)
+      return () => window.removeEventListener(MATCH_MVP_EVENT, notify)
     },
-    subscribeReceivedMatchRatings(revieweeId, listener) {
+    subscribeMatchMvpSummaries(listener) {
       const notify = () => listener(
-        readLocalMatchRatingStore().ratings.filter((rating) => rating.revieweeId === revieweeId),
+        aggregateMatchMvpSummaries(readLocalMatchMvpStore().responses),
       )
-      window.addEventListener(MATCH_RATINGS_EVENT, notify)
+      window.addEventListener(MATCH_MVP_EVENT, notify)
       notify()
-      return () => window.removeEventListener(MATCH_RATINGS_EVENT, notify)
-    },
-    subscribeMatchRatingSummaries(listener) {
-      const notify = () => listener(
-        aggregateMatchRatingSummaries(readLocalMatchRatingStore().ratings),
-      )
-      window.addEventListener(MATCH_RATINGS_EVENT, notify)
-      notify()
-      return () => window.removeEventListener(MATCH_RATINGS_EVENT, notify)
+      return () => window.removeEventListener(MATCH_MVP_EVENT, notify)
     },
     subscribeMatchReports(participantId, listener) {
       const notify = () => listener(
@@ -1077,7 +1087,7 @@ function localRepository(): PadelRepository {
     },
     subscribeFantasyRounds(listener) {
       const notify = () => listener(reconcileLocalFantasyStore().rounds)
-      const events = [FANTASY_EVENT, POLLS_EVENT, MATCH_RATINGS_EVENT, MATCH_REPORTS_EVENT]
+      const events = [FANTASY_EVENT, POLLS_EVENT, MATCH_MVP_EVENT, MATCH_REPORTS_EVENT]
       events.forEach((eventName) => window.addEventListener(eventName, notify))
       notify()
       return () => events.forEach((eventName) => window.removeEventListener(eventName, notify))
@@ -1341,25 +1351,22 @@ function localRepository(): PadelRepository {
       }
       localStorage.setItem(LOCAL_ACTIVITY_KEY, JSON.stringify(store))
     },
-    async dismissMatchRatingPrompt(prompt) {
-      const store = readLocalMatchRatingStore()
+    async dismissMatchMvpPrompt(prompt) {
+      const store = readLocalMatchMvpStore()
       const existing = store.responses.find((response) => response.id === prompt.id)
       if (existing) return existing
-      const response = makeRatingResponse(prompt, 'dismissed')
-      writeLocalMatchRatingStore({ ...store, responses: [...store.responses, response] })
+      const response = makeMvpResponse(prompt, 'dismissed')
+      writeLocalMatchMvpStore({ responses: [...store.responses, response] })
       return response
     },
-    async submitMatchRatings(prompt, reviewer, submissions) {
-      const store = readLocalMatchRatingStore()
+    async submitMatchMvp(prompt, voter, selectedPlayerId) {
+      const store = readLocalMatchMvpStore()
       if (store.responses.some((response) => response.id === prompt.id)) {
         throw new Error('Questa scheda è già stata chiusa.')
       }
-      const records = makeRatingRecords(prompt, reviewer, submissions)
-      const response = makeRatingResponse(prompt, 'submitted', records[0].createdAt)
-      writeLocalMatchRatingStore({
-        responses: [...store.responses, response],
-        ratings: [...store.ratings, ...records],
-      })
+      if (prompt.voterId !== voter.id) throw new Error('Questa scelta MVP appartiene a un altro giocatore.')
+      const response = makeMvpResponse(prompt, 'submitted', selectedPlayerId)
+      writeLocalMatchMvpStore({ responses: [...store.responses, response] })
       return response
     },
     async saveMatchReport(match, editor, sets) {

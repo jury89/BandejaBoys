@@ -9,7 +9,6 @@ import {
   Clock3,
   ImagePlus,
   LockKeyhole,
-  Star,
   Trash2,
   Trophy,
   UserRound,
@@ -70,10 +69,10 @@ const NOTIFICATION_OPTIONS: {
     icon: Clock3,
   },
   {
-    key: 'matchRating',
-    title: 'Pagelle',
-    description: 'Quando è il momento di votare i compagni.',
-    icon: Star,
+    key: 'matchMvp',
+    title: 'MVP del match',
+    description: 'Quando è il momento di scegliere il migliore in campo.',
+    icon: Trophy,
   },
   {
     key: 'fantasy',

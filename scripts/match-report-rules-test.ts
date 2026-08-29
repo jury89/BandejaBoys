@@ -206,31 +206,25 @@ const forbiddenUpdate = {
   ...validUpdate,
   pollTitle: 'Titolo alterato',
 }
-const ratingId = `${reportId}__${userId}__qa-a`
-const rating = {
-  id: ratingId,
-  responseId: `${reportId}__${userId}`,
+const mvpResponseId = `${reportId}__${userId}`
+const mvpResponse = {
+  id: mvpResponseId,
   pollId,
-  pollTitle: oneSet.pollTitle,
   slotId,
-  sessionStartsAt: oneSet.sessionStartsAt,
-  sessionEndedAt: createdAt,
-  reviewerId: userId,
-  reviewerName: 'Codex QA',
-  revieweeId: 'qa-a',
-  revieweeName: 'Player A',
-  score: 8,
-  createdAt,
+  voterId: userId,
+  status: 'submitted',
+  selectedPlayerId: 'qa-a',
+  selectedPlayerName: 'Player A',
+  closedAt: createdAt,
 }
 const summaryId = `${reportId}__qa-a`
 const summary = {
   id: summaryId,
   pollId,
   slotId,
-  revieweeId: 'qa-a',
-  scoreTotal: 17,
-  ratingCount: 2,
-  lastRatingId: ratingId,
+  playerId: 'qa-a',
+  voteCount: 2,
+  lastResponseId: mvpResponseId,
   updatedAt: createdAt,
 }
 const fantasyRoundPath = `/databases/(default)/documents/fantasyRounds/${reportId}`
@@ -293,38 +287,38 @@ const tests: TestDefinition[] = [
     testCase: readCase(path, oneSet, 'DENY'),
   },
   {
-    label: 'media aggregata leggibile da un membro',
+    label: 'risultato MVP aggregato leggibile da un membro',
     testCase: readCase(
-      `/databases/(default)/documents/matchRatingSummaries/${summaryId}`,
+      `/databases/(default)/documents/matchMvpSummaries/${summaryId}`,
       summary,
       'ALLOW',
       outsiderId,
     ),
   },
   {
-    label: 'media aggregata non leggibile senza autenticazione',
+    label: 'risultato MVP aggregato non leggibile senza autenticazione',
     testCase: readCase(
-      `/databases/(default)/documents/matchRatingSummaries/${summaryId}`,
+      `/databases/(default)/documents/matchMvpSummaries/${summaryId}`,
       summary,
       'DENY',
     ),
   },
   {
-    label: 'voto individuale non leggibile da un membro estraneo',
+    label: 'scelta MVP individuale non leggibile da un membro estraneo',
     testCase: readCase(
-      `/databases/(default)/documents/matchRatings/${ratingId}`,
-      rating,
+      `/databases/(default)/documents/matchMvpResponses/${mvpResponseId}`,
+      mvpResponse,
       'DENY',
       outsiderId,
     ),
   },
   {
-    label: 'voto individuale leggibile dal destinatario',
+    label: 'scelta MVP individuale leggibile dal votante',
     testCase: readCase(
-      `/databases/(default)/documents/matchRatings/${ratingId}`,
-      rating,
+      `/databases/(default)/documents/matchMvpResponses/${mvpResponseId}`,
+      mvpResponse,
       'ALLOW',
-      'qa-a',
+      userId,
     ),
   },
   {
@@ -439,5 +433,5 @@ if (failures.length > 0) {
 }
 
 console.log(
-  `PASS: ${tests.length} casi semantici superati per referti, aggregati e voti privati.`,
+  `PASS: ${tests.length} casi semantici superati per referti, aggregati MVP e scelte private.`,
 )

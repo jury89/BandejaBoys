@@ -19,7 +19,7 @@ const matches: PlayerMatchLists = {
   past: [{
     pollId: 'poll-past',
     pollTitle: 'Padel della settimana scorsa',
-    receivedRating: { average: 8.5, count: 2 },
+    receivedMvp: { votes: 2, isWinner: true },
     report: {
       id: 'poll-past__past',
       pollId: 'poll-past',
@@ -115,8 +115,8 @@ describe('pagina dei match personali', () => {
     expect(screen.getByRole('heading', { name: 'Partite giocate' })).toBeInTheDocument()
     expect(screen.getByText('Padel della settimana scorsa')).toBeInTheDocument()
     expect(screen.getByText('Giocata')).toBeInTheDocument()
-    expect(screen.getByLabelText('Media di 2 voti ricevuti: 8,5 su 10')).toBeInTheDocument()
-    expect(screen.getByText('8,5')).toBeInTheDocument()
+    expect(screen.getByLabelText('MVP della partita con 2 preferenze')).toBeInTheDocument()
+    expect(screen.getByText('MVP')).toBeInTheDocument()
     expect(screen.getByText('3 set registrati')).toBeInTheDocument()
     const firstFormation = screen.getByRole('table', {
       name: 'Formazione 1: Ale + Baru contro Luca + Teo',

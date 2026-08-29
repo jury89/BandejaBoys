@@ -1,17 +1,17 @@
 import type {
   FantasyEntry,
   FantasyRound,
-  MatchRatingResponse,
+  MatchMvpResponse,
   NotificationPreferences,
   PadelPoll,
   PadelSlot,
 } from '../types'
 import {
   DEFAULT_VENUE,
-  MATCH_RATING_DELAY_MS,
+  MATCH_MVP_DELAY_MS,
   MAX_STARTERS,
-  getMatchRatingDueAt,
-  getMatchRatingResponseId,
+  getMatchMvpDueAt,
+  getMatchMvpResponseId,
   getStarters,
   isGuestSignup,
   fantasyEntryIsCurrent,
@@ -34,11 +34,11 @@ export const SLOT_READY_NOTIFICATION_WINDOW_MS = DAY_MS
 export const STARTER_SUBSTITUTION_NOTIFICATION_WINDOW_MS = DAY_MS
 export const BOOKING_REMINDER_LEAD_MS = 7 * DAY_MS
 export const BOOKING_REMINDER_WINDOW_MS = DAY_MS
-export const MATCH_RATING_NOTIFICATION_WINDOW_MS = 30 * 60 * 1000
+export const MATCH_MVP_NOTIFICATION_WINDOW_MS = 30 * 60 * 1000
 export const MONDAY_MOTIVATION_WINDOW_MS = HOUR_MS
 
-export type NotificationKind = 'new-slots' | 'slot-ready' | 'starter-substitution' | 'booking-reminder-7d' | 'reminder-24h' | 'reminder-2h' | 'match-rating' | 'monday-motivation' | 'fantasy-open' | 'fantasy-roster-changed' | 'fantasy-result' | 'test'
-export type TestNotificationMode = 'standard' | 'match-rating'
+export type NotificationKind = 'new-slots' | 'slot-ready' | 'starter-substitution' | 'booking-reminder-7d' | 'reminder-24h' | 'reminder-2h' | 'match-rating' | 'match-mvp' | 'monday-motivation' | 'fantasy-open' | 'fantasy-roster-changed' | 'fantasy-result' | 'test'
+export type TestNotificationMode = 'standard' | 'match-mvp'
 
 const NOTIFICATION_PREFERENCE_BY_KIND = {
   'new-slots': 'newSlots',
@@ -47,7 +47,8 @@ const NOTIFICATION_PREFERENCE_BY_KIND = {
   'booking-reminder-7d': 'bookingReminder7d',
   'reminder-24h': 'reminder24h',
   'reminder-2h': 'reminder2h',
-  'match-rating': 'matchRating',
+  'match-rating': 'matchMvp',
+  'match-mvp': 'matchMvp',
   'monday-motivation': 'mondayMotivation',
   'fantasy-open': 'fantasy',
   'fantasy-roster-changed': 'fantasy',
@@ -275,20 +276,20 @@ export function createTestNotification(
   if (customBody && customBody.length > 240) throw new Error('Il messaggio di test supera i 240 caratteri.')
   if (customTitle && customTitle.length > 80) throw new Error('Il titolo del test supera gli 80 caratteri.')
 
-  const isMatchRatingTest = mode === 'match-rating'
-  const defaultUrl = isMatchRatingTest ? '/?ratingTest=1' : '/'
+  const isMatchMvpTest = mode === 'match-mvp'
+  const defaultUrl = isMatchMvpTest ? '/?mvpTest=1' : '/'
 
   return {
     id: `test:${identifier}`,
     kind: 'test',
-    title: isMatchRatingTest
-      ? 'TEST · È ora di dare i voti'
+    title: isMatchMvpTest
+      ? 'TEST · Scegli l’MVP'
       : customTitle || (customBody ? 'Bandeja Boys' : 'Test notifiche Bandeja Boys'),
-    body: customBody || (isMatchRatingTest
-      ? 'Tocca per aprire la pagella di collaudo. Nessun voto verrà salvato.'
+    body: customBody || (isMatchMvpTest
+      ? 'Tocca per aprire la scelta MVP di collaudo. Nessuna preferenza verrà salvata.'
       : 'Se leggi questo messaggio, le notifiche funzionano correttamente.'),
     url: addPushRefreshParameter(customUrl || defaultUrl, identifier),
-    tag: `${isMatchRatingTest ? 'test-rating' : 'test'}-${identifier}`,
+    tag: `${isMatchMvpTest ? 'test-mvp' : 'test'}-${identifier}`,
     ttlSeconds: 10 * 60,
     recipientUserIds: [recipient],
     excludedUserIds: [],
@@ -381,11 +382,11 @@ export function collectFantasyNotifications(
 export function collectScheduledNotifications(
   polls: PadelPoll[],
   now = Date.now(),
-  ratingResponses: MatchRatingResponse[] = [],
+  mvpResponses: MatchMvpResponse[] = [],
   mondayMotivation?: MondayMotivationSchedule,
 ): ScheduledNotification[] {
   const notifications = collectMondayMotivationNotifications(now, mondayMotivation)
-  const closedRatingPromptIds = new Set(ratingResponses.map((response) => response.id))
+  const closedMvpPromptIds = new Set(mvpResponses.map((response) => response.id))
 
   for (const poll of polls) {
     notifications.push(...collectNewSlotNotifications(poll, now))
@@ -483,29 +484,29 @@ export function collectScheduledNotifications(
       }
 
       if (!slot.bookedAt) continue
-      const pendingRatingRecipientUserIds = recipientUserIds.filter((userId) => !closedRatingPromptIds.has(
-        getMatchRatingResponseId(poll.id, slot.id, userId),
+      const pendingMvpRecipientUserIds = recipientUserIds.filter((userId) => !closedMvpPromptIds.has(
+        getMatchMvpResponseId(poll.id, slot.id, userId),
       ))
-      const ratingDueAt = getMatchRatingDueAt(slot)
+      const mvpDueAt = getMatchMvpDueAt(slot)
 
       if (
         starters.length === MAX_STARTERS
         && registeredStarters.length >= 2
-        && pendingRatingRecipientUserIds.length > 0
-        && now >= ratingDueAt
-        && now < ratingDueAt + MATCH_RATING_NOTIFICATION_WINDOW_MS
+        && pendingMvpRecipientUserIds.length > 0
+        && now >= mvpDueAt
+        && now < mvpDueAt + MATCH_MVP_NOTIFICATION_WINDOW_MS
       ) {
         notifications.push({
-          id: `match-rating:${poll.id}:${slot.id}:${slot.startsAt}`,
-          kind: 'match-rating',
-          title: 'È ora di dare i voti',
+          id: `match-mvp:${poll.id}:${slot.id}:${slot.startsAt}`,
+          kind: 'match-mvp',
+          title: 'Chi è stato l’MVP?',
           body: starters.some(isGuestSignup)
-            ? 'Com’è andata in campo? Valuta la prestazione dei compagni registrati.'
-            : 'Com’è andata in campo? Valuta la prestazione dei tuoi tre compagni.',
-          url: `/?ratePoll=${encodeURIComponent(poll.id)}&rateSlot=${encodeURIComponent(slot.id)}`,
-          tag: `match-rating-${poll.id}-${slot.id}`,
-          ttlSeconds: Math.floor((MATCH_RATING_NOTIFICATION_WINDOW_MS + MATCH_RATING_DELAY_MS) / 1000),
-          recipientUserIds: pendingRatingRecipientUserIds,
+            ? 'Scegli il migliore in campo tra i compagni registrati.'
+            : 'Scegli il migliore in campo tra i tuoi tre compagni.',
+          url: `/?mvpPoll=${encodeURIComponent(poll.id)}&mvpSlot=${encodeURIComponent(slot.id)}`,
+          tag: `match-mvp-${poll.id}-${slot.id}`,
+          ttlSeconds: Math.floor((MATCH_MVP_NOTIFICATION_WINDOW_MS + MATCH_MVP_DELAY_MS) / 1000),
+          recipientUserIds: pendingMvpRecipientUserIds,
           excludedUserIds: [],
         })
       }

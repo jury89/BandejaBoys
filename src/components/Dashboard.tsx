@@ -5,10 +5,8 @@ import type {
   FantasyEntry,
   FantasyRound,
   FantasySelectionInput,
-  MatchRatingRecord,
-  MatchRatingResponse,
-  MatchRatingSummary,
-  MatchRatingSubmission,
+  MatchMvpResponse,
+  MatchMvpSummary,
   MatchReport,
   MatchSetInput,
   MemberProfile,
@@ -16,9 +14,9 @@ import type {
   PlayerMatch,
 } from '../types'
 import {
-  getNextMatchRatingPromptAt,
+  getNextMatchMvpPromptAt,
   getOtherPlayedMatches,
-  getPendingMatchRatingPrompts,
+  getPendingMatchMvpPrompts,
   getPlayerMatches,
   getSlotEndsAt,
   getSlotPhase,
@@ -44,14 +42,14 @@ import {
   matchReportTargetFromSearch,
 } from '../lib/notificationUrl'
 import { notificationStateLabel, usePushNotifications } from '../lib/notifications'
-import { RATING_TEST_QUERY_PARAM, isRatingTestRequested, makeRatingTestPrompt } from '../lib/ratingTest'
+import { MVP_TEST_QUERY_PARAM, isMvpTestRequested, makeMvpTestPrompt } from '../lib/mvpTest'
 import { repository } from '../lib/repository'
 import { slotElementId, type SlotNavigationTarget } from '../lib/slotNavigation'
 import { Brand } from './Brand'
 import { CreatePollModal } from './CreatePollModal'
 import { FantasyBandejaPage } from './FantasyBandejaPage'
 import { GroupMatchesPage } from './GroupMatchesPage'
-import { MatchRatingModal } from './MatchRatingModal'
+import { MatchMvpModal } from './MatchMvpModal'
 import { MatchReportModal } from './MatchReportModal'
 import { MyMatchesPage } from './MyMatchesPage'
 import { NotificationCallup } from './NotificationCallup'
@@ -120,15 +118,13 @@ export function Dashboard() {
   const [notificationPanelOpen, setNotificationPanelOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
   const [now, setNow] = useState(() => Date.now())
-  const [ratingResponses, setRatingResponses] = useState<MatchRatingResponse[]>([])
-  const [ratingResponsesLoaded, setRatingResponsesLoaded] = useState(false)
-  const [receivedRatings, setReceivedRatings] = useState<MatchRatingRecord[]>([])
-  const [receivedRatingsLoaded, setReceivedRatingsLoaded] = useState(false)
+  const [mvpResponses, setMvpResponses] = useState<MatchMvpResponse[]>([])
+  const [mvpResponsesLoaded, setMvpResponsesLoaded] = useState(false)
+  const [mvpSummaries, setMvpSummaries] = useState<MatchMvpSummary[]>([])
+  const [mvpSummariesLoaded, setMvpSummariesLoaded] = useState(false)
   const [matchReports, setMatchReports] = useState<MatchReport[]>([])
   const [matchReportsLoaded, setMatchReportsLoaded] = useState(false)
-  const [groupRatingSummaries, setGroupRatingSummaries] = useState<MatchRatingSummary[]>([])
   const [groupMatchReports, setGroupMatchReports] = useState<MatchReport[]>([])
-  const [groupRatingSummariesLoaded, setGroupRatingSummariesLoaded] = useState(false)
   const [groupMatchReportsLoaded, setGroupMatchReportsLoaded] = useState(false)
   const [groupMatchesError, setGroupMatchesError] = useState<string | null>(null)
   const [fantasyRounds, setFantasyRounds] = useState<FantasyRound[]>([])
@@ -141,16 +137,16 @@ export function Dashboard() {
   const [notificationHistory, setNotificationHistory] = useState<NotificationHistoryItem[]>([])
   const [notificationHistoryLoaded, setNotificationHistoryLoaded] = useState(!hasRemoteBackend)
   const [notificationHistoryError, setNotificationHistoryError] = useState<string | null>(null)
-  const [ratingTestOpen, setRatingTestOpen] = useState(() => isRatingTestRequested(window.location.search))
-  const [ratingTestStartedAt] = useState(() => Date.now())
+  const [mvpTestOpen, setMvpTestOpen] = useState(() => isMvpTestRequested(window.location.search))
+  const [mvpTestStartedAt] = useState(() => Date.now())
   const [slotNavigationTarget, setSlotNavigationTarget] = useState<SlotNavigationTarget | null>(null)
   const accountMenuRef = useRef<HTMLDivElement>(null)
   const hasLoadedPollsRef = useRef(false)
   const initialDataRetryCountRef = useRef(0)
-  const [requestedRating] = useState(() => {
+  const [requestedMvp] = useState(() => {
     const parameters = new URLSearchParams(window.location.search)
-    const pollId = parameters.get('ratePoll')
-    const slotId = parameters.get('rateSlot')
+    const pollId = parameters.get('mvpPoll') ?? parameters.get('ratePoll')
+    const slotId = parameters.get('mvpSlot') ?? parameters.get('rateSlot')
     return pollId && slotId ? { pollId, slotId } : null
   })
   const [requestedMatchReport] = useState(
@@ -162,7 +158,7 @@ export function Dashboard() {
   )
   const markingNotificationDeliveryIdsRef = useRef(new Set<string>())
   const notifications = usePushNotifications(user)
-  const ratingReviewerId = user?.id
+  const mvpVoterId = user?.id
   const notificationHistoryUserId = user?.id
   const markNotificationDeliveriesRead = useCallback((
     deliveryIds: string[],
@@ -261,15 +257,15 @@ export function Dashboard() {
   }, [retryDashboardData])
 
   useEffect(() => {
-    if (!ratingReviewerId) return
-    return repository.subscribeMatchRatingResponses(ratingReviewerId, (responses) => {
-      setRatingResponses(responses)
-      setRatingResponsesLoaded(true)
+    if (!mvpVoterId) return
+    return repository.subscribeMatchMvpResponses(mvpVoterId, (responses) => {
+      setMvpResponses(responses)
+      setMvpResponsesLoaded(true)
     }, (error) => {
       setToast({ message: error.message, tone: 'error' })
-      setRatingResponsesLoaded(true)
+      setMvpResponsesLoaded(true)
     })
-  }, [ratingReviewerId])
+  }, [mvpVoterId])
 
   useEffect(() => {
     if (!hasRemoteBackend || !notificationHistoryUserId) return
@@ -320,47 +316,37 @@ export function Dashboard() {
   ])
 
   useEffect(() => {
-    if (!ratingReviewerId) return
-    return repository.subscribeReceivedMatchRatings(ratingReviewerId, (ratings) => {
-      setReceivedRatings(ratings)
-      setReceivedRatingsLoaded(true)
+    if (!mvpVoterId) return
+    return repository.subscribeMatchMvpSummaries((summaries) => {
+      setMvpSummaries(summaries)
+      setMvpSummariesLoaded(true)
     }, (error) => {
       setToast({ message: error.message, tone: 'error' })
-      setReceivedRatingsLoaded(true)
+      setMvpSummariesLoaded(true)
     })
-  }, [ratingReviewerId])
+  }, [mvpVoterId])
 
   useEffect(() => {
-    if (!ratingReviewerId) return
-    return repository.subscribeMatchReports(ratingReviewerId, (reports) => {
+    if (!mvpVoterId) return
+    return repository.subscribeMatchReports(mvpVoterId, (reports) => {
       setMatchReports(reports)
       setMatchReportsLoaded(true)
     }, (error) => {
       setToast({ message: error.message, tone: 'error' })
       setMatchReportsLoaded(true)
     })
-  }, [ratingReviewerId])
+  }, [mvpVoterId])
 
   useEffect(() => {
     if (dashboardView !== 'group-matches') return
 
-    let ratingSummariesFailed = false
     let matchReportsFailed = false
     const clearGroupDataError = () => {
-      if (!ratingSummariesFailed && !matchReportsFailed) setGroupMatchesError(null)
+      if (!matchReportsFailed) setGroupMatchesError(null)
     }
     const showGroupDataError = () => {
-      setGroupMatchesError('Non siamo riusciti a recuperare tutti i voti e i risultati del gruppo.')
+      setGroupMatchesError('Non siamo riusciti a recuperare tutti i risultati del gruppo.')
     }
-    const stopRatingSummaries = repository.subscribeMatchRatingSummaries((summaries) => {
-      setGroupRatingSummaries(summaries)
-      setGroupRatingSummariesLoaded(true)
-      clearGroupDataError()
-    }, () => {
-      ratingSummariesFailed = true
-      showGroupDataError()
-      setGroupRatingSummariesLoaded(true)
-    })
     const stopMatchReports = repository.subscribeAllMatchReports((reports) => {
       setGroupMatchReports(reports)
       setGroupMatchReportsLoaded(true)
@@ -372,7 +358,6 @@ export function Dashboard() {
     })
 
     return () => {
-      stopRatingSummaries()
       stopMatchReports()
     }
   }, [dashboardView])
@@ -501,14 +486,14 @@ export function Dashboard() {
       .map(getSlotEndsAt)
       .filter((endsAt) => Number.isFinite(endsAt) && endsAt > now)
       .sort((left, right) => left - right)[0]
-    const nextRatingPrompt = user
-      ? getNextMatchRatingPromptAt(polls, ratingResponses, user.id, now)
+    const nextMvpPrompt = user
+      ? getNextMatchMvpPromptAt(polls, mvpResponses, user.id, now)
       : null
     const nextFantasyBoundary = fantasyRounds
       .flatMap((round) => [round.locksAt, round.settlesAt])
       .filter((timestamp) => Number.isFinite(timestamp) && timestamp > now)
       .sort((left, right) => left - right)[0]
-    const nextWakeAt = [nextSlotEnd, nextRatingPrompt, nextFantasyBoundary]
+    const nextWakeAt = [nextSlotEnd, nextMvpPrompt, nextFantasyBoundary]
       .filter((timestamp): timestamp is number => typeof timestamp === 'number')
       .sort((left, right) => left - right)[0]
     if (!nextWakeAt) return
@@ -516,7 +501,7 @@ export function Dashboard() {
     const delay = Math.min(Math.max(nextWakeAt - Date.now() + 50, 0), 2_147_483_647)
     const timer = window.setTimeout(() => setNow(Date.now()), delay)
     return () => window.clearTimeout(timer)
-  }, [fantasyRounds, now, polls, ratingResponses, user])
+  }, [fantasyRounds, mvpResponses, now, polls, user])
 
   const upcomingSlotWeeks = useMemo(() => getUpcomingSlotWeeks(polls, now), [now, polls])
   const matchNameMembers = useMemo(
@@ -528,7 +513,7 @@ export function Dashboard() {
   const playerMatches = useMemo(
     () => {
       if (!user) return { upcoming: [], past: [] }
-      const matches = getPlayerMatches(polls, user.id, now, receivedRatings, matchReports)
+      const matches = getPlayerMatches(polls, user.id, now, mvpSummaries, matchReports)
       return {
         upcoming: matches.upcoming
           .map((match) => resolvePlayerMatchNames(matchNameMembers, match)),
@@ -536,7 +521,7 @@ export function Dashboard() {
           .map((match) => resolvePlayerMatchNames(matchNameMembers, match)),
       }
     },
-    [matchNameMembers, matchReports, now, polls, receivedRatings, user],
+    [matchNameMembers, matchReports, mvpSummaries, now, polls, user],
   )
 
   useEffect(() => {
@@ -544,7 +529,7 @@ export function Dashboard() {
       !requestedMatchReport
       || requestedMatchReportHandledRef.current
       || loading
-      || !receivedRatingsLoaded
+      || !mvpSummariesLoaded
       || !matchReportsLoaded
     ) return
 
@@ -569,7 +554,7 @@ export function Dashboard() {
     loading,
     matchReportsLoaded,
     playerMatches,
-    receivedRatingsLoaded,
+    mvpSummariesLoaded,
     requestedMatchReport,
   ])
   const groupMatches = useMemo(
@@ -579,57 +564,60 @@ export function Dashboard() {
         polls,
         user.id,
         now,
-        groupRatingSummaries,
+        mvpSummaries,
         groupMatchReports,
       ).map((match) => resolvePlayerMatchNames(matchNameMembers, match))
     },
-    [groupMatchReports, groupRatingSummaries, matchNameMembers, now, polls, user],
+    [groupMatchReports, matchNameMembers, mvpSummaries, now, polls, user],
   )
   const unreadNotifications = useMemo(
     () => unreadNotificationCount(notificationHistory),
     [notificationHistory],
   )
-  const ratingPrompts = useMemo(() => (
-    user && ratingResponsesLoaded
-      ? getPendingMatchRatingPrompts(polls, ratingResponses, user.id, now)
+  const mvpPrompts = useMemo(() => (
+    user && mvpResponsesLoaded
+      ? getPendingMatchMvpPrompts(polls, mvpResponses, user.id, now)
         .map((prompt) => ({
           ...prompt,
-          teammates: prompt.teammates.map((teammate) => ({
-            ...teammate,
-            displayName: resolveMemberName(members, teammate.userId, teammate.displayName),
+          candidates: prompt.candidates.map((candidate) => ({
+            ...candidate,
+            displayName: resolveMemberName(members, candidate.userId, candidate.displayName),
           })),
         }))
       : []
-  ), [members, now, polls, ratingResponses, ratingResponsesLoaded, user])
-  const activeRatingPrompt = useMemo(() => {
-    if (requestedRating) {
-      const requested = ratingPrompts.find((prompt) => (
-        prompt.pollId === requestedRating.pollId && prompt.slotId === requestedRating.slotId
+  ), [members, mvpResponses, mvpResponsesLoaded, now, polls, user])
+  const activeMvpPrompt = useMemo(() => {
+    if (requestedMvp) {
+      const requested = mvpPrompts.find((prompt) => (
+        prompt.pollId === requestedMvp.pollId && prompt.slotId === requestedMvp.slotId
       ))
       if (requested) return requested
     }
-    return ratingPrompts[0] ?? null
-  }, [ratingPrompts, requestedRating])
-  const ratingTestPrompt = useMemo(() => (
-    ratingTestOpen && user
-      ? makeRatingTestPrompt(user, members, ratingTestStartedAt)
+    return mvpPrompts[0] ?? null
+  }, [mvpPrompts, requestedMvp])
+  const mvpTestPrompt = useMemo(() => (
+    mvpTestOpen && user
+      ? makeMvpTestPrompt(user, members, mvpTestStartedAt)
       : null
-  ), [members, ratingTestOpen, ratingTestStartedAt, user])
+  ), [members, mvpTestOpen, mvpTestStartedAt, user])
 
   useEffect(() => {
-    if (!requestedRating || !ratingResponsesLoaded || loading) return
+    if (!requestedMvp || !mvpResponsesLoaded || loading) return
     const url = new URL(window.location.href)
+    url.searchParams.delete('mvpPoll')
+    url.searchParams.delete('mvpSlot')
     url.searchParams.delete('ratePoll')
     url.searchParams.delete('rateSlot')
     window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`)
-  }, [loading, ratingResponsesLoaded, requestedRating])
+  }, [loading, mvpResponsesLoaded, requestedMvp])
 
   useEffect(() => {
-    if (!ratingTestOpen) return
+    if (!mvpTestOpen) return
     const url = new URL(window.location.href)
-    url.searchParams.delete(RATING_TEST_QUERY_PARAM)
+    url.searchParams.delete(MVP_TEST_QUERY_PARAM)
+    url.searchParams.delete('ratingTest')
     window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`)
-  }, [ratingTestOpen])
+  }, [mvpTestOpen])
 
   const stats = useMemo(() => {
     const openWeeks = upcomingSlotWeeks.filter((group) => (
@@ -691,7 +679,6 @@ export function Dashboard() {
   }
   const openGroupMatches = () => {
     setAccountOpen(false)
-    setGroupRatingSummariesLoaded(false)
     setGroupMatchReportsLoaded(false)
     setGroupMatchesError(null)
     setDashboardView('group-matches')
@@ -775,22 +762,22 @@ export function Dashboard() {
   const updatePoll = (updatedPoll: PadelPoll) => {
     setPolls((current) => current.map((poll) => poll.id === updatedPoll.id ? updatedPoll : poll))
   }
-  const rememberRatingResponse = (response: MatchRatingResponse) => {
-    setRatingResponses((current) => [
+  const rememberMvpResponse = (response: MatchMvpResponse) => {
+    setMvpResponses((current) => [
       ...current.filter((item) => item.id !== response.id),
       response,
     ])
   }
-  const dismissRatingPrompt = async () => {
-    if (!activeRatingPrompt) return
-    const response = await repository.dismissMatchRatingPrompt(activeRatingPrompt)
-    rememberRatingResponse(response)
+  const dismissMvpPrompt = async () => {
+    if (!activeMvpPrompt) return
+    const response = await repository.dismissMatchMvpPrompt(activeMvpPrompt)
+    rememberMvpResponse(response)
   }
-  const submitRatings = async (submissions: MatchRatingSubmission[]) => {
-    if (!activeRatingPrompt) return
-    const response = await repository.submitMatchRatings(activeRatingPrompt, user, submissions)
-    rememberRatingResponse(response)
-    notify('Voti salvati nello storico della partita.')
+  const submitMvp = async (selectedPlayerId: string) => {
+    if (!activeMvpPrompt) return
+    const response = await repository.submitMatchMvp(activeMvpPrompt, user, selectedPlayerId)
+    rememberMvpResponse(response)
+    notify('Scelta MVP salvata nello storico della partita.')
   }
   const saveMatchReport = async (sets: MatchSetInput[]) => {
     if (!reportMatch) return
@@ -810,12 +797,12 @@ export function Dashboard() {
     setFantasyOwnEntries((current) => ({ ...current, [roundId]: saved }))
     notify('Formazione FantaBandeja salvata e nascosta fino al via.')
   }
-  const dismissRatingTest = async () => {
-    setRatingTestOpen(false)
+  const dismissMvpTest = async () => {
+    setMvpTestOpen(false)
   }
-  const completeRatingTest = async () => {
-    setRatingTestOpen(false)
-    notify('Collaudo completato: nessun voto è stato salvato.')
+  const completeMvpTest = async () => {
+    setMvpTestOpen(false)
+    notify('Collaudo completato: nessuna scelta MVP è stata salvata.')
   }
 
   return (
@@ -948,7 +935,7 @@ export function Dashboard() {
       {dashboardView === 'matches' ? (
         <MyMatchesPage
           matches={playerMatches}
-          loading={loading || !receivedRatingsLoaded || !matchReportsLoaded}
+          loading={loading || !mvpSummariesLoaded || !matchReportsLoaded}
           onBack={closePlayerMatches}
           onSelectMatch={showPlayerMatchOnBoard}
           onEditReport={setReportMatch}
@@ -957,7 +944,7 @@ export function Dashboard() {
         <GroupMatchesPage
           matches={groupMatches}
           members={matchNameMembers}
-          loading={loading || !groupRatingSummariesLoaded || !groupMatchReportsLoaded}
+          loading={loading || !mvpSummariesLoaded || !groupMatchReportsLoaded}
           error={groupMatchesError}
           onBack={closeGroupMatches}
         />
@@ -1084,23 +1071,23 @@ export function Dashboard() {
           onClose={() => setReportMatch(null)}
           onSave={saveMatchReport}
         />
-      ) : ratingTestPrompt ? (
-        <MatchRatingModal
+      ) : mvpTestPrompt ? (
+        <MatchMvpModal
           testMode
-          key={ratingTestPrompt.id}
-          prompt={ratingTestPrompt}
-          onDismiss={dismissRatingTest}
-          onSubmit={completeRatingTest}
+          key={mvpTestPrompt.id}
+          prompt={mvpTestPrompt}
+          onDismiss={dismissMvpTest}
+          onSubmit={completeMvpTest}
         />
-      ) : activeRatingPrompt && (
-        <MatchRatingModal
-          key={activeRatingPrompt.id}
-          prompt={activeRatingPrompt}
-          onDismiss={dismissRatingPrompt}
-          onSubmit={submitRatings}
+      ) : activeMvpPrompt && (
+        <MatchMvpModal
+          key={activeMvpPrompt.id}
+          prompt={activeMvpPrompt}
+          onDismiss={dismissMvpPrompt}
+          onSubmit={submitMvp}
         />
       )}
-      {!reportMatch && !ratingTestPrompt && !activeRatingPrompt && (notifications.shouldPrompt || notificationPanelOpen) && (
+      {!reportMatch && !mvpTestPrompt && !activeMvpPrompt && (notifications.shouldPrompt || notificationPanelOpen) && (
         <NotificationCallup
           state={notifications.state}
           busy={notifications.busy}

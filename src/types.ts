@@ -8,7 +8,9 @@ export interface NotificationPreferences {
   bookingReminder7d: boolean
   reminder24h: boolean
   reminder2h: boolean
-  matchRating: boolean
+  matchMvp: boolean
+  /** Legacy preference retained only while older saved profiles are normalized. */
+  matchRating?: boolean
   fantasy: boolean
 }
 
@@ -101,9 +103,9 @@ export interface PlayerMatch {
   pollTitle: string
   slot: PadelSlot
   report?: MatchReport
-  receivedRating?: {
-    average: number
-    count: number
+  receivedMvp?: {
+    votes: number
+    isWinner: boolean
   }
 }
 
@@ -112,25 +114,24 @@ export interface PlayerMatchLists {
   past: PlayerMatch[]
 }
 
-export interface MatchRatingSummary {
+export interface MatchMvpSummary {
   id: string
   pollId: string
   slotId: string
-  revieweeId: string
-  scoreTotal: number
-  ratingCount: number
-  lastRatingId: string
+  playerId: string
+  voteCount: number
+  lastResponseId: string
   updatedAt: number
 }
 
-export interface GroupMatchPlayerRating {
+export interface GroupMatchPlayerMvp {
   userId: string
-  average?: number
-  count: number
+  votes: number
+  isWinner: boolean
 }
 
 export interface GroupMatch extends PlayerMatch {
-  playerRatings: GroupMatchPlayerRating[]
+  playerMvpVotes: GroupMatchPlayerMvp[]
 }
 
 export interface SlotInput {
@@ -144,14 +145,14 @@ export interface CreatePollInput {
 
 export type SlotPhase = 'collecting' | 'ready' | 'booked'
 
-export type MatchRatingResponseStatus = 'dismissed' | 'submitted'
+export type MatchMvpResponseStatus = 'dismissed' | 'submitted'
 
-export interface MatchRatingTeammate {
+export interface MatchMvpCandidate {
   userId: string
   displayName: string
 }
 
-export interface MatchRatingPrompt {
+export interface MatchMvpPrompt {
   id: string
   pollId: string
   pollTitle: string
@@ -159,37 +160,19 @@ export interface MatchRatingPrompt {
   sessionStartsAt: string
   sessionEndedAt: number
   dueAt: number
-  reviewerId: string
-  teammates: MatchRatingTeammate[]
+  voterId: string
+  candidates: MatchMvpCandidate[]
 }
 
-export interface MatchRatingResponse {
+export interface MatchMvpResponse {
   id: string
   pollId: string
   slotId: string
-  reviewerId: string
-  status: MatchRatingResponseStatus
+  voterId: string
+  status: MatchMvpResponseStatus
+  selectedPlayerId?: string
+  selectedPlayerName?: string
   closedAt: number
-}
-
-export interface MatchRatingSubmission extends MatchRatingTeammate {
-  score: number
-}
-
-export interface MatchRatingRecord {
-  id: string
-  responseId: string
-  pollId: string
-  pollTitle: string
-  slotId: string
-  sessionStartsAt: string
-  sessionEndedAt: number
-  reviewerId: string
-  reviewerName: string
-  revieweeId: string
-  revieweeName: string
-  score: number
-  createdAt: number
 }
 
 export interface MatchReportPlayer {
@@ -251,9 +234,12 @@ export interface FantasyRoundPlayer {
 }
 
 export interface FantasyPlayerScore extends FantasyRoundPlayer {
+  scoringModel?: 'ratings-v1' | 'mvp-v2'
   baseRating: number
   ratingCount: number
   usedDefaultRating: boolean
+  mvpVotes?: number
+  mvpBonus?: number
   setWins: number
   setLosses: number
   gameDifference: number

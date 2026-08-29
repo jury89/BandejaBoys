@@ -4,11 +4,11 @@ import {
   ClipboardList,
   Clock3,
   MapPin,
-  Star,
+  Trophy,
   UsersRound,
 } from 'lucide-react'
 import { DEFAULT_VENUE, getStarters, isGuestSignup } from '../lib/domain'
-import { formatRatingAverage, slotDateParts } from '../lib/format'
+import { slotDateParts } from '../lib/format'
 import type { GroupMatch, MemberProfile } from '../types'
 import { MatchReportScoreboard } from './MatchReportScoreboard'
 import { ProfileAvatar } from './ProfileAvatar'
@@ -21,8 +21,8 @@ interface GroupMatchesPageProps {
   onBack: () => void
 }
 
-function ratingCountLabel(count: number): string {
-  return count === 1 ? '1 voto' : `${count} voti`
+function mvpVoteCountLabel(count: number): string {
+  return count === 1 ? '1 preferenza' : `${count} preferenze`
 }
 
 function GroupMatchCard({
@@ -59,24 +59,21 @@ function GroupMatchCard({
       </div>
 
       <div className="group-match__content">
-        <section className="group-match__panel group-match__ratings" aria-label="Pagellino dei giocatori">
+        <section className="group-match__panel group-match__ratings" aria-label="Scelta MVP dei giocatori">
           <header className="group-match__panel-heading">
             <span aria-hidden="true"><UsersRound size={18} /></span>
             <div>
-              <small>Pagellino</small>
-              <strong>Media dei giocatori</strong>
+              <small>Voto del gruppo</small>
+              <strong>MVP della partita</strong>
             </div>
           </header>
           <div className="group-match__players">
             {starters.map((signup) => {
               const member = memberById.get(signup.userId)
-              const rating = match.playerRatings.find((item) => item.userId === signup.userId)
-              const averageLabel = rating?.average === undefined
-                ? null
-                : formatRatingAverage(rating.average)
-              const ratingLabel = averageLabel
-                ? `${signup.displayName}: media ${averageLabel} su 10 da ${ratingCountLabel(rating?.count ?? 0)}`
-                : `${signup.displayName}: nessun voto ricevuto`
+              const mvp = match.playerMvpVotes.find((item) => item.userId === signup.userId)
+              const mvpLabel = mvp?.isWinner
+                ? `${signup.displayName}: MVP con ${mvpVoteCountLabel(mvp.votes)}`
+                : `${signup.displayName}: ${mvpVoteCountLabel(mvp?.votes ?? 0)}`
 
               return (
                 <div className="group-match__player" key={signup.id}>
@@ -88,12 +85,11 @@ function GroupMatchCard({
                   />
                   <div className="group-match__player-copy">
                     <strong>{signup.displayName}</strong>
-                    <small>{averageLabel ? ratingCountLabel(rating?.count ?? 0) : isGuestSignup(signup) ? 'Ospite' : 'Non votato'}</small>
+                    <small>{isGuestSignup(signup) ? 'Ospite' : mvp?.isWinner ? 'MVP' : mvpVoteCountLabel(mvp?.votes ?? 0)}</small>
                   </div>
-                  <span className={`group-match__player-score ${averageLabel ? 'has-rating' : ''}`} aria-label={ratingLabel}>
-                    {averageLabel ? <Star size={13} fill="currentColor" aria-hidden="true" /> : null}
-                    <strong>{averageLabel ?? '—'}</strong>
-                    {averageLabel ? <small>/10</small> : null}
+                  <span className={`group-match__player-score ${mvp?.isWinner ? 'has-rating' : ''}`} aria-label={mvpLabel}>
+                    {mvp?.isWinner ? <Trophy size={13} aria-hidden="true" /> : null}
+                    <strong>{mvp?.votes ?? 0}</strong>
                   </span>
                 </div>
               )
@@ -141,7 +137,7 @@ export function GroupMatchesPage({
         <div>
           <p className="eyebrow">Lo spogliatoio Bandeja</p>
           <h1>Gli altri match</h1>
-          <p>Le partite giocate dal gruppo senza di te, con pagellini e risultati dei set.</p>
+          <p>Le partite giocate dal gruppo senza di te, con MVP e risultati dei set.</p>
         </div>
         <div className="personal-matches__score group-matches__score" aria-label={`${matches.length} partite giocate dagli altri`}>
           <span><strong>{matches.length}</strong>Partite</span>

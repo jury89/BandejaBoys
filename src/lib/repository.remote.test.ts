@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type {
   FantasyRound,
-  MatchRatingPrompt,
+  MatchMvpPrompt,
   PadelPoll,
   PlayerMatch,
   SessionUser,
@@ -52,7 +52,7 @@ vi.mock('firebase/firestore', async (importOriginal) => {
 
 import { repository } from './repository'
 
-const reviewer: SessionUser = {
+const voter: SessionUser = {
   id: 'jury',
   displayName: 'Jury',
   email: 'jury@example.test',
@@ -60,11 +60,11 @@ const reviewer: SessionUser = {
 }
 
 const admin: SessionUser = {
-  ...reviewer,
+  ...voter,
   id: SLOT_ADMIN_USER_ID,
 }
 
-const prompt: MatchRatingPrompt = {
+const prompt: MatchMvpPrompt = {
   id: 'poll-1__slot-1__jury',
   pollId: 'poll-1',
   pollTitle: 'Padel del lunedì',
@@ -72,8 +72,8 @@ const prompt: MatchRatingPrompt = {
   sessionStartsAt: '2026-07-27T18:30',
   sessionEndedAt: 100,
   dueAt: 200,
-  reviewerId: reviewer.id,
-  teammates: [
+  voterId: voter.id,
+  candidates: [
     { userId: 'ale', displayName: 'Ale' },
     { userId: 'luca', displayName: 'Luca' },
     { userId: 'teo', displayName: 'Teo' },
@@ -98,7 +98,7 @@ const playedMatch: PlayerMatch = {
   },
 }
 
-describe('repository remoto delle pagelle', () => {
+describe('repository remoto della scelta MVP', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     firestoreMocks.batch.commit.mockResolvedValue(undefined)
@@ -110,55 +110,52 @@ describe('repository remoto delle pagelle', () => {
   it('crea documenti di slot senza salvare una settimana', async () => {
     await repository.createPoll({
       slots: [{ startsAt: '2026-08-18T18:30', durationMinutes: 90 }],
-    }, reviewer)
+    }, voter)
 
     const pollWrite = firestoreMocks.batch.set.mock.calls.find(([reference]) => (
       reference === 'polls/generated'
     ))
     expect(pollWrite).toBeDefined()
     expect(pollWrite?.[1]).toEqual(expect.objectContaining({
-      createdBy: reviewer.id,
+      createdBy: voter.id,
       slots: [expect.objectContaining({ startsAt: '2026-08-18T16:30:00.000Z' })],
     }))
     expect(pollWrite?.[1]).not.toHaveProperty('targetWeekStart')
     expect(pollWrite?.[1]).not.toHaveProperty('title')
   })
 
-  it('salva risposta e voti in un batch atomico senza letture transazionali', async () => {
-    const response = await repository.submitMatchRatings(prompt, reviewer, [
-      { userId: 'ale', displayName: 'Ale', score: 8 },
-      { userId: 'luca', displayName: 'Luca', score: 7 },
-      { userId: 'teo', displayName: 'Teo', score: 9 },
-    ])
+  it('salva risposta e aggregato MVP in un batch atomico senza letture transazionali', async () => {
+    const response = await repository.submitMatchMvp(prompt, voter, 'ale')
 
     expect(firestoreMocks.runTransaction).not.toHaveBeenCalled()
     expect(firestoreMocks.writeBatch).toHaveBeenCalledOnce()
-    expect(firestoreMocks.batch.set).toHaveBeenCalledTimes(7)
+    expect(firestoreMocks.batch.set).toHaveBeenCalledTimes(2)
     expect(firestoreMocks.batch.set).toHaveBeenCalledWith(
-      'matchRatingSummaries/poll-1__slot-1__ale',
+      'matchMvpSummaries/poll-1__slot-1__ale',
       expect.objectContaining({
         id: 'poll-1__slot-1__ale',
         pollId: 'poll-1',
         slotId: 'slot-1',
-        revieweeId: 'ale',
-        lastRatingId: 'poll-1__slot-1__jury__ale',
+        playerId: 'ale',
+        lastResponseId: 'poll-1__slot-1__jury',
       }),
       { merge: true },
     )
     expect(firestoreMocks.batch.set).toHaveBeenLastCalledWith(
-      'matchRatingResponses/poll-1__slot-1__jury',
+      'matchMvpResponses/poll-1__slot-1__jury',
       response,
     )
     expect(firestoreMocks.batch.commit).toHaveBeenCalledOnce()
     expect(response).toMatchObject({
       id: prompt.id,
-      reviewerId: reviewer.id,
+      voterId: voter.id,
       status: 'submitted',
+      selectedPlayerId: 'ale',
     })
   })
 
   it('crea il referto della partita in una transazione modificabile dai partecipanti', async () => {
-    const report = await repository.saveMatchReport(playedMatch, reviewer, [
+    const report = await repository.saveMatchReport(playedMatch, voter, [
       { teamAUserIds: ['jury', 'ale'], scoreA: 6, scoreB: 4 },
       { teamAUserIds: ['jury', 'luca'], scoreA: 3, scoreB: 6 },
     ])
@@ -186,8 +183,8 @@ describe('repository remoto delle pagelle', () => {
       id: 'poll-1',
       title: 'Padel · 31 ago – 6 set 2026',
       targetWeekStart: '2026-08-31',
-      createdBy: reviewer.id,
-      createdByName: reviewer.displayName,
+      createdBy: voter.id,
+      createdByName: voter.displayName,
       createdAt: 1,
       updatedAt: 1,
       status: 'open',
@@ -205,7 +202,7 @@ describe('repository remoto delle pagelle', () => {
       data: () => poll,
     })
 
-    await repository.rescheduleSlot(poll.id, poll.slots[0].id, '2026-08-25T18:30', reviewer)
+    await repository.rescheduleSlot(poll.id, poll.slots[0].id, '2026-08-25T18:30', voter)
 
     expect(firestoreMocks.transaction.update).toHaveBeenCalledOnce()
     const update = firestoreMocks.transaction.update.mock.calls[0][1]
@@ -288,7 +285,7 @@ describe('repository remoto delle pagelle', () => {
         : { exists: () => false }
     ))
 
-    const saved = await repository.saveFantasyEntry(round.id, reviewer, {
+    const saved = await repository.saveFantasyEntry(round.id, voter, {
       playerIds: ['ale', 'baru'],
       captainId: 'baru',
     })
