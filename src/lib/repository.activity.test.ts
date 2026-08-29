@@ -1,8 +1,7 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type {
-  MatchRatingPrompt,
-  MatchRatingRecord,
-  MatchRatingSummary,
+  MatchMvpPrompt,
+  MatchMvpSummary,
   PadelPoll,
   SessionUser,
 } from '../types'
@@ -175,8 +174,8 @@ describe('repository activity log in demo mode', () => {
     expect(activity().views[0].lastViewedAt).toBeGreaterThanOrEqual(activity().views[0].firstViewedAt)
   })
 
-  it('salva le pagelle dei soli compagni registrati quando nello slot c’è un ospite', async () => {
-    const prompt: MatchRatingPrompt = {
+  it('salva la scelta MVP soltanto per un compagno registrato quando nello slot c’è un ospite', async () => {
+    const prompt: MatchMvpPrompt = {
       id: 'poll-guest__slot-guest__jury',
       pollId: 'poll-guest',
       pollTitle: 'Padel con ospite',
@@ -184,38 +183,25 @@ describe('repository activity log in demo mode', () => {
       sessionStartsAt: '2027-01-05T19:30',
       sessionEndedAt: 100,
       dueAt: 200,
-      reviewerId: user.id,
-      teammates: [
+      voterId: user.id,
+      candidates: [
         { userId: 'ale', displayName: 'Ale' },
         { userId: 'luca', displayName: 'Luca' },
       ],
     }
 
-    await repository.submitMatchRatings(prompt, user, [
-      { userId: 'ale', displayName: 'Ale', score: 8 },
-      { userId: 'luca', displayName: 'Luca', score: 9 },
-    ])
+    await repository.submitMatchMvp(prompt, user, 'ale')
 
-    let ratings: MatchRatingRecord[] = []
-    const unsubscribe = repository.subscribeReceivedMatchRatings('ale', (records) => {
-      ratings = records
-    }, vi.fn())
-    unsubscribe()
-
-    expect(ratings).toHaveLength(1)
-    expect(ratings[0]).toMatchObject({ revieweeId: 'ale', score: 8 })
-
-    let summaries: MatchRatingSummary[] = []
-    const unsubscribeSummaries = repository.subscribeMatchRatingSummaries((records) => {
+    let summaries: MatchMvpSummary[] = []
+    const unsubscribeSummaries = repository.subscribeMatchMvpSummaries((records) => {
       summaries = records
     }, vi.fn())
     unsubscribeSummaries()
 
     expect(summaries).toContainEqual(expect.objectContaining({
       id: 'poll-guest__slot-guest__ale',
-      revieweeId: 'ale',
-      scoreTotal: 8,
-      ratingCount: 1,
+      playerId: 'ale',
+      voteCount: 1,
     }))
   })
 })

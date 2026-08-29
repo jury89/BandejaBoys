@@ -11,10 +11,9 @@ import type {
   FantasySelectionInput,
   GroupMatch,
   MatchPairing,
-  MatchRatingPrompt,
-  MatchRatingRecord,
-  MatchRatingResponse,
-  MatchRatingSummary,
+  MatchMvpPrompt,
+  MatchMvpResponse,
+  MatchMvpSummary,
   MatchReport,
   MatchReportPlayer,
   MatchSetInput,
@@ -40,13 +39,14 @@ export const DEFAULT_VENUE = 'Oasi Boschetto'
 export const DEFAULT_VENUE_PHONE = '+390376290058'
 export const PROFILE_NAME_MAX_LENGTH = 40
 export const GUEST_NAME_MAX_LENGTH = 40
-export const MATCH_RATING_DELAY_MS = 0
+export const MATCH_MVP_DELAY_MS = 0
+export const MATCH_MVP_PROMPT_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000
 export const MAX_MATCH_SETS = 5
 export const MAX_MATCH_SET_SCORE = 99
 export const FANTASY_EARLY_SETTLEMENT_DELAY_MS = 24 * 60 * 60 * 1000
 export const FANTASY_SETTLEMENT_DELAY_MS = 48 * 60 * 60 * 1000
-export const FANTASY_DEFAULT_RATING = 6
-export const FANTASY_MIN_RATINGS = 2
+export const FANTASY_BASE_SCORE = 6
+export const FANTASY_MVP_BONUS = 1
 export const FANTASY_STARTER_LEAGUE_POINTS = 2
 export const FANTASY_MVP_LEAGUE_POINTS = 3
 export const FANTASY_MISSING_REPORT_VOID_REASON = 'Il referto non è stato inserito entro 48 ore.'
@@ -161,41 +161,40 @@ export function getStarters(slot: PadelSlot): Signup[] {
     .slice(0, MAX_STARTERS)
 }
 
-export function getMatchRatingResponseId(pollId: string, slotId: string, reviewerId: string): string {
-  return [pollId, slotId, reviewerId].join('__')
+export function getMatchMvpResponseId(pollId: string, slotId: string, voterId: string): string {
+  return [pollId, slotId, voterId].join('__')
 }
 
-export function getMatchRatingSummaryId(
+export function getMatchMvpSummaryId(
   pollId: string,
   slotId: string,
-  revieweeId: string,
+  playerId: string,
 ): string {
-  return [pollId, slotId, revieweeId].join('__')
+  return [pollId, slotId, playerId].join('__')
 }
 
-export function aggregateMatchRatingSummaries(
-  ratings: MatchRatingRecord[],
-): MatchRatingSummary[] {
-  const summaries = new Map<string, MatchRatingSummary>()
+export function aggregateMatchMvpSummaries(
+  responses: MatchMvpResponse[],
+): MatchMvpSummary[] {
+  const summaries = new Map<string, MatchMvpSummary>()
 
-  ratings.forEach((rating) => {
-    if (!Number.isInteger(rating.score) || rating.score < 1 || rating.score > 10) return
+  responses.forEach((response) => {
+    if (response.status !== 'submitted' || !response.selectedPlayerId) return
 
-    const id = getMatchRatingSummaryId(rating.pollId, rating.slotId, rating.revieweeId)
+    const id = getMatchMvpSummaryId(response.pollId, response.slotId, response.selectedPlayerId)
     const current = summaries.get(id)
     const isLatest = !current
-      || rating.createdAt > current.updatedAt
-      || (rating.createdAt === current.updatedAt && rating.id.localeCompare(current.lastRatingId) > 0)
+      || response.closedAt > current.updatedAt
+      || (response.closedAt === current.updatedAt && response.id.localeCompare(current.lastResponseId) > 0)
 
     summaries.set(id, {
       id,
-      pollId: rating.pollId,
-      slotId: rating.slotId,
-      revieweeId: rating.revieweeId,
-      scoreTotal: (current?.scoreTotal ?? 0) + rating.score,
-      ratingCount: (current?.ratingCount ?? 0) + 1,
-      lastRatingId: isLatest ? rating.id : current.lastRatingId,
-      updatedAt: isLatest ? rating.createdAt : current.updatedAt,
+      pollId: response.pollId,
+      slotId: response.slotId,
+      playerId: response.selectedPlayerId,
+      voteCount: (current?.voteCount ?? 0) + 1,
+      lastResponseId: isLatest ? response.id : current.lastResponseId,
+      updatedAt: isLatest ? response.closedAt : current.updatedAt,
     })
   })
 
@@ -208,70 +207,73 @@ export function getSlotEndsAt(slot: PadelSlot): number {
   return startsAt + slot.durationMinutes * 60 * 1000
 }
 
-export function getMatchRatingDueAt(slot: PadelSlot): number {
+export function getMatchMvpDueAt(slot: PadelSlot): number {
   const endsAt = getSlotEndsAt(slot)
   if (!Number.isFinite(endsAt)) return Number.NaN
-  return endsAt + MATCH_RATING_DELAY_MS
+  return endsAt + MATCH_MVP_DELAY_MS
 }
 
-function getRatingPromptForSlot(
+function getMvpPromptForSlot(
   poll: PadelPoll,
   slot: PadelSlot,
-  reviewerId: string,
-): MatchRatingPrompt | null {
+  voterId: string,
+): MatchMvpPrompt | null {
   if (!slot.bookedAt) return null
   const starters = getStarters(slot)
-  if (starters.length !== MAX_STARTERS || !starters.some((signup) => signup.userId === reviewerId)) {
+  if (starters.length !== MAX_STARTERS || !starters.some((signup) => signup.userId === voterId)) {
     return null
   }
 
-  const dueAt = getMatchRatingDueAt(slot)
+  const dueAt = getMatchMvpDueAt(slot)
   if (!Number.isFinite(dueAt)) return null
 
-  const teammates = starters
-    .filter((signup) => signup.userId !== reviewerId && !isGuestSignup(signup))
+  const candidates = starters
+    .filter((signup) => signup.userId !== voterId && !isGuestSignup(signup))
     .map((signup) => ({ userId: signup.userId, displayName: signup.displayName }))
-  if (teammates.length === 0) return null
+  if (candidates.length === 0) return null
 
   return {
-    id: getMatchRatingResponseId(poll.id, slot.id, reviewerId),
+    id: getMatchMvpResponseId(poll.id, slot.id, voterId),
     pollId: poll.id,
     pollTitle: slotWeekTitle(slot.startsAt),
     slotId: slot.id,
     sessionStartsAt: slot.startsAt,
-    sessionEndedAt: dueAt - MATCH_RATING_DELAY_MS,
+    sessionEndedAt: dueAt - MATCH_MVP_DELAY_MS,
     dueAt,
-    reviewerId,
-    teammates,
+    voterId,
+    candidates,
   }
 }
 
-export function getPendingMatchRatingPrompts(
+export function getPendingMatchMvpPrompts(
   polls: PadelPoll[],
-  responses: MatchRatingResponse[],
-  reviewerId: string,
+  responses: MatchMvpResponse[],
+  voterId: string,
   now = Date.now(),
-): MatchRatingPrompt[] {
+): MatchMvpPrompt[] {
   const closedPromptIds = new Set(responses.map((response) => response.id))
 
   return polls
-    .flatMap((poll) => poll.slots.map((slot) => getRatingPromptForSlot(poll, slot, reviewerId)))
-    .filter((prompt): prompt is MatchRatingPrompt => (
-      prompt !== null && prompt.dueAt <= now && !closedPromptIds.has(prompt.id)
+    .flatMap((poll) => poll.slots.map((slot) => getMvpPromptForSlot(poll, slot, voterId)))
+    .filter((prompt): prompt is MatchMvpPrompt => (
+      prompt !== null
+      && prompt.dueAt <= now
+      && now < prompt.dueAt + MATCH_MVP_PROMPT_EXPIRY_MS
+      && !closedPromptIds.has(prompt.id)
     ))
     .sort((left, right) => left.dueAt - right.dueAt || left.id.localeCompare(right.id))
 }
 
-export function getNextMatchRatingPromptAt(
+export function getNextMatchMvpPromptAt(
   polls: PadelPoll[],
-  responses: MatchRatingResponse[],
-  reviewerId: string,
+  responses: MatchMvpResponse[],
+  voterId: string,
   now = Date.now(),
 ): number | null {
   const closedPromptIds = new Set(responses.map((response) => response.id))
   const nextDueAt = polls
-    .flatMap((poll) => poll.slots.map((slot) => getRatingPromptForSlot(poll, slot, reviewerId)))
-    .filter((prompt): prompt is MatchRatingPrompt => (
+    .flatMap((poll) => poll.slots.map((slot) => getMvpPromptForSlot(poll, slot, voterId)))
+    .filter((prompt): prompt is MatchMvpPrompt => (
       prompt !== null && prompt.dueAt > now && !closedPromptIds.has(prompt.id)
     ))
     .map((prompt) => prompt.dueAt)
@@ -477,13 +479,18 @@ export function getPlayerMatches(
   polls: PadelPoll[],
   userId: string,
   now = Date.now(),
-  receivedRatings: MatchRatingRecord[] = [],
+  mvpSummaries: MatchMvpSummary[] = [],
   matchReports: MatchReport[] = [],
 ): PlayerMatchLists {
   const reportsByMatch = new Map(matchReports.map((report) => [
     getMatchReportId(report.pollId, report.slotId),
     report,
   ]))
+  const summariesByMatch = new Map<string, MatchMvpSummary[]>()
+  mvpSummaries.forEach((summary) => {
+    const key = getMatchReportId(summary.pollId, summary.slotId)
+    summariesByMatch.set(key, [...(summariesByMatch.get(key) ?? []), summary])
+  })
   const matches: Array<PlayerMatch & { startsAt: number; endsAt: number }> = polls
     .flatMap((poll) => poll.slots.map((slot) => {
       const startsAt = padelDateTimeToTimestamp(slot.startsAt)
@@ -503,26 +510,19 @@ export function getPlayerMatches(
     ))
 
   const toPlayerMatch = ({ pollId, pollTitle, slot }: PlayerMatch): PlayerMatch => {
-    const scores = receivedRatings
-      .filter((rating) => (
-        rating.revieweeId === userId
-        && rating.pollId === pollId
-        && rating.slotId === slot.id
-        && Number.isFinite(rating.score)
-        && rating.score >= 1
-        && rating.score <= 10
-      ))
-      .map((rating) => rating.score)
+    const matchSummaries = summariesByMatch.get(getMatchReportId(pollId, slot.id)) ?? []
+    const votes = matchSummaries.find((summary) => summary.playerId === userId)?.voteCount ?? 0
+    const bestVoteCount = Math.max(0, ...matchSummaries.map((summary) => summary.voteCount))
 
     return {
       pollId,
       pollTitle,
       slot,
       report: reportsByMatch.get(getMatchReportId(pollId, slot.id)),
-      ...(scores.length > 0 ? {
-        receivedRating: {
-          average: scores.reduce((total, score) => total + score, 0) / scores.length,
-          count: scores.length,
+      ...(bestVoteCount > 0 ? {
+        receivedMvp: {
+          votes,
+          isWinner: votes === bestVoteCount,
         },
       } : {}),
     }
@@ -544,15 +544,15 @@ export function getOtherPlayedMatches(
   polls: PadelPoll[],
   viewerId: string,
   now = Date.now(),
-  ratingSummaries: MatchRatingSummary[] = [],
+  mvpSummaries: MatchMvpSummary[] = [],
   matchReports: MatchReport[] = [],
 ): GroupMatch[] {
   const reportsByMatch = new Map(matchReports.map((report) => [
     getMatchReportId(report.pollId, report.slotId),
     report,
   ]))
-  const summariesByMatchAndPlayer = new Map(ratingSummaries.map((summary) => [
-    `${getMatchReportId(summary.pollId, summary.slotId)}__${summary.revieweeId}`,
+  const summariesByMatchAndPlayer = new Map(mvpSummaries.map((summary) => [
+    `${getMatchReportId(summary.pollId, summary.slotId)}__${summary.playerId}`,
     summary,
   ]))
 
@@ -583,24 +583,23 @@ export function getOtherPlayedMatches(
       pollTitle,
       slot,
       report: reportsByMatch.get(getMatchReportId(pollId, slot.id)),
-      playerRatings: getStarters(slot).map((signup) => {
+      playerMvpVotes: (() => {
+        const playerVotes = getStarters(slot).map((signup) => {
         const summary = summariesByMatchAndPlayer.get(
           `${getMatchReportId(pollId, slot.id)}__${signup.userId}`,
         )
-        if (
-          !summary
-          || !Number.isFinite(summary.scoreTotal)
-          || !Number.isInteger(summary.ratingCount)
-          || summary.ratingCount <= 0
-        ) {
-          return { userId: signup.userId, count: 0 }
-        }
         return {
           userId: signup.userId,
-          count: summary.ratingCount,
-          average: summary.scoreTotal / summary.ratingCount,
+          votes: summary?.voteCount ?? 0,
+          isWinner: false,
         }
-      }),
+        })
+        const bestVoteCount = Math.max(0, ...playerVotes.map((player) => player.votes))
+        return playerVotes.map((player) => ({
+          ...player,
+          isWinner: bestVoteCount > 0 && player.votes === bestVoteCount,
+        }))
+      })(),
     }))
 }
 
@@ -752,12 +751,12 @@ export function fantasyEntryIsCurrent(
 function fantasyPlayerScores(
   round: FantasyRound,
   report: MatchReport,
-  ratingSummaries: MatchRatingSummary[],
+  mvpSummaries: MatchMvpSummary[],
 ): FantasyPlayerScore[] {
-  const summariesByPlayer = new Map(
-    ratingSummaries
+  const votesByPlayer = new Map(
+    mvpSummaries
       .filter((summary) => summary.pollId === round.pollId && summary.slotId === round.slotId)
-      .map((summary) => [summary.revieweeId, summary]),
+      .map((summary) => [summary.playerId, summary.voteCount]),
   )
   const statsByPlayer = new Map(round.participants.map((player) => [
     player.userId,
@@ -783,26 +782,19 @@ function fantasyPlayerScores(
   })
 
   const baseScores = round.participants.map((player) => {
-    const summary = summariesByPlayer.get(player.userId)
-    const hasEnoughRatings = Boolean(
-      summary
-      && Number.isFinite(summary.scoreTotal)
-      && Number.isInteger(summary.ratingCount)
-      && summary.ratingCount >= FANTASY_MIN_RATINGS,
-    )
     const stats = statsByPlayer.get(player.userId)!
     return {
       ...player,
-      baseRating: hasEnoughRatings
-        ? roundTo(summary!.scoreTotal / summary!.ratingCount, 2)
-        : FANTASY_DEFAULT_RATING,
-      ratingCount: hasEnoughRatings ? summary!.ratingCount : summary?.ratingCount ?? 0,
-      usedDefaultRating: !hasEnoughRatings,
+      scoringModel: 'mvp-v2' as const,
+      baseRating: FANTASY_BASE_SCORE,
+      ratingCount: 0,
+      usedDefaultRating: false,
+      mvpVotes: votesByPlayer.get(player.userId) ?? 0,
       ...stats,
     }
   })
   const bestGameDifference = Math.max(...baseScores.map((score) => score.gameDifference))
-  const bestBaseRating = Math.max(...baseScores.map((score) => score.baseRating))
+  const bestMvpVotes = Math.max(0, ...baseScores.map((score) => score.mvpVotes))
 
   return baseScores.map((score) => {
     const resultBonus = score.setWins > score.setLosses
@@ -810,12 +802,15 @@ function fantasyPlayerScores(
       : score.setWins < score.setLosses ? -0.5 : 0
     const differenceBonus = bestGameDifference > 0
       && score.gameDifference === bestGameDifference ? 0.5 : 0
+    const isMvp = bestMvpVotes > 0 && score.mvpVotes === bestMvpVotes
+    const mvpBonus = isMvp ? FANTASY_MVP_BONUS : 0
     return {
       ...score,
       resultBonus,
       differenceBonus,
-      fantasyScore: roundTo(score.baseRating + resultBonus + differenceBonus, 2),
-      isMvp: score.baseRating === bestBaseRating,
+      mvpBonus,
+      fantasyScore: roundTo(score.baseRating + resultBonus + differenceBonus + mvpBonus, 2),
+      isMvp,
     }
   })
 }
@@ -851,14 +846,14 @@ export function scoreFantasyRound(
   round: FantasyRound,
   entries: FantasyEntry[],
   report: MatchReport,
-  ratingSummaries: MatchRatingSummary[],
+  mvpSummaries: MatchMvpSummary[],
   now = Date.now(),
 ): FantasyRound {
   if (!matchReportMatchesFantasyRound(round, report)) {
     throw new Error('Il referto non corrisponde alla formazione bloccata del round.')
   }
 
-  const playerScores = fantasyPlayerScores(round, report, ratingSummaries)
+  const playerScores = fantasyPlayerScores(round, report, mvpSummaries)
   const scoresByPlayer = new Map(playerScores.map((score) => [score.userId, score]))
   const ranked = entries
     .filter((entry) => fantasyEntryIsCurrent(round, entry))
@@ -958,7 +953,8 @@ export function reconcileFantasyRounds(
   polls: PadelPoll[],
   existingRounds: FantasyRound[],
   entries: FantasyEntry[],
-  ratingSummaries: MatchRatingSummary[],
+  mvpSummaries: MatchMvpSummary[],
+  mvpResponses: MatchMvpResponse[],
   matchReports: MatchReport[],
   now = Date.now(),
 ): FantasyRound[] {
@@ -985,7 +981,7 @@ export function reconcileFantasyRounds(
         round,
         entries.filter((entry) => entry.roundId === round.id),
         lateReport,
-        ratingSummaries,
+        mvpSummaries,
         now,
       )
     }
@@ -1019,21 +1015,13 @@ export function reconcileFantasyRounds(
 
     const report = reportsByRound.get(round.id)
     const earlySettlementAt = round.slotEndsAt + FANTASY_EARLY_SETTLEMENT_DELAY_MS
-    const summariesByPlayer = new Map(
-      ratingSummaries
-        .filter((summary) => summary.pollId === round.pollId && summary.slotId === round.slotId)
-        .map((summary) => [summary.revieweeId, summary]),
+    const closedVoterIds = new Set(
+      mvpResponses
+        .filter((response) => response.pollId === round.pollId && response.slotId === round.slotId)
+        .map((response) => response.voterId),
     )
-    const ratingsAreComplete = round.participantIds.every((userId) => {
-      const summary = summariesByPlayer.get(userId)
-      return Boolean(
-        summary
-        && Number.isFinite(summary.scoreTotal)
-        && Number.isInteger(summary.ratingCount)
-        && summary.ratingCount >= FANTASY_MIN_RATINGS
-      )
-    })
-    const canSettleEarly = now >= earlySettlementAt && Boolean(report) && ratingsAreComplete
+    const mvpVoteIsComplete = round.participantIds.every((userId) => closedVoterIds.has(userId))
+    const canSettleEarly = now >= earlySettlementAt && Boolean(report) && mvpVoteIsComplete
     if (now < round.settlesAt && !canSettleEarly) return round
 
     if (!report) {
@@ -1043,7 +1031,7 @@ export function reconcileFantasyRounds(
       round,
       entries.filter((entry) => entry.roundId === round.id),
       report,
-      ratingSummaries,
+      mvpSummaries,
       now,
     )
   })

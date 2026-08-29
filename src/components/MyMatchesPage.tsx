@@ -9,10 +9,10 @@ import {
   MapPin,
   PencilLine,
   Plus,
-  Star,
+  Trophy,
 } from 'lucide-react'
 import { DEFAULT_VENUE } from '../lib/domain'
-import { formatRatingAverage, slotDateParts } from '../lib/format'
+import { slotDateParts } from '../lib/format'
 import type { PlayerMatch, PlayerMatchLists } from '../types'
 import { MatchReportScoreboard } from './MatchReportScoreboard'
 
@@ -50,10 +50,7 @@ function MatchItem({
   const booked = Boolean(match.slot.bookedAt)
   const venue = booked ? (match.slot.venue || DEFAULT_VENUE) : 'Campo da prenotare'
   const status = past ? 'Giocata' : booked ? 'Campo confermato' : 'Da prenotare'
-  const receivedRating = past ? match.receivedRating : undefined
-  const averageLabel = receivedRating
-    ? formatRatingAverage(receivedRating.average)
-    : null
+  const receivedMvp = past ? match.receivedMvp : undefined
   const report = past ? match.report : undefined
 
   return (
@@ -89,15 +86,16 @@ function MatchItem({
       <div className={`personal-match__status ${booked ? 'is-booked' : 'is-pending'}`}>
         {booked ? <CheckCircle2 size={17} /> : <CalendarClock size={17} />}
         <span>{status}</span>
-        {receivedRating && averageLabel && (
+        {receivedMvp && (receivedMvp.isWinner || receivedMvp.votes > 0) && (
           <span
             className="personal-match__rating"
-            aria-label={`Media di ${receivedRating.count} ${receivedRating.count === 1 ? 'voto ricevuto' : 'voti ricevuti'}: ${averageLabel} su 10`}
+            aria-label={receivedMvp.isWinner
+              ? `MVP della partita con ${receivedMvp.votes} ${receivedMvp.votes === 1 ? 'preferenza' : 'preferenze'}`
+              : `${receivedMvp.votes} ${receivedMvp.votes === 1 ? 'preferenza MVP ricevuta' : 'preferenze MVP ricevute'}`}
           >
-            <Star size={14} fill="currentColor" aria-hidden="true" />
-            <span>Media</span>
-            <strong>{averageLabel}</strong>
-            <small>/10</small>
+            <Trophy size={14} aria-hidden="true" />
+            <span>{receivedMvp.isWinner ? 'MVP' : 'Voti MVP'}</span>
+            <strong>{receivedMvp.votes}</strong>
           </span>
         )}
         {onSelect && <ArrowRight className="personal-match__open-icon" size={17} aria-hidden="true" />}

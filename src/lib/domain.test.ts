@@ -4,14 +4,14 @@ import {
   addSlotToPoll,
   addSignup,
   applyAdminSlotRosterAction,
-  aggregateMatchRatingSummaries,
+  aggregateMatchMvpSummaries,
   defaultSlotForWeek,
   groupMatchReportSetsByTeams,
   getMatchPairings,
-  getMatchRatingResponseId,
-  getNextMatchRatingPromptAt,
+  getMatchMvpResponseId,
+  getNextMatchMvpPromptAt,
   getOtherPlayedMatches,
-  getPendingMatchRatingPrompts,
+  getPendingMatchMvpPrompts,
   getPlayerMatches,
   getReserves,
   getSlotPhase,
@@ -37,7 +37,7 @@ import {
   substituteStarter,
   toDateTimeInput,
 } from './domain'
-import type { MatchRatingRecord, MemberProfile, PadelPoll, PadelSlot, SessionUser, Signup, SignupRole } from '../types'
+import type { MatchMvpResponse, MemberProfile, PadelPoll, PadelSlot, SessionUser, Signup, SignupRole } from '../types'
 
 const member = (id: string, displayName = id): MemberProfile => ({
   id,
@@ -646,7 +646,7 @@ describe('partite personali', () => {
     expect(result.upcoming).toEqual([])
   })
 
-  it('calcola per ogni partita la media dei soli voti ricevuti dal giocatore', () => {
+  it('mostra quante preferenze MVP ha ricevuto il giocatore e se ha vinto', () => {
     const poll = personalPoll()
     poll.slots = [{
       ...slot(['jury', 'a', 'b', 'c'].map((id, index) => signup(id, index))),
@@ -654,69 +654,53 @@ describe('partite personali', () => {
       startsAt: '2026-07-27T18:30:00.000Z',
       bookedAt: 1,
     }]
-    const rating = (reviewerId: string, revieweeId: string, score: number): MatchRatingRecord => ({
-      id: `rating-${reviewerId}-${revieweeId}`,
-      responseId: `response-${reviewerId}`,
-      pollId: poll.id,
-      pollTitle: poll.title,
-      slotId: 'past-rated',
-      sessionStartsAt: poll.slots[0].startsAt,
-      sessionEndedAt: 1,
-      reviewerId,
-      reviewerName: reviewerId,
-      revieweeId,
-      revieweeName: revieweeId,
-      score,
-      createdAt: 1,
-    })
-
     const result = getPlayerMatches(
       [poll],
       'jury',
       Date.parse('2026-07-28T12:00:00.000Z'),
-      [rating('a', 'jury', 8), rating('b', 'jury', 9), rating('jury', 'a', 2)],
+      [{
+        id: `${poll.id}__past-rated__jury`,
+        pollId: poll.id,
+        slotId: 'past-rated',
+        playerId: 'jury',
+        voteCount: 2,
+        lastResponseId: 'response-b',
+        updatedAt: 1,
+      }],
     )
 
-    expect(result.past[0].receivedRating).toEqual({ average: 8.5, count: 2 })
+    expect(result.past[0].receivedMvp).toEqual({ votes: 2, isWinner: true })
   })
 })
 
 describe('partite giocate dagli altri', () => {
-  const rating = (
-    reviewerId: string,
-    revieweeId: string,
-    score: number,
-    createdAt: number,
-  ): MatchRatingRecord => ({
-    id: `poll-group__slot-other__${reviewerId}__${revieweeId}`,
-    responseId: `poll-group__slot-other__${reviewerId}`,
+  const mvpResponse = (
+    voterId: string,
+    selectedPlayerId: string,
+    closedAt: number,
+  ): MatchMvpResponse => ({
+    id: `poll-group__slot-other__${voterId}`,
     pollId: 'poll-group',
-    pollTitle: 'Padel del gruppo',
     slotId: 'slot-other',
-    sessionStartsAt: '2026-07-27T18:30:00.000Z',
-    sessionEndedAt: 1,
-    reviewerId,
-    reviewerName: reviewerId,
-    revieweeId,
-    revieweeName: revieweeId,
-    score,
-    createdAt,
+    voterId,
+    status: 'submitted',
+    selectedPlayerId,
+    selectedPlayerName: selectedPlayerId,
+    closedAt,
   })
 
-  it('aggrega i voti senza conservare chi li ha assegnati', () => {
-    expect(aggregateMatchRatingSummaries([
-      rating('a', 'b', 8, 100),
-      rating('c', 'b', 9, 200),
-      rating('a', 'd', 11, 300),
+  it('aggrega le preferenze MVP senza esporre chi le ha assegnate', () => {
+    expect(aggregateMatchMvpSummaries([
+      mvpResponse('a', 'b', 100),
+      mvpResponse('c', 'b', 200),
     ])).toEqual([
       {
         id: 'poll-group__slot-other__b',
         pollId: 'poll-group',
         slotId: 'slot-other',
-        revieweeId: 'b',
-        scoreTotal: 17,
-        ratingCount: 2,
-        lastRatingId: 'poll-group__slot-other__c__b',
+        playerId: 'b',
+        voteCount: 2,
+        lastResponseId: 'poll-group__slot-other__c',
         updatedAt: 200,
       },
     ])
@@ -767,9 +751,9 @@ describe('partite giocate dagli altri', () => {
         { ...otherSlot, id: 'slot-incomplete', signups: [signup('a', 1)] },
       ],
     }
-    const summaries = aggregateMatchRatingSummaries([
-      rating('a', 'b', 8, 100),
-      rating('c', 'b', 9, 200),
+    const summaries = aggregateMatchMvpSummaries([
+      mvpResponse('a', 'b', 100),
+      mvpResponse('c', 'b', 200),
     ])
 
     const result = getOtherPlayedMatches(
@@ -783,16 +767,16 @@ describe('partite giocate dagli altri', () => {
     expect(result.map((match) => match.slot.id)).toEqual(['slot-other', 'slot-reserve'])
     expect(result[0].pollTitle).toBe('Padel · 27 lug – 2 ago 2026')
     expect(result[0].report).toEqual(report)
-    expect(result[0].playerRatings).toContainEqual({
+    expect(result[0].playerMvpVotes).toContainEqual({
       userId: 'b',
-      average: 8.5,
-      count: 2,
+      votes: 2,
+      isWinner: true,
     })
-    expect(result[0].playerRatings).toContainEqual({ userId: 'a', count: 0 })
+    expect(result[0].playerMvpVotes).toContainEqual({ userId: 'a', votes: 0, isWinner: false })
   })
 })
 
-describe('voti di fine partita', () => {
+describe('scelta MVP di fine partita', () => {
   const ratingPoll = (): PadelPoll => ({
     id: 'poll-rating',
     title: 'Padel del martedì',
@@ -825,41 +809,51 @@ describe('voti di fine partita', () => {
     const polls = [ratingPoll()]
     const dueAt = Date.parse('2026-07-28T08:30:00.000Z')
 
-    expect(getPendingMatchRatingPrompts(polls, [], 'jury', dueAt - 1)).toHaveLength(0)
-    expect(getNextMatchRatingPromptAt(polls, [], 'jury', dueAt - 1)).toBe(dueAt)
+    expect(getPendingMatchMvpPrompts(polls, [], 'jury', dueAt - 1)).toHaveLength(0)
+    expect(getNextMatchMvpPromptAt(polls, [], 'jury', dueAt - 1)).toBe(dueAt)
 
-    const prompts = getPendingMatchRatingPrompts(polls, [], 'jury', dueAt)
+    const prompts = getPendingMatchMvpPrompts(polls, [], 'jury', dueAt)
     expect(prompts).toHaveLength(1)
     expect(prompts[0]).toMatchObject({
       id: 'poll-rating__slot-rating__jury',
-      reviewerId: 'jury',
+      voterId: 'jury',
       sessionEndedAt: Date.parse('2026-07-28T08:30:00.000Z'),
       dueAt,
     })
-    expect(prompts[0].teammates.map((teammate) => teammate.userId)).toEqual(['ale', 'luca', 'teo'])
+    expect(prompts[0].candidates.map((candidate) => candidate.userId)).toEqual(['ale', 'luca', 'teo'])
   })
 
   it('non ripropone una scheda già chiusa e ignora riserve o formazioni incomplete', () => {
     const current = ratingPoll()
     const dueAt = Date.parse('2026-07-28T08:30:00.000Z')
-    const responseId = getMatchRatingResponseId(current.id, current.slots[0].id, 'jury')
+    const responseId = getMatchMvpResponseId(current.id, current.slots[0].id, 'jury')
 
-    expect(getPendingMatchRatingPrompts([current], [{
+    expect(getPendingMatchMvpPrompts([current], [{
       id: responseId,
       pollId: current.id,
       slotId: current.slots[0].id,
-      reviewerId: 'jury',
+      voterId: 'jury',
       status: 'dismissed',
       closedAt: dueAt,
     }], 'jury', dueAt)).toHaveLength(0)
-    expect(getPendingMatchRatingPrompts([current], [], 'reserve', dueAt)).toHaveLength(0)
-    expect(getPendingMatchRatingPrompts([{
+    expect(getPendingMatchMvpPrompts([current], [], 'reserve', dueAt)).toHaveLength(0)
+    expect(getPendingMatchMvpPrompts([{
       ...current,
       slots: [{ ...current.slots[0], signups: current.slots[0].signups.slice(0, 3) }],
     }], [], 'jury', dueAt)).toHaveLength(0)
   })
 
-  it('esclude gli ospiti dalle pagelle ma mantiene valido il match da quattro titolari', () => {
+  it('lascia scadere una richiesta MVP non completata dopo sette giorni', () => {
+    const current = ratingPoll()
+    const dueAt = Date.parse('2026-07-28T08:30:00.000Z')
+    const sevenDays = 7 * 24 * 60 * 60 * 1000
+
+    expect(getPendingMatchMvpPrompts([current], [], 'jury', dueAt + sevenDays - 1)).toHaveLength(1)
+    expect(getPendingMatchMvpPrompts([current], [], 'jury', dueAt + sevenDays)).toHaveLength(0)
+    expect(getNextMatchMvpPromptAt([current], [], 'jury', dueAt + sevenDays)).toBeNull()
+  })
+
+  it('esclude gli ospiti dalla scelta MVP ma mantiene valido il match da quattro titolari', () => {
     const current = ratingPoll()
     current.slots[0].signups[3] = {
       ...current.slots[0].signups[3],
@@ -868,9 +862,9 @@ describe('voti di fine partita', () => {
       isGuest: true,
     }
     const dueAt = Date.parse('2026-07-28T08:30:00.000Z')
-    const prompt = getPendingMatchRatingPrompts([current], [], 'jury', dueAt)[0]
+    const prompt = getPendingMatchMvpPrompts([current], [], 'jury', dueAt)[0]
 
-    expect(prompt.teammates.map((teammate) => teammate.userId)).toEqual(['ale', 'luca'])
+    expect(prompt.candidates.map((candidate) => candidate.userId)).toEqual(['ale', 'luca'])
   })
 })
 

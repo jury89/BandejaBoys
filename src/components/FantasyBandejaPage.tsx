@@ -192,8 +192,8 @@ function FantasyRulesModal({ onClose }: { onClose: () => void }) {
           </header>
           <dl>
             <div>
-              <dt>Pagella</dt>
-              <dd>Media dei voti ricevuti, oppure 6 d’ufficio con meno di due voti.</dd>
+              <dt>Base</dt>
+              <dd>Ogni titolare parte da 6 punti.</dd>
             </div>
             <div>
               <dt>Risultato</dt>
@@ -204,16 +204,20 @@ function FantasyRulesModal({ onClose }: { onClose: () => void }) {
               <dd>+0,5 a chi condivide la miglior differenza game positiva.</dd>
             </div>
             <div>
+              <dt>MVP</dt>
+              <dd>+1 al giocatore con più preferenze; il bonus vale anche in caso di ex aequo.</dd>
+            </div>
+            <div>
               <dt>Capitano</dt>
-              <dd>Punteggio ×1,5 e altri +2 se è l’MVP della pagella.</dd>
+              <dd>Punteggio ×1,5 e altri +2 se è uno degli MVP del match.</dd>
             </div>
           </dl>
         </section>
 
         <p className="fantasy-rulebook__note">
           <Clock3 size={18} />
-          Dopo 24 ore il risultato viene calcolato se ci sono il referto e almeno
-          due pagelle per giocatore. A 48 ore il round si chiude comunque; senza
+          Dopo 24 ore il risultato viene calcolato se ci sono il referto e tutte
+          le scelte MVP chiuse. A 48 ore il round si chiude comunque; senza
           referto viene annullato.
         </p>
       </div>
@@ -463,7 +467,7 @@ function LockedRound({
           ))}
         </ol>
       )}
-      <footer><Clock3 size={15} /> Calcolo da 24 ore con referto e pagelle completi.</footer>
+      <footer><Clock3 size={15} /> Calcolo da 24 ore con referto e scelte MVP chiuse.</footer>
     </article>
   )
 }
@@ -613,6 +617,11 @@ function ratingSource(score: FantasyPlayerScore): string {
   return `${score.ratingCount} pagelle ricevute`
 }
 
+function mvpVoteSource(score: FantasyPlayerScore): string {
+  const votes = score.mvpVotes ?? 0
+  return `${votes} ${votes === 1 ? 'preferenza ricevuta' : 'preferenze ricevute'}`
+}
+
 function FantasyPlayerScoreRow({
   roundId,
   score,
@@ -625,10 +634,12 @@ function FantasyPlayerScoreRow({
   const [expanded, setExpanded] = useState(false)
   const playerName = resolveMemberName(members, score.userId, score.displayName)
   const detailId = `fantasy-score-${roundId}-${score.userId}`
+  const usesMvpScoring = score.scoringModel === 'mvp-v2'
+  const modifiers = [score.resultBonus, score.differenceBonus]
+  if (usesMvpScoring) modifiers.push(score.mvpBonus ?? 0)
   const formulaLabel = [
     `Calcolo: ${fantasyNumber(score.baseRating)}`,
-    fantasyModifier(score.resultBonus),
-    fantasyModifier(score.differenceBonus),
+    ...modifiers.map(fantasyModifier),
     `uguale ${fantasyNumber(score.fantasyScore)}`,
   ].join(' ')
 
@@ -646,8 +657,9 @@ function FantasyPlayerScoreRow({
         <span className="fantasy-player-score__identity">
           <strong>{playerName}</strong>
           <small>
-            Pagella {fantasyNumber(score.baseRating)}
-            {score.usedDefaultRating && ' d’ufficio'}
+            {usesMvpScoring
+              ? `Base ${fantasyNumber(score.baseRating)} · ${mvpVoteSource(score)}`
+              : `Pagella ${fantasyNumber(score.baseRating)}${score.usedDefaultRating ? ' d’ufficio' : ''}`}
           </small>
         </span>
         <strong className="fantasy-player-score__total">{fantasyNumber(score.fantasyScore)}</strong>
@@ -666,12 +678,13 @@ function FantasyPlayerScoreRow({
             <span>{fantasyNumber(score.baseRating)}</span>
             <small>{fantasyModifier(score.resultBonus)}</small>
             <small>{fantasyModifier(score.differenceBonus)}</small>
+            {usesMvpScoring && <small>{fantasyModifier(score.mvpBonus ?? 0)}</small>}
             <em>=</em>
             <strong>{fantasyNumber(score.fantasyScore)}</strong>
           </p>
           <dl>
             <div>
-              <dt>Voto base<small>{ratingSource(score)}</small></dt>
+              <dt>{usesMvpScoring ? 'Base comune' : 'Voto base'}<small>{usesMvpScoring ? 'Uguale per tutti i titolari' : ratingSource(score)}</small></dt>
               <dd>{fantasyNumber(score.baseRating)}</dd>
             </div>
             <div>
@@ -682,6 +695,12 @@ function FantasyPlayerScoreRow({
               <dt>Bonus differenza game<small>Differenza totale {fantasyModifier(score.gameDifference)}</small></dt>
               <dd>{fantasyModifier(score.differenceBonus)}</dd>
             </div>
+            {usesMvpScoring && (
+              <div>
+                <dt>Bonus MVP<small>{mvpVoteSource(score)}</small></dt>
+                <dd>{fantasyModifier(score.mvpBonus ?? 0)}</dd>
+              </div>
+            )}
           </dl>
           <footer>
             <span>Totale FantaBandeja</span>

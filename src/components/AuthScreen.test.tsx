@@ -81,6 +81,6 @@ describe('accesso locale', () => {
     expect(await screen.findByText('Nessuno slot prenotato.')).toBeInTheDocument()
 
     await user.click(allFilter)
-    expect(await screen.findByRole('heading', { name: /^Padel · .* \d{4}$/ })).toBeInTheDocument()
+    expect((await screen.findAllByRole('heading', { name: /^Padel · .* \d{4}$/ })).length).toBeGreaterThan(0)
   }, 15_000)
 })

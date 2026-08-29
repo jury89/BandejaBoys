@@ -2,7 +2,7 @@ import type { FantasyEntry, FantasyRound, PadelPoll, PadelSlot, Signup } from '.
 import {
   BOOKING_REMINDER_LEAD_MS,
   BOOKING_REMINDER_WINDOW_MS,
-  MATCH_RATING_NOTIFICATION_WINDOW_MS,
+  MATCH_MVP_NOTIFICATION_WINDOW_MS,
   NEW_SLOT_NOTIFICATION_WINDOW_MS,
   NEW_SLOT_QUIET_PERIOD_MS,
   SLOT_READY_NOTIFICATION_WINDOW_MS,
@@ -27,7 +27,7 @@ describe('preferenze notifiche', () => {
     expect(isNotificationKindEnabled('booking-reminder-7d')).toBe(true)
     expect(isNotificationKindEnabled('reminder-24h')).toBe(true)
     expect(isNotificationKindEnabled('reminder-2h')).toBe(true)
-    expect(isNotificationKindEnabled('match-rating')).toBe(true)
+    expect(isNotificationKindEnabled('match-mvp')).toBe(true)
     expect(isNotificationKindEnabled('fantasy-open')).toBe(true)
   })
 
@@ -40,7 +40,7 @@ describe('preferenze notifiche', () => {
       bookingReminder7d: true,
       reminder24h: false,
       reminder2h: true,
-      matchRating: false,
+      matchMvp: false,
       fantasy: false,
     }
 
@@ -51,7 +51,7 @@ describe('preferenze notifiche', () => {
     expect(isNotificationKindEnabled('booking-reminder-7d', preferences)).toBe(true)
     expect(isNotificationKindEnabled('reminder-24h', preferences)).toBe(false)
     expect(isNotificationKindEnabled('reminder-2h', preferences)).toBe(true)
-    expect(isNotificationKindEnabled('match-rating', preferences)).toBe(false)
+    expect(isNotificationKindEnabled('match-mvp', preferences)).toBe(false)
     expect(isNotificationKindEnabled('fantasy-result', preferences)).toBe(false)
     expect(isNotificationKindEnabled('test', preferences)).toBe(true)
   })
@@ -161,23 +161,23 @@ describe('pianificazione notifiche', () => {
     )).toThrow('Il titolo del test supera gli 80 caratteri.')
   })
 
-  it('crea una vera push di collaudo che apre la pagella senza dati partita', () => {
-    expect(createTestNotification('jury', 'run-45', undefined, 'match-rating')).toMatchObject({
+  it('crea una vera push di collaudo che apre la scelta MVP senza dati partita', () => {
+    expect(createTestNotification('jury', 'run-45', undefined, 'match-mvp')).toMatchObject({
       id: 'test:run-45',
       kind: 'test',
-      title: 'TEST · È ora di dare i voti',
-      body: 'Tocca per aprire la pagella di collaudo. Nessun voto verrà salvato.',
-      url: '/?ratingTest=1&_pushRefresh=run-45',
-      tag: 'test-rating-run-45',
+      title: 'TEST · Scegli l’MVP',
+      body: 'Tocca per aprire la scelta MVP di collaudo. Nessuna preferenza verrà salvata.',
+      url: '/?mvpTest=1&_pushRefresh=run-45',
+      tag: 'test-mvp-run-45',
       recipientUserIds: ['jury'],
     })
   })
 
-  it('mantiene il deep link pagelle anche con un messaggio di test personalizzato', () => {
-    expect(createTestNotification('jury', 'run-46', 'Apri il test', 'match-rating')).toMatchObject({
-      title: 'TEST · È ora di dare i voti',
+  it('mantiene il deep link MVP anche con un messaggio di test personalizzato', () => {
+    expect(createTestNotification('jury', 'run-46', 'Apri il test', 'match-mvp')).toMatchObject({
+      title: 'TEST · Scegli l’MVP',
       body: 'Apri il test',
-      url: '/?ratingTest=1&_pushRefresh=run-46',
+      url: '/?mvpTest=1&_pushRefresh=run-46',
     })
   })
 
@@ -665,17 +665,17 @@ describe('pianificazione notifiche', () => {
     expect(notifications[0].body).toContain('Guarda che tra 2 ore giochi')
   })
 
-  it('alla fine del match invita tutti e quattro i titolari a dare i voti', () => {
+  it('alla fine del match invita tutti e quattro i titolari a scegliere l’MVP', () => {
     const players = ['a', 'b', 'c', 'd'].map((id, index) => signup(id, index))
     const finishedSlot = slot('2026-07-20T18:30', players)
     const notifications = collectScheduledNotifications([poll([finishedSlot])], NOW)
 
     expect(notifications).toHaveLength(1)
     expect(notifications[0]).toMatchObject({
-      kind: 'match-rating',
-      title: 'È ora di dare i voti',
+      kind: 'match-mvp',
+      title: 'Chi è stato l’MVP?',
       recipientUserIds: ['a', 'b', 'c', 'd'],
-      url: '/?ratePoll=poll-1&rateSlot=slot-1',
+      url: '/?mvpPoll=poll-1&mvpSlot=slot-1',
     })
   })
 
@@ -689,18 +689,18 @@ describe('pianificazione notifiche', () => {
     ], NOW)).toHaveLength(0)
     expect(collectScheduledNotifications(
       [poll([finishedSlot])],
-      NOW + MATCH_RATING_NOTIFICATION_WINDOW_MS,
+      NOW + MATCH_MVP_NOTIFICATION_WINDOW_MS,
     )).toHaveLength(0)
   })
 
-  it('esclude dalla notifica chi ha già salvato o chiuso la propria pagella', () => {
+  it('esclude dalla notifica chi ha già salvato o chiuso la scelta MVP', () => {
     const players = ['a', 'b', 'c', 'd'].map((id, index) => signup(id, index))
     const finishedSlot = slot('2026-07-20T18:30', players)
     const notifications = collectScheduledNotifications([poll([finishedSlot])], NOW, [{
       id: 'poll-1__slot-1__a',
       pollId: 'poll-1',
       slotId: 'slot-1',
-      reviewerId: 'a',
+      voterId: 'a',
       status: 'dismissed',
       closedAt: NOW,
     }])

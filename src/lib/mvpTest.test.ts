@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { MemberProfile, SessionUser } from '../types'
-import { isRatingTestRequested, makeRatingTestPrompt } from './ratingTest'
+import { isMvpTestRequested, makeMvpTestPrompt } from './mvpTest'
 
 const reviewer: SessionUser = {
   id: 'jury',
@@ -16,15 +16,15 @@ const member = (id: string, displayName = id): MemberProfile => ({
   createdAt: 1,
 })
 
-describe('modalità collaudo pagelle', () => {
+describe('modalità collaudo MVP', () => {
   it('si attiva soltanto con il deep link esplicito', () => {
-    expect(isRatingTestRequested('?ratingTest=1')).toBe(true)
-    expect(isRatingTestRequested('?ratingTest=0')).toBe(false)
-    expect(isRatingTestRequested('?ratePoll=poll-1')).toBe(false)
+    expect(isMvpTestRequested('?mvpTest=1')).toBe(true)
+    expect(isMvpTestRequested('?ratingTest=1')).toBe(true)
+    expect(isMvpTestRequested('?mvpTest=0')).toBe(false)
   })
 
   it('usa tre membri diversi dal revisore senza duplicati', () => {
-    const prompt = makeRatingTestPrompt(reviewer, [
+    const prompt = makeMvpTestPrompt(reviewer, [
       reviewer,
       member('ale', 'Ale'),
       member('luca', 'Luca'),
@@ -34,12 +34,12 @@ describe('modalità collaudo pagelle', () => {
     ], Date.parse('2026-07-21T18:00:00.000Z'))
 
     expect(prompt).toMatchObject({
-      id: 'rating-test__jury',
-      pollId: 'rating-test',
-      reviewerId: 'jury',
+      id: 'mvp-test__jury',
+      pollId: 'mvp-test',
+      voterId: 'jury',
       sessionStartsAt: '2026-07-21T18:00:00.000Z',
     })
-    expect(prompt.teammates).toEqual([
+    expect(prompt.candidates).toEqual([
       { userId: 'ale', displayName: 'Ale' },
       { userId: 'luca', displayName: 'Luca' },
       { userId: 'teo', displayName: 'Teo' },
@@ -47,12 +47,12 @@ describe('modalità collaudo pagelle', () => {
   })
 
   it('completa la scheda con nomi fittizi senza richiedere dati reali', () => {
-    const prompt = makeRatingTestPrompt(reviewer, [member('ale', 'Ale')], 1)
+    const prompt = makeMvpTestPrompt(reviewer, [member('ale', 'Ale')], 1)
 
-    expect(prompt.teammates).toEqual([
+    expect(prompt.candidates).toEqual([
       { userId: 'ale', displayName: 'Ale' },
-      { userId: 'rating-test-player-2', displayName: 'Compagno test 2' },
-      { userId: 'rating-test-player-3', displayName: 'Compagno test 3' },
+      { userId: 'mvp-test-player-2', displayName: 'Compagno test 2' },
+      { userId: 'mvp-test-player-3', displayName: 'Compagno test 3' },
     ])
   })
 })
