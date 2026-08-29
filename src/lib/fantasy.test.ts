@@ -20,6 +20,7 @@ import {
   makeFantasyEntry,
   makeFantasyRound,
   padelDateTimeToTimestamp,
+  reconcileFantasyRoundRosterMutation,
   reconcileFantasyRounds,
   scoreFantasyRound,
 } from './domain'
@@ -361,6 +362,55 @@ describe('round FantaBandeja', () => {
       participantIds: ['a', 'b', 'c', 'e'],
     })
     expect(fantasyEntryIsCurrent(restored, saved)).toBe(false)
+  })
+
+  it('riallinea soltanto la rosa di un round aperto nella transazione dello slot', () => {
+    const originalRound = roundFixture()
+    const substitutedSlot = bookedSlot({
+      signups: bookedSlot().signups.map((signup) => (
+        signup.userId === 'd'
+          ? { ...signup, id: 'signup-e', userId: 'e', displayName: 'E' }
+          : signup
+      )),
+    })
+    const updatedAt = now + 2
+
+    const synchronized = reconcileFantasyRoundRosterMutation(
+      { ...pollWith(substitutedSlot), updatedAt },
+      substitutedSlot.id,
+      originalRound,
+      updatedAt,
+    )
+
+    expect(synchronized).toMatchObject({
+      status: 'open',
+      participantIds: ['a', 'b', 'c', 'e'],
+      participants: expect.arrayContaining([
+        expect.objectContaining({ userId: 'e', displayName: 'E' }),
+      ]),
+      updatedAt,
+    })
+    expect(synchronized.slotStartsAt).toBe(originalRound.slotStartsAt)
+    expect(synchronized.locksAt).toBe(originalRound.locksAt)
+  })
+
+  it('sospende subito il round se la rosa non è più valida, ma non tocca round già bloccati', () => {
+    const originalRound = roundFixture()
+    const incompletePoll = pollWith(bookedSlot({ signups: bookedSlot().signups.slice(0, 3) }))
+
+    expect(reconcileFantasyRoundRosterMutation(
+      incompletePoll,
+      'slot-1',
+      originalRound,
+      now + 2,
+    )).toMatchObject({ status: 'pending', updatedAt: now + 2 })
+
+    expect(reconcileFantasyRoundRosterMutation(
+      incompletePoll,
+      'slot-1',
+      originalRound,
+      originalRound.locksAt,
+    )).toBe(originalRound)
   })
 })
 

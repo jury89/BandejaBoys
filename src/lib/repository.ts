@@ -48,6 +48,7 @@ import {
   addSignup,
   applyAdminSlotRosterAction,
   aggregateMatchFeedbackSummaries,
+  getFantasyRoundId,
   getMatchFeedbackDefinition,
   getMatchFeedbackSummaryId,
   getStarters,
@@ -59,6 +60,7 @@ import {
   removeGuestSignup,
   removeSignup,
   removeSlotFromPoll,
+  reconcileFantasyRoundRosterMutation,
   reconcileFantasyRounds,
   rescheduleSlot,
   setSlotBooking,
@@ -312,6 +314,15 @@ function makeFeedbackResponse(
   }
 }
 
+function starterRosterSnapshot(slot: PadelSlot | undefined): string {
+  if (!slot) return '[]'
+  return JSON.stringify(getStarters(slot).map((signup) => ({
+    userId: signup.userId,
+    displayName: signup.displayName,
+    isGuest: isGuestSignup(signup),
+  })))
+}
+
 function remoteRepository(): PadelRepository {
   if (!firestore) throw new Error('Firebase non è configurato.')
   const db = firestore
@@ -326,7 +337,23 @@ function remoteRepository(): PadelRepository {
       const snapshot = await transaction.get(reference)
       if (!snapshot.exists()) throw new Error('Sondaggio non trovato.')
       const poll = normalizePollWeek({ id: snapshot.id, ...snapshot.data() } as PadelPoll)
-      const updated = mutate(poll)
+      const mutated = mutate(poll)
+      const updated = mutated.updatedAt > poll.updatedAt
+        ? mutated
+        : { ...mutated, updatedAt: poll.updatedAt + 1 }
+      const updatedSlotsById = new Map(updated.slots.map((slot) => [slot.id, slot]))
+      const changedStarterSlotIds = poll.slots
+        .filter((slot) => (
+          starterRosterSnapshot(slot) !== starterRosterSnapshot(updatedSlotsById.get(slot.id))
+        ))
+        .map((slot) => slot.id)
+      const roundReferences = changedStarterSlotIds.map((slotId) => (
+        doc(db, 'fantasyRounds', getFantasyRoundId(pollId, slotId))
+      ))
+      const roundSnapshots = await Promise.all(
+        roundReferences.map((roundReference) => transaction.get(roundReference)),
+      )
+
       transaction.update(reference, {
         slots: updated.slots,
         status: updated.status,
@@ -334,6 +361,22 @@ function remoteRepository(): PadelRepository {
       })
       const activity = activityFactory(poll, updated)
       if (activity) setRemoteActivity(db, transaction, activity)
+      roundSnapshots.forEach((roundSnapshot, index) => {
+        if (!roundSnapshot.exists()) return
+        const existingRound = {
+          ...roundSnapshot.data(),
+          id: roundSnapshot.id,
+        } as FantasyRound
+        const synchronizedRound = reconcileFantasyRoundRosterMutation(
+          updated,
+          changedStarterSlotIds[index],
+          existingRound,
+          updated.updatedAt,
+        )
+        if (synchronizedRound !== existingRound) {
+          transaction.set(roundReferences[index], synchronizedRound)
+        }
+      })
       return updated
     })
   }

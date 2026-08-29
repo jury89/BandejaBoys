@@ -742,6 +742,34 @@ export function makeFantasyRound(
   }
 }
 
+export function reconcileFantasyRoundRosterMutation(
+  poll: PadelPoll,
+  slotId: string,
+  round: FantasyRound,
+  now = poll.updatedAt,
+): FantasyRound {
+  if (!['open', 'pending'].includes(round.status) || now >= round.locksAt) return round
+
+  const slot = poll.slots.find((item) => item.id === slotId)
+  const candidate = slot ? fantasyRoundCandidate(poll, slot) : null
+  if (!candidate) {
+    return round.status === 'pending'
+      ? round
+      : suspendFantasyRound(round, now)
+  }
+
+  if (candidate.locksAt <= now) return round
+
+  return {
+    ...round,
+    participantIds: candidate.participantIds,
+    participants: candidate.participants,
+    rosterKey: candidate.rosterKey,
+    status: 'open',
+    updatedAt: now,
+  }
+}
+
 export function fantasySelectionError(
   round: FantasyRound,
   managerId: string,
