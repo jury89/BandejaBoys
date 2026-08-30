@@ -3003,6 +3003,14 @@ p {
   font-size: 0.68rem;
 }
 
+.group-match__ratings-intro {
+  margin: -3px 0 11px;
+  color: var(--muted);
+  font-size: 0.52rem;
+  font-weight: 650;
+  line-height: 1.45;
+}
+
 .group-match__players {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -3013,17 +3021,17 @@ p {
   display: grid;
   min-width: 0;
   align-items: center;
-  padding: 8px;
-  grid-template-columns: 34px minmax(0, 1fr) auto;
-  gap: 7px;
+  padding: 10px;
+  grid-template-columns: 38px minmax(0, 1fr);
+  gap: 9px;
   border: 1px solid #d7e5e8;
   border-radius: 9px;
   background: var(--white);
 }
 
 .group-match__avatar {
-  width: 34px;
-  height: 34px;
+  width: 38px;
+  height: 38px;
   border: 2px solid #d6e8ec;
   border-radius: 50%;
   object-fit: cover;
@@ -3032,61 +3040,56 @@ p {
   font-size: 0.62rem;
   font-weight: 900;
   text-align: center;
-  line-height: 30px;
+  line-height: 34px;
 }
 
 .group-match__player-copy {
   display: flex;
   min-width: 0;
   flex-direction: column;
+  align-items: flex-start;
 }
 
 .group-match__player-copy strong {
   overflow: hidden;
   color: var(--ink);
-  font-size: 0.61rem;
+  font-size: 0.63rem;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.group-match__player-copy small {
-  margin-top: 2px;
-  color: var(--muted);
-  font-size: 0.48rem;
-}
-
-.group-match__player-score {
+.group-match__player-verdict {
   display: inline-flex;
-  min-width: 36px;
-  align-items: baseline;
-  justify-content: center;
-  gap: 2px;
-  padding: 5px 6px;
-  border: 1px solid #d7e5e8;
-  border-radius: 7px;
-  color: #82959d;
-}
-
-.group-match__player-score.has-rating {
+  max-width: 100%;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  padding: 4px 7px;
   border-color: #badc48;
+  border-style: solid;
+  border-width: 1px;
+  border-radius: 6px;
   background: var(--ball);
   color: var(--deep);
+  font-size: 0.53rem;
+  font-weight: 900;
+  line-height: 1.15;
   box-shadow: inset 0 -2px 0 rgba(19, 55, 64, 0.1);
 }
 
-.group-match__player-score svg {
-  align-self: center;
+.group-match__player-verdict.is-empty {
+  border-color: #d7e5e8;
+  background: #f3f7f8;
+  color: #71858e;
+  box-shadow: none;
 }
 
-.group-match__player-score strong {
-  font-family: var(--display);
-  font-size: 0.95rem;
-  line-height: 0.9;
-}
-
-.group-match__player-score small {
-  font-size: 0.45rem;
-  font-weight: 850;
+.group-match__player-count {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 0.46rem;
+  font-weight: 700;
+  line-height: 1.3;
 }
 
 .group-match__result.is-complete {
@@ -6954,20 +6957,13 @@ p {
   }
 
   .group-match__player {
-    align-items: start;
-    grid-template-columns: 32px minmax(0, 1fr);
+    grid-template-columns: 36px minmax(0, 1fr);
   }
 
   .group-match__avatar {
-    width: 32px;
-    height: 32px;
-    line-height: 28px;
-  }
-
-  .group-match__player-score {
-    min-width: 0;
-    justify-self: start;
-    grid-column: 2;
+    width: 36px;
+    height: 36px;
+    line-height: 32px;
   }
 
   .notification-history__hero {

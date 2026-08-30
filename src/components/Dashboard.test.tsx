@@ -240,7 +240,9 @@ describe('menu account', () => {
     expect(window.location.hash).toBe('#gli-altri-match')
     expect(screen.getByRole('heading', { name: 'Gli altri match' })).toBeInTheDocument()
     expect(screen.getByText('Padel · 27 lug – 2 ago 2020')).toBeInTheDocument()
-    expect(screen.getByLabelText('Ale: Pavone gonfiato, 2 giudizi')).toBeInTheDocument()
+    expect(screen.getByRole('listitem', {
+      name: 'Ale: giudizio medio Pavone gonfiato, calcolato su 2 giudizi ricevuti',
+    })).toBeInTheDocument()
 
     act(() => {
       window.history.replaceState({}, '', '/')
