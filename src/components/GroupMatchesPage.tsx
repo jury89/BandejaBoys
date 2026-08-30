@@ -60,22 +60,29 @@ function GroupMatchCard({
             <span aria-hidden="true"><UsersRound size={18} /></span>
             <div>
               <small>Giudizi del gruppo</small>
-              <strong>La voliera del match</strong>
+              <strong>Il verdetto della voliera</strong>
             </div>
           </header>
-          <div className="group-match__players">
+          <p className="group-match__ratings-intro">
+            Per ogni giocatore mostriamo la media dei giudizi ricevuti.
+          </p>
+          <div className="group-match__players" role="list">
             {starters.map((signup) => {
               const member = memberById.get(signup.userId)
               const feedback = match.playerFeedback.find((item) => item.userId === signup.userId)
               const definition = feedback && feedback.ratingCount > 0
                 ? getMatchFeedbackDefinition(feedback.level)
                 : null
+              const ratingCount = feedback?.ratingCount ?? 0
+              const countLabel = ratingCount === 1
+                ? 'Media di 1 giudizio ricevuto'
+                : `Media di ${ratingCount} giudizi ricevuti`
               const feedbackLabel = definition
-                ? `${signup.displayName}: ${definition.label}, ${feedback?.ratingCount} giudizi`
-                : `${signup.displayName}: nessun giudizio`
+                ? `${signup.displayName}: giudizio medio ${definition.label}, calcolato su ${ratingCount} ${ratingCount === 1 ? 'giudizio ricevuto' : 'giudizi ricevuti'}`
+                : `${signup.displayName}: nessun giudizio ricevuto`
 
               return (
-                <div className="group-match__player" key={signup.id}>
+                <div className="group-match__player" key={signup.id} role="listitem" aria-label={feedbackLabel}>
                   <ProfileAvatar
                     className="group-match__avatar"
                     displayName={signup.displayName}
@@ -84,12 +91,20 @@ function GroupMatchCard({
                   />
                   <div className="group-match__player-copy">
                     <strong>{signup.displayName}</strong>
-                    <small>{isGuestSignup(signup) ? 'Ospite' : definition?.label ?? 'Nessun giudizio'}</small>
+                    {isGuestSignup(signup) ? (
+                      <span className="group-match__player-verdict is-empty">Ospite</span>
+                    ) : definition ? (
+                      <span className="group-match__player-verdict">
+                        <Bird size={13} aria-hidden="true" />
+                        {definition.label}
+                      </span>
+                    ) : (
+                      <span className="group-match__player-verdict is-empty">Nessun giudizio</span>
+                    )}
+                    <small className="group-match__player-count">
+                      {isGuestSignup(signup) ? 'Non partecipa ai giudizi' : definition ? countLabel : 'Nessun giudizio ricevuto'}
+                    </small>
                   </div>
-                  <span className={`group-match__player-score ${definition ? 'has-rating' : ''}`} aria-label={feedbackLabel}>
-                    {definition ? <Bird size={13} aria-hidden="true" /> : null}
-                    <strong>{feedback?.ratingCount ?? 0}</strong>
-                  </span>
                 </div>
               )
             })}
@@ -136,7 +151,7 @@ export function GroupMatchesPage({
         <div>
           <p className="eyebrow">Lo spogliatoio Bandeja</p>
           <h1>Gli altri match</h1>
-          <p>Le partite giocate dal gruppo senza di te, con MVP e risultati dei set.</p>
+          <p>Le partite giocate dal gruppo senza di te, con giudizi e risultati dei set.</p>
         </div>
         <div className="personal-matches__score group-matches__score" aria-label={`${matches.length} partite giocate dagli altri`}>
           <span><strong>{matches.length}</strong>Partite</span>

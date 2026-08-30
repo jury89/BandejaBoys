@@ -93,8 +93,14 @@ describe('pagina degli altri match', () => {
 
     expect(screen.getByRole('heading', { name: 'Gli altri match' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Partite concluse' })).toBeInTheDocument()
-    expect(screen.getByLabelText('Teo: Aquilotto reale, 3 giudizi')).toBeInTheDocument()
-    expect(screen.getAllByLabelText('Luca: nessun giudizio')).toHaveLength(2)
+    expect(screen.getAllByText('Per ogni giocatore mostriamo la media dei giudizi ricevuti.')).toHaveLength(2)
+    const teo = screen.getByRole('listitem', {
+      name: 'Teo: giudizio medio Aquilotto reale, calcolato su 3 giudizi ricevuti',
+    })
+    expect(within(teo).getByText('Aquilotto reale')).toBeInTheDocument()
+    expect(within(teo).getByText('Media di 3 giudizi ricevuti')).toBeInTheDocument()
+    expect(screen.getAllByRole('listitem', { name: 'Luca: nessun giudizio ricevuto' })).toHaveLength(2)
+    expect(screen.getAllByText('Nessun giudizio ricevuto')).toHaveLength(5)
     expect(screen.getByText('1 set registrato')).toBeInTheDocument()
 
     const result = screen.getByRole('table', {
