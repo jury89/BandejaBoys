@@ -72,6 +72,10 @@ import { getLocalProfiles, USERS_EVENT } from './auth'
 import { firestore, hasRemoteBackend } from './firebase'
 import { mondayOfWeek, pollWeekTitle, slotWeekTitle, weekStartForDateTime } from './format'
 import type { NotificationDelivery } from './notificationHistory'
+import {
+  FANTASY_BANDEJA_WRITES_ENABLED,
+  MATCH_FEEDBACK_ENABLED,
+} from './productFeatures'
 
 export interface PadelRepository {
   subscribePolls(listener: (polls: PadelPoll[]) => void, onError: (error: Error) => void): Unsubscribe
@@ -342,11 +346,13 @@ function remoteRepository(): PadelRepository {
         ? mutated
         : { ...mutated, updatedAt: poll.updatedAt + 1 }
       const updatedSlotsById = new Map(updated.slots.map((slot) => [slot.id, slot]))
-      const changedStarterSlotIds = poll.slots
-        .filter((slot) => (
-          starterRosterSnapshot(slot) !== starterRosterSnapshot(updatedSlotsById.get(slot.id))
-        ))
-        .map((slot) => slot.id)
+      const changedStarterSlotIds = FANTASY_BANDEJA_WRITES_ENABLED
+        ? poll.slots
+          .filter((slot) => (
+            starterRosterSnapshot(slot) !== starterRosterSnapshot(updatedSlotsById.get(slot.id))
+          ))
+          .map((slot) => slot.id)
+        : []
       const roundReferences = changedStarterSlotIds.map((slotId) => (
         doc(db, 'fantasyRounds', getFantasyRoundId(pollId, slotId))
       ))
@@ -830,6 +836,7 @@ function remoteRepository(): PadelRepository {
       })
     },
     async dismissMatchFeedbackPrompt(prompt) {
+      if (!MATCH_FEEDBACK_ENABLED) throw new Error('I giudizi post partita sono disattivati.')
       const reference = doc(db, 'matchFeedbackResponses', prompt.id)
       return runTransaction(db, async (transaction) => {
         const snapshot = await transaction.get(reference)
@@ -840,6 +847,7 @@ function remoteRepository(): PadelRepository {
       })
     },
     async submitMatchFeedback(prompt, reviewer, ratings) {
+      if (!MATCH_FEEDBACK_ENABLED) throw new Error('I giudizi post partita sono disattivati.')
       if (prompt.reviewerId !== reviewer.id) {
         throw new Error('Questa scheda appartiene a un altro giocatore.')
       }
@@ -876,6 +884,9 @@ function remoteRepository(): PadelRepository {
       })
     },
     async saveFantasyEntry(roundId, manager, input) {
+      if (!FANTASY_BANDEJA_WRITES_ENABLED) {
+        throw new Error('La stagione FantaBandeja è conclusa: l’archivio è in sola lettura.')
+      }
       const roundReference = doc(db, 'fantasyRounds', roundId)
       const entryReference = doc(db, 'fantasyRounds', roundId, 'entries', manager.id)
       return runTransaction(db, async (transaction) => {
@@ -1077,6 +1088,7 @@ function writeLocalFantasyStore(store: LocalFantasyStore, notify = true) {
 
 function reconcileLocalFantasyStore(): LocalFantasyStore {
   const current = readLocalFantasyStore()
+  if (!FANTASY_BANDEJA_WRITES_ENABLED) return current
   const rounds = reconcileFantasyRounds(
     readLocalPolls(),
     current.rounds,
@@ -1188,8 +1200,14 @@ function localRepository(): PadelRepository {
       return () => window.removeEventListener(MATCH_REPORTS_EVENT, notify)
     },
     subscribeFantasyRounds(listener) {
-      const notify = () => listener(reconcileLocalFantasyStore().rounds)
-      const events = [FANTASY_EVENT, POLLS_EVENT, MATCH_FEEDBACK_EVENT, MATCH_REPORTS_EVENT]
+      const notify = () => listener(
+        (FANTASY_BANDEJA_WRITES_ENABLED
+          ? reconcileLocalFantasyStore()
+          : readLocalFantasyStore()).rounds,
+      )
+      const events = FANTASY_BANDEJA_WRITES_ENABLED
+        ? [FANTASY_EVENT, POLLS_EVENT, MATCH_FEEDBACK_EVENT, MATCH_REPORTS_EVENT]
+        : [FANTASY_EVENT]
       events.forEach((eventName) => window.addEventListener(eventName, notify))
       notify()
       return () => events.forEach((eventName) => window.removeEventListener(eventName, notify))
@@ -1454,6 +1472,7 @@ function localRepository(): PadelRepository {
       localStorage.setItem(LOCAL_ACTIVITY_KEY, JSON.stringify(store))
     },
     async dismissMatchFeedbackPrompt(prompt) {
+      if (!MATCH_FEEDBACK_ENABLED) throw new Error('I giudizi post partita sono disattivati.')
       const store = readLocalMatchFeedbackStore()
       const existing = store.responses.find((response) => response.id === prompt.id)
       if (existing) return existing
@@ -1462,6 +1481,7 @@ function localRepository(): PadelRepository {
       return response
     },
     async submitMatchFeedback(prompt, reviewer, ratings) {
+      if (!MATCH_FEEDBACK_ENABLED) throw new Error('I giudizi post partita sono disattivati.')
       const store = readLocalMatchFeedbackStore()
       if (store.responses.some((response) => response.id === prompt.id)) {
         throw new Error('Questa scheda è già stata chiusa.')
@@ -1490,6 +1510,9 @@ function localRepository(): PadelRepository {
       return report
     },
     async saveFantasyEntry(roundId, manager, input) {
+      if (!FANTASY_BANDEJA_WRITES_ENABLED) {
+        throw new Error('La stagione FantaBandeja è conclusa: l’archivio è in sola lettura.')
+      }
       const store = reconcileLocalFantasyStore()
       const round = store.rounds.find((item) => item.id === roundId)
       if (!round) throw new Error('Round FantaBandeja non trovato.')

@@ -5278,6 +5278,62 @@ p {
   line-height: 1;
 }
 
+.fantasy-season-closed {
+  display: grid;
+  align-items: center;
+  margin-bottom: 16px;
+  padding: 20px 22px;
+  grid-template-columns: 48px minmax(0, 1fr) auto;
+  gap: 16px;
+  border: 1px solid #bcd1d7;
+  border-left: 6px solid var(--ball);
+  border-radius: 14px;
+  background: #f7fbfc;
+  box-shadow: 0 10px 24px rgba(7, 58, 80, 0.09);
+}
+
+.fantasy-season-closed__icon {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  place-items: center;
+  background: var(--deep);
+  color: var(--ball);
+}
+
+.fantasy-season-closed .eyebrow {
+  margin-bottom: 4px;
+}
+
+.fantasy-season-closed h2 {
+  margin: 0 0 4px;
+  color: var(--ink);
+  font-family: var(--display);
+  font-size: clamp(1.8rem, 3.5vw, 2.6rem);
+  line-height: 0.9;
+  text-transform: uppercase;
+}
+
+.fantasy-season-closed p:last-child {
+  max-width: 720px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.55;
+}
+
+.fantasy-season-closed > strong {
+  padding: 9px 12px 7px;
+  border: 2px dashed var(--court);
+  color: var(--court);
+  font-family: var(--display);
+  font-size: 1.15rem;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  text-transform: uppercase;
+  transform: rotate(-2deg);
+}
+
 .fantasy-hub-nav {
   position: sticky;
   top: 82px;
@@ -5293,6 +5349,10 @@ p {
   background: rgba(232, 240, 243, 0.95);
   box-shadow: 0 10px 26px rgba(7, 58, 80, 0.12);
   backdrop-filter: blur(14px);
+}
+
+.fantasy-hub-nav--archive {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .fantasy-hub-nav::after {
@@ -6796,6 +6856,22 @@ p {
     font-size: 1.35rem;
   }
 
+  .fantasy-season-closed {
+    padding: 18px;
+    grid-template-columns: 44px minmax(0, 1fr);
+    gap: 13px;
+  }
+
+  .fantasy-season-closed__icon {
+    width: 44px;
+    height: 44px;
+  }
+
+  .fantasy-season-closed > strong {
+    justify-self: start;
+    grid-column: 1 / -1;
+  }
+
   .fantasy-hub-nav {
     top: 78px;
     margin-bottom: 28px;
@@ -7295,6 +7371,19 @@ p {
   .fantasy-hero__rules-button {
     width: auto;
     min-height: 44px;
+  }
+
+  .fantasy-season-closed {
+    align-items: start;
+    padding: 16px 14px;
+  }
+
+  .fantasy-season-closed h2 {
+    font-size: 1.8rem;
+  }
+
+  .fantasy-season-closed p:last-child {
+    font-size: 0.75rem;
   }
 
   .fantasy-hub-nav {

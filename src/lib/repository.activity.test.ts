@@ -1,7 +1,6 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import type {
   MatchFeedbackPrompt,
-  MatchFeedbackSummary,
   PadelPoll,
   SessionUser,
 } from '../types'
@@ -174,7 +173,7 @@ describe('repository activity log in demo mode', () => {
     expect(activity().views[0].lastViewedAt).toBeGreaterThanOrEqual(activity().views[0].firstViewedAt)
   })
 
-  it('salva un giudizio per ogni compagno registrato anche quando nello slot c’è un ospite', async () => {
+  it('rifiuta nuovi giudizi quando il sistema post partita è in pausa', async () => {
     const prompt: MatchFeedbackPrompt = {
       id: 'poll-guest__slot-guest__jury',
       pollId: 'poll-guest',
@@ -190,22 +189,11 @@ describe('repository activity log in demo mode', () => {
       ],
     }
 
-    await repository.submitMatchFeedback(prompt, user, [
+    await expect(repository.submitMatchFeedback(prompt, user, [
       { playerId: 'ale', level: 4 },
       { playerId: 'luca', level: 2 },
-    ])
+    ])).rejects.toThrow('I giudizi post partita sono disattivati.')
 
-    let summaries: MatchFeedbackSummary[] = []
-    const unsubscribeSummaries = repository.subscribeMatchFeedbackSummaries((records) => {
-      summaries = records
-    }, vi.fn())
-    unsubscribeSummaries()
-
-    expect(summaries).toContainEqual(expect.objectContaining({
-      id: 'poll-guest__slot-guest__ale',
-      playerId: 'ale',
-      scoreUnitsTotal: 15,
-      ratingCount: 1,
-    }))
+    expect(localStorage.getItem('bandeja-boys:match-feedback-responses')).toBeNull()
   })
 })
