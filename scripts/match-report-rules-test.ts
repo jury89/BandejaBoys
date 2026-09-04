@@ -332,9 +332,22 @@ const tests: TestDefinition[] = [
     ),
   },
   {
-    label: 'round fantasy creato soltanto dal notifier',
+    label: 'nuovi giudizi disabilitati durante la pausa prodotto',
     testCase: {
-      expectation: 'ALLOW',
+      expectation: 'DENY',
+      request: {
+        auth: auth(),
+        path: `/databases/(default)/documents/matchFeedbackResponses/${feedbackResponseId}`,
+        method: 'create',
+        resource: { data: feedbackResponse },
+      },
+      expressionReportLevel: 'FULL',
+    },
+  },
+  {
+    label: 'round fantasy non più creato dal notifier a stagione conclusa',
+    testCase: {
+      expectation: 'DENY',
       request: {
         auth: notifierAuth(),
         path: fantasyRoundPath,
@@ -358,9 +371,9 @@ const tests: TestDefinition[] = [
     },
   },
   {
-    label: 'notifier può riallineare un round fantasy',
+    label: 'notifier non riallinea i round fantasy archiviati',
     testCase: {
-      expectation: 'ALLOW',
+      expectation: 'DENY',
       request: {
         auth: notifierAuth(),
         path: fantasyRoundPath,

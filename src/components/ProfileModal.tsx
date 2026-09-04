@@ -17,6 +17,7 @@ import type { NotificationPreferences, SessionUser } from '../types'
 import { compressAvatar } from '../lib/avatar'
 import { profileNameError, PROFILE_NAME_MAX_LENGTH } from '../lib/domain'
 import { normalizeNotificationPreferences } from '../lib/notificationPreferences'
+import { isNotificationPreferenceVisible } from '../lib/productFeatures'
 import { Modal } from './Modal'
 import { ProfileAvatar } from './ProfileAvatar'
 
@@ -214,7 +215,9 @@ export function ProfileModal({ user, onClose, onSave, onDone }: ProfileModalProp
           </div>
           <p>La scelta vale per tutti i tuoi dispositivi e puoi cambiarla quando vuoi.</p>
           <div className="profile-notifications__list">
-            {NOTIFICATION_OPTIONS.map((option) => {
+            {NOTIFICATION_OPTIONS.filter((option) => (
+              isNotificationPreferenceVisible(option.key)
+            )).map((option) => {
               const Icon = option.icon
               const checked = notificationPreferences[option.key]
               return (

@@ -36,6 +36,11 @@ import {
   createTestNotification,
   isNotificationKindEnabled,
 } from '../src/lib/notificationSchedule'
+import {
+  FANTASY_BANDEJA_WRITES_ENABLED,
+  isProductNotificationEnabled,
+  MATCH_FEEDBACK_ENABLED,
+} from '../src/lib/productFeatures'
 
 interface StoredPushSubscription extends PushSubscription {
   userId: string
@@ -66,6 +71,9 @@ if (testNotificationTitle && !testUserId) throw new Error('Un titolo manuale ric
 if (testNotificationUrl && !testUserId) throw new Error('Un link manuale richiede il destinatario.')
 if (testNotificationMode === 'feedback' && !testUserId) {
   throw new Error('Il collaudo dei giudizi richiede il destinatario.')
+}
+if (testNotificationMode === 'feedback' && !MATCH_FEEDBACK_ENABLED) {
+  throw new Error('I giudizi post partita sono disattivati.')
 }
 
 const app = initializeApp({ apiKey, authDomain: `${projectId}.firebaseapp.com`, projectId })
@@ -203,23 +211,27 @@ const motivationRecipientUserIds = Array.from(new Set(
   subscriptions.map((subscription) => subscription.data.userId),
 ))
 const now = Date.now()
-const fantasyRounds = reconcileFantasyRounds(
-  polls,
-  existingFantasyRounds,
-  fantasyEntries,
-  feedbackSummaries,
-  feedbackResponses,
-  matchReports,
-  now,
-)
+const fantasyRounds = FANTASY_BANDEJA_WRITES_ENABLED
+  ? reconcileFantasyRounds(
+      polls,
+      existingFantasyRounds,
+      fantasyEntries,
+      feedbackSummaries,
+      feedbackResponses,
+      matchReports,
+      now,
+    )
+  : existingFantasyRounds
 const existingFantasyRoundsById = new Map(
   existingFantasyRounds.map((round) => [round.id, round]),
 )
-await Promise.all(fantasyRounds.map(async (round) => {
-  const existing = existingFantasyRoundsById.get(round.id)
-  if (existing && JSON.stringify(existing) === JSON.stringify(round)) return
-  await setDoc(doc(db, 'fantasyRounds', round.id), round)
-}))
+if (FANTASY_BANDEJA_WRITES_ENABLED) {
+  await Promise.all(fantasyRounds.map(async (round) => {
+    const existing = existingFantasyRoundsById.get(round.id)
+    if (existing && JSON.stringify(existing) === JSON.stringify(round)) return
+    await setDoc(doc(db, 'fantasyRounds', round.id), round)
+  }))
+}
 const notifications = testUserId
   ? [createTestNotification(
       testUserId,
@@ -235,8 +247,10 @@ const notifications = testUserId
         recipientUserIds: motivationRecipientUserIds,
         motherNamesByUserId,
       }),
-      ...collectFantasyNotifications(fantasyRounds, fantasyEntries, now),
-    ]
+      ...(FANTASY_BANDEJA_WRITES_ENABLED
+        ? collectFantasyNotifications(fantasyRounds, fantasyEntries, now)
+        : []),
+    ].filter((notification) => isProductNotificationEnabled(notification.kind))
 
 let sent = 0
 let skipped = 0

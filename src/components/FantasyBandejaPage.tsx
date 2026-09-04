@@ -50,6 +50,7 @@ interface FantasyBandejaPageProps {
   onBack: () => void
   onRetry: () => void
   onSave: (roundId: string, input: FantasySelectionInput) => Promise<void>
+  readOnly?: boolean
 }
 
 interface FantasyRoundCardProps {
@@ -421,6 +422,8 @@ function LockedRound({
   members: MemberProfile[]
   user: SessionUser
 }) {
+  const currentEntries = entries?.filter((entry) => fantasyEntryIsCurrent(round, entry))
+
   return (
     <article className="fantasy-locked-round">
       <header>
@@ -433,11 +436,11 @@ function LockedRound({
       </header>
       {entries === undefined ? (
         <div className="fantasy-locked-round__state">Recuperiamo le formazioni…</div>
-      ) : entries.length === 0 ? (
+      ) : currentEntries?.length === 0 ? (
         <div className="fantasy-locked-round__state">Nessuno ha schierato una coppia per questo round.</div>
       ) : (
         <ol className="fantasy-entry-list">
-          {entries.map((entry) => (
+          {currentEntries?.map((entry) => (
             <li key={entry.managerId} className={entry.managerId === user.id ? 'is-mine' : ''}>
               <div>
                 <strong>
@@ -844,14 +847,21 @@ export function FantasyBandejaPage({
   onBack,
   onRetry,
   onSave,
+  readOnly = false,
 }: FantasyBandejaPageProps) {
   const [rulesOpen, setRulesOpen] = useState(false)
   const [selectedView, setSelectedView] = useState<FantasyView | null>(null)
   const [visibleResultCount, setVisibleResultCount] = useState(INITIAL_VISIBLE_RESULTS)
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([])
+  const availableViews = readOnly
+    ? FANTASY_VIEWS.filter((view) => view !== 'play')
+    : FANTASY_VIEWS
   const visibleRounds = useMemo(
-    () => rounds.filter((round) => round.status !== 'pending'),
-    [rounds],
+    () => rounds.filter((round) => (
+      round.status !== 'pending'
+      && (!readOnly || round.status === 'scored' || round.status === 'void')
+    )),
+    [readOnly, rounds],
   )
   const orderedRounds = useMemo(
     () => [...visibleRounds].sort((left, right) => left.locksAt - right.locksAt),
@@ -863,33 +873,37 @@ export function FantasyBandejaPage({
     .filter((round) => round.status === 'scored' || round.status === 'void')
     .sort((left, right) => right.locksAt - left.locksAt)
   const leaderboard = getFantasyLeaderboard(visibleRounds)
-  const resultRoundsCount = lockedRounds.length + finishedRounds.length
+  const resultRoundsCount = (readOnly ? 0 : lockedRounds.length) + finishedRounds.length
   const visibleFinishedRounds = finishedRounds.slice(0, visibleResultCount)
   const remainingResultsCount = Math.max(0, finishedRounds.length - visibleFinishedRounds.length)
-  const defaultView: FantasyView = openRounds.length > 0
-    ? 'play'
-    : resultRoundsCount > 0
-      ? 'results'
-      : 'leaderboard'
-  const activeView = selectedView ?? defaultView
+  const defaultView: FantasyView = readOnly
+    ? 'leaderboard'
+    : openRounds.length > 0
+      ? 'play'
+      : resultRoundsCount > 0
+        ? 'results'
+        : 'leaderboard'
+  const activeView = selectedView === 'play' && readOnly
+    ? defaultView
+    : selectedView ?? defaultView
 
   const chooseView = (view: FantasyView) => setSelectedView(view)
   const focusViewTab = (view: FantasyView) => {
     chooseView(view)
-    tabRefs.current[FANTASY_VIEWS.indexOf(view)]?.focus()
+    tabRefs.current[availableViews.indexOf(view)]?.focus()
   }
   const handleTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>, view: FantasyView) => {
-    const currentIndex = FANTASY_VIEWS.indexOf(view)
+    const currentIndex = availableViews.indexOf(view)
     let targetIndex: number | null = null
 
-    if (event.key === 'ArrowRight') targetIndex = (currentIndex + 1) % FANTASY_VIEWS.length
-    if (event.key === 'ArrowLeft') targetIndex = (currentIndex - 1 + FANTASY_VIEWS.length) % FANTASY_VIEWS.length
+    if (event.key === 'ArrowRight') targetIndex = (currentIndex + 1) % availableViews.length
+    if (event.key === 'ArrowLeft') targetIndex = (currentIndex - 1 + availableViews.length) % availableViews.length
     if (event.key === 'Home') targetIndex = 0
-    if (event.key === 'End') targetIndex = FANTASY_VIEWS.length - 1
+    if (event.key === 'End') targetIndex = availableViews.length - 1
     if (targetIndex === null) return
 
     event.preventDefault()
-    focusViewTab(FANTASY_VIEWS[targetIndex])
+    focusViewTab(availableViews[targetIndex])
   }
 
   return (
@@ -906,8 +920,9 @@ export function FantasyBandejaPage({
             <span className="fantasy-hero__title-accent">Bandeja</span>
           </h1>
           <p className="fantasy-hero__intro">
-            Scegli la coppia. Affida la fascia. Prenditi la gloria senza nemmeno
-            entrare in campo.
+            {readOnly
+              ? 'La stagione si è conclusa. Classifica, formazioni e risultati restano qui come archivio del campionato.'
+              : 'Scegli la coppia. Affida la fascia. Prenditi la gloria senza nemmeno entrare in campo.'}
           </p>
           <button
             className="fantasy-hero__rules-button"
@@ -915,7 +930,7 @@ export function FantasyBandejaPage({
             onClick={() => setRulesOpen(true)}
           >
             <BookOpenText size={18} />
-            Come si gioca
+            {readOnly ? 'Regole della stagione' : 'Come si gioca'}
           </button>
         </div>
         <div className="fantasy-hero__mark" aria-hidden="true">
@@ -924,27 +939,50 @@ export function FantasyBandejaPage({
         </div>
       </section>
 
+      {readOnly && (
+        <section className="fantasy-season-closed" role="status" aria-labelledby="fantasy-season-closed-title">
+          <span className="fantasy-season-closed__icon" aria-hidden="true">
+            <LockKeyhole size={24} />
+          </span>
+          <div>
+            <p className="eyebrow">Archivio FantaBandeja</p>
+            <h2 id="fantasy-season-closed-title">La stagione è finita.</h2>
+            <p>
+              Il gioco è ora in sola consultazione: non si possono più salvare formazioni,
+              inviare giudizi o calcolare nuovi round.
+            </p>
+          </div>
+          <strong aria-label="Stagione conclusa">Fine stagione</strong>
+        </section>
+      )}
+
       {rulesOpen && <FantasyRulesModal onClose={() => setRulesOpen(false)} />}
 
-      <nav className="fantasy-hub-nav" aria-label="Sezioni FantaBandeja" role="tablist">
+      <nav
+        className={`fantasy-hub-nav${readOnly ? ' fantasy-hub-nav--archive' : ''}`}
+        aria-label="Sezioni FantaBandeja"
+        role="tablist"
+      >
+        {!readOnly && (
+          <button
+            ref={(node) => { tabRefs.current[availableViews.indexOf('play')] = node }}
+            id="fantasy-tab-play"
+            type="button"
+            role="tab"
+            aria-selected={activeView === 'play'}
+            aria-controls="fantasy-panel-play"
+            tabIndex={activeView === 'play' ? 0 : -1}
+            className={activeView === 'play' ? 'is-active' : ''}
+            onClick={() => chooseView('play')}
+            onKeyDown={(event) => handleTabKeyDown(event, 'play')}
+          >
+            <CalendarDays size={20} />
+            <span><strong>Partite</strong><small>Formazioni aperte</small></span>
+            <em aria-label={`${openRounds.length} formazioni aperte`}>{openRounds.length}</em>
+          </button>
+        )}
         <button
-          ref={(node) => { tabRefs.current[0] = node }}
-          id="fantasy-tab-play"
-          type="button"
-          role="tab"
-          aria-selected={activeView === 'play'}
-          aria-controls="fantasy-panel-play"
-          tabIndex={activeView === 'play' ? 0 : -1}
-          className={activeView === 'play' ? 'is-active' : ''}
-          onClick={() => chooseView('play')}
-          onKeyDown={(event) => handleTabKeyDown(event, 'play')}
-        >
-          <CalendarDays size={20} />
-          <span><strong>Partite</strong><small>Formazioni aperte</small></span>
-          <em aria-label={`${openRounds.length} formazioni aperte`}>{openRounds.length}</em>
-        </button>
-        <button
-          ref={(node) => { tabRefs.current[1] = node }}
+          ref={(node) => { tabRefs.current[availableViews.indexOf('leaderboard')] = node }}
           id="fantasy-tab-leaderboard"
           type="button"
           role="tab"
@@ -960,7 +998,7 @@ export function FantasyBandejaPage({
           <em>{leaderboard.length}</em>
         </button>
         <button
-          ref={(node) => { tabRefs.current[2] = node }}
+          ref={(node) => { tabRefs.current[availableViews.indexOf('results')] = node }}
           id="fantasy-tab-results"
           type="button"
           role="tab"
@@ -972,7 +1010,7 @@ export function FantasyBandejaPage({
           onKeyDown={(event) => handleTabKeyDown(event, 'results')}
         >
           <ShieldCheck size={20} />
-          <span><strong>Risultati</strong><small>In calcolo e conclusi</small></span>
+          <span><strong>Risultati</strong><small>{readOnly ? 'Archivio stagione' : 'In calcolo e conclusi'}</small></span>
           <em>{resultRoundsCount}</em>
         </button>
       </nav>
@@ -994,9 +1032,17 @@ export function FantasyBandejaPage({
       ) : visibleRounds.length === 0 ? (
         <section className="fantasy-empty">
           <Trophy size={34} />
-          <p className="eyebrow">Spogliatoi ancora vuoti</p>
-          <h2>Il prossimo round nasce con una partita prenotata.</h2>
-          <p>Servono quattro titolari registrati e il campo confermato. Appena ci sono, potrai schierare la coppia.</p>
+          <p className="eyebrow">{readOnly ? 'Archivio vuoto' : 'Spogliatoi ancora vuoti'}</p>
+          <h2>
+            {readOnly
+              ? 'La stagione si è chiusa senza round archiviati.'
+              : 'Il prossimo round nasce con una partita prenotata.'}
+          </h2>
+          <p>
+            {readOnly
+              ? 'Non verranno create nuove giornate, ma il resto dell’app continua a funzionare normalmente.'
+              : 'Servono quattro titolari registrati e il campo confermato. Appena ci sono, potrai schierare la coppia.'}
+          </p>
         </section>
       ) : (
         <>
@@ -1058,7 +1104,7 @@ export function FantasyBandejaPage({
             >
               {resultRoundsCount > 0 ? (
                 <>
-                  {lockedRounds.length > 0 && (
+                  {!readOnly && lockedRounds.length > 0 && (
                     <section className="fantasy-section" aria-labelledby="fantasy-locked-title">
                       <header className="fantasy-section__heading">
                         <div><p className="eyebrow">Risultato in corso</p><h2 id="fantasy-locked-title">Round in calcolo</h2></div>
@@ -1112,7 +1158,11 @@ export function FantasyBandejaPage({
                   <ShieldCheck size={34} />
                   <p className="eyebrow">Archivio vuoto</p>
                   <h2>Nessun round è ancora terminato.</h2>
-                  <p>Risultati, formazioni e dettaglio dei punteggi appariranno qui dopo il calcolo.</p>
+                  <p>
+                    {readOnly
+                      ? 'La stagione è conclusa e non verranno aggiunti altri risultati.'
+                      : 'Risultati, formazioni e dettaglio dei punteggi appariranno qui dopo il calcolo.'}
+                  </p>
                 </section>
               )}
             </div>

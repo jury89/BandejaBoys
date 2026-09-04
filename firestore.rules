@@ -20,6 +20,15 @@ service cloud.firestore {
       return isMember() && request.auth.uid == '4VSiYJso4YSWf35Rg8Cp0Q8hVmu2';
     }
 
+    // Product pause switches. Keep validation logic below intact for a future reactivation.
+    function matchFeedbackEnabled() {
+      return false;
+    }
+
+    function fantasyBandejaWritesEnabled() {
+      return false;
+    }
+
     function validAvatar() {
       return !request.resource.data.keys().hasAny(['avatarDataUrl'])
         || (request.resource.data.avatarDataUrl is string
@@ -553,7 +562,9 @@ service cloud.firestore {
 
     match /matchFeedbackResponses/{responseId} {
       allow read: if isNotifier() || (isMember() && resource.data.reviewerId == request.auth.uid);
-      allow create: if isMember() && validMatchFeedbackResponse(responseId);
+      allow create: if matchFeedbackEnabled()
+        && isMember()
+        && validMatchFeedbackResponse(responseId);
       allow update, delete: if false;
     }
 
@@ -569,8 +580,12 @@ service cloud.firestore {
 
     match /matchFeedbackSummaries/{summaryId} {
       allow read: if isMember() || isNotifier();
-      allow create: if isMember() && validMatchFeedbackSummaryCreate(summaryId);
-      allow update: if isMember() && validMatchFeedbackSummaryUpdate(summaryId);
+      allow create: if matchFeedbackEnabled()
+        && isMember()
+        && validMatchFeedbackSummaryCreate(summaryId);
+      allow update: if matchFeedbackEnabled()
+        && isMember()
+        && validMatchFeedbackSummaryUpdate(summaryId);
       allow delete: if false;
     }
 
@@ -594,9 +609,12 @@ service cloud.firestore {
 
     match /fantasyRounds/{roundId} {
       allow read: if isMember() || isNotifier();
-      allow create: if isNotifier() && validFantasyRound(roundId);
-      allow update: if (isNotifier() && validFantasyRound(roundId))
-        || validMemberFantasyRosterSync(roundId);
+      allow create: if fantasyBandejaWritesEnabled()
+        && isNotifier()
+        && validFantasyRound(roundId);
+      allow update: if fantasyBandejaWritesEnabled()
+        && ((isNotifier() && validFantasyRound(roundId))
+          || validMemberFantasyRosterSync(roundId));
       allow delete: if false;
 
       match /entries/{managerId} {
@@ -607,8 +625,11 @@ service cloud.firestore {
         allow list: if isNotifier()
           || (isMember() && request.time.toMillis()
             >= get(/databases/$(database)/documents/fantasyRounds/$(roundId)).data.locksAt);
-        allow create: if isMember() && validFantasyEntry(roundId, managerId);
-        allow update: if isMember()
+        allow create: if fantasyBandejaWritesEnabled()
+          && isMember()
+          && validFantasyEntry(roundId, managerId);
+        allow update: if fantasyBandejaWritesEnabled()
+          && isMember()
           && validFantasyEntry(roundId, managerId)
           && request.resource.data.createdAt == resource.data.createdAt;
         allow delete: if false;
