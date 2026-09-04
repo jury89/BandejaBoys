@@ -421,6 +421,8 @@ function LockedRound({
   members: MemberProfile[]
   user: SessionUser
 }) {
+  const currentEntries = entries?.filter((entry) => fantasyEntryIsCurrent(round, entry))
+
   return (
     <article className="fantasy-locked-round">
       <header>
@@ -433,11 +435,11 @@ function LockedRound({
       </header>
       {entries === undefined ? (
         <div className="fantasy-locked-round__state">Recuperiamo le formazioni…</div>
-      ) : entries.length === 0 ? (
+      ) : currentEntries?.length === 0 ? (
         <div className="fantasy-locked-round__state">Nessuno ha schierato una coppia per questo round.</div>
       ) : (
         <ol className="fantasy-entry-list">
-          {entries.map((entry) => (
+          {currentEntries?.map((entry) => (
             <li key={entry.managerId} className={entry.managerId === user.id ? 'is-mine' : ''}>
               <div>
                 <strong>
