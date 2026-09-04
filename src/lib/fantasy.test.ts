@@ -9,7 +9,8 @@ import type {
 } from '../types'
 import {
   FANTASY_BASE_SCORE,
-  FANTASY_EARLY_SETTLEMENT_DELAY_MS,
+  FANTASY_FEEDBACK_FALLBACK_DELAY_MS,
+  FANTASY_SETTLEMENT_GRACE_MS,
   FANTASY_TOP_PERFORMER_LEAGUE_POINTS,
   FANTASY_MISSING_REPORT_VOID_REASON,
   FANTASY_SETTLEMENT_DELAY_MS,
@@ -510,8 +511,9 @@ describe('punteggio FantaBandeja', () => {
     ])
   })
 
-  it('chiude dopo 24 ore quando referto e schede dei giudizi sono completi', () => {
+  it('chiude dieci minuti dopo l’ultimo dato quando referto e giudizi sono completi', () => {
     const round = roundFixture()
+    const readyAt = reportFixture().updatedAt + FANTASY_SETTLEMENT_GRACE_MS
     const beforeSettlement = reconcileFantasyRounds(
       [pollWith()],
       [round],
@@ -519,9 +521,14 @@ describe('punteggio FantaBandeja', () => {
       feedbackSummaries,
       feedbackResponses,
       [reportFixture()],
-      round.slotEndsAt + FANTASY_EARLY_SETTLEMENT_DELAY_MS - 1,
+      readyAt - 1,
     )
-    expect(beforeSettlement[0].status).toBe('open')
+    expect(beforeSettlement[0]).toMatchObject({
+      status: 'open',
+      hasMatchReport: true,
+      feedbackResponseCount: 4,
+      settlementReadyAt: readyAt,
+    })
 
     const scored = reconcileFantasyRounds(
       [pollWith()],
@@ -530,12 +537,12 @@ describe('punteggio FantaBandeja', () => {
       feedbackSummaries,
       feedbackResponses,
       [reportFixture()],
-      round.slotEndsAt + FANTASY_EARLY_SETTLEMENT_DELAY_MS,
+      readyAt,
     )
     expect(scored[0].status).toBe('scored')
   })
 
-  it('attende 48 ore se manca una scheda e usa i giudizi disponibili come fallback', () => {
+  it('usa dopo 24 ore i giudizi disponibili se manca una scheda', () => {
     const round = roundFixture()
     const incompleteResponses = feedbackResponses.filter((response) => response.reviewerId !== 'd')
     const afterTwentyFourHours = reconcileFantasyRounds(
@@ -545,9 +552,13 @@ describe('punteggio FantaBandeja', () => {
       feedbackSummaries,
       incompleteResponses,
       [reportFixture()],
-      round.slotEndsAt + FANTASY_EARLY_SETTLEMENT_DELAY_MS,
+      round.slotEndsAt + FANTASY_FEEDBACK_FALLBACK_DELAY_MS - 1,
     )
-    expect(afterTwentyFourHours[0].status).toBe('open')
+    expect(afterTwentyFourHours[0]).toMatchObject({
+      status: 'open',
+      hasMatchReport: true,
+      feedbackResponseCount: 3,
+    })
 
     const scoredWithDefault = reconcileFantasyRounds(
       [pollWith()],
@@ -556,7 +567,7 @@ describe('punteggio FantaBandeja', () => {
       feedbackSummaries,
       incompleteResponses,
       [reportFixture()],
-      round.settlesAt,
+      round.slotEndsAt + FANTASY_FEEDBACK_FALLBACK_DELAY_MS,
     )
     expect(scoredWithDefault[0]).toMatchObject({
       status: 'scored',
@@ -568,6 +579,47 @@ describe('punteggio FantaBandeja', () => {
         }),
       ]),
     })
+  })
+
+  it('attende il referto anche dopo 24 ore e lo lascia dieci minuti al sicuro se arriva tardi', () => {
+    const round = roundFixture()
+    const fallbackAt = round.slotEndsAt + FANTASY_FEEDBACK_FALLBACK_DELAY_MS
+    const withoutReport = reconcileFantasyRounds(
+      [pollWith()],
+      [round],
+      [],
+      feedbackSummaries,
+      feedbackResponses,
+      [],
+      fallbackAt,
+    )
+    expect(withoutReport[0]).toMatchObject({ status: 'open', hasMatchReport: false })
+
+    const lateReport = { ...reportFixture(), updatedAt: fallbackAt, createdAt: fallbackAt }
+    const beforeGrace = reconcileFantasyRounds(
+      [pollWith()],
+      [round],
+      [],
+      feedbackSummaries,
+      feedbackResponses,
+      [lateReport],
+      fallbackAt + FANTASY_SETTLEMENT_GRACE_MS - 1,
+    )
+    expect(beforeGrace[0]).toMatchObject({
+      status: 'open',
+      settlementReadyAt: fallbackAt + FANTASY_SETTLEMENT_GRACE_MS,
+    })
+
+    const afterGrace = reconcileFantasyRounds(
+      [pollWith()],
+      [round],
+      [],
+      feedbackSummaries,
+      feedbackResponses,
+      [lateReport],
+      fallbackAt + FANTASY_SETTLEMENT_GRACE_MS,
+    )
+    expect(afterGrace[0].status).toBe('scored')
   })
 
   it('annulla dopo 48 ore se il referto manca', () => {

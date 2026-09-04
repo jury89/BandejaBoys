@@ -67,8 +67,9 @@ describe('FantaBandeja', () => {
     expect(within(dialog).getByText('Punteggio giocatore')).toBeInTheDocument()
     expect(within(dialog).getByText(/chi gioca in campo riceve 2 punti/i)).toBeInTheDocument()
     expect(within(dialog).getByText(/chi ottiene il giudizio medio migliore ne riceve 3/i)).toBeInTheDocument()
-    expect(within(dialog).getByText(/Dopo 24 ore il risultato/i)).toBeInTheDocument()
-    expect(within(dialog).getByText(/A 48 ore il round si chiude comunque/i)).toBeInTheDocument()
+    expect(within(dialog).getByText(/dopo 10 minuti di sicurezza/i)).toBeInTheDocument()
+    expect(within(dialog).getByText(/dopo 24 ore/i)).toBeInTheDocument()
+    expect(within(dialog).getByText(/annullato a 48 ore/i)).toBeInTheDocument()
 
     await user.click(within(dialog).getByRole('button', { name: 'Chiudi' }))
     expect(screen.queryByRole('dialog', { name: 'Come si gioca' })).not.toBeInTheDocument()
@@ -177,6 +178,23 @@ describe('FantaBandeja', () => {
     const inProgressTitle = screen.getByText('Round in calcolo')
     const historyTitle = screen.getByText('Risultati dei round')
     expect(inProgressTitle.compareDocumentPosition(historyTitle) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('mostra lo stato reale di referto, voti e finestra di consolidamento', () => {
+    const afterMatch = round.slotEndsAt + 5 * 60_000
+    const readyAt = afterMatch + 5 * 60_000
+    renderPage({
+      now: afterMatch,
+      rounds: [{
+        ...round,
+        locksAt: round.locksAt - 1,
+        hasMatchReport: true,
+        feedbackResponseCount: 4,
+        settlementReadyAt: readyAt,
+      }],
+    })
+
+    expect(screen.getByText('Tutto pronto · risultato tra pochi minuti.')).toBeInTheDocument()
   })
 
   it('permette di riprovare dopo un errore di caricamento', async () => {

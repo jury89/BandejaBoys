@@ -254,6 +254,13 @@ const updatedFantasyRound = {
   rosterKey: JSON.stringify([userId, 'qa-a', 'qa-b', 'qa-e']),
   updatedAt: createdAt + 1,
 }
+const progressFantasyRound = {
+  ...fantasyRound,
+  hasMatchReport: true,
+  feedbackResponseCount: 4,
+  settlementReadyAt: fantasyRound.slotEndsAt + 10 * 60_000,
+  updatedAt: createdAt + 2,
+}
 
 const tests: TestDefinition[] = [
   {
@@ -366,6 +373,34 @@ const tests: TestDefinition[] = [
         path: fantasyRoundPath,
         method: 'update',
         resource: { data: updatedFantasyRound },
+      },
+      resource: { data: fantasyRound },
+      expressionReportLevel: 'FULL',
+    },
+  },
+  {
+    label: 'notifier può salvare l’avanzamento del consolidamento fantasy',
+    testCase: {
+      expectation: 'ALLOW',
+      request: {
+        auth: notifierAuth(),
+        path: fantasyRoundPath,
+        method: 'update',
+        resource: { data: progressFantasyRound },
+      },
+      resource: { data: fantasyRound },
+      expressionReportLevel: 'FULL',
+    },
+  },
+  {
+    label: 'il conteggio dei voti fantasy non può superare quattro',
+    testCase: {
+      expectation: 'DENY',
+      request: {
+        auth: notifierAuth(),
+        path: fantasyRoundPath,
+        method: 'update',
+        resource: { data: { ...progressFantasyRound, feedbackResponseCount: 5 } },
       },
       resource: { data: fantasyRound },
       expressionReportLevel: 'FULL',

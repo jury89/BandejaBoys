@@ -288,6 +288,9 @@ export interface FantasyRound {
   status: FantasyRoundStatus
   createdAt: number
   updatedAt: number
+  hasMatchReport?: boolean
+  feedbackResponseCount?: number
+  settlementReadyAt?: number
   settledAt?: number
   voidReason?: string
   playerScores?: FantasyPlayerScore[]

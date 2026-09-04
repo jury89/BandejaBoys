@@ -273,6 +273,7 @@ service cloud.firestore {
           'slotEndsAt', 'locksAt', 'settlesAt',
           'participantIds', 'participants', 'rosterKey', 'status',
           'createdAt', 'updatedAt', 'settledAt', 'voidReason',
+          'hasMatchReport', 'feedbackResponseCount', 'settlementReadyAt',
           'playerScores', 'standings'
         ])
         && request.resource.data.keys().hasAll([
@@ -299,6 +300,15 @@ service cloud.firestore {
         && request.resource.data.participants.size() == 4
         && request.resource.data.rosterKey is string
         && request.resource.data.status in ['pending', 'open', 'scored', 'void']
+        && (!request.resource.data.keys().hasAny(['hasMatchReport'])
+          || request.resource.data.hasMatchReport is bool)
+        && (!request.resource.data.keys().hasAny(['feedbackResponseCount'])
+          || (request.resource.data.feedbackResponseCount is int
+            && request.resource.data.feedbackResponseCount >= 0
+            && request.resource.data.feedbackResponseCount <= 4))
+        && (!request.resource.data.keys().hasAny(['settlementReadyAt'])
+          || (request.resource.data.settlementReadyAt is int
+            && request.resource.data.settlementReadyAt >= request.resource.data.slotEndsAt))
         && request.resource.data.createdAt is int
         && request.resource.data.updatedAt is int
         && request.resource.data.updatedAt >= request.resource.data.createdAt;

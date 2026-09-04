@@ -44,7 +44,8 @@ export const MATCH_FEEDBACK_DELAY_MS = 30 * 60 * 1000
 export const MATCH_FEEDBACK_PROMPT_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000
 export const MAX_MATCH_SETS = 5
 export const MAX_MATCH_SET_SCORE = 99
-export const FANTASY_EARLY_SETTLEMENT_DELAY_MS = 24 * 60 * 60 * 1000
+export const FANTASY_SETTLEMENT_GRACE_MS = 10 * 60 * 1000
+export const FANTASY_FEEDBACK_FALLBACK_DELAY_MS = 24 * 60 * 60 * 1000
 export const FANTASY_SETTLEMENT_DELAY_MS = 48 * 60 * 60 * 1000
 export const FANTASY_BASE_SCORE = 6
 export const FANTASY_STARTER_LEAGUE_POINTS = 2
@@ -1112,22 +1113,51 @@ export function reconcileFantasyRounds(
       return voidFantasyRound(round, 'La formazione è cambiata al momento del blocco.', now)
     }
 
-    const report = reportsByRound.get(round.id)
-    const earlySettlementAt = round.slotEndsAt + FANTASY_EARLY_SETTLEMENT_DELAY_MS
-    const closedVoterIds = new Set(
-      feedbackResponses
-        .filter((response) => response.pollId === round.pollId && response.slotId === round.slotId)
-        .map((response) => response.reviewerId),
-    )
+    const candidateReport = reportsByRound.get(round.id)
+    const report = candidateReport && matchReportMatchesFantasyRound(round, candidateReport)
+      ? candidateReport
+      : undefined
+    const participantIds = new Set(round.participantIds)
+    const relevantResponses = feedbackResponses.filter((response) => (
+      response.pollId === round.pollId
+      && response.slotId === round.slotId
+      && participantIds.has(response.reviewerId)
+    ))
+    const closedVoterIds = new Set(relevantResponses.map((response) => response.reviewerId))
+    const feedbackResponseCount = closedVoterIds.size
     const feedbackIsComplete = round.participantIds.every((userId) => closedVoterIds.has(userId))
-    const canSettleEarly = now >= earlySettlementAt && Boolean(report) && feedbackIsComplete
-    if (now < round.settlesAt && !canSettleEarly) return round
+    const settlementReadyAt = report && feedbackIsComplete
+      ? Math.max(
+          round.slotEndsAt,
+          report.updatedAt,
+          ...relevantResponses.map((response) => response.closedAt),
+        ) + FANTASY_SETTLEMENT_GRACE_MS
+      : undefined
+    const progressChanged = round.hasMatchReport !== Boolean(report)
+      || round.feedbackResponseCount !== feedbackResponseCount
+      || round.settlementReadyAt !== settlementReadyAt
+    const roundWithProgress: FantasyRound = progressChanged
+      ? {
+          ...round,
+          hasMatchReport: Boolean(report),
+          feedbackResponseCount,
+          ...(settlementReadyAt === undefined ? {} : { settlementReadyAt }),
+          updatedAt: now,
+        }
+      : round
+    const canSettleWhenComplete = settlementReadyAt !== undefined && now >= settlementReadyAt
+    const feedbackFallbackAt = round.slotEndsAt + FANTASY_FEEDBACK_FALLBACK_DELAY_MS
+    const canUseFeedbackFallback = Boolean(report)
+      && now >= Math.max(feedbackFallbackAt, (report?.updatedAt ?? 0) + FANTASY_SETTLEMENT_GRACE_MS)
+    if (now < round.settlesAt && !canSettleWhenComplete && !canUseFeedbackFallback) {
+      return roundWithProgress
+    }
 
     if (!report) {
-      return voidFantasyRound(round, FANTASY_MISSING_REPORT_VOID_REASON, now)
+      return voidFantasyRound(roundWithProgress, FANTASY_MISSING_REPORT_VOID_REASON, now)
     }
     return scoreFantasyRound(
-      round,
+      roundWithProgress,
       entries.filter((entry) => entry.roundId === round.id),
       report,
       feedbackSummaries,

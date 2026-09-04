@@ -213,9 +213,9 @@ function FantasyRulesModal({ onClose }: { onClose: () => void }) {
 
         <p className="fantasy-rulebook__note">
           <Clock3 size={18} />
-          Dopo 24 ore il risultato viene calcolato se ci sono il referto e tutte
-          le schede dei giudizi chiuse. A 48 ore il round si chiude comunque; senza
-          referto viene annullato.
+          Quando ci sono il referto e tutte le schede dei giudizi chiuse, il risultato
+          viene calcolato dopo 10 minuti di sicurezza. Se manca qualche voto, il calcolo
+          usa quelli disponibili dopo 24 ore. Senza referto, il round viene annullato a 48 ore.
         </p>
       </div>
     </Modal>
@@ -415,13 +415,27 @@ function LockedRound({
   entries,
   members,
   user,
+  now,
 }: {
   round: FantasyRound
   entries?: FantasyEntry[]
   members: MemberProfile[]
   user: SessionUser
+  now: number
 }) {
   const currentEntries = entries?.filter((entry) => fantasyEntryIsCurrent(round, entry))
+  const feedbackResponseCount = round.feedbackResponseCount ?? 0
+  const progressLabel = now < round.slotEndsAt
+    ? 'Partita in corso · il risultato arriverà dopo il referto.'
+    : !round.hasMatchReport
+      ? feedbackResponseCount > 0
+        ? `In attesa del referto · voti ricevuti ${feedbackResponseCount}/4.`
+        : 'In attesa del referto.'
+      : feedbackResponseCount < 4
+        ? `Voti ricevuti ${feedbackResponseCount}/4.`
+        : round.settlementReadyAt !== undefined && now < round.settlementReadyAt
+          ? 'Tutto pronto · risultato tra pochi minuti.'
+          : 'Tutto pronto · consolidamento in corso.'
 
   return (
     <article className="fantasy-locked-round">
@@ -466,7 +480,7 @@ function LockedRound({
           ))}
         </ol>
       )}
-      <footer><Clock3 size={15} /> Calcolo da 24 ore con referto e giudizi chiusi.</footer>
+      <footer><Clock3 size={15} /> {progressLabel}</footer>
     </article>
   )
 }
@@ -1074,6 +1088,7 @@ export function FantasyBandejaPage({
                             entries={roundEntries[round.id]}
                             members={members}
                             user={user}
+                            now={now}
                           />
                         ))}
                       </div>
