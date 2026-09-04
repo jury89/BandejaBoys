@@ -39,7 +39,9 @@ permissions:
 jobs:
   send:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    # A cold npm cache can occasionally take more than five minutes on the
+    # shared runner. Keep enough headroom for installation and queue processing.
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
