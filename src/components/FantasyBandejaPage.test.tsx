@@ -275,15 +275,25 @@ describe('FantaBandeja', () => {
       createdAt: now,
       updatedAt: now,
     }
+    const obsoleteEntry: FantasyEntry = {
+      ...entry,
+      id: 'a',
+      managerId: 'a',
+      managerName: 'Ale',
+      playerIds: ['b', 'c'],
+      captainId: 'b',
+      rosterKey: '["a","b","c","manager"]',
+    }
     const lockedNow = round.locksAt + 1
     renderPage({
       now: lockedNow,
-      roundEntries: { [round.id]: [entry] },
+      roundEntries: { [round.id]: [entry, obsoleteEntry] },
     })
 
     expect(screen.getByText('Formazioni bloccate')).toBeInTheDocument()
     expect(screen.getByText('Ale + Luigi')).toBeInTheDocument()
     expect(screen.getByText('La tua')).toBeInTheDocument()
+    expect(screen.queryByText('Baru + Brescio')).not.toBeInTheDocument()
   })
 
   it('nasconde un round sospeso invece di mostrarne la rosa obsoleta', () => {
