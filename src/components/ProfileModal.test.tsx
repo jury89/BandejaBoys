@@ -57,8 +57,6 @@ describe('profilo giocatore', () => {
 
     const monday = screen.getByRole('switch', { name: 'Ricevi Sveglia del lunedì' })
     const twoHours = screen.getByRole('switch', { name: 'Ricevi Partita tra 2 ore' })
-    expect(screen.queryByRole('switch', { name: /giudizi post partita/i })).not.toBeInTheDocument()
-    expect(screen.queryByRole('switch', { name: /FantaBandeja/i })).not.toBeInTheDocument()
     expect(monday).toBeChecked()
     expect(twoHours).toBeChecked()
 

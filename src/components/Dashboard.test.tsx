@@ -261,9 +261,8 @@ describe('menu account', () => {
 
     expect(window.location.hash).toBe('#fantabandeja')
     expect(screen.getByRole('heading', { name: /FantaBandeja/i })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'La stagione è finita.' })).toBeInTheDocument()
     expect(screen.getByRole('heading', {
-      name: 'La stagione si è chiusa senza round archiviati.',
+      name: 'Il prossimo round nasce con una partita prenotata.',
     })).toBeInTheDocument()
   })
 

@@ -182,17 +182,44 @@ describe('repository remoto della scelta MVP', () => {
     expect(pollWrite?.[1]).not.toHaveProperty('title')
   })
 
-  it('rifiuta nuovi giudizi senza aprire batch o transazioni', async () => {
-    await expect(repository.submitMatchFeedback(prompt, voter, [
+  it('salva risposta e tre aggregati dei giudizi in un batch atomico senza letture transazionali', async () => {
+    const response = await repository.submitMatchFeedback(prompt, voter, [
       { playerId: 'ale', level: 5 },
       { playerId: 'luca', level: 3 },
       { playerId: 'teo', level: 1 },
-    ])).rejects.toThrow('I giudizi post partita sono disattivati.')
+    ])
 
     expect(firestoreMocks.runTransaction).not.toHaveBeenCalled()
-    expect(firestoreMocks.writeBatch).not.toHaveBeenCalled()
-    expect(firestoreMocks.batch.set).not.toHaveBeenCalled()
-    expect(firestoreMocks.batch.commit).not.toHaveBeenCalled()
+    expect(firestoreMocks.writeBatch).toHaveBeenCalledOnce()
+    expect(firestoreMocks.batch.set).toHaveBeenCalledTimes(4)
+    expect(firestoreMocks.batch.set).toHaveBeenCalledWith(
+      'matchFeedbackSummaries/poll-1__slot-1__ale',
+      expect.objectContaining({
+        id: 'poll-1__slot-1__ale',
+        pollId: 'poll-1',
+        slotId: 'slot-1',
+        playerId: 'ale',
+        scoreUnitsTotal: expect.anything(),
+        ratingCount: expect.anything(),
+        lastResponseId: 'poll-1__slot-1__jury',
+      }),
+      { merge: true },
+    )
+    expect(firestoreMocks.batch.set).toHaveBeenLastCalledWith(
+      'matchFeedbackResponses/poll-1__slot-1__jury',
+      response,
+    )
+    expect(firestoreMocks.batch.commit).toHaveBeenCalledOnce()
+    expect(response).toMatchObject({
+      id: prompt.id,
+      reviewerId: voter.id,
+      status: 'submitted',
+      ratings: [
+        expect.objectContaining({ playerId: 'ale', level: 5, scoreUnits: 18 }),
+        expect.objectContaining({ playerId: 'luca', level: 3, scoreUnits: 12 }),
+        expect.objectContaining({ playerId: 'teo', level: 1, scoreUnits: 8 }),
+      ],
+    })
   })
 
   it('crea il referto della partita in una transazione modificabile dai partecipanti', async () => {
@@ -299,7 +326,7 @@ describe('repository remoto della scelta MVP', () => {
     )
   })
 
-  it('aggiorna i titolari senza mutare i round fantasy archiviati', async () => {
+  it('riallinea il round fantasy nella stessa transazione quando cambia un titolare', async () => {
     const poll = futureRosterPoll()
     const round = futureFantasyRound()
     firestoreMocks.transaction.get.mockImplementation(async (reference: string) => {
@@ -315,10 +342,15 @@ describe('repository remoto della scelta MVP', () => {
     const updated = await repository.leaveSlot(poll.id, poll.slots[0].id, voter)
 
     expect(firestoreMocks.transaction.get).toHaveBeenCalledWith(`polls/${poll.id}`)
-    expect(firestoreMocks.transaction.get).not.toHaveBeenCalledWith(`fantasyRounds/${round.id}`)
-    expect(firestoreMocks.transaction.set.mock.calls.some(([reference]) => (
+    expect(firestoreMocks.transaction.get).toHaveBeenCalledWith(`fantasyRounds/${round.id}`)
+    const roundWrite = firestoreMocks.transaction.set.mock.calls.find(([reference]) => (
       reference === `fantasyRounds/${round.id}`
-    ))).toBe(false)
+    ))
+    expect(roundWrite?.[1]).toMatchObject({
+      participantIds: ['ale', 'luca', 'teo', 'reserve'],
+      status: 'open',
+      updatedAt: updated.updatedAt,
+    })
     expect(updated.slots[0].signups.find((signup) => signup.userId === 'reserve')).toMatchObject({
       role: 'starter',
     })
@@ -331,7 +363,7 @@ describe('repository remoto della scelta MVP', () => {
     expect(lastReadOrder).toBeLessThan(firstWriteOrder)
   })
 
-  it('non lascia che un round fantasy archiviato blocchi la modifica dello slot', async () => {
+  it('non salva dati parziali se la lettura del round fantasy fallisce', async () => {
     const poll = futureRosterPoll()
     const round = futureFantasyRound()
     firestoreMocks.transaction.get.mockImplementation(async (reference: string) => {
@@ -344,12 +376,13 @@ describe('repository remoto della scelta MVP', () => {
       return { exists: () => false }
     })
 
-    await expect(repository.leaveSlot(poll.id, poll.slots[0].id, voter)).resolves.toBeDefined()
-    expect(firestoreMocks.transaction.get).not.toHaveBeenCalledWith(`fantasyRounds/${round.id}`)
-    expect(firestoreMocks.transaction.update).toHaveBeenCalled()
+    await expect(repository.leaveSlot(poll.id, poll.slots[0].id, voter))
+      .rejects.toThrow('Round non disponibile')
+    expect(firestoreMocks.transaction.update).not.toHaveBeenCalled()
+    expect(firestoreMocks.transaction.set).not.toHaveBeenCalled()
   })
 
-  it('rifiuta nuove formazioni fantasy senza aprire una transazione', async () => {
+  it('salva la formazione fantasy leggendo round e giocata nella stessa transazione', async () => {
     const locksAt = Date.now() + 60 * 60 * 1000
     const round: FantasyRound = {
       id: 'poll-1__slot-1',
@@ -376,13 +409,26 @@ describe('repository remoto della scelta MVP', () => {
         : { exists: () => false }
     ))
 
-    await expect(repository.saveFantasyEntry(round.id, voter, {
+    const saved = await repository.saveFantasyEntry(round.id, voter, {
       playerIds: ['ale', 'baru'],
       captainId: 'baru',
-    })).rejects.toThrow('La stagione FantaBandeja è conclusa')
+    })
 
-    expect(firestoreMocks.runTransaction).not.toHaveBeenCalled()
-    expect(firestoreMocks.transaction.get).not.toHaveBeenCalled()
-    expect(firestoreMocks.transaction.set).not.toHaveBeenCalled()
+    expect(firestoreMocks.transaction.get).toHaveBeenCalledWith(
+      'fantasyRounds/poll-1__slot-1',
+    )
+    expect(firestoreMocks.transaction.get).toHaveBeenCalledWith(
+      'fantasyRounds/poll-1__slot-1/entries/jury',
+    )
+    expect(firestoreMocks.transaction.set).toHaveBeenCalledWith(
+      'fantasyRounds/poll-1__slot-1/entries/jury',
+      saved,
+    )
+    expect(saved).toMatchObject({
+      managerId: 'jury',
+      playerIds: ['ale', 'baru'],
+      captainId: 'baru',
+      rosterKey: round.rosterKey,
+    })
   })
 })

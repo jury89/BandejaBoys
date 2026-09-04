@@ -46,7 +46,6 @@ function renderPage(overrides: Partial<Parameters<typeof FantasyBandejaPage>[0]>
       now={now}
       loading={false}
       error={null}
-      readOnly={false}
       onBack={vi.fn()}
       onRetry={onRetry}
       onSave={onSave}
@@ -73,35 +72,6 @@ describe('FantaBandeja', () => {
 
     await user.click(within(dialog).getByRole('button', { name: 'Chiudi' }))
     expect(screen.queryByRole('dialog', { name: 'Come si gioca' })).not.toBeInTheDocument()
-  })
-
-  it('in modalità archivio mostra solo classifica e risultati senza azioni di gioco', async () => {
-    const user = userEvent.setup()
-    const scoredRound: FantasyRound = {
-      ...round,
-      id: 'poll-past__slot-past',
-      pollId: 'poll-past',
-      slotId: 'slot-past',
-      slotStartsAt: '2026-07-30T16:30:00.000Z',
-      slotEndsAt: now - 90 * 60_000,
-      locksAt: now - 180 * 60_000,
-      settlesAt: now - 60_000,
-      status: 'scored',
-      standings: [],
-      playerScores: [],
-      settledAt: now - 30_000,
-    }
-
-    renderPage({ rounds: [round, scoredRound], readOnly: true })
-
-    expect(screen.getByRole('heading', { name: 'La stagione è finita.' })).toBeInTheDocument()
-    expect(screen.queryByRole('tab', { name: /Partite/i })).not.toBeInTheDocument()
-    expect(screen.getByRole('tab', { name: /Classifica/i })).toHaveAttribute('aria-selected', 'true')
-    expect(screen.queryByRole('button', { name: /Salva formazione/i })).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Regole della stagione' })).toBeInTheDocument()
-
-    await user.click(screen.getByRole('tab', { name: /Risultati/i }))
-    expect(screen.getByText('Risultati dei round')).toBeInTheDocument()
   })
 
   it('separa prossimi round, classifica e risultati in tre viste navigabili', async () => {
@@ -275,25 +245,15 @@ describe('FantaBandeja', () => {
       createdAt: now,
       updatedAt: now,
     }
-    const obsoleteEntry: FantasyEntry = {
-      ...entry,
-      id: 'a',
-      managerId: 'a',
-      managerName: 'Ale',
-      playerIds: ['b', 'c'],
-      captainId: 'b',
-      rosterKey: '["a","b","c","manager"]',
-    }
     const lockedNow = round.locksAt + 1
     renderPage({
       now: lockedNow,
-      roundEntries: { [round.id]: [entry, obsoleteEntry] },
+      roundEntries: { [round.id]: [entry] },
     })
 
     expect(screen.getByText('Formazioni bloccate')).toBeInTheDocument()
     expect(screen.getByText('Ale + Luigi')).toBeInTheDocument()
     expect(screen.getByText('La tua')).toBeInTheDocument()
-    expect(screen.queryByText('Baru + Brescio')).not.toBeInTheDocument()
   })
 
   it('nasconde un round sospeso invece di mostrarne la rosa obsoleta', () => {

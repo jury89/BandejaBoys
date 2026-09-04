@@ -44,7 +44,6 @@ import {
 } from '../lib/notificationUrl'
 import { notificationStateLabel, usePushNotifications } from '../lib/notifications'
 import { FEEDBACK_TEST_QUERY_PARAM, isFeedbackTestRequested, makeFeedbackTestPrompt } from '../lib/feedbackTest'
-import { FANTASY_BANDEJA_READ_ONLY, MATCH_FEEDBACK_ENABLED } from '../lib/productFeatures'
 import { repository } from '../lib/repository'
 import { slotElementId, type SlotNavigationTarget } from '../lib/slotNavigation'
 import { Brand } from './Brand'
@@ -139,16 +138,13 @@ export function Dashboard() {
   const [notificationHistory, setNotificationHistory] = useState<NotificationHistoryItem[]>([])
   const [notificationHistoryLoaded, setNotificationHistoryLoaded] = useState(!hasRemoteBackend)
   const [notificationHistoryError, setNotificationHistoryError] = useState<string | null>(null)
-  const [feedbackTestOpen, setFeedbackTestOpen] = useState(() => (
-    MATCH_FEEDBACK_ENABLED && isFeedbackTestRequested(window.location.search)
-  ))
+  const [feedbackTestOpen, setFeedbackTestOpen] = useState(() => isFeedbackTestRequested(window.location.search))
   const [feedbackTestStartedAt] = useState(() => Date.now())
   const [slotNavigationTarget, setSlotNavigationTarget] = useState<SlotNavigationTarget | null>(null)
   const accountMenuRef = useRef<HTMLDivElement>(null)
   const hasLoadedPollsRef = useRef(false)
   const initialDataRetryCountRef = useRef(0)
   const [requestedFeedback] = useState(() => {
-    if (!MATCH_FEEDBACK_ENABLED) return null
     const parameters = new URLSearchParams(window.location.search)
     const pollId = parameters.get('feedbackPoll') ?? parameters.get('mvpPoll') ?? parameters.get('ratePoll')
     const slotId = parameters.get('feedbackSlot') ?? parameters.get('mvpSlot') ?? parameters.get('rateSlot')
@@ -380,12 +376,7 @@ export function Dashboard() {
   }, [dashboardView, fantasySubscriptionAttempt])
 
   useEffect(() => {
-    if (
-      FANTASY_BANDEJA_READ_ONLY
-      || dashboardView !== 'fantasy'
-      || !user
-      || !fantasyRoundsLoaded
-    ) return
+    if (dashboardView !== 'fantasy' || !user || !fantasyRoundsLoaded) return
     const subscriptions: Array<() => void> = []
     const showFantasyEntryError = () => {
       setFantasyError('Non siamo riusciti a recuperare tutte le formazioni fantasy.')
@@ -496,10 +487,10 @@ export function Dashboard() {
       .map(getSlotEndsAt)
       .filter((endsAt) => Number.isFinite(endsAt) && endsAt > now)
       .sort((left, right) => left - right)[0]
-    const nextFeedbackPrompt = MATCH_FEEDBACK_ENABLED && user
+    const nextFeedbackPrompt = user
       ? getNextMatchFeedbackPromptAt(polls, feedbackResponses, user.id, now)
       : null
-    const nextFantasyBoundary = FANTASY_BANDEJA_READ_ONLY ? undefined : fantasyRounds
+    const nextFantasyBoundary = fantasyRounds
       .flatMap((round) => [round.locksAt, round.settlesAt])
       .filter((timestamp) => Number.isFinite(timestamp) && timestamp > now)
       .sort((left, right) => left - right)[0]
@@ -587,7 +578,7 @@ export function Dashboard() {
     [notificationHistory],
   )
   const feedbackPrompts = useMemo(() => (
-    MATCH_FEEDBACK_ENABLED && user && feedbackResponsesLoaded
+    user && feedbackResponsesLoaded
       ? getPendingMatchFeedbackPrompts(polls, feedbackResponses, user.id, now)
         .map((prompt) => ({
           ...prompt,
@@ -608,7 +599,7 @@ export function Dashboard() {
     return feedbackPrompts[0] ?? null
   }, [feedbackPrompts, requestedFeedback])
   const feedbackTestPrompt = useMemo(() => (
-    MATCH_FEEDBACK_ENABLED && feedbackTestOpen && user
+    feedbackTestOpen && user
       ? makeFeedbackTestPrompt(user, members, feedbackTestStartedAt)
       : null
   ), [members, feedbackTestOpen, feedbackTestStartedAt, user])
@@ -976,7 +967,6 @@ export function Dashboard() {
           onBack={closeFantasy}
           onRetry={retryFantasyData}
           onSave={saveFantasyEntry}
-          readOnly={FANTASY_BANDEJA_READ_ONLY}
         />
       ) : dashboardView === 'notifications' ? (
         <NotificationHistoryPage
