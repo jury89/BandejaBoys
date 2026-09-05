@@ -1,8 +1,9 @@
-import { useRef, useState, type ChangeEvent, type FormEvent } from 'react'
+import { useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
 import {
   BellRing,
   CalendarCheck2,
   CalendarClock,
+  CalendarDays,
   CalendarPlus,
   Camera,
   CheckCircle2,
@@ -13,10 +14,22 @@ import {
   Trophy,
   UserRound,
 } from 'lucide-react'
-import type { NotificationPreferences, SessionUser } from '../types'
+import type {
+  FixedSeatPreference,
+  FixedSeatWeekday,
+  MemberProfile,
+  NotificationPreferences,
+  SessionUser,
+} from '../types'
 import { compressAvatar } from '../lib/avatar'
 import { profileNameError, PROFILE_NAME_MAX_LENGTH } from '../lib/domain'
 import { normalizeNotificationPreferences } from '../lib/notificationPreferences'
+import {
+  FIXED_SEAT_MAX_PLAYERS,
+  fixedSeatMaxOtherOverlap,
+  fixedSeatPreferenceError,
+  normalizeFixedSeatPreference,
+} from '../lib/fixedSeat'
 import { Modal } from './Modal'
 import { ProfileAvatar } from './ProfileAvatar'
 
@@ -82,28 +95,73 @@ const NOTIFICATION_OPTIONS: {
   },
 ]
 
+const FIXED_SEAT_DAYS: Array<{ value: FixedSeatWeekday; label: string }> = [
+  { value: 1, label: 'Lunedì' },
+  { value: 2, label: 'Martedì' },
+  { value: 3, label: 'Mercoledì' },
+  { value: 4, label: 'Giovedì' },
+  { value: 5, label: 'Venerdì' },
+  { value: 6, label: 'Sabato' },
+  { value: 7, label: 'Domenica' },
+]
+
+const FIXED_SEAT_TIMES = Array.from({ length: 49 }, (_, index) => index * 30)
+
+function fixedSeatTimeLabel(minutes: number): string {
+  if (minutes === 24 * 60) return '24:00'
+  return `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`
+}
+
 interface ProfileModalProps {
   user: SessionUser
+  members?: MemberProfile[]
   onClose: () => void
   onSave: (
     displayName: string,
     avatarDataUrl?: string,
     notificationPreferences?: NotificationPreferences,
+    fixedSeatPreference?: FixedSeatPreference,
   ) => Promise<void>
   onDone: (message: string) => void
 }
 
-export function ProfileModal({ user, onClose, onSave, onDone }: ProfileModalProps) {
+export function ProfileModal({ user, members = [user], onClose, onSave, onDone }: ProfileModalProps) {
   const fileInput = useRef<HTMLInputElement>(null)
+  const savedFixedSeatPreference = normalizeFixedSeatPreference(user.fixedSeatPreference)
   const [displayName, setDisplayName] = useState(user.displayName)
   const [avatarDataUrl, setAvatarDataUrl] = useState(user.avatarDataUrl)
   const [notificationPreferences, setNotificationPreferences] = useState(
     () => normalizeNotificationPreferences(user.notificationPreferences),
   )
+  const [fixedSeatEnabled, setFixedSeatEnabled] = useState(Boolean(savedFixedSeatPreference))
+  const [fixedSeatWeekday, setFixedSeatWeekday] = useState<FixedSeatWeekday>(
+    savedFixedSeatPreference?.weekday ?? 2,
+  )
+  const [fixedSeatStartMinutes, setFixedSeatStartMinutes] = useState(
+    savedFixedSeatPreference?.startMinutes ?? 18 * 60,
+  )
+  const [fixedSeatEndMinutes, setFixedSeatEndMinutes] = useState(
+    savedFixedSeatPreference?.endMinutes ?? 20 * 60,
+  )
   const [nameError, setNameError] = useState('')
   const [error, setError] = useState('')
   const [processingPhoto, setProcessingPhoto] = useState(false)
   const [saving, setSaving] = useState(false)
+  const fixedSeatPreference = useMemo<FixedSeatPreference | undefined>(() => (
+    fixedSeatEnabled
+      ? {
+          weekday: fixedSeatWeekday,
+          startMinutes: fixedSeatStartMinutes,
+          endMinutes: fixedSeatEndMinutes,
+        }
+      : undefined
+  ), [fixedSeatEnabled, fixedSeatEndMinutes, fixedSeatStartMinutes, fixedSeatWeekday])
+  const fixedSeatOtherOverlap = fixedSeatPreference
+    ? fixedSeatMaxOtherOverlap(members, fixedSeatPreference, user.id)
+    : 0
+  const fixedSeatUnavailable = Boolean(
+    fixedSeatPreference && fixedSeatOtherOverlap >= FIXED_SEAT_MAX_PLAYERS,
+  )
 
   const selectPhoto = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -128,12 +186,23 @@ export function ProfileModal({ user, onClose, onSave, onDone }: ProfileModalProp
       setError('')
       return
     }
+    if (fixedSeatPreference) {
+      const preferenceError = fixedSeatPreferenceError(fixedSeatPreference)
+      if (preferenceError || fixedSeatUnavailable) {
+        setNameError('')
+        setError(
+          preferenceError
+          ?? 'Questa fascia ha già tre posti fissi. Scegli un altro giorno o un altro orario.',
+        )
+        return
+      }
+    }
 
     setNameError('')
     setError('')
     setSaving(true)
     try {
-      await onSave(displayName.trim(), avatarDataUrl, notificationPreferences)
+      await onSave(displayName.trim(), avatarDataUrl, notificationPreferences, fixedSeatPreference)
       onDone('Profilo aggiornato.')
       onClose()
     } catch (saveError) {
@@ -201,6 +270,115 @@ export function ProfileModal({ user, onClose, onSave, onDone }: ProfileModalProp
           <span><small>Email dell’account</small><strong>{user.email}</strong></span>
           <em>Non modificabile</em>
         </div>
+
+        <section
+          className={`profile-fixed-seat${fixedSeatEnabled ? ' is-enabled' : ''}`}
+          aria-labelledby="profile-fixed-seat-title"
+        >
+          <div className="profile-fixed-seat__heading">
+            <span className="profile-fixed-seat__heading-icon" aria-hidden="true">
+              <CalendarDays size={19} />
+            </span>
+            <span>
+              <small>Organizzazione automatica</small>
+              <strong id="profile-fixed-seat-title">Posto fisso</strong>
+            </span>
+            <label className="profile-fixed-seat__switch">
+              <span>{fixedSeatEnabled ? 'Attivo' : 'Disattivo'}</span>
+              <input
+                aria-label="Attiva posto fisso"
+                checked={fixedSeatEnabled}
+                disabled={saving}
+                role="switch"
+                type="checkbox"
+                onChange={(event) => {
+                  setFixedSeatEnabled(event.target.checked)
+                  setError('')
+                }}
+              />
+            </label>
+          </div>
+          <p>
+            Ti aggiungiamo come titolare agli slot futuri che iniziano e finiscono interamente nella fascia scelta.
+          </p>
+
+          {fixedSeatEnabled && (
+            <div className="profile-fixed-seat__controls">
+              <label className="field">
+                <span>Giorno fisso</span>
+                <select
+                  aria-label="Giorno del posto fisso"
+                  value={fixedSeatWeekday}
+                  disabled={saving}
+                  onChange={(event) => {
+                    setFixedSeatWeekday(Number(event.target.value) as FixedSeatWeekday)
+                    setError('')
+                  }}
+                >
+                  {FIXED_SEAT_DAYS.map((day) => (
+                    <option key={day.value} value={day.value}>{day.label}</option>
+                  ))}
+                </select>
+              </label>
+
+              <div className="profile-fixed-seat__time-grid">
+                <label className="field">
+                  <span>Dalle</span>
+                  <select
+                    aria-label="Inizio fascia posto fisso"
+                    value={fixedSeatStartMinutes}
+                    disabled={saving}
+                    onChange={(event) => {
+                      const nextStart = Number(event.target.value)
+                      setFixedSeatStartMinutes(nextStart)
+                      if (fixedSeatEndMinutes < nextStart + 60) setFixedSeatEndMinutes(nextStart + 60)
+                      setError('')
+                    }}
+                  >
+                    {FIXED_SEAT_TIMES.slice(0, -2).map((minutes) => (
+                      <option key={minutes} value={minutes}>{fixedSeatTimeLabel(minutes)}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="field">
+                  <span>Alle</span>
+                  <select
+                    aria-label="Fine fascia posto fisso"
+                    value={fixedSeatEndMinutes}
+                    disabled={saving}
+                    onChange={(event) => {
+                      setFixedSeatEndMinutes(Number(event.target.value))
+                      setError('')
+                    }}
+                  >
+                    {FIXED_SEAT_TIMES.filter((minutes) => minutes >= fixedSeatStartMinutes + 60).map((minutes) => (
+                      <option key={minutes} value={minutes}>{fixedSeatTimeLabel(minutes)}</option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+
+              <div
+                className={`profile-fixed-seat__availability${fixedSeatUnavailable ? ' is-full' : ''}`}
+                role={fixedSeatUnavailable ? 'alert' : 'status'}
+              >
+                <strong>
+                  {fixedSeatUnavailable
+                    ? 'Fascia già completa'
+                    : `${fixedSeatOtherOverlap + 1}/${FIXED_SEAT_MAX_PLAYERS} posti fissi dopo il salvataggio`}
+                </strong>
+                <span>
+                  {fixedSeatUnavailable
+                    ? 'Tre giocatori coprono già almeno una parte di questo intervallo.'
+                    : 'Resterà sempre almeno un posto libero per le adesioni normali.'}
+                </span>
+              </div>
+              <small className="profile-fixed-seat__note">
+                Le iscrizioni già effettuate non vengono rimosse se cambi preferenza. Riceverai una notifica per ogni aggiunta automatica.
+              </small>
+            </div>
+          )}
+        </section>
 
         <section className="profile-notifications" aria-labelledby="profile-notifications-title">
           <div className="profile-notifications__heading">

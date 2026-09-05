@@ -11,6 +11,7 @@ import { repository } from './repository'
 
 const ACTIVITY_KEY = 'bandeja-boys:activity'
 const POLLS_KEY = 'bandeja-boys:polls'
+const ACCOUNTS_KEY = 'bandeja-boys:accounts'
 
 const user: SessionUser = {
   id: 'jury',
@@ -70,6 +71,30 @@ describe('repository activity log in demo mode', () => {
       details: { previousStartsAt: '2027-01-05T18:30:00.000Z' },
     })
     expect(activity().events.every((event) => Number.isFinite(event.occurredAt))).toBe(true)
+  })
+
+  it('applica il posto fisso anche in modalità demo e ne registra la provenienza', async () => {
+    localStorage.setItem(ACCOUNTS_KEY, JSON.stringify([{
+      id: 'fixed-player',
+      displayName: 'Fisso',
+      email: 'fisso@example.test',
+      createdAt: 2,
+      passwordHash: 'test',
+      fixedSeatPreference: { weekday: 2, startMinutes: 19 * 60, endMinutes: 21 * 60 },
+    }]))
+
+    await repository.createPoll({
+      slots: [{ startsAt: '2027-01-05T19:30', durationMinutes: 90 }],
+    }, user)
+
+    expect(polls()[0].slots[0].signups).toEqual([
+      expect.objectContaining({ userId: 'fixed-player', source: 'fixed-seat' }),
+    ])
+    expect(activity().events.map((event) => event.type)).toEqual([
+      'poll_created',
+      'slot_created',
+      'fixed_seat_auto_joined',
+    ])
   })
 
   it('registra le modifiche amministrative alla formazione e le limita a Jury', async () => {

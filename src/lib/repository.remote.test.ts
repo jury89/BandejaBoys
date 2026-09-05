@@ -170,7 +170,7 @@ describe('repository remoto della scelta MVP', () => {
       slots: [{ startsAt: '2026-08-18T18:30', durationMinutes: 90 }],
     }, voter)
 
-    const pollWrite = firestoreMocks.batch.set.mock.calls.find(([reference]) => (
+    const pollWrite = firestoreMocks.transaction.set.mock.calls.find(([reference]) => (
       reference === 'polls/generated'
     ))
     expect(pollWrite).toBeDefined()
@@ -180,6 +180,52 @@ describe('repository remoto della scelta MVP', () => {
     }))
     expect(pollWrite?.[1]).not.toHaveProperty('targetWeekStart')
     expect(pollWrite?.[1]).not.toHaveProperty('title')
+    expect(firestoreMocks.runTransaction).toHaveBeenCalledOnce()
+  })
+
+  it('aggiunge come titolari i profili con un posto fisso che copre tutto lo slot', async () => {
+    firestoreMocks.transaction.get.mockImplementation(async (reference: string) => {
+      if (reference.startsWith('fixedSeatBuckets/')) {
+        return {
+          exists: () => true,
+          data: () => ({ members: { 'fixed-player': true } }),
+        }
+      }
+      if (reference === 'users/fixed-player') {
+        return {
+          exists: () => true,
+          data: () => ({
+            displayName: 'Fisso',
+            email: 'fisso@example.test',
+            createdAt: 2,
+            fixedSeatPreference: { weekday: 2, startMinutes: 18 * 60, endMinutes: 21 * 60 },
+          }),
+        }
+      }
+      return { exists: () => false }
+    })
+
+    await repository.createPoll({
+      slots: [{ startsAt: '2026-08-18T18:30', durationMinutes: 90 }],
+    }, voter)
+
+    const pollWrite = firestoreMocks.transaction.set.mock.calls.find(([reference]) => (
+      reference === 'polls/generated'
+    ))
+    expect(pollWrite?.[1].slots[0].signups).toEqual([
+      expect.objectContaining({
+        userId: 'fixed-player',
+        displayName: 'Fisso',
+        source: 'fixed-seat',
+      }),
+    ])
+    expect(firestoreMocks.transaction.set).toHaveBeenCalledWith(
+      expect.stringContaining('activityEvents/'),
+      expect.objectContaining({
+        type: 'fixed_seat_auto_joined',
+        details: expect.objectContaining({ targetUserId: 'fixed-player' }),
+      }),
+    )
   })
 
   it('salva risposta e tre aggregati dei giudizi in un batch atomico senza letture transazionali', async () => {

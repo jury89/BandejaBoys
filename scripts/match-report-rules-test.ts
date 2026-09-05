@@ -262,7 +262,91 @@ const progressFantasyRound = {
   updatedAt: createdAt + 2,
 }
 
+const fixedSeatBucketPath = '/databases/(default)/documents/fixedSeatBuckets/2-1080'
+const fixedSeatProfilePath = `/databases/(default)/documents/users/${userId}`
+const fixedSeatProfile = {
+  id: userId,
+  displayName: 'Utente QA',
+  email: 'qa@example.test',
+  createdAt,
+  fixedSeatPreference: { weekday: 2, startMinutes: 18 * 60, endMinutes: 20 * 60 },
+}
+
 const tests: TestDefinition[] = [
+  {
+    label: 'profilo con posto fisso valido',
+    testCase: {
+      expectation: 'ALLOW',
+      request: {
+        auth: auth(),
+        path: fixedSeatProfilePath,
+        method: 'create',
+        resource: { data: fixedSeatProfile },
+      },
+      expressionReportLevel: 'FULL',
+    },
+  },
+  {
+    label: 'profilo con posto fisso fuori dagli intervalli di 30 minuti',
+    testCase: {
+      expectation: 'DENY',
+      request: {
+        auth: auth(),
+        path: fixedSeatProfilePath,
+        method: 'create',
+        resource: {
+          data: {
+            ...fixedSeatProfile,
+            fixedSeatPreference: { weekday: 2, startMinutes: 18 * 60 + 15, endMinutes: 20 * 60 },
+          },
+        },
+      },
+      expressionReportLevel: 'FULL',
+    },
+  },
+  {
+    label: 'creazione del proprio bucket posto fisso',
+    testCase: {
+      expectation: 'ALLOW',
+      request: {
+        auth: auth(),
+        path: fixedSeatBucketPath,
+        method: 'create',
+        resource: { data: { members: { [userId]: true } } },
+      },
+      expressionReportLevel: 'FULL',
+    },
+  },
+  {
+    label: 'aggiunta del secondo giocatore al bucket posto fisso',
+    testCase: {
+      expectation: 'ALLOW',
+      request: {
+        auth: auth(outsiderId),
+        path: fixedSeatBucketPath,
+        method: 'update',
+        resource: { data: { members: { [userId]: true, [outsiderId]: true } } },
+      },
+      resource: { data: { members: { [userId]: true } } },
+      expressionReportLevel: 'FULL',
+    },
+  },
+  {
+    label: 'quarto giocatore rifiutato nel bucket posto fisso',
+    testCase: {
+      expectation: 'DENY',
+      request: {
+        auth: auth('qa-c'),
+        path: fixedSeatBucketPath,
+        method: 'update',
+        resource: {
+          data: { members: { [userId]: true, [outsiderId]: true, 'qa-a': true, 'qa-c': true } },
+        },
+      },
+      resource: { data: { members: { [userId]: true, [outsiderId]: true, 'qa-a': true } } },
+      expressionReportLevel: 'FULL',
+    },
+  },
   {
     label: 'creazione con un set',
     testCase: createCase(oneSet, 'ALLOW'),
@@ -492,5 +576,5 @@ if (failures.length > 0) {
 }
 
 console.log(
-  `PASS: ${tests.length} casi semantici superati per referti, giudizi aggregati e scelte private.`,
+  `PASS: ${tests.length} casi semantici superati per profili, posti fissi, referti, giudizi aggregati e scelte private.`,
 )

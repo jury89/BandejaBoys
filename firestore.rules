@@ -63,7 +63,7 @@ service cloud.firestore {
       return request.resource.data.keys()
           .hasOnly([
             'id', 'displayName', 'email', 'createdAt', 'avatarDataUrl',
-            'notificationPreferences'
+            'notificationPreferences', 'fixedSeatPreference'
           ])
         && request.resource.data.id == userId
         && request.resource.data.displayName is string
@@ -72,7 +72,24 @@ service cloud.firestore {
         && request.resource.data.email is string
         && request.resource.data.createdAt is number
         && validAvatar()
-        && validNotificationPreferences();
+        && validNotificationPreferences()
+        && (!request.resource.data.keys().hasAny(['fixedSeatPreference'])
+          || (request.resource.data.fixedSeatPreference is map
+            && request.resource.data.fixedSeatPreference.keys()
+              .hasOnly(['weekday', 'startMinutes', 'endMinutes'])
+            && request.resource.data.fixedSeatPreference.keys()
+              .hasAll(['weekday', 'startMinutes', 'endMinutes'])
+            && request.resource.data.fixedSeatPreference.weekday is int
+            && request.resource.data.fixedSeatPreference.weekday >= 1
+            && request.resource.data.fixedSeatPreference.weekday <= 7
+            && request.resource.data.fixedSeatPreference.startMinutes is int
+            && request.resource.data.fixedSeatPreference.startMinutes >= 0
+            && request.resource.data.fixedSeatPreference.startMinutes % 30 == 0
+            && request.resource.data.fixedSeatPreference.endMinutes is int
+            && request.resource.data.fixedSeatPreference.endMinutes <= 1440
+            && request.resource.data.fixedSeatPreference.endMinutes % 30 == 0
+            && request.resource.data.fixedSeatPreference.endMinutes
+              - request.resource.data.fixedSeatPreference.startMinutes >= 60));
     }
 
     function validMatchFeedbackRating(rating) {
@@ -370,7 +387,7 @@ service cloud.firestore {
         && request.resource.data.type in [
           'poll_created', 'poll_archived', 'poll_reopened', 'poll_deleted',
           'slot_created', 'slot_rescheduled', 'slot_deleted',
-          'signup_joined', 'signup_left', 'starter_substituted',
+          'signup_joined', 'fixed_seat_auto_joined', 'signup_left', 'starter_substituted',
           'slot_roster_admin_updated',
           'guest_added', 'guest_removed',
           'slot_booked', 'slot_unbooked'
@@ -397,6 +414,7 @@ service cloud.firestore {
         && request.resource.data.eventId is string
         && request.resource.data.kind in [
           'new-slots', 'slot-ready', 'starter-substitution', 'booking-reminder-7d',
+          'fixed-seat-auto-join',
           'reminder-24h', 'reminder-2h', 'match-rating', 'match-mvp', 'match-feedback',
           'monday-motivation', 'fantasy-open', 'fantasy-roster-changed',
           'fantasy-result', 'test'
@@ -453,6 +471,30 @@ service cloud.firestore {
         && (request.resource.data.displayName == resource.data.displayName
           || !request.resource.data.displayName.matches('.*[Ee][Vv][Ii].*'));
       allow delete: if false;
+    }
+
+    match /fixedSeatBuckets/{bucketId} {
+      allow read: if isMember() || isNotifier();
+      allow create: if isMember()
+        && bucketId.matches('^[1-7]-[0-9]{4}$')
+        && request.resource.data.keys().hasOnly(['members'])
+        && request.resource.data.members is map
+        && request.resource.data.members.keys().hasOnly([request.auth.uid])
+        && request.resource.data.members[request.auth.uid] == true;
+      allow update: if isMember()
+        && bucketId.matches('^[1-7]-[0-9]{4}$')
+        && request.resource.data.keys().hasOnly(['members'])
+        && request.resource.data.members is map
+        && request.resource.data.members.keys().size() >= 1
+        && request.resource.data.members.keys().size() <= 3
+        && request.resource.data.members.diff(resource.data.members).affectedKeys()
+          .hasOnly([request.auth.uid])
+        && (!request.resource.data.members.keys().hasAny([request.auth.uid])
+          || request.resource.data.members[request.auth.uid] == true);
+      allow delete: if isMember()
+        && resource.data.members is map
+        && resource.data.members.keys().hasOnly([request.auth.uid])
+        && resource.data.members[request.auth.uid] == true;
     }
 
     match /polls/{pollId} {

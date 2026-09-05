@@ -1357,6 +1357,7 @@ export function addSignup(
   member: Pick<MemberProfile, 'id' | 'displayName'>,
   joinedAt = Date.now(),
   role?: SignupRole,
+  source?: Signup['source'],
 ): PadelSlot {
   if (slot.signups.some((signup) => signup.userId === member.id)) return slot
 
@@ -1375,6 +1376,7 @@ export function addSignup(
         displayName: member.displayName,
         joinedAt,
         role: selectedRole,
+        ...(source ? { source } : {}),
       },
     ]),
   }

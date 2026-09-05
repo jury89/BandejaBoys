@@ -24,6 +24,12 @@
    La presenza di `bookedAt` fa apparire automaticamente lo slot come **Orario confermato**. Annullando la prenotazione, l’interfaccia torna a mostrare **Orario indicativo** senza richiedere un secondo dato da mantenere sincronizzato.
 7. I documenti `polls` esistono soltanto come contenitori tecnici e confini di transazione/audit; non rappresentano più una settimana gestibile dall’utente.
 
+## Posto fisso
+
+La preferenza facoltativa `users/{uid}.fixedSeatPreference` contiene giorno ISO (`1` lunedì, `7` domenica) e minuti di inizio/fine nel fuso `Europe/Rome`. Il profilo divide la fascia in bucket da 30 minuti nella raccolta `fixedSeatBuckets`: il salvataggio legge e aggiorna tutti i bucket coinvolti in una sola transazione e rifiuta la modifica se anche uno di essi contiene già tre altri utenti. Le Security Rules consentono a ciascun membro di modificare soltanto la propria presenza nei bucket e impongono il limite di tre.
+
+Alla creazione di uno slot, il repository legge nella stessa transazione i bucket coperti dalla partita e i profili candidati. Vengono aggiunti come titolari soltanto gli utenti la cui fascia contiene l’intero intervallo `startsAt`–`startsAt + durationMinutes`; l’adesione conserva `source: fixed-seat` e l’audit registra `fixed_seat_auto_joined`. L’ordine tra più posti fissi è deterministico per data di creazione del profilo e UID. L’automatismo non viene eseguito quando uno slot esistente viene riprogrammato e un successivo cambio o disattivazione della preferenza non rimuove iscrizioni già acquisite.
+
 La bacheca non espone i contenitori Firestore. Il filtro sticky sotto l’header offre **Tutti**, che mostra ogni slot futuro o in corso, **Da prenotare**, che usa `isBookingCandidate` per mostrare soltanto gli slot con esattamente quattro titolari e senza `bookedAt`, e **Prenotati**, che mostra soltanto quelli con campo confermato. Le riserve vengono escluse dal conteggio perché non occupano un posto in campo. Ogni vista raggruppa gli slot visibili per settimana effettiva e nasconde gli altri; slot provenienti da documenti diversi vengono riuniti nella stessa scheda e mantengono il proprio ID sorgente per mutazioni e audit. L’elenco settimanale può essere collassato nello stato locale del componente, senza scritture. Le settimane sono ordinate dal primo slot più vicino; la visibilità termina a `startsAt + durationMinutes`, quindi una partita già iniziata resta consultabile fino alla propria fine. La dashboard pianifica il prossimo aggiornamento su questo confine e rimuove automaticamente lo slot terminato senza cancellare dati da Firestore.
 
 La voce **I miei match** nel menu account apre una vista personale derivata dai documenti dei sondaggi e dagli eventuali referti `matchReports`. `getPlayerMatches` applica `getStarters`, quindi rispetta ordine cronologico, ruoli espliciti e sostituzioni: sia lo storico sia i prossimi match richiedono esattamente quattro titolari e includono l’utente soltanto se occupa uno di quei posti. I prossimi match possono avere il campo ancora da prenotare e sono ordinati dal più vicino; lo storico include soltanto slot prenotati la cui durata è terminata, ordinati dal più recente. Slot vuoti o incompleti, adesioni come riserva e slot passati mai confermati non vengono presentati come partite.
@@ -87,6 +93,7 @@ Il client inizializza Firestore con cache IndexedDB persistente e gestione multi
 Il Worker Cloudflare richiama tramite `workflow_dispatch` il workflow GitHub, che legge lo stato corrente ogni 10 minuti e genera eventi idempotenti:
 
 - **Nuovi slot**: a tutti i dispositivi registrati tranne quelli di chi li ha aggiunti. Gli slot pubblicati nello stesso contenitore tecnico a non più di 10 minuti di distanza vengono raggruppati; l’evento viene emesso soltanto dopo 10 minuti senza altre aggiunte. Cinque proposte iniziali producono quindi un avviso, mentre un’altra proposta inserita il giorno seguente ne produce uno nuovo. Il messaggio identifica la settimana con l’intervallo lunedì-domenica derivato direttamente dalla data effettiva del primo slot nel fuso di Roma, senza leggere un titolo o una settimana salvati. Il raggruppamento usa l’intera sequenza di creazione prima di applicare la scadenza, perciò l’identità dell’evento resta stabile anche quando il primo elemento diventa più vecchio. Un gruppo è notificabile soltanto fino a un’ora dall’ultima aggiunta e solo per partite future.
+- **Posto fisso applicato**: entro la stessa finestra di un’ora dalla pubblicazione, ogni giocatore aggiunto automaticamente riceve un avviso personale con giorno e ora. Questa convocazione resta attiva indipendentemente dalle preferenze delle altre categorie e lo stesso UID viene escluso dall’avviso generico “Nuovi slot”, evitando due notifiche per la medesima proposta.
 - **Formazione completa**: quando un quarto titolare completa uno slot futuro ancora da prenotare, soltanto ai quattro titolari correnti. L’identità dell’evento include il timestamp del quarto titolare: le esecuzioni successive restano idempotenti, mentre una formazione che si svuota e torna completa genera un nuovo evento. La finestra di 24 ore evita avvisi retroattivi al rilascio; se `bookedAt` è già presente, l’evento non viene creato.
 - **Sostituzione titolare**: quando un giocatore riceve direttamente il posto di un titolare, soltanto al sostituto. Il messaggio indica chi è stato sostituito e giorno e ora della partita; l’identità include UID e timestamp della sostituzione per impedire duplicati. La finestra di 24 ore evita recuperi storici al rilascio. Se la formazione era già completa, il sostituto viene escluso dall’eventuale vecchio avviso “Formazione completa”, perché la convocazione personale contiene già l’informazione aggiornata; se la sostituzione precede il completamento, riceverà normalmente anche l’avviso quando arriverà il quarto titolare.
 - **Reminder prenotazione 7g**: nella prima esecuzione a partire da sette giorni prima della partita, soltanto se la formazione era già completa prima della soglia e `bookedAt` è ancora assente. I destinatari sono i quattro titolari correnti e la finestra dura 24 ore; l’identità include l’orario della partita, quindi uno spostamento genera il promemoria rispetto alla nuova data.
@@ -137,6 +144,7 @@ Le ispezioni operative da terminale passano dalla CLI read-only `scripts/firesto
 ```text
 users/{uid}
   id, displayName, email, createdAt, avatarDataUrl?
+  fixedSeatPreference? {weekday, startMinutes, endMinutes}
   notificationPreferences?
     mondayMotivation, newSlots, slotReady, starterSubstitution, bookingReminder7d
     reminder24h, reminder2h, matchFeedback, fantasy
@@ -148,8 +156,11 @@ polls/{pollId}
     createdAt?, createdBy?, createdByName?
     bookedAt?, bookedBy?, bookedByName?
     signups[]
-      id, userId, displayName, joinedAt, role?, substitutedFor?
+      id, userId, displayName, joinedAt, role?, source?, substitutedFor?
       isGuest?, addedBy?, addedByName?
+
+fixedSeatBuckets/{weekday-minute}
+  members{uid: true}
 
 pushSubscriptions/{subscriptionId}
   userId, endpoint, expirationTime

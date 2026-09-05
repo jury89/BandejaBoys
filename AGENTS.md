@@ -10,6 +10,8 @@ Run `npm run check` before every commit or push. It must complete lint, all test
 - The first four ordered signups are starters; all later signups are reserves.
 - Removing a starter promotes the first reserve by derivation, not by a second write.
 - A direct substitution keeps the outgoing starter's position and removes an existing reserve entry for the replacement.
+- Fixed-seat preferences use `Europe/Rome` half-hour buckets, with at most three users in every overlapping bucket.
+- Fixed-seat auto-signup runs only when a slot is created; rescheduling or changing a preference never adds or removes historical signups.
 - `collecting` and `ready` are derived states. Persist only booking facts (`bookedAt`, venue and actor).
 - Mutations of a Firestore poll must remain transactional.
 

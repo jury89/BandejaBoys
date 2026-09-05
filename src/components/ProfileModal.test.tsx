@@ -26,6 +26,7 @@ describe('profilo giocatore', () => {
       'Brescio',
       undefined,
       DEFAULT_NOTIFICATION_PREFERENCES,
+      undefined,
     )
     expect(screen.queryByLabelText('Password')).not.toBeInTheDocument()
     expect(screen.queryByRole('textbox', { name: /Email/ })).not.toBeInTheDocument()
@@ -68,6 +69,56 @@ describe('profilo giocatore', () => {
       ...DEFAULT_NOTIFICATION_PREFERENCES,
       mondayMotivation: false,
       reminder2h: false,
-    })
+    }, undefined)
+  })
+
+  it('salva giorno e fascia del posto fisso', async () => {
+    const user = userEvent.setup()
+    const onSave = vi.fn().mockResolvedValue(undefined)
+    render(<ProfileModal user={player} onClose={vi.fn()} onSave={onSave} onDone={vi.fn()} />)
+
+    await user.click(screen.getByRole('switch', { name: 'Attiva posto fisso' }))
+    await user.selectOptions(screen.getByLabelText('Giorno del posto fisso'), '3')
+    await user.selectOptions(screen.getByLabelText('Inizio fascia posto fisso'), String(18 * 60 + 30))
+    await user.selectOptions(screen.getByLabelText('Fine fascia posto fisso'), String(20 * 60 + 30))
+    await user.click(screen.getByRole('button', { name: 'Salva profilo' }))
+
+    expect(onSave).toHaveBeenCalledWith(
+      'Jury',
+      undefined,
+      DEFAULT_NOTIFICATION_PREFERENCES,
+      { weekday: 3, startMinutes: 18 * 60 + 30, endMinutes: 20 * 60 + 30 },
+    )
+  })
+
+  it('segnala le fasce che si sovrappongono a tre posti fissi esistenti', async () => {
+    const user = userEvent.setup()
+    const onSave = vi.fn().mockResolvedValue(undefined)
+    const members = [
+      player,
+      ...['uno', 'due', 'tre'].map((id, index) => ({
+        id,
+        displayName: id,
+        email: `${id}@example.test`,
+        createdAt: index + 2,
+        fixedSeatPreference: { weekday: 2 as const, startMinutes: 18 * 60 + 30, endMinutes: 19 * 60 + 30 },
+      })),
+    ]
+    render(
+      <ProfileModal
+        user={player}
+        members={members}
+        onClose={vi.fn()}
+        onSave={onSave}
+        onDone={vi.fn()}
+      />,
+    )
+
+    await user.click(screen.getByRole('switch', { name: 'Attiva posto fisso' }))
+    expect(screen.getByRole('alert')).toHaveTextContent('Fascia già completa')
+    await user.click(screen.getByRole('button', { name: 'Salva profilo' }))
+
+    expect(screen.getByText(/Questa fascia ha già tre posti fissi/)).toBeInTheDocument()
+    expect(onSave).not.toHaveBeenCalled()
   })
 })

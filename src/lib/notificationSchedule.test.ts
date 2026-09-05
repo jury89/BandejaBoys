@@ -22,6 +22,7 @@ describe('preferenze notifiche', () => {
   it('mantiene tutti gli avvisi attivi per i profili esistenti', () => {
     expect(isNotificationKindEnabled('monday-motivation')).toBe(true)
     expect(isNotificationKindEnabled('new-slots')).toBe(true)
+    expect(isNotificationKindEnabled('fixed-seat-auto-join')).toBe(true)
     expect(isNotificationKindEnabled('slot-ready')).toBe(true)
     expect(isNotificationKindEnabled('starter-substitution')).toBe(true)
     expect(isNotificationKindEnabled('booking-reminder-7d')).toBe(true)
@@ -55,15 +56,17 @@ describe('preferenze notifiche', () => {
     expect(isNotificationKindEnabled('match-mvp', preferences)).toBe(false)
     expect(isNotificationKindEnabled('match-feedback', preferences)).toBe(false)
     expect(isNotificationKindEnabled('fantasy-result', preferences)).toBe(false)
+    expect(isNotificationKindEnabled('fixed-seat-auto-join', preferences)).toBe(true)
     expect(isNotificationKindEnabled('test', preferences)).toBe(true)
   })
 })
 
-const signup = (userId: string, joinedAt: number): Signup => ({
+const signup = (userId: string, joinedAt: number, source?: Signup['source']): Signup => ({
   id: `signup-${userId}`,
   userId,
   displayName: userId.toUpperCase(),
   joinedAt,
+  ...(source ? { source } : {}),
 })
 
 const slot = (
@@ -283,6 +286,31 @@ describe('pianificazione notifiche', () => {
       excludedUserIds: ['jury'],
       title: 'Sveglia fagianotto!',
       body: 'Ci sono 5 nuovi slot disponibili per “Padel · 20 lug – 26 lug 2026”. Segna quando ci sei.',
+    })
+  })
+
+  it('avvisa chi è stato aggiunto col posto fisso e gli evita il doppione generico', () => {
+    const createdAt = NOW - 15 * 60 * 1000
+    const future = new Date(NOW + 7 * 24 * 60 * 60 * 1000).toISOString()
+    const notifications = collectScheduledNotifications([
+      poll([slot(
+        future,
+        [signup('fisso', createdAt, 'fixed-seat')],
+        false,
+        { at: createdAt, by: 'jury' },
+      )], createdAt),
+    ], NOW)
+
+    expect(notifications).toHaveLength(2)
+    expect(notifications[0]).toMatchObject({
+      id: 'fixed-seat-auto-join:poll-1:slot-1:fisso',
+      kind: 'fixed-seat-auto-join',
+      recipientUserIds: ['fisso'],
+      title: 'Posto fisso confermato',
+    })
+    expect(notifications[1]).toMatchObject({
+      kind: 'new-slots',
+      excludedUserIds: ['jury', 'fisso'],
     })
   })
 

@@ -15,6 +15,14 @@ export interface NotificationPreferences {
   fantasy: boolean
 }
 
+export type FixedSeatWeekday = 1 | 2 | 3 | 4 | 5 | 6 | 7
+
+export interface FixedSeatPreference {
+  weekday: FixedSeatWeekday
+  startMinutes: number
+  endMinutes: number
+}
+
 export interface MemberProfile {
   id: string
   displayName: string
@@ -22,6 +30,7 @@ export interface MemberProfile {
   createdAt: number
   avatarDataUrl?: string
   notificationPreferences?: NotificationPreferences
+  fixedSeatPreference?: FixedSeatPreference
 }
 
 export type SessionUser = MemberProfile
@@ -44,6 +53,7 @@ export interface Signup {
   addedBy?: string
   addedByName?: string
   substitutedFor?: SubstitutionNote
+  source?: 'fixed-seat'
 }
 
 export type AdminSlotRosterAction =

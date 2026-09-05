@@ -70,6 +70,11 @@ import {
 import { isSlotAdmin } from './admin'
 import { getLocalProfiles, USERS_EVENT } from './auth'
 import { firestore, hasRemoteBackend } from './firebase'
+import {
+  fixedSeatMatchingMembers,
+  fixedSeatMemberIdsForSlot,
+  fixedSeatSlotBucketIds,
+} from './fixedSeat'
 import { mondayOfWeek, pollWeekTitle, slotWeekTitle, weekStartForDateTime } from './format'
 import type { NotificationDelivery } from './notificationHistory'
 
@@ -265,6 +270,58 @@ function pollCreationEvents(poll: PadelPoll, creator: SessionUser): ActivityEven
   ]
 }
 
+interface FixedSeatJoin {
+  slot: PadelSlot
+  member: MemberProfile
+}
+
+function applyFixedSeatPreferences(
+  poll: PadelPoll,
+  members: MemberProfile[],
+  slotIds?: ReadonlySet<string>,
+): { poll: PadelPoll; joins: FixedSeatJoin[] } {
+  const joins: FixedSeatJoin[] = []
+  const slots = poll.slots.map((slot) => {
+    if (slotIds && !slotIds.has(slot.id)) return slot
+    let updated = slot
+    fixedSeatMatchingMembers(slot, members).forEach((member, index) => {
+      if (updated.signups.some((signup) => signup.userId === member.id)) return
+      updated = addSignup(
+        updated,
+        member,
+        (slot.createdAt ?? poll.createdAt) + index,
+        'starter',
+        'fixed-seat',
+      )
+      joins.push({ slot: updated, member })
+    })
+    return updated
+  })
+
+  return {
+    poll: { ...poll, slots },
+    joins,
+  }
+}
+
+function fixedSeatJoinEvents(
+  poll: PadelPoll,
+  creator: SessionUser,
+  joins: FixedSeatJoin[],
+): ActivityEventInput[] {
+  return joins.map(({ slot, member }) => makeActivityEvent(
+    'fixed_seat_auto_joined',
+    creator,
+    poll,
+    slot,
+    {
+      targetUserId: member.id,
+      targetName: member.displayName,
+      role: 'starter',
+    },
+  ))
+}
+
 function setRemoteActivity(
   db: NonNullable<typeof firestore>,
   transaction: Transaction,
@@ -326,6 +383,36 @@ function starterRosterSnapshot(slot: PadelSlot | undefined): string {
 function remoteRepository(): PadelRepository {
   if (!firestore) throw new Error('Firebase non è configurato.')
   const db = firestore
+
+  const readFixedSeatMembers = async (
+    transaction: Transaction,
+    slots: PadelSlot[],
+  ): Promise<MemberProfile[]> => {
+    const bucketIds = Array.from(new Set(slots.flatMap(fixedSeatSlotBucketIds)))
+    const bucketSnapshots = await Promise.all(
+      bucketIds.map((bucketId) => transaction.get(doc(db, 'fixedSeatBuckets', bucketId))),
+    )
+    const membersByBucket = new Map<string, string[]>()
+    bucketSnapshots.forEach((snapshot, index) => {
+      if (!snapshot.exists()) return
+      const members = snapshot.data().members
+      if (!members || typeof members !== 'object') return
+      membersByBucket.set(bucketIds[index], Object.entries(members)
+        .filter(([, enabled]) => enabled === true)
+        .map(([userId]) => userId))
+    })
+    const relevantIds = Array.from(new Set(
+      slots.flatMap((slot) => fixedSeatMemberIdsForSlot(slot, membersByBucket)),
+    ))
+    const userSnapshots = await Promise.all(
+      relevantIds.map((userId) => transaction.get(doc(db, 'users', userId))),
+    )
+    return userSnapshots.flatMap((snapshot, index) => (
+      snapshot.exists()
+        ? [{ id: relevantIds[index], ...snapshot.data() } as MemberProfile]
+        : []
+    ))
+  }
 
   const mutatePoll = async (
     pollId: string,
@@ -594,31 +681,45 @@ function remoteRepository(): PadelRepository {
     async createPoll(input, creator) {
       const data = makePoll(input, creator)
       const reference = doc(collection(db, 'polls'))
-      const poll = { id: reference.id, ...data }
-      const batch = writeBatch(db)
-      batch.set(reference, storedPollData(data))
-      pollCreationEvents(poll, creator).forEach((activity) => {
-        batch.set(doc(collection(db, 'activityEvents')), {
-          ...activity,
-          occurredAt: serverTimestamp(),
-        })
+      await runTransaction(db, async (transaction) => {
+        const members = await readFixedSeatMembers(transaction, data.slots)
+        const applied = applyFixedSeatPreferences({ id: reference.id, ...data }, members)
+        transaction.set(reference, storedPollData(applied.poll))
+        ;[
+          ...pollCreationEvents(applied.poll, creator),
+          ...fixedSeatJoinEvents(applied.poll, creator, applied.joins),
+        ].forEach((activity) => setRemoteActivity(db, transaction, activity))
       })
-      await batch.commit()
     },
     async addSlot(pollId, input, creator) {
-      return mutatePoll(
-        pollId,
-        (poll) => addSlotToPoll(poll, input, creator),
-        (before, after) => {
-          const previousIds = new Set(before.slots.map((slot) => slot.id))
-          const added = after.slots.find((slot) => !previousIds.has(slot.id))
-          return added
-            ? makeActivityEvent('slot_created', creator, after, added, {
-              durationMinutes: added.durationMinutes,
-            })
-            : null
-        },
-      )
+      const reference = doc(db, 'polls', pollId)
+      return runTransaction(db, async (transaction) => {
+        const snapshot = await transaction.get(reference)
+        if (!snapshot.exists()) throw new Error('Sondaggio non trovato.')
+        const before = normalizePollWeek({ id: snapshot.id, ...snapshot.data() } as PadelPoll)
+        const withSlot = addSlotToPoll(before, input, creator)
+        const previousIds = new Set(before.slots.map((slot) => slot.id))
+        const added = withSlot.slots.find((slot) => !previousIds.has(slot.id))
+        if (!added) throw new Error('Slot non trovato.')
+        const members = await readFixedSeatMembers(transaction, [added])
+        const applied = applyFixedSeatPreferences(withSlot, members, new Set([added.id]))
+        const appliedSlot = applied.poll.slots.find((slot) => slot.id === added.id) ?? added
+        transaction.update(reference, {
+          slots: applied.poll.slots,
+          status: applied.poll.status,
+          updatedAt: applied.poll.updatedAt,
+        })
+        setRemoteActivity(db, transaction, makeActivityEvent(
+          'slot_created',
+          creator,
+          applied.poll,
+          appliedSlot,
+          { durationMinutes: appliedSlot.durationMinutes },
+        ))
+        fixedSeatJoinEvents(applied.poll, creator, applied.joins)
+          .forEach((activity) => setRemoteActivity(db, transaction, activity))
+        return applied.poll
+      })
     },
     async joinSlot(pollId, slotId, member, role) {
       return mutatePoll(
@@ -1227,13 +1328,31 @@ function localRepository(): PadelRepository {
     async createPoll(input, creator) {
       const data = makePoll(input, creator)
       const poll = { id: `poll-${Date.now()}`, ...data }
-      writeLocalPolls([poll, ...readLocalPolls()])
-      writeLocalActivities(pollCreationEvents(poll, creator), poll.createdAt)
+      const members = [...demoMembers, ...getLocalProfiles()]
+      const applied = applyFixedSeatPreferences(poll, members)
+      writeLocalPolls([applied.poll, ...readLocalPolls()])
+      writeLocalActivities([
+        ...pollCreationEvents(applied.poll, creator),
+        ...fixedSeatJoinEvents(applied.poll, creator, applied.joins),
+      ], applied.poll.createdAt)
     },
     async addSlot(pollId, input, creator) {
-      return mutate(
+      let joins: FixedSeatJoin[] = []
+      const updated = await mutate(
         pollId,
-        (poll) => addSlotToPoll(poll, input, creator),
+        (poll) => {
+          const withSlot = addSlotToPoll(poll, input, creator)
+          const previousIds = new Set(poll.slots.map((slot) => slot.id))
+          const applied = applyFixedSeatPreferences(
+            withSlot,
+            [...demoMembers, ...getLocalProfiles()],
+            new Set(withSlot.slots
+              .filter((slot) => !previousIds.has(slot.id))
+              .map((slot) => slot.id)),
+          )
+          joins = applied.joins
+          return applied.poll
+        },
         (before, after) => {
           const previousIds = new Set(before.slots.map((slot) => slot.id))
           const added = after.slots.find((slot) => !previousIds.has(slot.id))
@@ -1244,6 +1363,8 @@ function localRepository(): PadelRepository {
             : null
         },
       )
+      writeLocalActivities(fixedSeatJoinEvents(updated, creator, joins))
+      return updated
     },
     async joinSlot(pollId, slotId, member, role) {
       return mutate(

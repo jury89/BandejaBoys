@@ -107,6 +107,15 @@ function activityPresentation(event: LocalActivityEvent): ActivityPresentation {
         icon: UserRoundPlus,
         tone: 'joined',
       }
+    case 'fixed_seat_auto_joined': {
+      const targetName = detailString(event, 'targetName') ?? 'Il giocatore'
+      return {
+        title: 'Posto fisso applicato',
+        description: `${targetName} è stato aggiunto automaticamente come titolare.`,
+        icon: UserRoundPlus,
+        tone: 'joined',
+      }
+    }
     case 'signup_left':
       return {
         title: 'Adesione rimossa',

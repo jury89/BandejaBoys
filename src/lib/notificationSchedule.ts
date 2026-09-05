@@ -36,7 +36,7 @@ export const BOOKING_REMINDER_WINDOW_MS = DAY_MS
 export const MATCH_FEEDBACK_NOTIFICATION_WINDOW_MS = 30 * 60 * 1000
 export const MONDAY_MOTIVATION_WINDOW_MS = HOUR_MS
 
-export type NotificationKind = 'new-slots' | 'slot-ready' | 'starter-substitution' | 'booking-reminder-7d' | 'reminder-24h' | 'reminder-2h' | 'match-rating' | 'match-mvp' | 'match-feedback' | 'monday-motivation' | 'fantasy-open' | 'fantasy-roster-changed' | 'fantasy-result' | 'test'
+export type NotificationKind = 'new-slots' | 'fixed-seat-auto-join' | 'slot-ready' | 'starter-substitution' | 'booking-reminder-7d' | 'reminder-24h' | 'reminder-2h' | 'match-rating' | 'match-mvp' | 'match-feedback' | 'monday-motivation' | 'fantasy-open' | 'fantasy-roster-changed' | 'fantasy-result' | 'test'
 export type TestNotificationMode = 'standard' | 'feedback' | 'match-mvp'
 
 const NOTIFICATION_PREFERENCE_BY_KIND = {
@@ -53,13 +53,13 @@ const NOTIFICATION_PREFERENCE_BY_KIND = {
   'fantasy-open': 'fantasy',
   'fantasy-roster-changed': 'fantasy',
   'fantasy-result': 'fantasy',
-} as const satisfies Record<Exclude<NotificationKind, 'test'>, keyof NotificationPreferences>
+} as const satisfies Record<Exclude<NotificationKind, 'test' | 'fixed-seat-auto-join'>, keyof NotificationPreferences>
 
 export function isNotificationKindEnabled(
   kind: NotificationKind,
   preferences?: Partial<NotificationPreferences>,
 ): boolean {
-  if (kind === 'test') return true
+  if (kind === 'test' || kind === 'fixed-seat-auto-join') return true
   return normalizeNotificationPreferences(preferences)[NOTIFICATION_PREFERENCE_BY_KIND[kind]]
 }
 
@@ -175,7 +175,12 @@ function collectNewSlotNotifications(poll: PadelPoll, now: number): ScheduledNot
 
     const first = group[0]
     const excludedUserIds = Array.from(new Set(
-      group.map((slot) => slot.createdBy).filter((userId): userId is string => Boolean(userId)),
+      group.flatMap((slot) => [
+        slot.createdBy,
+        ...slot.signups
+          .filter((signup) => signup.source === 'fixed-seat')
+          .map((signup) => signup.userId),
+      ]).filter((userId): userId is string => Boolean(userId)),
     ))
     const body = group.length === 1
       ? `C’è un nuovo slot disponibile: ${formatSession(first.startsAt)}. Segna se ci sei.`
@@ -192,6 +197,39 @@ function collectNewSlotNotifications(poll: PadelPoll, now: number): ScheduledNot
       recipientUserIds: null,
       excludedUserIds,
     }]
+  })
+}
+
+function collectFixedSeatNotifications(poll: PadelPoll, now: number): ScheduledNotification[] {
+  if (poll.status !== 'open') return []
+
+  return poll.slots.flatMap((slot) => {
+    const createdAt = slot.createdAt
+    const startsAt = padelDateTimeToTimestamp(slot.startsAt)
+    if (
+      typeof createdAt !== 'number'
+      || !Number.isFinite(createdAt)
+      || createdAt > now
+      || now >= createdAt + NEW_SLOT_NOTIFICATION_WINDOW_MS
+      || !Number.isFinite(startsAt)
+      || startsAt <= now
+    ) return []
+
+    return slot.signups
+      .filter((signup) => signup.source === 'fixed-seat' && !isGuestSignup(signup))
+      .map((signup) => ({
+        id: `fixed-seat-auto-join:${poll.id}:${slot.id}:${signup.userId}`,
+        kind: 'fixed-seat-auto-join' as const,
+        title: 'Posto fisso confermato',
+        body: `Ti abbiamo aggiunto automaticamente come titolare per ${formatSession(slot.startsAt)}.`,
+        url: `/?poll=${encodeURIComponent(poll.id)}`,
+        tag: `fixed-seat-auto-join-${poll.id}-${slot.id}-${signup.userId}`,
+        ttlSeconds: Math.max(60, Math.floor(
+          (createdAt + NEW_SLOT_NOTIFICATION_WINDOW_MS - now) / 1000,
+        )),
+        recipientUserIds: [signup.userId],
+        excludedUserIds: [],
+      }))
   })
 }
 
@@ -389,6 +427,7 @@ export function collectScheduledNotifications(
   const closedFeedbackPromptIds = new Set(feedbackResponses.map((response) => response.id))
 
   for (const poll of polls) {
+    notifications.push(...collectFixedSeatNotifications(poll, now))
     notifications.push(...collectNewSlotNotifications(poll, now))
 
     for (const slot of poll.slots) {

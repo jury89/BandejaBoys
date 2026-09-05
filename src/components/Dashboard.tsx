@@ -1065,6 +1065,7 @@ export function Dashboard() {
       {profileOpen && (
         <ProfileModal
           user={user}
+          members={members}
           onClose={() => setProfileOpen(false)}
           onSave={updateProfile}
           onDone={notify}

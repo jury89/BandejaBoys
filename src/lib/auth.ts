@@ -6,14 +6,32 @@ import {
   signOut as firebaseSignOut,
   updateProfile,
 } from 'firebase/auth'
-import { deleteField, doc, onSnapshot, setDoc, updateDoc } from 'firebase/firestore'
-import type { MemberProfile, NotificationPreferences, SessionUser } from '../types'
+import {
+  deleteField,
+  doc,
+  onSnapshot,
+  runTransaction,
+  setDoc,
+} from 'firebase/firestore'
+import type {
+  FixedSeatPreference,
+  MemberProfile,
+  NotificationPreferences,
+  SessionUser,
+} from '../types'
 import { firebaseAuth, firestore, hasRemoteBackend } from './firebase'
 import { makeId, profileNameError } from './domain'
 import {
   DEFAULT_NOTIFICATION_PREFERENCES,
   normalizeNotificationPreferences,
 } from './notificationPreferences'
+import {
+  FIXED_SEAT_MAX_PLAYERS,
+  fixedSeatMaxOtherOverlap,
+  fixedSeatPreferenceBucketIds,
+  fixedSeatPreferenceError,
+  normalizeFixedSeatPreference,
+} from './fixedSeat'
 
 interface LocalAccount extends MemberProfile {
   passwordHash: string
@@ -45,6 +63,7 @@ function accountProfile(account: LocalAccount): MemberProfile {
     createdAt: account.createdAt,
     avatarDataUrl: account.avatarDataUrl,
     notificationPreferences: normalizeNotificationPreferences(account.notificationPreferences),
+    fixedSeatPreference: normalizeFixedSeatPreference(account.fixedSeatPreference),
   }
 }
 
@@ -104,6 +123,7 @@ export function subscribeToSession(listener: (user: SessionUser | null) => void)
             displayName: profile.displayName?.trim() || fallback.displayName,
             email: profile.email ?? fallback.email,
             notificationPreferences: normalizeNotificationPreferences(profile.notificationPreferences),
+            fixedSeatPreference: normalizeFixedSeatPreference(profile.fixedSeatPreference),
           })
         },
         () => listener(fallback),
@@ -168,24 +188,71 @@ export async function updateAccountProfile(
   displayName: string,
   avatarDataUrl?: string,
   notificationPreferences?: NotificationPreferences,
+  fixedSeatPreference?: FixedSeatPreference,
 ): Promise<SessionUser> {
   const cleanName = displayName.trim()
   const error = profileNameError(cleanName)
   if (error) throw new Error(error)
+  const normalizedFixedSeatPreference = normalizeFixedSeatPreference(fixedSeatPreference)
+  if (fixedSeatPreference && !normalizedFixedSeatPreference) {
+    throw new Error(fixedSeatPreferenceError(fixedSeatPreference) ?? 'La fascia del posto fisso non è valida.')
+  }
 
   const nextProfile: SessionUser = {
     ...current,
     displayName: cleanName,
     avatarDataUrl: avatarDataUrl || undefined,
     notificationPreferences: normalizeNotificationPreferences(notificationPreferences),
+    fixedSeatPreference: normalizedFixedSeatPreference,
   }
 
   if (hasRemoteBackend && firebaseAuth?.currentUser && firestore) {
     if (firebaseAuth.currentUser.uid !== current.id) throw new Error('Profilo non disponibile.')
-    await updateDoc(doc(firestore, 'users', current.id), {
-      displayName: cleanName,
-      avatarDataUrl: avatarDataUrl || deleteField(),
-      notificationPreferences: nextProfile.notificationPreferences,
+    const db = firestore
+    const profileReference = doc(db, 'users', current.id)
+    await runTransaction(db, async (transaction) => {
+      const profileSnapshot = await transaction.get(profileReference)
+      if (!profileSnapshot.exists()) throw new Error('Profilo non trovato.')
+      const storedPreference = normalizeFixedSeatPreference(
+        (profileSnapshot.data() as Partial<MemberProfile>).fixedSeatPreference,
+      )
+      const oldBucketIds = storedPreference ? fixedSeatPreferenceBucketIds(storedPreference) : []
+      const newBucketIds = normalizedFixedSeatPreference
+        ? fixedSeatPreferenceBucketIds(normalizedFixedSeatPreference)
+        : []
+      const allBucketIds = Array.from(new Set([...oldBucketIds, ...newBucketIds])).sort()
+      const bucketReferences = allBucketIds.map((bucketId) => doc(db, 'fixedSeatBuckets', bucketId))
+      const bucketSnapshots = await Promise.all(
+        bucketReferences.map((reference) => transaction.get(reference)),
+      )
+      const newBucketIdSet = new Set(newBucketIds)
+
+      const nextBuckets = bucketSnapshots.map((snapshot, index) => {
+        const data = snapshot.exists() ? snapshot.data() as { members?: Record<string, boolean> } : {}
+        const members = Object.fromEntries(
+          Object.entries(data.members ?? {}).filter(([, enabled]) => enabled === true),
+        )
+        delete members[current.id]
+        if (newBucketIdSet.has(allBucketIds[index])) {
+          if (Object.keys(members).length >= FIXED_SEAT_MAX_PLAYERS) {
+            throw new Error('Questa fascia ha già tre posti fissi. Scegli un altro orario.')
+          }
+          members[current.id] = true
+        }
+        return members
+      })
+
+      transaction.update(profileReference, {
+        displayName: cleanName,
+        avatarDataUrl: avatarDataUrl || deleteField(),
+        notificationPreferences: nextProfile.notificationPreferences,
+        fixedSeatPreference: normalizedFixedSeatPreference || deleteField(),
+      })
+      bucketReferences.forEach((reference, index) => {
+        const members = nextBuckets[index]
+        if (Object.keys(members).length === 0) transaction.delete(reference)
+        else transaction.set(reference, { members })
+      })
     })
     await updateProfile(firebaseAuth.currentUser, { displayName: cleanName })
     return nextProfile
@@ -194,11 +261,16 @@ export async function updateAccountProfile(
   const accounts = readAccounts()
   const accountIndex = accounts.findIndex((account) => account.id === current.id)
   if (accountIndex < 0) throw new Error('Profilo non trovato.')
+  if (
+    normalizedFixedSeatPreference
+    && fixedSeatMaxOtherOverlap(accounts, normalizedFixedSeatPreference, current.id) >= FIXED_SEAT_MAX_PLAYERS
+  ) throw new Error('Questa fascia ha già tre posti fissi. Scegli un altro orario.')
   accounts[accountIndex] = {
     ...accounts[accountIndex],
     displayName: cleanName,
     avatarDataUrl: avatarDataUrl || undefined,
     notificationPreferences: nextProfile.notificationPreferences,
+    fixedSeatPreference: normalizedFixedSeatPreference,
   }
   writeAccounts(accounts)
   emitAuthChange()
