@@ -80,6 +80,7 @@ const members: MemberProfile[] = players.map((player) => ({
 describe('pagina degli altri match', () => {
   it('mostra giudizi, risultati disponibili e stato del referto mancante', async () => {
     const onBack = vi.fn()
+    const onOpenStatistics = vi.fn()
     const user = userEvent.setup()
     render(
       <GroupMatchesPage
@@ -88,6 +89,7 @@ describe('pagina degli altri match', () => {
         loading={false}
         error={null}
         onBack={onBack}
+        onOpenStatistics={onOpenStatistics}
       />,
     )
 
@@ -111,6 +113,9 @@ describe('pagina degli altri match', () => {
     expect(screen.getByText('Referto non aggiunto')).toBeInTheDocument()
     expect(screen.getByText(/Coppie e punteggi non sono ancora disponibili/)).toBeInTheDocument()
 
+    await user.click(screen.getAllByRole('button', { name: 'Apri le statistiche di Teo' })[0])
+    expect(onOpenStatistics).toHaveBeenCalledWith('teo')
+
     await user.click(screen.getByRole('button', { name: 'Torna alla bacheca' }))
     expect(onBack).toHaveBeenCalledOnce()
   })
@@ -123,6 +128,7 @@ describe('pagina degli altri match', () => {
         loading={false}
         error="Dati incompleti."
         onBack={vi.fn()}
+        onOpenStatistics={vi.fn()}
       />,
     )
 

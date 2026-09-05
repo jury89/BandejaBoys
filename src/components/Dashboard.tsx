@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Bell, BellRing, CalendarCheck2, CalendarClock, CalendarDays, CalendarPlus, CheckCircle2, ChevronDown, CircleUserRound, History, LogOut, PhoneCall, RefreshCw, Trophy, UsersRound } from 'lucide-react'
+import { BarChart3, Bell, BellRing, CalendarCheck2, CalendarClock, CalendarDays, CalendarPlus, CheckCircle2, ChevronDown, CircleUserRound, History, LogOut, PhoneCall, RefreshCw, Trophy, UsersRound } from 'lucide-react'
 import { useAuth } from '../AuthContext'
 import type {
   FantasyEntry,
@@ -58,13 +58,15 @@ import { NotificationHistoryPage } from './NotificationHistoryPage'
 import { PollCard, type PollSlotFilter } from './PollCard'
 import { ProfileAvatar } from './ProfileAvatar'
 import { ProfileModal } from './ProfileModal'
+import { PlayerStatisticsPage } from './PlayerStatisticsPage'
 import { PullToRefresh } from './PullToRefresh'
 
 type FeedFilter = PollSlotFilter
-type DashboardView = 'feed' | 'matches' | 'group-matches' | 'fantasy' | 'notifications'
+type DashboardView = 'feed' | 'matches' | 'group-matches' | 'statistics' | 'fantasy' | 'notifications'
 
 const PERSONAL_MATCHES_HASH = '#i-miei-match'
 const GROUP_MATCHES_HASH = '#gli-altri-match'
+const STATISTICS_HASH = '#statistiche'
 const FANTASY_HASH = '#fantabandeja'
 const NOTIFICATION_HISTORY_HASH = '#notifiche'
 const INITIAL_DATA_TIMEOUT_MS = 6_000
@@ -73,9 +75,20 @@ const INITIAL_DATA_AUTO_RETRIES = 2
 function dashboardViewFromLocation(): DashboardView {
   if (window.location.hash === PERSONAL_MATCHES_HASH) return 'matches'
   if (window.location.hash === GROUP_MATCHES_HASH) return 'group-matches'
+  if (window.location.hash.startsWith(STATISTICS_HASH)) return 'statistics'
   if (window.location.hash === FANTASY_HASH) return 'fantasy'
   if (window.location.hash === NOTIFICATION_HISTORY_HASH) return 'notifications'
   return 'feed'
+}
+
+function statisticsPlayerIdFromLocation(): string | null {
+  const playerId = window.location.hash.slice(`${STATISTICS_HASH}/`.length)
+  if (!window.location.hash.startsWith(`${STATISTICS_HASH}/`) || !playerId) return null
+  try {
+    return decodeURIComponent(playerId)
+  } catch {
+    return null
+  }
 }
 
 const feedCopy: Record<FeedFilter, {
@@ -113,6 +126,9 @@ export function Dashboard() {
   const [dataSubscriptionAttempt, setDataSubscriptionAttempt] = useState(0)
   const [feedFilter, setFeedFilter] = useState<FeedFilter>('all')
   const [dashboardView, setDashboardView] = useState<DashboardView>(dashboardViewFromLocation)
+  const [statisticsPlayerId, setStatisticsPlayerId] = useState(
+    () => statisticsPlayerIdFromLocation() ?? user?.id ?? '',
+  )
   const [createOpen, setCreateOpen] = useState(false)
   const [toast, setToast] = useState<{ message: string; tone: 'success' | 'error' } | null>(null)
   const [accountOpen, setAccountOpen] = useState(false)
@@ -339,7 +355,7 @@ export function Dashboard() {
   }, [feedbackReviewerId])
 
   useEffect(() => {
-    if (dashboardView !== 'group-matches') return
+    if (dashboardView !== 'group-matches' && dashboardView !== 'statistics') return
 
     let matchReportsFailed = false
     const clearGroupDataError = () => {
@@ -437,14 +453,17 @@ export function Dashboard() {
   }, [accountOpen])
 
   useEffect(() => {
-    const syncViewWithHistory = () => setDashboardView(dashboardViewFromLocation())
+    const syncViewWithHistory = () => {
+      setDashboardView(dashboardViewFromLocation())
+      setStatisticsPlayerId(statisticsPlayerIdFromLocation() ?? user?.id ?? '')
+    }
     window.addEventListener('popstate', syncViewWithHistory)
     window.addEventListener('hashchange', syncViewWithHistory)
     return () => {
       window.removeEventListener('popstate', syncViewWithHistory)
       window.removeEventListener('hashchange', syncViewWithHistory)
     }
-  }, [])
+  }, [user?.id])
 
   useEffect(() => {
     if (dashboardView !== 'feed' || loading || !slotNavigationTarget) return
@@ -705,6 +724,38 @@ export function Dashboard() {
     window.history.replaceState(window.history.state, '', url)
     setDashboardView('feed')
   }
+  const openStatistics = (playerId = user.id) => {
+    setAccountOpen(false)
+    setGroupMatchReportsLoaded(false)
+    setGroupMatchesError(null)
+    setStatisticsPlayerId(playerId)
+    setDashboardView('statistics')
+    const targetHash = `${STATISTICS_HASH}/${encodeURIComponent(playerId)}`
+    if (window.location.hash === targetHash) return
+    const url = new URL(window.location.href)
+    url.hash = targetHash
+    const currentState = typeof window.history.state === 'object' && window.history.state
+      ? window.history.state
+      : {}
+    window.history.pushState({ ...currentState, bandejaView: 'statistics' }, '', url)
+  }
+  const selectStatisticsPlayer = (playerId: string) => {
+    setStatisticsPlayerId(playerId)
+    const url = new URL(window.location.href)
+    url.hash = `${STATISTICS_HASH}/${encodeURIComponent(playerId)}`
+    window.history.replaceState(window.history.state, '', url)
+  }
+  const closeStatistics = () => {
+    if (window.history.state?.bandejaView === 'statistics') {
+      window.history.back()
+      return
+    }
+
+    const url = new URL(window.location.href)
+    url.hash = ''
+    window.history.replaceState(window.history.state, '', url)
+    setDashboardView('feed')
+  }
   const openFantasy = () => {
     setAccountOpen(false)
     setFantasyRoundsLoaded(false)
@@ -864,6 +915,10 @@ export function Dashboard() {
                   <UsersRound size={16} />
                   <span>Gli altri match <small>Pagellini e risultati del gruppo</small></span>
                 </button>
+                <button type="button" onClick={() => openStatistics()}>
+                  <BarChart3 size={16} />
+                  <span>Statistiche <small>Numeri, coppie e curiosità</small></span>
+                </button>
                 <button type="button" onClick={openFantasy}>
                   <Trophy size={16} />
                   <span>FantaBandeja <small>Schiera la coppia e scala la classifica</small></span>
@@ -953,6 +1008,22 @@ export function Dashboard() {
           loading={loading || !feedbackSummariesLoaded || !groupMatchReportsLoaded}
           error={groupMatchesError}
           onBack={closeGroupMatches}
+          onOpenStatistics={openStatistics}
+        />
+      ) : dashboardView === 'statistics' ? (
+        <PlayerStatisticsPage
+          key={statisticsPlayerId || user.id}
+          polls={polls}
+          members={matchNameMembers}
+          user={user}
+          initialPlayerId={statisticsPlayerId || user.id}
+          feedbackSummaries={feedbackSummaries}
+          matchReports={groupMatchReports}
+          now={now}
+          loading={loading || !feedbackSummariesLoaded || !groupMatchReportsLoaded}
+          error={groupMatchesError}
+          onBack={closeStatistics}
+          onSelectPlayer={selectStatisticsPlayer}
         />
       ) : dashboardView === 'fantasy' ? (
         <FantasyBandejaPage

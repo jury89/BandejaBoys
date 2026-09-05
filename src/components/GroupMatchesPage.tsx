@@ -19,14 +19,17 @@ interface GroupMatchesPageProps {
   loading: boolean
   error: string | null
   onBack: () => void
+  onOpenStatistics: (playerId: string) => void
 }
 
 function GroupMatchCard({
   match,
   members,
+  onOpenStatistics,
 }: {
   match: GroupMatch
   members: MemberProfile[]
+  onOpenStatistics: (playerId: string) => void
 }) {
   const date = slotDateParts(match.slot.startsAt)
   const starters = getStarters(match.slot)
@@ -80,9 +83,8 @@ function GroupMatchCard({
               const feedbackLabel = definition
                 ? `${signup.displayName}: giudizio medio ${definition.label}, calcolato su ${ratingCount} ${ratingCount === 1 ? 'giudizio ricevuto' : 'giudizi ricevuti'}`
                 : `${signup.displayName}: nessun giudizio ricevuto`
-
-              return (
-                <div className="group-match__player" key={signup.id} role="listitem" aria-label={feedbackLabel}>
+              const playerContent = (
+                <>
                   <ProfileAvatar
                     className="group-match__avatar"
                     displayName={signup.displayName}
@@ -105,6 +107,23 @@ function GroupMatchCard({
                       {isGuestSignup(signup) ? 'Non partecipa ai giudizi' : definition ? countLabel : 'Nessun giudizio ricevuto'}
                     </small>
                   </div>
+                </>
+              )
+
+              return member && !isGuestSignup(signup) ? (
+                <div className="group-match__player-shell" key={signup.id} role="listitem" aria-label={feedbackLabel}>
+                  <button
+                    className="group-match__player group-match__player--link"
+                    type="button"
+                    aria-label={`Apri le statistiche di ${signup.displayName}`}
+                    onClick={() => onOpenStatistics(signup.userId)}
+                  >
+                    {playerContent}
+                  </button>
+                </div>
+              ) : (
+                <div className="group-match__player" key={signup.id} role="listitem" aria-label={feedbackLabel}>
+                  {playerContent}
                 </div>
               )
             })}
@@ -140,6 +159,7 @@ export function GroupMatchesPage({
   loading,
   error,
   onBack,
+  onOpenStatistics,
 }: GroupMatchesPageProps) {
   return (
     <main className="dashboard personal-matches group-matches">
@@ -178,6 +198,7 @@ export function GroupMatchesPage({
                   key={`${match.pollId}-${match.slot.id}`}
                   match={match}
                   members={members}
+                  onOpenStatistics={onOpenStatistics}
                 />
               ))}
             </div>

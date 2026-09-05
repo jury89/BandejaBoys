@@ -148,6 +148,56 @@ export interface GroupMatch extends PlayerMatch {
   playerFeedback: GroupMatchPlayerFeedback[]
 }
 
+export interface PlayerStatisticsRelationship {
+  userId: string
+  displayName: string
+  setsPlayed: number
+  setWins: number
+  setLosses: number
+  gamesFor: number
+  gamesAgainst: number
+  gameDifference: number
+  winRate: number
+}
+
+export interface PlayerMatchPerformance {
+  pollId: string
+  slotId: string
+  setsPlayed: number
+  setWins: number
+  setLosses: number
+  gamesFor: number
+  gamesAgainst: number
+  gameDifference: number
+}
+
+export interface PlayerStatistics {
+  appearances: number
+  totalMinutes: number
+  reportedMatches: number
+  positiveMatches: number
+  setsPlayed: number
+  setWins: number
+  setLosses: number
+  setWinRate: number
+  gamesFor: number
+  gamesAgainst: number
+  gameDifference: number
+  longestSetWinStreak: number
+  biggestSetWin: number | null
+  biggestSetLoss: number | null
+  tieBreakWins: number
+  tieBreakLosses: number
+  favoriteWeekday: number | null
+  favoriteStartMinutes: number | null
+  feedbackLevel?: MatchFeedbackLevel
+  feedbackCount: number
+  feedbackMatches: number
+  teammates: PlayerStatisticsRelationship[]
+  opponents: PlayerStatisticsRelationship[]
+  performances: PlayerMatchPerformance[]
+}
+
 export interface SlotInput {
   startsAt: string
   durationMinutes: number

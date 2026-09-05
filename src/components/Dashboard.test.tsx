@@ -191,6 +191,18 @@ describe('menu account', () => {
     expect(screen.getByRole('heading', { name: /Mettiamo in campo/ })).toBeInTheDocument()
   })
 
+  it('apre le statistiche sul giocatore corrente e mantiene la route dedicata', async () => {
+    const user = userEvent.setup()
+    render(<Dashboard />)
+
+    await user.click(screen.getByRole('button', { name: 'Apri menu account di Jury' }))
+    await user.click(screen.getByRole('button', { name: /Statistiche/ }))
+
+    expect(window.location.hash).toBe('#statistiche/jury')
+    expect(screen.getByRole('heading', { name: 'Jury' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Ancora nessuna partita' })).toBeInTheDocument()
+  })
+
   it('apre Gli altri match e carica soltanto allora le medie aggregate del gruppo', async () => {
     dashboardTestState.members = [
       { id: 'ale', displayName: 'Ale', email: 'ale@example.test', createdAt: 1 },

@@ -13,6 +13,7 @@ import {
   getOtherPlayedMatches,
   getPendingMatchFeedbackPrompts,
   getPlayerMatches,
+  getPlayerStatistics,
   getReserves,
   getSlotPhase,
   getStarters,
@@ -37,7 +38,7 @@ import {
   substituteStarter,
   toDateTimeInput,
 } from './domain'
-import type { MatchFeedbackResponse, MemberProfile, PadelPoll, PadelSlot, SessionUser, Signup, SignupRole } from '../types'
+import type { MatchFeedbackResponse, MemberProfile, PadelPoll, PadelSlot, PlayerMatch, SessionUser, Signup, SignupRole } from '../types'
 
 const member = (id: string, displayName = id): MemberProfile => ({
   id,
@@ -671,6 +672,121 @@ describe('partite personali', () => {
     )
 
     expect(result.past[0].receivedFeedback).toEqual({ level: 4, ratingCount: 2 })
+  })
+})
+
+describe('statistiche giocatore', () => {
+  const statisticsMatch = (
+    id: string,
+    startsAt: string,
+    sets: Array<{ teamAUserIds: [string, string]; scoreA: number; scoreB: number }>,
+  ): PlayerMatch => {
+    const matchSlot: PadelSlot = {
+      ...slot(['jury', 'ale', 'baru', 'teo'].map((playerId, index) => signup(playerId, index + 1))),
+      id,
+      startsAt,
+      durationMinutes: 90,
+      bookedAt: 1,
+    }
+    const report = makeMatchReport({
+      pollId: 'poll-statistics',
+      pollTitle: 'Padel',
+      slot: matchSlot,
+    }, member('jury', 'Jury'), sets, undefined, 100)
+    return {
+      pollId: 'poll-statistics',
+      pollTitle: 'Padel',
+      slot: matchSlot,
+      report,
+    }
+  }
+
+  it('calcola risultati, curiosità e rapporti usando la coppia di ogni set', () => {
+    const matches = [
+      statisticsMatch('match-2', '2026-07-29T19:30', [
+        { teamAUserIds: ['jury', 'ale'], scoreA: 0, scoreB: 6 },
+      ]),
+      statisticsMatch('match-1', '2026-07-28T19:30', [
+        { teamAUserIds: ['jury', 'ale'], scoreA: 6, scoreB: 4 },
+        { teamAUserIds: ['jury', 'ale'], scoreA: 7, scoreB: 6 },
+        { teamAUserIds: ['jury', 'baru'], scoreA: 4, scoreB: 6 },
+      ]),
+    ]
+
+    const statistics = getPlayerStatistics(matches, 'jury', [{
+      id: 'poll-statistics__match-1__jury',
+      pollId: 'poll-statistics',
+      slotId: 'match-1',
+      playerId: 'jury',
+      scoreUnitsTotal: 30,
+      ratingCount: 2,
+      lastResponseId: 'response-2',
+      updatedAt: 2,
+    }])
+
+    expect(statistics).toMatchObject({
+      appearances: 2,
+      totalMinutes: 180,
+      reportedMatches: 2,
+      positiveMatches: 1,
+      setsPlayed: 4,
+      setWins: 2,
+      setLosses: 2,
+      setWinRate: 50,
+      gamesFor: 17,
+      gamesAgainst: 22,
+      gameDifference: -5,
+      longestSetWinStreak: 2,
+      biggestSetWin: 2,
+      biggestSetLoss: 6,
+      tieBreakWins: 1,
+      tieBreakLosses: 0,
+      favoriteWeekday: 2,
+      favoriteStartMinutes: 19 * 60 + 30,
+      feedbackLevel: 4,
+      feedbackCount: 2,
+      feedbackMatches: 1,
+    })
+    expect(statistics.teammates[0]).toMatchObject({
+      userId: 'ale',
+      setsPlayed: 3,
+      setWins: 2,
+      setLosses: 1,
+      winRate: 66.7,
+      gameDifference: -3,
+    })
+    expect(statistics.opponents.find((opponent) => opponent.userId === 'teo')).toMatchObject({
+      setsPlayed: 4,
+      setWins: 2,
+      setLosses: 2,
+      winRate: 50,
+      gameDifference: -5,
+    })
+  })
+
+  it('conta una presenza senza referto senza trasformare i dati mancanti in sconfitte', () => {
+    const match = statisticsMatch('without-report', '2026-07-28T19:30', [
+      { teamAUserIds: ['jury', 'ale'], scoreA: 6, scoreB: 4 },
+    ])
+    delete match.report
+
+    expect(getPlayerStatistics([match], 'jury')).toMatchObject({
+      appearances: 1,
+      totalMinutes: 90,
+      reportedMatches: 0,
+      positiveMatches: 0,
+      setsPlayed: 0,
+      setWins: 0,
+      setLosses: 0,
+      setWinRate: 0,
+      gamesFor: 0,
+      gamesAgainst: 0,
+      gameDifference: 0,
+      feedbackCount: 0,
+      feedbackMatches: 0,
+      teammates: [],
+      opponents: [],
+    })
   })
 })
 

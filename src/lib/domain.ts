@@ -24,7 +24,10 @@ import type {
   PadelPoll,
   PadelSlot,
   PlayerMatch,
+  PlayerMatchPerformance,
   PlayerMatchLists,
+  PlayerStatistics,
+  PlayerStatisticsRelationship,
   SessionUser,
   Signup,
   SignupRole,
@@ -605,6 +608,245 @@ export function getPlayerMatches(
       .filter((match) => Boolean(match.slot.bookedAt) && match.endsAt <= now)
       .sort((left, right) => right.startsAt - left.startsAt || left.slot.id.localeCompare(right.slot.id))
       .map(toPlayerMatch),
+  }
+}
+
+interface PlayerRelationshipAccumulator {
+  userId: string
+  displayName: string
+  setsPlayed: number
+  setWins: number
+  setLosses: number
+  gamesFor: number
+  gamesAgainst: number
+}
+
+const playerStatisticsClockFormatter = new Intl.DateTimeFormat('en-GB', {
+  weekday: 'short',
+  hour: '2-digit',
+  minute: '2-digit',
+  hourCycle: 'h23',
+  timeZone: PADEL_TIME_ZONE,
+})
+
+const weekdayIndexByLabel: Record<string, number> = {
+  Sun: 0,
+  Mon: 1,
+  Tue: 2,
+  Wed: 3,
+  Thu: 4,
+  Fri: 5,
+  Sat: 6,
+}
+
+function playerStatisticsSlotClock(startsAt: string): {
+  weekday: number
+  startMinutes: number
+} | null {
+  const timestamp = padelDateTimeToTimestamp(startsAt)
+  if (!Number.isFinite(timestamp)) return null
+
+  const parts = Object.fromEntries(
+    playerStatisticsClockFormatter
+      .formatToParts(timestamp)
+      .map((part) => [part.type, part.value]),
+  )
+  const weekday = weekdayIndexByLabel[parts.weekday]
+  const hour = Number(parts.hour)
+  const minute = Number(parts.minute)
+  if (weekday === undefined || !Number.isFinite(hour) || !Number.isFinite(minute)) return null
+  return { weekday, startMinutes: hour * 60 + minute }
+}
+
+function mostFrequentValue(values: number[]): number | null {
+  if (values.length === 0) return null
+  const counts = new Map<number, number>()
+  values.forEach((value) => counts.set(value, (counts.get(value) ?? 0) + 1))
+  return [...counts.entries()]
+    .sort((left, right) => right[1] - left[1] || left[0] - right[0])[0]?.[0] ?? null
+}
+
+function relationshipRows(
+  relationships: Map<string, PlayerRelationshipAccumulator>,
+): PlayerStatisticsRelationship[] {
+  return [...relationships.values()]
+    .map((relationship) => ({
+      ...relationship,
+      gameDifference: relationship.gamesFor - relationship.gamesAgainst,
+      winRate: relationship.setsPlayed > 0
+        ? Math.round((relationship.setWins / relationship.setsPlayed) * 1_000) / 10
+        : 0,
+    }))
+    .sort((left, right) => (
+      right.setsPlayed - left.setsPlayed
+      || right.winRate - left.winRate
+      || left.displayName.localeCompare(right.displayName, 'it')
+    ))
+}
+
+function addRelationshipSet(
+  relationships: Map<string, PlayerRelationshipAccumulator>,
+  player: MatchReportPlayer,
+  gamesFor: number,
+  gamesAgainst: number,
+) {
+  const current = relationships.get(player.userId) ?? {
+    userId: player.userId,
+    displayName: player.displayName,
+    setsPlayed: 0,
+    setWins: 0,
+    setLosses: 0,
+    gamesFor: 0,
+    gamesAgainst: 0,
+  }
+  current.displayName = player.displayName
+  current.setsPlayed += 1
+  current.setWins += gamesFor > gamesAgainst ? 1 : 0
+  current.setLosses += gamesFor < gamesAgainst ? 1 : 0
+  current.gamesFor += gamesFor
+  current.gamesAgainst += gamesAgainst
+  relationships.set(player.userId, current)
+}
+
+export function getPlayerMatchPerformance(
+  match: PlayerMatch,
+  playerId: string,
+): PlayerMatchPerformance {
+  const performance: PlayerMatchPerformance = {
+    pollId: match.pollId,
+    slotId: match.slot.id,
+    setsPlayed: 0,
+    setWins: 0,
+    setLosses: 0,
+    gamesFor: 0,
+    gamesAgainst: 0,
+    gameDifference: 0,
+  }
+
+  match.report?.sets.forEach((set) => {
+    const playsForA = set.teamA.some((player) => player.userId === playerId)
+    const playsForB = set.teamB.some((player) => player.userId === playerId)
+    if (playsForA === playsForB) return
+
+    const gamesFor = playsForA ? set.scoreA : set.scoreB
+    const gamesAgainst = playsForA ? set.scoreB : set.scoreA
+    performance.setsPlayed += 1
+    performance.setWins += gamesFor > gamesAgainst ? 1 : 0
+    performance.setLosses += gamesFor < gamesAgainst ? 1 : 0
+    performance.gamesFor += gamesFor
+    performance.gamesAgainst += gamesAgainst
+  })
+  performance.gameDifference = performance.gamesFor - performance.gamesAgainst
+  return performance
+}
+
+export function getPlayerStatistics(
+  matches: PlayerMatch[],
+  playerId: string,
+  feedbackSummaries: MatchFeedbackSummary[] = [],
+): PlayerStatistics {
+  const performances = matches.map((match) => getPlayerMatchPerformance(match, playerId))
+  const reportedPerformances = performances.filter((performance) => performance.setsPlayed > 0)
+  const teammates = new Map<string, PlayerRelationshipAccumulator>()
+  const opponents = new Map<string, PlayerRelationshipAccumulator>()
+  const clocks = matches
+    .map((match) => playerStatisticsSlotClock(match.slot.startsAt))
+    .filter((clock): clock is NonNullable<typeof clock> => Boolean(clock))
+  let longestSetWinStreak = 0
+  let currentSetWinStreak = 0
+  let biggestSetWin: number | null = null
+  let biggestSetLoss: number | null = null
+  let tieBreakWins = 0
+  let tieBreakLosses = 0
+
+  ;[...matches]
+    .sort((left, right) => (
+      padelDateTimeToTimestamp(left.slot.startsAt) - padelDateTimeToTimestamp(right.slot.startsAt)
+      || left.slot.id.localeCompare(right.slot.id)
+    ))
+    .forEach((match) => {
+      match.report?.sets.forEach((set) => {
+        const playsForA = set.teamA.some((player) => player.userId === playerId)
+        const playsForB = set.teamB.some((player) => player.userId === playerId)
+        if (playsForA === playsForB) return
+
+        const ownTeam = playsForA ? set.teamA : set.teamB
+        const opposingTeam = playsForA ? set.teamB : set.teamA
+        const gamesFor = playsForA ? set.scoreA : set.scoreB
+        const gamesAgainst = playsForA ? set.scoreB : set.scoreA
+        const won = gamesFor > gamesAgainst
+        const margin = Math.abs(gamesFor - gamesAgainst)
+        const teammate = ownTeam.find((player) => player.userId !== playerId)
+        if (teammate) addRelationshipSet(teammates, teammate, gamesFor, gamesAgainst)
+        opposingTeam.forEach((opponent) => {
+          addRelationshipSet(opponents, opponent, gamesFor, gamesAgainst)
+        })
+
+        if (won) {
+          currentSetWinStreak += 1
+          longestSetWinStreak = Math.max(longestSetWinStreak, currentSetWinStreak)
+          biggestSetWin = Math.max(biggestSetWin ?? 0, margin)
+        } else {
+          currentSetWinStreak = 0
+          biggestSetLoss = Math.max(biggestSetLoss ?? 0, margin)
+        }
+
+        if (Math.max(gamesFor, gamesAgainst) === 7 && Math.min(gamesFor, gamesAgainst) === 6) {
+          if (won) tieBreakWins += 1
+          else tieBreakLosses += 1
+        }
+      })
+    })
+
+  const matchKeys = new Set(matches.map((match) => getMatchReportId(match.pollId, match.slot.id)))
+  const playerFeedback = feedbackSummaries.filter((summary) => (
+    summary.playerId === playerId
+    && summary.ratingCount > 0
+    && matchKeys.has(getMatchReportId(summary.pollId, summary.slotId))
+  ))
+  const feedbackCount = playerFeedback.reduce((total, summary) => total + summary.ratingCount, 0)
+  const scoreUnitsTotal = playerFeedback.reduce(
+    (total, summary) => total + summary.scoreUnitsTotal,
+    0,
+  )
+  const setWins = reportedPerformances.reduce((total, performance) => total + performance.setWins, 0)
+  const setLosses = reportedPerformances.reduce((total, performance) => total + performance.setLosses, 0)
+  const setsPlayed = setWins + setLosses
+  const gamesFor = reportedPerformances.reduce((total, performance) => total + performance.gamesFor, 0)
+  const gamesAgainst = reportedPerformances.reduce(
+    (total, performance) => total + performance.gamesAgainst,
+    0,
+  )
+
+  return {
+    appearances: matches.length,
+    totalMinutes: matches.reduce((total, match) => total + match.slot.durationMinutes, 0),
+    reportedMatches: reportedPerformances.length,
+    positiveMatches: reportedPerformances.filter(
+      (performance) => performance.setWins > performance.setLosses,
+    ).length,
+    setsPlayed,
+    setWins,
+    setLosses,
+    setWinRate: setsPlayed > 0 ? Math.round((setWins / setsPlayed) * 1_000) / 10 : 0,
+    gamesFor,
+    gamesAgainst,
+    gameDifference: gamesFor - gamesAgainst,
+    longestSetWinStreak,
+    biggestSetWin,
+    biggestSetLoss,
+    tieBreakWins,
+    tieBreakLosses,
+    favoriteWeekday: mostFrequentValue(clocks.map((clock) => clock.weekday)),
+    favoriteStartMinutes: mostFrequentValue(clocks.map((clock) => clock.startMinutes)),
+    ...(feedbackCount > 0 ? {
+      feedbackLevel: getMatchFeedbackLevelFromAverage(scoreUnitsTotal, feedbackCount),
+    } : {}),
+    feedbackCount,
+    feedbackMatches: playerFeedback.length,
+    teammates: relationshipRows(teammates),
+    opponents: relationshipRows(opponents),
+    performances,
   }
 }
 
