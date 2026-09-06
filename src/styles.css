@@ -3262,25 +3262,28 @@ p {
   content: '';
 }
 
+/* The score panel is a landscape padel court: net in the middle, service
+   lines on both sides and a centre service line only between them. */
 .player-stats__court-score::before {
-  top: 12px;
-  bottom: 12px;
-  left: 50%;
-  border-left: 1px solid rgba(255, 255, 255, 0.55);
+  top: 50%;
+  right: 33.333%;
+  left: 33.333%;
+  border-top: 1px solid rgba(255, 255, 255, 0.55);
 }
 
 .player-stats__court-score::after {
-  top: 50%;
-  right: 12px;
-  left: 12px;
-  border-top: 3px double rgba(255, 255, 255, 0.68);
+  top: 12px;
+  bottom: 12px;
+  left: 50%;
+  border-left: 3px double rgba(255, 255, 255, 0.68);
 }
 
 .player-stats__court-score > i {
   top: 12px;
+  right: 33.333%;
   bottom: 12px;
   left: 33.333%;
-  border-left: 1px solid rgba(255, 255, 255, 0.25);
+  border-inline: 1px solid rgba(255, 255, 255, 0.42);
 }
 
 .player-stats__court-score > span {
