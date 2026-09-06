@@ -19,7 +19,7 @@ import {
   getPlayerStatistics,
   padelDateTimeToTimestamp,
 } from '../lib/domain'
-import { PADEL_TIME_ZONE, slotDateParts } from '../lib/format'
+import { PADEL_TIME_ZONE, relationshipPerformanceLabel, slotDateParts } from '../lib/format'
 import { resolvePlayerMatchNames } from '../lib/memberNames'
 import type {
   MatchFeedbackSummary,
@@ -131,7 +131,7 @@ function relationshipSummary(
   if (!relationship) return { name: 'Ancora da scoprire', detail: emptyCopy }
   return {
     name: relationship.displayName,
-    detail: `${percentage(relationship.winRate)} in ${relationship.setsPlayed} set · ${signedNumber(relationship.gameDifference)} game`,
+    detail: relationshipPerformanceLabel(relationship),
   }
 }
 

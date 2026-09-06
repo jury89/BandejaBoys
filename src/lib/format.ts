@@ -1,5 +1,25 @@
 export const PADEL_TIME_ZONE = 'Europe/Rome'
 
+export function relationshipPerformanceLabel({
+  gameDifference,
+  setWins,
+  setsPlayed,
+  winRate,
+}: {
+  gameDifference: number
+  setWins: number
+  setsPlayed: number
+  winRate: number
+}): string {
+  const setResult = `${setWins} ${setWins === 1 ? 'set vinto' : 'set vinti'} su ${setsPlayed}`
+  const gameCount = Math.abs(gameDifference)
+  const gameResult = gameDifference === 0
+    ? 'stesso numero di game degli avversari'
+    : `${gameCount} game ${gameCount === 1 ? 'fatto' : 'fatti'} ${gameDifference > 0 ? 'in più' : 'in meno'} degli avversari`
+  const percentage = `${new Intl.NumberFormat('it-IT', { maximumFractionDigits: 1 }).format(winRate)}%`
+  return `${setResult} (${percentage}) · ${gameResult}`
+}
+
 const weekdayFormatter = new Intl.DateTimeFormat('it-IT', {
   weekday: 'short',
   timeZone: PADEL_TIME_ZONE,

@@ -2,11 +2,35 @@ import {
   formatRatingAverage,
   mondayOfWeek,
   pollWeekTitle,
+  relationshipPerformanceLabel,
   slotDateParts,
   slotWeekTitle,
   weekLabel,
   weekStartForDateTime,
 } from './format'
+
+describe('sintesi dei rapporti tra giocatori', () => {
+  it('spiega set vinti, vantaggio, svantaggio e parità nei game', () => {
+    expect(relationshipPerformanceLabel({
+      setWins: 2,
+      setsPlayed: 3,
+      winRate: 66.7,
+      gameDifference: 3,
+    })).toBe('2 set vinti su 3 (66,7%) · 3 game fatti in più degli avversari')
+    expect(relationshipPerformanceLabel({
+      setWins: 0,
+      setsPlayed: 4,
+      winRate: 0,
+      gameDifference: -16,
+    })).toBe('0 set vinti su 4 (0%) · 16 game fatti in meno degli avversari')
+    expect(relationshipPerformanceLabel({
+      setWins: 1,
+      setsPlayed: 3,
+      winRate: 33.3,
+      gameDifference: 0,
+    })).toBe('1 set vinto su 3 (33,3%) · stesso numero di game degli avversari')
+  })
+})
 
 describe('medie delle pagelle', () => {
   it('arrotonda al mezzo punto più vicino senza decimali inutili', () => {

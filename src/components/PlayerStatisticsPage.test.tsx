@@ -101,6 +101,7 @@ describe('pagina statistiche giocatore', () => {
 
     await browserUser.click(screen.getByRole('button', { name: /Coppie e rivali/ }))
     expect(screen.getByText('Compagno portafortuna')).toBeInTheDocument()
+    expect(screen.getAllByText('2 set vinti su 3 (66,7%) · 1 game fatto in più degli avversari')).toHaveLength(3)
     const teammateList = screen.getByRole('heading', { name: 'Come compagni' }).closest('section')
     expect(teammateList).not.toBeNull()
     expect(within(teammateList!).getByText('Alex')).toBeInTheDocument()
