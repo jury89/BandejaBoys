@@ -3244,6 +3244,8 @@ p {
 }
 
 .player-stats__court-score {
+  --padel-service-line-inset: 15.25%;
+
   display: grid;
   width: 100%;
   min-width: 0;
@@ -3265,12 +3267,12 @@ p {
   content: '';
 }
 
-/* Regulation proportions: 20 × 10 metres, with each service line 3 metres
-   from the net (35% and 65% of the court length). */
+/* Regulation proportions: 20 × 10 metres. Each service line is 6.95 metres
+   from the net, leaving 3.05 metres (15.25%) between the line and back wall. */
 .player-stats__court-score::before {
   top: 50%;
-  right: 35%;
-  left: 35%;
+  right: var(--padel-service-line-inset);
+  left: var(--padel-service-line-inset);
   border-top: 1px solid rgba(255, 255, 255, 0.55);
 }
 
@@ -3283,9 +3285,9 @@ p {
 
 .player-stats__court-score > i {
   top: 12px;
-  right: 35%;
+  right: var(--padel-service-line-inset);
   bottom: 12px;
-  left: 35%;
+  left: var(--padel-service-line-inset);
   border-inline: 1px solid rgba(255, 255, 255, 0.42);
 }
 

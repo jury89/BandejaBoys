@@ -2,6 +2,7 @@ import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { vi } from 'vitest'
 import type { MatchReport, MemberProfile, PadelPoll } from '../types'
+import styles from '../styles.css?raw'
 import { PlayerStatisticsPage } from './PlayerStatisticsPage'
 
 const user: MemberProfile = {
@@ -66,6 +67,12 @@ const report: MatchReport = {
 }
 
 describe('pagina statistiche giocatore', () => {
+  it('mantiene le linee di servizio a 3,05 metri dal fondo del campo', () => {
+    expect(styles).toContain('--padel-service-line-inset: 15.25%')
+    expect(styles).toContain('right: var(--padel-service-line-inset)')
+    expect(styles).toContain('left: var(--padel-service-line-inset)')
+  })
+
   it('mostra il profilo, cambia giocatore e rende consultabili rapporti e storico', async () => {
     const onSelectPlayer = vi.fn()
     const browserUser = userEvent.setup()
