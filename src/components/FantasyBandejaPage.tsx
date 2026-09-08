@@ -36,6 +36,7 @@ import {
 import { PADEL_TIME_ZONE } from '../lib/format'
 import {
   FANTASY_SEASONS,
+  FANTASY_SUMMER_2026_ENDS_AT,
   fantasySeasonIsArchived,
   fantasySeasonIsUpcoming,
   getFantasySeasonAt,
@@ -916,6 +917,7 @@ export function FantasyBandejaPage({
   ) ?? currentSeason
   const selectedSeasonIsArchived = fantasySeasonIsArchived(selectedSeason, countdownNow)
   const selectedSeasonIsUpcoming = fantasySeasonIsUpcoming(selectedSeason, countdownNow)
+  const seasonSwitcherAvailable = countdownNow >= FANTASY_SUMMER_2026_ENDS_AT
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -1029,23 +1031,25 @@ export function FantasyBandejaPage({
             <div className="fantasy-season__live"><span /> Stagione in corso</div>
           )}
         </div>
-        <div className="fantasy-season__switcher" aria-label="Stagioni FantaBandeja">
-          {FANTASY_SEASONS.map((season) => {
-            const active = season.id === selectedSeason.id
-            return (
-              <button
-                key={season.id}
-                type="button"
-                className={active ? 'is-active' : ''}
-                aria-pressed={active}
-                onClick={() => setSelectedSeasonId(season.id === currentSeason.id ? null : season.id)}
-              >
-                <span><strong>{season.label}</strong><small>{seasonStatus(season, countdownNow)}</small></span>
-                {active && <Check size={17} aria-hidden="true" />}
-              </button>
-            )
-          })}
-        </div>
+        {seasonSwitcherAvailable && (
+          <div className="fantasy-season__switcher" aria-label="Stagioni FantaBandeja">
+            {FANTASY_SEASONS.map((season) => {
+              const active = season.id === selectedSeason.id
+              return (
+                <button
+                  key={season.id}
+                  type="button"
+                  className={active ? 'is-active' : ''}
+                  aria-pressed={active}
+                  onClick={() => setSelectedSeasonId(season.id === currentSeason.id ? null : season.id)}
+                >
+                  <span><strong>{season.label}</strong><small>{seasonStatus(season, countdownNow)}</small></span>
+                  {active && <Check size={17} aria-hidden="true" />}
+                </button>
+              )
+            })}
+          </div>
+        )}
         {selectedSeasonIsArchived && (
           <div className="fantasy-season__archive-note">
             <LockKeyhole size={18} aria-hidden="true" />

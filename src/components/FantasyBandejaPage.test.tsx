@@ -57,13 +57,13 @@ function renderPage(overrides: Partial<Parameters<typeof FantasyBandejaPage>[0]>
 }
 
 describe('FantaBandeja', () => {
-  it('mostra la stagione corrente e il countdown alla chiusura', () => {
+  it('mostra soltanto la stagione corrente e il countdown prima della chiusura', () => {
     renderPage()
 
     expect(screen.getByRole('heading', { name: 'Estate 2026' })).toBeInTheDocument()
     expect(screen.getByRole('timer', { name: /Alla chiusura/ })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Estate 2026.*In corso/ })).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByRole('button', { name: /Inverno 2026\/27.*Prossima/ })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.queryByRole('button', { name: /Estate 2026.*In corso/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Inverno 2026\/27/ })).not.toBeInTheDocument()
   })
 
   it('separa classifica invernale e archivio estivo dalla data della partita', async () => {
@@ -99,6 +99,8 @@ describe('FantaBandeja', () => {
     renderPage({ rounds: [summerRound, winterRound], now: winterNow })
 
     expect(screen.getByRole('heading', { name: 'Inverno 2026/27' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Inverno 2026\/27.*In corso/ })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: /Estate 2026.*Archivio/ })).toHaveAttribute('aria-pressed', 'false')
     await user.click(screen.getByRole('tab', { name: /Classifica/i }))
     expect(screen.getByRole('button', { name: /dettaglio punti di Jury/i })).toHaveTextContent('3pt')
 
