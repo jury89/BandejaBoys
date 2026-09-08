@@ -6276,6 +6276,205 @@ p {
   line-height: 1;
 }
 
+.fantasy-season {
+  overflow: hidden;
+  margin-bottom: 16px;
+  border: 1px solid #b9d1d9;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: 0 12px 28px rgba(7, 58, 80, 0.09);
+}
+
+.fantasy-season.is-archived {
+  background: rgba(244, 248, 249, 0.92);
+}
+
+.fantasy-season__summary {
+  display: grid;
+  align-items: center;
+  padding: 22px 26px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 24px;
+}
+
+.fantasy-season__summary .eyebrow {
+  margin-bottom: 4px;
+}
+
+.fantasy-season__summary h2 {
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--display);
+  font-size: clamp(2rem, 4vw, 3.15rem);
+  font-weight: 760;
+  letter-spacing: -0.02em;
+  line-height: 0.95;
+  text-transform: uppercase;
+}
+
+.fantasy-season__summary > div:first-child > p:last-child {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 0.76rem;
+  line-height: 1.5;
+}
+
+.fantasy-season__countdown {
+  min-width: 315px;
+  padding-left: 24px;
+  border-left: 1px solid #cadce1;
+}
+
+.fantasy-season__countdown > span {
+  display: block;
+  margin-bottom: 7px;
+  color: var(--muted);
+  font-size: 0.58rem;
+  font-weight: 850;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+
+.fantasy-season__countdown > div {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(48px, 1fr));
+  gap: 7px;
+}
+
+.fantasy-season__countdown > div > span {
+  display: grid;
+  min-height: 54px;
+  place-items: center;
+  padding: 5px 8px;
+  border: 1px solid #c6d9df;
+  border-radius: 8px;
+  background: var(--ink);
+  color: var(--white);
+}
+
+.fantasy-season__countdown strong {
+  font-family: var(--display);
+  font-size: 1.48rem;
+  font-weight: 780;
+  line-height: 1;
+}
+
+.fantasy-season__countdown small {
+  color: var(--ball);
+  font-size: 0.46rem;
+  font-weight: 850;
+  letter-spacing: 0.09em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.fantasy-season__live {
+  display: inline-flex;
+  min-height: 42px;
+  align-items: center;
+  padding: 9px 14px;
+  gap: 9px;
+  border: 1px solid #9ccfc4;
+  border-radius: 999px;
+  background: #e3f6f1;
+  color: #075e57;
+  font-size: 0.66rem;
+  font-weight: 850;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.fantasy-season__live span {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #0a897d;
+  box-shadow: 0 0 0 4px rgba(10, 137, 125, 0.13);
+}
+
+.fantasy-season__switcher {
+  display: grid;
+  padding: 6px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  border-top: 1px solid #d8e5e9;
+  background: #eaf2f4;
+}
+
+.fantasy-season__switcher button {
+  display: flex;
+  min-width: 0;
+  min-height: 52px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 14px;
+  gap: 12px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: #4c6872;
+  text-align: left;
+  transition: 150ms ease;
+}
+
+.fantasy-season__switcher button:hover {
+  border-color: #bfd3d9;
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.fantasy-season__switcher button:focus-visible {
+  outline: 3px solid rgba(12, 110, 147, 0.24);
+  outline-offset: 1px;
+}
+
+.fantasy-season__switcher button.is-active {
+  border-color: #a9c8d1;
+  background: var(--white);
+  color: var(--ink);
+  box-shadow: 0 5px 14px rgba(7, 58, 80, 0.08);
+}
+
+.fantasy-season__switcher button > span {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.fantasy-season__switcher strong {
+  overflow: hidden;
+  font-size: 0.72rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fantasy-season__switcher small {
+  color: var(--muted);
+  font-size: 0.55rem;
+  font-weight: 750;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.fantasy-season__switcher svg {
+  flex: 0 0 auto;
+  color: var(--court);
+}
+
+.fantasy-season__archive-note {
+  display: flex;
+  align-items: center;
+  padding: 12px 26px;
+  gap: 10px;
+  border-top: 1px solid #d4e1e5;
+  background: #eef3f4;
+  color: #536c75;
+  font-size: 0.68rem;
+}
+
+.fantasy-season__archive-note svg {
+  flex: 0 0 auto;
+}
+
 .fantasy-hub-nav {
   position: sticky;
   top: 82px;
@@ -7811,6 +8010,26 @@ p {
     font-size: 1.35rem;
   }
 
+  .fantasy-season__summary {
+    align-items: stretch;
+    padding: 20px;
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+
+  .fantasy-season__countdown {
+    min-width: 0;
+    padding: 16px 0 0;
+    border-top: 1px solid #cadce1;
+    border-left: 0;
+  }
+
+  .fantasy-season__archive-note {
+    align-items: flex-start;
+    padding: 12px 20px;
+    line-height: 1.45;
+  }
+
   .fantasy-hub-nav {
     top: 78px;
     margin-bottom: 28px;
@@ -8454,6 +8673,36 @@ p {
   .fantasy-hero__rules-button {
     width: auto;
     min-height: 44px;
+  }
+
+  .fantasy-season__summary {
+    padding: 18px 16px;
+  }
+
+  .fantasy-season__summary h2 {
+    font-size: 2.2rem;
+  }
+
+  .fantasy-season__countdown > div {
+    gap: 4px;
+  }
+
+  .fantasy-season__countdown > div > span {
+    min-height: 50px;
+    padding-inline: 4px;
+  }
+
+  .fantasy-season__countdown strong {
+    font-size: 1.28rem;
+  }
+
+  .fantasy-season__switcher button {
+    min-height: 49px;
+    padding: 8px 10px;
+  }
+
+  .fantasy-season__switcher strong {
+    font-size: 0.64rem;
   }
 
   .fantasy-hub-nav {

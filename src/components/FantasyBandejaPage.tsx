@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type KeyboardEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import {
   ArrowLeft,
   BookOpenText,
@@ -34,6 +34,15 @@ import {
   getMatchFeedbackDefinition,
 } from '../lib/domain'
 import { PADEL_TIME_ZONE } from '../lib/format'
+import {
+  FANTASY_SEASONS,
+  fantasySeasonIsArchived,
+  fantasySeasonIsUpcoming,
+  getFantasySeasonAt,
+  getFantasySeasonCountdown,
+  getFantasySeasonForRound,
+  type FantasySeason,
+} from '../lib/fantasySeasons'
 import { resolveMemberName } from '../lib/memberNames'
 import { Modal } from './Modal'
 import { ProfileAvatar } from './ProfileAvatar'
@@ -65,6 +74,40 @@ type FantasyView = 'play' | 'leaderboard' | 'results'
 
 const FANTASY_VIEWS: FantasyView[] = ['play', 'leaderboard', 'results']
 const INITIAL_VISIBLE_RESULTS = 4
+
+function countdownValue(value: number): string {
+  return String(value).padStart(2, '0')
+}
+
+function SeasonCountdown({ label, targetAt, now }: { label: string; targetAt: number; now: number }) {
+  const countdown = getFantasySeasonCountdown(targetAt, now)
+  const units = [
+    { label: 'giorni', value: countdown.days },
+    { label: 'ore', value: countdown.hours },
+    { label: 'min', value: countdown.minutes },
+    { label: 'sec', value: countdown.seconds },
+  ]
+
+  return (
+    <div className="fantasy-season__countdown" role="timer" aria-label={`${label}: ${countdown.days} giorni, ${countdown.hours} ore, ${countdown.minutes} minuti e ${countdown.seconds} secondi`}>
+      <span>{label}</span>
+      <div>
+        {units.map((unit) => (
+          <span key={unit.label}>
+            <strong>{countdownValue(unit.value)}</strong>
+            <small>{unit.label}</small>
+          </span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function seasonStatus(season: FantasySeason, now: number): string {
+  if (fantasySeasonIsArchived(season, now)) return 'Archivio'
+  if (fantasySeasonIsUpcoming(season, now)) return 'Prossima'
+  return 'In corso'
+}
 
 const matchFormatter = new Intl.DateTimeFormat('it-IT', {
   weekday: 'long',
@@ -863,11 +906,30 @@ export function FantasyBandejaPage({
 }: FantasyBandejaPageProps) {
   const [rulesOpen, setRulesOpen] = useState(false)
   const [selectedView, setSelectedView] = useState<FantasyView | null>(null)
+  const [selectedSeasonId, setSelectedSeasonId] = useState<FantasySeason['id'] | null>(null)
+  const [countdownNow, setCountdownNow] = useState(now)
   const [visibleResultCount, setVisibleResultCount] = useState(INITIAL_VISIBLE_RESULTS)
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([])
+  const currentSeason = getFantasySeasonAt(countdownNow)
+  const selectedSeason = FANTASY_SEASONS.find(
+    (season) => season.id === (selectedSeasonId ?? currentSeason.id),
+  ) ?? currentSeason
+  const selectedSeasonIsArchived = fantasySeasonIsArchived(selectedSeason, countdownNow)
+  const selectedSeasonIsUpcoming = fantasySeasonIsUpcoming(selectedSeason, countdownNow)
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setCountdownNow((current) => Math.max(current, now, Date.now()))
+    }, 1_000)
+    return () => window.clearInterval(timer)
+  }, [now])
+
   const visibleRounds = useMemo(
-    () => rounds.filter((round) => round.status !== 'pending'),
-    [rounds],
+    () => rounds.filter((round) => (
+      round.status !== 'pending'
+      && getFantasySeasonForRound(round).id === selectedSeason.id
+    )),
+    [rounds, selectedSeason.id],
   )
   const orderedRounds = useMemo(
     () => [...visibleRounds].sort((left, right) => left.locksAt - right.locksAt),
@@ -941,6 +1003,56 @@ export function FantasyBandejaPage({
       </section>
 
       {rulesOpen && <FantasyRulesModal onClose={() => setRulesOpen(false)} />}
+
+      <section className={`fantasy-season${selectedSeasonIsArchived ? ' is-archived' : ''}`} aria-labelledby="fantasy-season-title">
+        <div className="fantasy-season__summary">
+          <div>
+            <p className="eyebrow">{selectedSeason.eyebrow}</p>
+            <h2 id="fantasy-season-title">{selectedSeason.label}</h2>
+            <p>
+              {selectedSeasonIsArchived
+                ? 'Stagione conclusa: classifica e risultati restano consultabili.'
+                : selectedSeasonIsUpcoming
+                  ? 'La nuova classifica parte con le partite del 28 settembre.'
+                  : 'Si chiude domenica 27 settembre alle 23:59.'}
+            </p>
+          </div>
+          {typeof selectedSeason.endsAt === 'number' ? (
+            <SeasonCountdown
+              label={selectedSeasonIsArchived ? 'Stagione conclusa' : 'Alla chiusura'}
+              targetAt={selectedSeason.endsAt}
+              now={countdownNow}
+            />
+          ) : selectedSeasonIsUpcoming ? (
+            <SeasonCountdown label="Al calcio d’inizio" targetAt={selectedSeason.startsAt} now={countdownNow} />
+          ) : (
+            <div className="fantasy-season__live"><span /> Stagione in corso</div>
+          )}
+        </div>
+        <div className="fantasy-season__switcher" aria-label="Stagioni FantaBandeja">
+          {FANTASY_SEASONS.map((season) => {
+            const active = season.id === selectedSeason.id
+            return (
+              <button
+                key={season.id}
+                type="button"
+                className={active ? 'is-active' : ''}
+                aria-pressed={active}
+                onClick={() => setSelectedSeasonId(season.id === currentSeason.id ? null : season.id)}
+              >
+                <span><strong>{season.label}</strong><small>{seasonStatus(season, countdownNow)}</small></span>
+                {active && <Check size={17} aria-hidden="true" />}
+              </button>
+            )
+          })}
+        </div>
+        {selectedSeasonIsArchived && (
+          <div className="fantasy-season__archive-note">
+            <LockKeyhole size={18} aria-hidden="true" />
+            <span><strong>Sola consultazione.</strong> Questa stagione non riceve più nuovi round o punti.</span>
+          </div>
+        )}
+      </section>
 
       <nav className="fantasy-hub-nav" aria-label="Sezioni FantaBandeja" role="tablist">
         <button
@@ -1028,7 +1140,9 @@ export function FantasyBandejaPage({
                   <CalendarDays size={34} />
                   <p className="eyebrow">Nessuna formazione aperta</p>
                   <h2>Non ci sono coppie da schierare.</h2>
-                  <p>I round già iniziati passano nei Risultati; la prossima formazione comparirà qui.</p>
+                  <p>{selectedSeasonIsArchived
+                    ? 'Le formazioni di questa stagione sono chiuse e restano disponibili nei risultati.'
+                    : 'I round già iniziati passano nei Risultati; la prossima formazione comparirà qui.'}</p>
                 </section>
               ) : (
                 <section className="fantasy-section" aria-labelledby="fantasy-open-title">

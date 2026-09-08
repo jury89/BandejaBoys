@@ -2,6 +2,7 @@ import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { FantasyEntry, FantasyRound, MemberProfile, SessionUser } from '../types'
 import styles from '../styles.css?raw'
+import { FANTASY_SUMMER_2026_ENDS_AT } from '../lib/fantasySeasons'
 import { FantasyBandejaPage } from './FantasyBandejaPage'
 
 const now = new Date('2026-08-03T12:00:00.000Z').getTime()
@@ -56,6 +57,57 @@ function renderPage(overrides: Partial<Parameters<typeof FantasyBandejaPage>[0]>
 }
 
 describe('FantaBandeja', () => {
+  it('mostra la stagione corrente e il countdown alla chiusura', () => {
+    renderPage()
+
+    expect(screen.getByRole('heading', { name: 'Estate 2026' })).toBeInTheDocument()
+    expect(screen.getByRole('timer', { name: /Alla chiusura/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Estate 2026.*In corso/ })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: /Inverno 2026\/27.*Prossima/ })).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  it('separa classifica invernale e archivio estivo dalla data della partita', async () => {
+    const user = userEvent.setup()
+    const winterNow = FANTASY_SUMMER_2026_ENDS_AT + 60_000
+    const scoredRound = (id: string, locksAt: number, leaguePoints: number): FantasyRound => ({
+      ...round,
+      id,
+      pollId: id,
+      slotId: id,
+      slotStartsAt: new Date(locksAt).toISOString(),
+      slotEndsAt: locksAt + 90 * 60_000,
+      locksAt,
+      settlesAt: locksAt + 24 * 60 * 60_000,
+      status: 'scored',
+      standings: [{
+        managerId: manager.id,
+        managerName: manager.displayName,
+        playerIds: ['a', 'b'],
+        captainId: 'a',
+        totalScore: 18,
+        captainRating: 7,
+        baseRatingTotal: 13,
+        rank: 1,
+        leaguePoints,
+      }],
+      playerScores: [],
+      settledAt: locksAt + 60_000,
+    })
+    const summerRound = scoredRound('summer-round', FANTASY_SUMMER_2026_ENDS_AT - 60_000, 5)
+    const winterRound = scoredRound('winter-round', FANTASY_SUMMER_2026_ENDS_AT + 60_000, 3)
+
+    renderPage({ rounds: [summerRound, winterRound], now: winterNow })
+
+    expect(screen.getByRole('heading', { name: 'Inverno 2026/27' })).toBeInTheDocument()
+    await user.click(screen.getByRole('tab', { name: /Classifica/i }))
+    expect(screen.getByRole('button', { name: /dettaglio punti di Jury/i })).toHaveTextContent('3pt')
+
+    await user.click(screen.getByRole('button', { name: /Estate 2026.*Archivio/ }))
+    expect(screen.getByText('Sola consultazione.')).toBeInTheDocument()
+    expect(screen.getByRole('timer', { name: /Stagione conclusa: 0 giorni/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /dettaglio punti di Jury/i })).toHaveTextContent('5pt')
+  })
+
   it('apre il regolamento completo e permette di chiuderlo', async () => {
     const user = userEvent.setup()
     renderPage()
