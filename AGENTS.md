@@ -26,4 +26,4 @@ Run `npm run check` before every commit or push. It must complete lint, all test
 
 ## Product constraints
 
-This is a single-group, private tool designed to stay on Firebase's no-cost Spark plan. Do not introduce Cloud Functions, paid infrastructure, analytics or public-discovery features without an explicit product decision.
+This is a single-group, private tool designed to minimize costs and remain within free usage allowances. The owner upgraded production to Firebase Blaze on 2026-09-09 after Spark's daily read quota was exhausted. This does not authorize additional paid services: do not introduce Cloud Functions, new paid infrastructure, analytics or public-discovery features without an explicit product decision.
