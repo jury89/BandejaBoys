@@ -8,17 +8,15 @@ import {
   getDoc,
   getDocs,
   getFirestore,
+  query,
   serverTimestamp,
   setDoc,
   terminate,
+  where,
 } from 'firebase/firestore'
 import webpush, { type PushSubscription } from 'web-push'
 import type {
-  FantasyEntry,
   FantasyRound,
-  MatchFeedbackResponse,
-  MatchFeedbackSummary,
-  MatchReport,
   MemberProfile,
   PadelPoll,
 } from '../src/types'
@@ -35,7 +33,9 @@ import {
   createNotificationPushPayload,
   createTestNotification,
   isNotificationKindEnabled,
+  isMondayMotivationWindow,
 } from '../src/lib/notificationSchedule'
+import { loadNotificationMatchData, type NotificationDataReader } from './notification-data'
 
 interface StoredPushSubscription extends PushSubscription {
   userId: string
@@ -73,136 +73,73 @@ await signInWithEmailAndPassword(getAuth(app), notifierEmail, notifierPassword)
 const db = getFirestore(app)
 webpush.setVapidDetails(origin, publicKey, privateKey)
 
-const motivationReference = doc(db, 'notificationContent', 'mondayMotivation')
-const motherNamesReference = doc(db, 'notificationContent', 'motherNames')
-const [
-  pollSnapshot,
-  subscriptionSnapshot,
-  feedbackResponseSnapshot,
-  legacyMvpResponseSnapshot,
-  legacyRatingResponseSnapshot,
-  motivationSnapshot,
-  motherNamesSnapshot,
-  userSnapshot,
-  fantasyRoundSnapshot,
-  feedbackSummarySnapshot,
-  matchReportSnapshot,
-] = await Promise.all([
-  getDocs(collection(db, 'polls')),
-  getDocs(collection(db, 'pushSubscriptions')),
-  getDocs(collection(db, 'matchFeedbackResponses')),
-  getDocs(collection(db, 'matchMvpResponses')),
-  getDocs(collection(db, 'matchRatingResponses')),
-  getDoc(motivationReference),
-  getDoc(motherNamesReference),
-  getDocs(collection(db, 'users')),
-  getDocs(collection(db, 'fantasyRounds')),
-  getDocs(collection(db, 'matchFeedbackSummaries')),
-  getDocs(collection(db, 'matchReports')),
-])
-
-const polls = pollSnapshot.docs.map((item) => ({ id: item.id, ...item.data() }) as PadelPoll)
-const subscriptions = subscriptionSnapshot.docs.map((item) => ({
-  id: item.id,
-  reference: item.ref,
-  data: item.data() as StoredPushSubscription,
-}))
-const currentFeedbackResponses = feedbackResponseSnapshot.docs.map((item) => ({
-  id: item.id,
-  ...item.data(),
-}) as MatchFeedbackResponse)
-const currentFeedbackResponseIds = new Set(currentFeedbackResponses.map((response) => response.id))
-const legacyMvpClosedResponses = legacyMvpResponseSnapshot.docs.map((item) => {
-  const data = item.data() as {
-    pollId: string
-    slotId: string
-    voterId: string
-    status: MatchFeedbackResponse['status']
-    closedAt: number
-  }
-  return {
-    id: item.id,
-    pollId: data.pollId,
-    slotId: data.slotId,
-    reviewerId: data.voterId,
-    status: data.status,
-    closedAt: data.closedAt,
-  } satisfies MatchFeedbackResponse
-})
-const legacyRatingClosedResponses = legacyRatingResponseSnapshot.docs.map((item) => {
-    const data = item.data() as {
-      pollId: string
-      slotId: string
-      reviewerId: string
-      status: MatchFeedbackResponse['status']
-      closedAt: number
-    }
-    return {
-      id: item.id,
-      pollId: data.pollId,
-      slotId: data.slotId,
-      reviewerId: data.reviewerId,
-      status: data.status,
-      closedAt: data.closedAt,
-    } satisfies MatchFeedbackResponse
-  })
-const feedbackResponses = [
-  ...[...legacyMvpClosedResponses, ...legacyRatingClosedResponses]
-    .filter((response) => !currentFeedbackResponseIds.has(response.id)),
-  ...currentFeedbackResponses,
-]
-const existingFantasyRounds = fantasyRoundSnapshot.docs.map((item) => ({
-  id: item.id,
-  ...item.data(),
-}) as FantasyRound)
-const fantasyEntries = (await Promise.all(existingFantasyRounds.map(async (round) => {
-  const snapshot = await getDocs(collection(db, 'fantasyRounds', round.id, 'entries'))
-  return snapshot.docs.map((item) => ({
-    id: item.id,
-    ...item.data(),
-  }) as FantasyEntry)
-}))).flat()
-const feedbackSummaries = feedbackSummarySnapshot.docs.map((item) => ({
-  id: item.id,
-  ...item.data(),
-}) as MatchFeedbackSummary)
-const matchReports = matchReportSnapshot.docs.map((item) => ({
-  id: item.id,
-  ...item.data(),
-}) as MatchReport)
-const notificationPreferencesByUserId = new Map(
-  userSnapshot.docs.map((item) => [
-    item.id,
-    (item.data() as Partial<MemberProfile>).notificationPreferences,
-  ]),
-)
-const storedMotivationData = motivationSnapshot.exists()
-  ? motivationSnapshot.data()
-  : undefined
-const motherNamesByUserId = normalizeMotherNamesByUserId(
-  motherNamesSnapshot.exists()
-    ? motherNamesSnapshot.data().namesByUserId
-    : undefined,
-)
-const {
-  messages: motivationalMessages,
-  needsWrite: motivationNeedsWrite,
-} = resolveMotivationalCatalog(storedMotivationData)
-if (motivationalMessages.length === 0) {
-  throw new Error('Il documento notificationContent/mondayMotivation non contiene frasi valide.')
+const now = Date.now()
+const readCounts = new Map<string, number>()
+const countReads = (path: string, count: number) => {
+  const name = path.split('/')[0]
+  readCounts.set(name, (readCounts.get(name) ?? 0) + Math.max(1, count))
 }
-if (motivationNeedsWrite) {
-  await setDoc(motivationReference, {
-    messages: motivationalMessages,
-    catalogVersion: MONDAY_MOTIVATIONAL_CATALOG_VERSION,
-    createdAt: storedMotivationData?.createdAt ?? serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  })
+const reader: NotificationDataReader = {
+  async list<T>(path: string, filter?: { field: string; values: string[] }): Promise<T[]> {
+    const reference = collection(db, path)
+    const snapshot = await getDocs(filter
+      ? query(reference, where(filter.field, 'in', filter.values))
+      : reference)
+    countReads(path, snapshot.size)
+    return snapshot.docs.map((item) => ({ id: item.id, ...item.data() }) as T)
+  },
+}
+const [subscriptionRows, users, polls, existingFantasyRounds] = await Promise.all([
+  reader.list<StoredPushSubscription & { id: string }>('pushSubscriptions', testUserId
+    ? { field: 'userId', values: [testUserId] } : undefined),
+  testUserId
+    ? getDoc(doc(db, 'users', testUserId)).then((snapshot) => {
+        countReads('users', 1)
+        return snapshot.exists() ? [{ id: snapshot.id, ...snapshot.data() } as MemberProfile] : []
+      })
+    : reader.list<MemberProfile>('users'),
+  testUserId ? Promise.resolve([] as PadelPoll[]) : reader.list<PadelPoll>('polls'),
+  testUserId ? Promise.resolve([] as FantasyRound[]) : reader.list<FantasyRound>('fantasyRounds'),
+])
+const subscriptions = subscriptionRows.map((data) => ({
+  id: data.id,
+  reference: doc(db, 'pushSubscriptions', data.id),
+  data,
+}))
+const { feedbackResponses, feedbackSummaries, matchReports, fantasyEntries } = testUserId
+  ? { feedbackResponses: [], feedbackSummaries: [], matchReports: [], fantasyEntries: [] }
+  : await loadNotificationMatchData(reader, polls, existingFantasyRounds, now)
+const notificationPreferencesByUserId = new Map(
+  users.map((user) => [user.id, user.notificationPreferences]),
+)
+let motivationalMessages: string[] = []
+let motherNamesByUserId = normalizeMotherNamesByUserId(undefined)
+if (!testUserId && isMondayMotivationWindow(now)) {
+  const motivationReference = doc(db, 'notificationContent', 'mondayMotivation')
+  const [motivationSnapshot, motherNamesSnapshot] = await Promise.all([
+    getDoc(motivationReference),
+    getDoc(doc(db, 'notificationContent', 'motherNames')),
+  ])
+  countReads('notificationContent', 2)
+  const storedMotivationData = motivationSnapshot.exists() ? motivationSnapshot.data() : undefined
+  motherNamesByUserId = normalizeMotherNamesByUserId(motherNamesSnapshot.data()?.namesByUserId)
+  const catalog = resolveMotivationalCatalog(storedMotivationData)
+  motivationalMessages = catalog.messages
+  if (motivationalMessages.length === 0) {
+    throw new Error('Il documento notificationContent/mondayMotivation non contiene frasi valide.')
+  }
+  if (catalog.needsWrite) {
+    await setDoc(motivationReference, {
+      messages: motivationalMessages,
+      catalogVersion: MONDAY_MOTIVATIONAL_CATALOG_VERSION,
+      createdAt: storedMotivationData?.createdAt ?? serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    })
+  }
 }
 const motivationRecipientUserIds = Array.from(new Set(
   subscriptions.map((subscription) => subscription.data.userId),
 ))
-const now = Date.now()
 const fantasyRounds = reconcileFantasyRounds(
   polls,
   existingFantasyRounds,
@@ -261,6 +198,7 @@ for (const notification of notifications) {
       .update(`${notification.id}:${userId}:${subscription.id}`)
       .digest('hex')
     const deliveryReference = doc(db, 'notificationDeliveries', deliveryId)
+    countReads('notificationDeliveries', 1)
     if ((await getDoc(deliveryReference)).exists()) {
       skipped += 1
       continue
@@ -300,6 +238,7 @@ for (const notification of notifications) {
 }
 
 console.log(`Notifiche: ${sent} inviate, ${skipped} già consegnate, ${disabled} disattivate, ${removed} dispositivi rimossi, ${failed} errori.`)
+console.log(`Letture documenti (stima minima, escluse regole e indici): ${[...readCounts.values()].reduce((sum, count) => sum + count, 0)}; ${JSON.stringify(Object.fromEntries(readCounts))}`)
 await terminate(db)
 await deleteApp(app)
 if (failed > 0) process.exitCode = 1

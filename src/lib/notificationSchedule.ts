@@ -5,6 +5,7 @@ import type {
   NotificationPreferences,
   PadelPoll,
   PadelSlot,
+  MatchReport,
 } from '../types'
 import {
   DEFAULT_VENUE,
@@ -15,6 +16,7 @@ import {
   isGuestSignup,
   fantasyEntryIsCurrent,
   padelDateTimeToTimestamp,
+  FANTASY_MISSING_REPORT_VOID_REASON,
 } from './domain'
 import { slotWeekTitle } from './format'
 import { addPushRefreshParameter, normalizeInternalNotificationUrl } from './notificationUrl'
@@ -35,6 +37,60 @@ export const BOOKING_REMINDER_LEAD_MS = 7 * DAY_MS
 export const BOOKING_REMINDER_WINDOW_MS = DAY_MS
 export const MATCH_FEEDBACK_NOTIFICATION_WINDOW_MS = 30 * 60 * 1000
 export const MONDAY_MOTIVATION_WINDOW_MS = HOUR_MS
+export const FANTASY_RESULT_NOTIFICATION_WINDOW_MS = 7 * DAY_MS
+
+export function isFantasyResultNotificationWindow(round: FantasyRound, now: number): boolean {
+  return (round.status === 'scored' || round.status === 'void')
+    && typeof round.settledAt === 'number'
+    && now >= round.settledAt
+    && now < round.settledAt + FANTASY_RESULT_NOTIFICATION_WINDOW_MS
+}
+
+export interface NotificationMatchKey {
+  pollId: string
+  slotId: string
+}
+
+/** Load historical match details only while they can affect delivery or scoring. */
+export function planNotificationMatchReads(
+  polls: PadelPoll[],
+  rounds: FantasyRound[],
+  reports: MatchReport[],
+  now: number,
+) {
+  const key = (match: NotificationMatchKey) => JSON.stringify([match.pollId, match.slotId])
+  const reportKeys = new Set(reports.map(key))
+  const reportMatches = new Map<string, NotificationMatchKey>()
+  const feedbackMatches = new Map<string, NotificationMatchKey>()
+  const summaryMatches = new Map<string, NotificationMatchKey>()
+  const entryRoundIds = new Set<string>()
+  polls.forEach((poll) => poll.slots.forEach((slot) => {
+    const dueAt = getMatchFeedbackDueAt(slot)
+    if (poll.status !== 'open' || !slot.bookedAt || getStarters(slot).length !== MAX_STARTERS
+      || now < dueAt || now >= dueAt + MATCH_FEEDBACK_NOTIFICATION_WINDOW_MS) return
+    const match = { pollId: poll.id, slotId: slot.id }
+    feedbackMatches.set(key(match), match)
+  }))
+  rounds.forEach((round) => {
+    const match = { pollId: round.pollId, slotId: round.slotId }
+    const activeMatch = round.status === 'open' && now >= round.locksAt
+    const awaitingLateReport = round.status === 'void'
+      && round.voidReason === FANTASY_MISSING_REPORT_VOID_REASON
+    const hasReport = reportKeys.has(key(match))
+    if (activeMatch || awaitingLateReport) reportMatches.set(key(match), match)
+    if (activeMatch) feedbackMatches.set(key(match), match)
+    if ((activeMatch || awaitingLateReport) && hasReport) summaryMatches.set(key(match), match)
+    if (round.status === 'open' || round.status === 'pending'
+      || (round.status === 'void' && isFantasyResultNotificationWindow(round, now))
+      || (awaitingLateReport && hasReport)) entryRoundIds.add(round.id)
+  })
+  return {
+    reportMatches: [...reportMatches.values()],
+    feedbackMatches: [...feedbackMatches.values()],
+    summaryMatches: [...summaryMatches.values()],
+    entryRoundIds: [...entryRoundIds],
+  }
+}
 
 export type NotificationKind = 'new-slots' | 'fixed-seat-auto-join' | 'slot-ready' | 'starter-substitution' | 'booking-reminder-7d' | 'reminder-24h' | 'reminder-2h' | 'match-rating' | 'match-mvp' | 'match-feedback' | 'monday-motivation' | 'fantasy-open' | 'fantasy-roster-changed' | 'fantasy-result' | 'test'
 export type TestNotificationMode = 'standard' | 'feedback' | 'match-mvp'
@@ -343,6 +399,7 @@ export function collectFantasyNotifications(
 
   rounds.forEach((round) => {
     const roundEntries = entries.filter((entry) => entry.roundId === round.id)
+    const settledAt = round.settledAt
 
     if (round.status === 'open' && now < round.locksAt) {
       notifications.push({
@@ -378,7 +435,7 @@ export function collectFantasyNotifications(
       return
     }
 
-    if (round.status === 'scored' && round.settledAt) {
+    if (round.status === 'scored' && settledAt && isFantasyResultNotificationWindow(round, now)) {
       ;(round.standings ?? []).forEach((standing) => {
         notifications.push({
           id: `fantasy-result:${round.id}:${round.settledAt}`,
@@ -389,7 +446,7 @@ export function collectFantasyNotifications(
           })} punti: +${standing.leaguePoints} in classifica.`,
           url: '/#fantabandeja',
           tag: `fantasy-result-${round.id}`,
-          ttlSeconds: 7 * 24 * 60 * 60,
+          ttlSeconds: Math.floor((settledAt + FANTASY_RESULT_NOTIFICATION_WINDOW_MS - now) / 1000),
           recipientUserIds: [standing.managerId],
           excludedUserIds: [],
         })
@@ -397,7 +454,7 @@ export function collectFantasyNotifications(
       return
     }
 
-    if (round.status === 'void' && round.settledAt) {
+    if (round.status === 'void' && settledAt && isFantasyResultNotificationWindow(round, now)) {
       Array.from(new Set(roundEntries.map((entry) => entry.managerId))).forEach((managerId) => {
         notifications.push({
           id: `fantasy-result:${round.id}:${round.settledAt}`,
@@ -406,7 +463,7 @@ export function collectFantasyNotifications(
           body: round.voidReason || 'Il round non poteva essere calcolato.',
           url: '/#fantabandeja',
           tag: `fantasy-result-${round.id}`,
-          ttlSeconds: 7 * 24 * 60 * 60,
+          ttlSeconds: Math.floor((settledAt + FANTASY_RESULT_NOTIFICATION_WINDOW_MS - now) / 1000),
           recipientUserIds: [managerId],
           excludedUserIds: [],
         })
