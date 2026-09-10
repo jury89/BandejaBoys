@@ -112,6 +112,10 @@ describe('pagina dei match personali', () => {
     expect(screen.getByRole('heading', { name: 'Prossimi match' })).toBeInTheDocument()
     expect(screen.getByText('Padel della prossima settimana')).toBeInTheDocument()
     expect(screen.getByText('Da prenotare')).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Partite giocate' })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /Apri Padel della prossima settimana.*nella bacheca/ }))
+    expect(onSelectMatch).toHaveBeenCalledWith(matches.upcoming[0])
+    await user.click(screen.getByRole('button', { name: /Giocate/ }))
     expect(screen.getByRole('heading', { name: 'Partite giocate' })).toBeInTheDocument()
     expect(screen.getByText('Padel della settimana scorsa')).toBeInTheDocument()
     expect(screen.getByText('Giocata')).toBeInTheDocument()
@@ -133,11 +137,6 @@ describe('pagina dei match personali', () => {
     expect(within(secondFormation).getByRole('row', { name: 'Ale + Luca 3' })).toBeInTheDocument()
     expect(within(secondFormation).getByRole('row', { name: 'Baru + Teo 6' })).toBeInTheDocument()
     expect(screen.queryByText('6–4 · 3–6 · 5–7')).not.toBeInTheDocument()
-
-    await user.click(screen.getByRole('button', {
-      name: /Apri Padel della prossima settimana.*nella bacheca/,
-    }))
-    expect(onSelectMatch).toHaveBeenCalledWith(matches.upcoming[0])
 
     await user.click(screen.getByRole('button', {
       name: /Modifica il referto di Padel della settimana scorsa/,

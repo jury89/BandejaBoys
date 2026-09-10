@@ -20,7 +20,7 @@ describe('accesso locale', () => {
     await user.type(screen.getByLabelText('Password'), 'segreto123')
     await user.click(screen.getByRole('button', { name: /Crea il mio account/ }))
 
-    expect(await screen.findByText(/Mettiamo in campo/)).toBeInTheDocument()
+    expect(await screen.findByText(/Ci vediamo in campo/)).toBeInTheDocument()
     expect(screen.getByText('Jury')).toBeInTheDocument()
     expect(screen.queryByText('jury.rossi')).not.toBeInTheDocument()
     expect(screen.getByText(/Demo locale/)).toBeInTheDocument()
@@ -66,18 +66,16 @@ describe('accesso locale', () => {
     await user.click(screen.getByRole('button', { name: /Crea il mio account/ }))
 
     const allFilter = await screen.findByRole('button', { name: /^Tutti/ })
-    const unbookedFilter = screen.getByRole('button', { name: /^Slot da prenotare/ })
-    const bookedFilter = screen.getByRole('button', { name: /^Slot prenotati/ })
+    const bookingFilter = screen.getByRole('combobox', { name: 'Filtra per prenotazione' })
     expect(allFilter).toHaveAttribute('aria-pressed', 'true')
 
-    await user.click(unbookedFilter)
-    expect(unbookedFilter).toHaveAttribute('aria-pressed', 'true')
-    expect(unbookedFilter).toHaveAccessibleName('Slot da prenotare, 1')
+    await user.selectOptions(bookingFilter, 'booking')
+    expect(bookingFilter).toHaveValue('booking')
     expect(await screen.findByRole('heading', { name: 'Slot da prenotare' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: /^Padel · .* \d{4}$/ })).toBeInTheDocument()
 
-    await user.click(bookedFilter)
-    expect(bookedFilter).toHaveAttribute('aria-pressed', 'true')
+    await user.selectOptions(bookingFilter, 'booked')
+    expect(bookingFilter).toHaveValue('booked')
     expect(await screen.findByText('Nessuno slot prenotato.')).toBeInTheDocument()
 
     await user.click(allFilter)

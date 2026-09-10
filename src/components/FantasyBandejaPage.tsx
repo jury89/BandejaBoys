@@ -524,7 +524,9 @@ function LockedRound({
           ))}
         </ol>
       )}
-      <footer><Clock3 size={15} /> {progressLabel}</footer>
+      <footer><Clock3 size={15} /><span>{progressLabel}
+        {round.updatedAt > 0 && <small className="club-progress-time">Dati aggiornati il {new Intl.DateTimeFormat('it-IT', { timeZone: 'Europe/Rome', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(round.updatedAt)}</small>}
+      </span></footer>
     </article>
   )
 }

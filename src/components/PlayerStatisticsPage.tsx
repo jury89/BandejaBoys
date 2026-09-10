@@ -226,6 +226,7 @@ export function PlayerStatisticsPage({
   const [selectedPlayerId, setSelectedPlayerId] = useState(safeInitialPlayerId)
   const [period, setPeriod] = useState<StatisticsPeriod>('all')
   const [view, setView] = useState<StatisticsView>('overview')
+  const [playerSearch, setPlayerSearch] = useState('')
 
   const selectedPlayer = membersById.get(selectedPlayerId) ?? user
   const allMatches = useMemo(() => (
@@ -300,23 +301,30 @@ export function PlayerStatisticsPage({
             <span>{selectedPlayer.id === user.id ? 'Questa sei tu, fagiano.' : 'Numeri ufficiali della voliera.'}</span>
           </div>
         </div>
-        <div className="player-stats__court-score" aria-label={`${statistics.appearances} presenze, ${percentage(statistics.setWinRate)} set vinti, differenza game ${signedNumber(statistics.gameDifference)}`}>
-          <i aria-hidden="true" />
+        <div className="club-stats-score" aria-label={`${statistics.appearances} presenze, ${percentage(statistics.setWinRate)} set vinti, differenza game ${signedNumber(statistics.gameDifference)}`}>
           <span><strong>{statistics.appearances}</strong>Presenze</span>
           <span><strong>{statistics.setsPlayed > 0 ? percentage(statistics.setWinRate) : '—'}</strong>Set vinti</span>
-          <span><strong>{statistics.setsPlayed > 0 ? signedNumber(statistics.gameDifference) : '—'}</strong>Game</span>
+          <span><strong>{statistics.setsPlayed > 0 ? signedNumber(statistics.gameDifference) : '—'}</strong>Differenza game</span>
         </div>
       </section>
 
       <section className="player-stats__controls" aria-label="Scegli giocatore e periodo">
-        <div className="player-stats__player-picker" role="group" aria-label="Giocatori">
-          {players.map((player) => (
+        <details className="club-player-picker">
+          <summary><ProfileAvatar displayName={selectedPlayer.displayName} avatarDataUrl={selectedPlayer.avatarDataUrl} decorative /><span><small>Giocatore</small><strong>{selectedPlayer.displayName}</strong></span><ChevronRight size={18} /></summary>
+          <label className="club-player-search"><span>Cerca giocatore</span><input type="search" value={playerSearch} onChange={(event) => setPlayerSearch(event.target.value)} placeholder="Nome del giocatore" /></label>
+          <div className="player-stats__player-picker" role="group" aria-label="Giocatori">
+          {players.filter((player) => player.displayName.toLocaleLowerCase('it').includes(playerSearch.toLocaleLowerCase('it'))).map((player) => (
             <button
               type="button"
               className={player.id === selectedPlayer.id ? 'is-active' : ''}
               aria-pressed={player.id === selectedPlayer.id}
               key={player.id}
-              onClick={() => selectPlayer(player.id)}
+              onClick={(event) => {
+                selectPlayer(player.id)
+                setPlayerSearch('')
+                const picker = event.currentTarget.closest('details')
+                if (picker) picker.open = false
+              }}
             >
               <ProfileAvatar
                 displayName={player.displayName}
@@ -327,7 +335,9 @@ export function PlayerStatisticsPage({
               <span>{player.id === user.id ? 'Tu' : player.displayName}</span>
             </button>
           ))}
-        </div>
+          </div>
+          {!players.some((player) => player.displayName.toLocaleLowerCase('it').includes(playerSearch.toLocaleLowerCase('it'))) && <p>Nessun giocatore trovato.</p>}
+        </details>
         <label>
           <span>Periodo</span>
           <select value={period} onChange={(event) => setPeriod(event.target.value as StatisticsPeriod)}>

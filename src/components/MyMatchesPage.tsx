@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import {
   ArrowLeft,
   ArrowRight,
@@ -28,6 +29,7 @@ interface MatchListProps {
   eyebrow: string
   title: string
   matches: PlayerMatch[]
+  totalCount?: number
   emptyTitle: string
   emptyBody: string
   past?: boolean
@@ -93,7 +95,7 @@ function MatchItem({
           >
             <Bird size={14} aria-hidden="true" />
             <span>{getMatchFeedbackDefinition(receivedFeedback.level).label}</span>
-            <strong>{receivedFeedback.ratingCount}</strong>
+            <small>{receivedFeedback.ratingCount} {receivedFeedback.ratingCount === 1 ? 'giudizio ricevuto' : 'giudizi ricevuti'}</small>
           </span>
         )}
         {onSelect && <ArrowRight className="personal-match__open-icon" size={17} aria-hidden="true" />}
@@ -131,6 +133,7 @@ function MatchList({
   eyebrow,
   title,
   matches,
+  totalCount = matches.length,
   emptyTitle,
   emptyBody,
   past = false,
@@ -144,7 +147,7 @@ function MatchList({
           <p className="eyebrow">{eyebrow}</p>
           <h2>{title}</h2>
         </div>
-        <strong>{matches.length}</strong>
+        <strong>{totalCount}</strong>
       </header>
       {matches.length > 0 ? (
         <div className="personal-matches__list">
@@ -175,6 +178,8 @@ export function MyMatchesPage({
   onSelectMatch,
   onEditReport,
 }: MyMatchesPageProps) {
+  const [period, setPeriod] = useState<'upcoming' | 'past'>('upcoming')
+  const [visiblePast, setVisiblePast] = useState(8)
   return (
     <main className="dashboard personal-matches">
       <button className="button button--ghost personal-matches__back" type="button" onClick={onBack}>
@@ -185,7 +190,7 @@ export function MyMatchesPage({
         <div>
           <p className="eyebrow">Il tuo calendario Bandeja</p>
           <h1>I miei match</h1>
-          <p>Tutte le partite in cui sei tra i quattro titolari, prima e dopo il fischio d’inizio.</p>
+          <p>Il tuo posto in campo, prima e dopo la partita.</p>
         </div>
         <div className="personal-matches__score" aria-label={`${matches.upcoming.length} prossimi match e ${matches.past.length} partite giocate`}>
           <span><strong>{matches.upcoming.length}</strong>Prossimi</span>
@@ -194,27 +199,35 @@ export function MyMatchesPage({
         </div>
       </section>
 
+      <nav className="club-period-switch" aria-label="Periodo delle tue partite">
+        <button type="button" aria-pressed={period === 'upcoming'} onClick={() => setPeriod('upcoming')}>Prossime <span>{matches.upcoming.length}</span></button>
+        <button type="button" aria-pressed={period === 'past'} onClick={() => setPeriod('past')}>Giocate <span>{matches.past.length}</span></button>
+      </nav>
+
       {loading ? (
         <div className="loading-state"><span /><p>Recuperiamo i tuoi match…</p></div>
       ) : (
         <div className="personal-matches__grid">
-          <MatchList
+          {period === 'upcoming' ? <MatchList
             eyebrow="In agenda"
             title="Prossimi match"
             matches={matches.upcoming}
             onSelectMatch={onSelectMatch}
             emptyTitle="Nessun match in programma"
             emptyBody="Uno slot comparirà qui quando avrà quattro titolari e tu sarai tra loro."
-          />
-          <MatchList
+          /> : <MatchList
             past
             eyebrow="Il tuo storico"
             title="Partite giocate"
-            matches={matches.past}
+            matches={matches.past.slice(0, visiblePast)}
+            totalCount={matches.past.length}
             onEditReport={onEditReport}
             emptyTitle="Nessuna partita nello storico"
             emptyBody="Qui trovi i match conclusi per cui il campo era stato confermato."
-          />
+          />}
+          {period === 'past' && visiblePast < matches.past.length && (
+            <button className="button button--secondary" type="button" onClick={() => setVisiblePast((count) => count + 8)}>Mostra altre partite</button>
+          )}
         </div>
       )}
     </main>

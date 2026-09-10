@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import {
   ArrowLeft,
   Bird,
@@ -161,6 +162,7 @@ export function GroupMatchesPage({
   onBack,
   onOpenStatistics,
 }: GroupMatchesPageProps) {
+  const [visibleCount, setVisibleCount] = useState(8)
   return (
     <main className="dashboard personal-matches group-matches">
       <button className="button button--ghost personal-matches__back" type="button" onClick={onBack}>
@@ -193,7 +195,7 @@ export function GroupMatchesPage({
           </header>
           {matches.length > 0 ? (
             <div className="personal-matches__list group-matches__list">
-              {matches.map((match) => (
+              {matches.slice(0, visibleCount).map((match) => (
                 <GroupMatchCard
                   key={`${match.pollId}-${match.slot.id}`}
                   match={match}
@@ -201,6 +203,7 @@ export function GroupMatchesPage({
                   onOpenStatistics={onOpenStatistics}
                 />
               ))}
+              {visibleCount < matches.length && <button className="button button--secondary" type="button" onClick={() => setVisibleCount((count) => count + 8)}>Mostra altre partite</button>}
             </div>
           ) : (
             <div className="personal-matches__empty">

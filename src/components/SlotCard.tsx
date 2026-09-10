@@ -5,11 +5,12 @@ import {
   CalendarCheck2,
   CalendarPlus,
   Check,
-  CircleHelp,
+  ChevronDown,
   Clock3,
   History,
   LogOut,
   MapPin,
+  MoreHorizontal,
   PencilLine,
   PhoneCall,
   ShieldCheck,
@@ -58,14 +59,17 @@ const phaseCopy = {
 }
 
 export function SlotCard({ poll, slot, user, members, disabled, onPollChange, onNotify, onError }: SlotCardProps) {
-  const substitutionTooltipId = useId()
+  const participationHelpId = useId()
   const cardRef = useRef<HTMLElement>(null)
+  const menuRef = useRef<HTMLDetailsElement>(null)
   const [activityOpen, setActivityOpen] = useState(false)
   const [adminRosterOpen, setAdminRosterOpen] = useState(false)
   const [guestPlayerOpen, setGuestPlayerOpen] = useState(false)
   const [scheduleOpen, setScheduleOpen] = useState(false)
   const [substitutionOpen, setSubstitutionOpen] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [courtExpanded, setCourtExpanded] = useState(false)
+  const courtId = useId()
   const date = slotDateParts(slot.startsAt)
   const starters = getStarters(slot)
   const reserves = getReserves(slot)
@@ -79,6 +83,15 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
     members.find((member) => member.id === userId) ?? (userId === user.id ? user : undefined)
   const memberName = (userId: string | undefined, savedName: string | undefined) =>
     memberProfile(userId)?.displayName ?? resolveMemberName(members, userId, savedName)
+
+  useEffect(() => {
+    const closeMenu = (event: PointerEvent) => {
+      const menu = menuRef.current
+      if (menu?.open && event.target instanceof Node && !menu.contains(event.target)) menu.open = false
+    }
+    document.addEventListener('pointerdown', closeMenu)
+    return () => document.removeEventListener('pointerdown', closeMenu)
+  }, [])
 
   useEffect(() => {
     const element = cardRef.current
@@ -168,7 +181,7 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
     <article
       id={slotElementId({ pollId: poll.id, slotId: slot.id })}
       ref={cardRef}
-      className={`slot-card slot-card--${phase}`}
+      className={`slot-card slot-card--${phase} club-slot ${courtExpanded ? 'club-slot--expanded' : ''}`}
     >
       <header className="slot-card__header">
         <div className="slot-date" aria-label={`${date.full} alle ${date.time}`}>
@@ -189,7 +202,16 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
             <PhaseIcon size={14} />
             {phaseCopy[phase].label}
           </div>
-          <div className="slot-card__management" role="group" aria-label="Azioni dello slot">
+          <details ref={menuRef} className="club-slot-menu" onKeyDown={(event) => {
+            if (event.key === 'Escape') {
+              event.currentTarget.open = false
+              event.currentTarget.querySelector('summary')?.focus()
+            }
+          }}>
+            <summary aria-label={`Altre azioni per lo slot di ${date.full} alle ${date.time}`}><MoreHorizontal size={19} /><span>Altre azioni</span></summary>
+          <div className="slot-card__management" role="group" aria-label="Azioni dello slot" onClick={(event) => {
+            if (event.target instanceof Element && event.target.closest('button') && menuRef.current) menuRef.current.open = false
+          }}>
             {userIsAdmin && (
               <button
                 className="slot-card__icon-action slot-card__icon-action--admin"
@@ -200,6 +222,7 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
                 aria-label={`Gestisci i giocatori dello slot di ${date.full} alle ${date.time}`}
               >
                 <ShieldCheck size={16} />
+                <span>Gestisci giocatori</span>
               </button>
             )}
             {!disabled && (
@@ -212,17 +235,9 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
                 aria-label={`Aggiungi un ospite allo slot di ${date.full} alle ${date.time}`}
               >
                 <UserRoundPlus size={16} />
+                <span>Aggiungi ospite</span>
               </button>
             )}
-            <button
-              className="slot-card__icon-action slot-card__icon-action--calendar"
-              type="button"
-              onClick={addToCalendar}
-              title="Aggiungi al calendario"
-              aria-label={`Aggiungi lo slot di ${date.full} alle ${date.time} al calendario`}
-            >
-              <CalendarPlus size={16} />
-            </button>
             <button
               className="slot-card__icon-action slot-card__icon-action--history"
               type="button"
@@ -231,6 +246,7 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
               aria-label={`Vedi la cronologia dello slot di ${date.full} alle ${date.time}`}
             >
               <History size={16} />
+              <span>Cronologia</span>
             </button>
             {!disabled && (
               <>
@@ -243,6 +259,7 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
                   aria-label="Modifica data e ora dello slot"
                 >
                   <PencilLine size={15} />
+                  <span>Modifica data e ora</span>
                 </button>
                 <button
                   className="slot-card__icon-action slot-card__icon-action--delete"
@@ -253,10 +270,12 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
                   aria-label={`Elimina lo slot di ${date.full} alle ${date.time}`}
                 >
                   <Trash2 size={15} />
+                  <span>Elimina slot</span>
                 </button>
               </>
             )}
           </div>
+          </details>
         </div>
       </header>
 
@@ -282,7 +301,14 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
         </div>
       )}
 
-      <section className="court-lineup" aria-label="Titolari">
+      <div className="club-slot-roster-heading">
+        <strong>{starters.length}/4 titolari</strong>
+        {joined && <span className="club-your-place">{userIsStarter ? 'Sei titolare' : `Sei la riserva n° ${reserves.findIndex((signup) => signup.userId === user.id) + 1}`}</span>}
+        <button type="button" aria-expanded={courtExpanded} aria-controls={courtId} onClick={() => setCourtExpanded(!courtExpanded)}>
+          {courtExpanded ? 'Riduci campo' : 'Mostra campo'}<ChevronDown size={16} />
+        </button>
+      </div>
+      <section id={courtId} className={`court-lineup ${courtExpanded ? '' : 'court-lineup--compact'}`} aria-label="Titolari">
         <div className="court-lineup__net" aria-hidden="true" />
         {Array.from({ length: 4 }, (_, index) => {
           const signup = starters[index]
@@ -291,13 +317,11 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
               <span className="court-player__marker">{index + 1}</span>
               {signup ? (
                 <>
-                  {memberProfile(signup.userId)?.avatarDataUrl && (
                     <ProfileAvatar
                       displayName={memberName(signup.userId, signup.displayName)}
                       avatarDataUrl={memberProfile(signup.userId)?.avatarDataUrl}
                       className="court-player__avatar"
                     />
-                  )}
                   <span className="court-player__name">
                     <strong>{memberName(signup.userId, signup.displayName)}</strong>
                     {signup.userId === user.id && <small>Tu</small>}
@@ -327,7 +351,7 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
         })}
       </section>
 
-      <section className="reserve-list" aria-label="Lista d’attesa">
+      <section className={`reserve-list ${reserves.length === 0 ? 'reserve-list--empty' : ''}`} aria-label="Lista d’attesa">
         <div className="reserve-list__heading">
           <span>Riserve</span>
           <small>{reserves.length ? 'ordine di adesione' : 'nessuna lista d’attesa'}</small>
@@ -370,9 +394,16 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
       <footer className="slot-card__actions">
         {!disabled && (
           joined ? (
+            <details className="club-participation">
+              <summary>Gestisci iscrizione <ChevronDown size={16} /></summary>
             <button className="button button--secondary button--grow" type="button" onClick={leave} disabled={busy}>
               <LogOut size={17} /> {userIsStarter ? 'Ritirati' : 'Lascia la riserva'}
             </button>
+            {userIsStarter && <button className="button button--ghost" type="button" onClick={() => setSubstitutionOpen(true)} disabled={busy} aria-describedby={participationHelpId}>
+              <ArrowLeftRight size={17} /> Passo il posto
+            </button>}
+            <p id={participationHelpId}>Ritirandoti lasci il posto alla prima riserva. Con “Passo il posto” scegli chi ti sostituisce: prenderà la tua posizione e tu uscirai dallo slot. Se era in riserva, verrà rimosso dalla lista d’attesa.</p>
+            </details>
           ) : (
             <div className="join-choice" role="group" aria-label="Scegli come partecipare">
               <p className="join-choice__label">Come vuoi segnarti?</p>
@@ -385,7 +416,7 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
               >
                 <span className="join-option__icon" aria-hidden="true"><UserRoundPlus size={17} /></span>
                 <span>
-                  <strong>Titolare</strong>
+                  <strong>{starters.length >= MAX_STARTERS ? 'Titolari al completo' : 'Mi iscrivo'}</strong>
                   <small>{starters.length >= MAX_STARTERS ? '4/4 completi' : `${starters.length}/4 occupati`}</small>
                 </span>
               </button>
@@ -398,7 +429,7 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
               >
                 <span className="join-option__icon" aria-hidden="true"><Clock3 size={17} /></span>
                 <span>
-                  <strong>Riserva</strong>
+                  <strong>Entra in riserva</strong>
                   <small>In lista d’attesa</small>
                 </span>
               </button>
@@ -406,30 +437,9 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
           )
         )}
 
-        {!disabled && userIsStarter && (
-          <div className="substitution-action">
-            <button
-              className="button button--ghost"
-              type="button"
-              onClick={() => setSubstitutionOpen(true)}
-              disabled={busy}
-              aria-describedby={substitutionTooltipId}
-            >
-              <ArrowLeftRight size={17} /> Passo il posto
-            </button>
-            <button
-              className="substitution-action__help"
-              type="button"
-              aria-label="Come funziona Passo il posto"
-              aria-describedby={substitutionTooltipId}
-            >
-              <CircleHelp size={16} />
-            </button>
-            <span className="action-tooltip" id={substitutionTooltipId} role="tooltip">
-              Scegli chi ti sostituisce: prenderà la tua posizione e tu uscirai dallo slot. Se era in riserva, verrà rimosso dalla lista d’attesa.
-            </span>
-          </div>
-        )}
+        <button className="button button--ghost club-calendar" type="button" onClick={addToCalendar} aria-label={`Aggiungi lo slot di ${date.full} alle ${date.time} al calendario`}>
+          <CalendarPlus size={17} /><span>Calendario</span>
+        </button>
 
         {!disabled && phase !== 'booked' && (
           <button

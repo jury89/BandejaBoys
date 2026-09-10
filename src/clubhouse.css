@@ -1,0 +1,368 @@
+/* Clubhouse: a compact, mobile-first layer. Brand geometry and domain states
+   stay in styles.css; these selectors only reshape the authenticated UI. */
+.app-shell {
+  --club-header: 68px;
+  --club-navigation: 68px;
+  --shadow: 0 6px 24px rgb(7 58 80 / 5%);
+  padding-bottom: calc(var(--club-navigation) + env(safe-area-inset-bottom));
+}
+
+.app-shell .topbar {
+  min-height: var(--club-header);
+  padding: 10px max(16px, calc((100vw - 1160px) / 2));
+  background: var(--chalk);
+  backdrop-filter: none;
+}
+
+.club-navigation {
+  position: fixed;
+  inset: auto 0 0;
+  z-index: 35;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  padding: 5px 8px calc(5px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--line);
+  background: var(--white);
+}
+
+.club-navigation button {
+  display: flex;
+  min-height: 58px;
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border: 0;
+  border-radius: 10px;
+  color: var(--muted);
+  background: transparent;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.club-navigation button[aria-current] { color: var(--deep); background: var(--aqua); }
+.club-navigation button[aria-current] svg { stroke-width: 2.5; }
+.app-shell .dashboard { width: min(1160px, calc(100% - 32px)); padding: 24px 0 36px; }
+.app-shell h1 { font-size: clamp(30px, 4vw, 42px); line-height: 1.05; }
+.app-shell h2 { font-size: clamp(24px, 3vw, 30px); line-height: 1.15; }
+.app-shell .eyebrow { font-size: 12px; letter-spacing: 0; text-transform: none; margin-bottom: 6px; }
+.app-shell .button { min-height: 44px; border-radius: 10px; box-shadow: none; font-size: 14px; }
+.app-shell .icon-button { min-width: 44px; min-height: 44px; }
+.app-shell :is(button, a, input, select, summary):focus-visible { outline: 3px solid var(--court); outline-offset: 3px; }
+.app-shell :is(button, summary) { -webkit-tap-highlight-color: transparent; }
+.app-shell .site-footer { padding: 24px 16px; background: transparent; }
+.app-shell .site-footer .brand { display: none; }
+.app-shell .demo-banner { font-size: 11px; padding: 6px 16px; }
+
+/* Fixture feed: one continuous week, separate fixtures, no nested frames. */
+.app-shell .dashboard-intro { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; }
+.app-shell .dashboard-intro h1 { font-size: 30px; }
+.app-shell .dashboard-intro .button { flex-shrink: 0; padding: 10px 14px; }
+.app-shell .feed-heading { margin: 26px 0 12px; }
+.app-shell .feed-heading .eyebrow { display: none; }
+.app-shell .feed-heading h2 { font-size: 24px; }
+.app-shell .club-filters { position: static; padding: 0 0 12px; border: 0; background: transparent; backdrop-filter: none; }
+.app-shell .club-filters .feed-filter__inner {
+  display: flex; flex-wrap: wrap; width: min(1160px, 100%); max-width: 1160px;
+  justify-content: flex-start; gap: 6px; padding: 0; border: 0; background: transparent;
+}
+.app-shell .club-filters button { flex: 1 1 auto; min-height: 44px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--white); font-size: 13px; }
+.app-shell .club-filters button.is-active { color: var(--ink); border-color: var(--deep); box-shadow: inset 0 -3px var(--deep); }
+.app-shell .club-filters button strong { background: transparent; font-size: 12px; width: auto; height: auto; }
+.club-booking-filter { min-width: 0; flex: 1 1 100%; }
+.club-booking-filter select { width: 100%; min-height: 44px; padding: 8px 10px; color: var(--muted); font-size: 13px; border-radius: 8px; background: transparent; }
+.club-next-match {
+  display: flex; width: 100%; align-items: center; gap: 14px; padding: 16px;
+  border: 0; border-left: 4px solid var(--ball); border-radius: 0 12px 12px 0;
+  text-align: left; background: var(--ink); color: var(--white); cursor: pointer;
+}
+.club-next-match > svg { color: var(--ball); flex-shrink: 0; }
+.club-next-match > span { display: grid; gap: 4px; min-width: 0; }
+.club-next-match small { color: #cae1e9; font-size: 12px; }
+.club-next-match strong { font-size: 14px; }
+.club-next-match > span:last-child { margin-left: auto; font-size: 12px; text-align: right; }
+.club-board-tools { display: none; }
+.app-shell .dashboard-intro > div { text-align: left; }
+.app-shell .club-slot .profile-avatar { box-shadow: none; }
+.app-shell .poll-feed { gap: 28px; }
+.app-shell .poll-card { border: 0; border-radius: 0; background: transparent; box-shadow: none; overflow: visible; }
+.app-shell .poll-card__header { padding: 12px 0; align-items: center; gap: 12px; }
+.app-shell .poll-card__week { display: none; }
+.app-shell .poll-card__identity h2 { color: var(--deep); font-family: Manrope, 'Manrope Variable', sans-serif; text-transform: none; font-size: 15px; font-weight: 800; }
+.app-shell .poll-card__meta { margin-top: 2px; font-size: 11px; flex-wrap: wrap; }
+.app-shell .poll-card__meta > span { display: none; }
+.app-shell .poll-card__collapse { min-height: 44px; padding: 4px 8px; font-size: 12px; }
+.app-shell .poll-card__action { min-width: 44px; padding: 8px; }
+.app-shell .poll-card__action-label { display: none; }
+.app-shell .poll-card__slots { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; padding: 0; border: 0; background: transparent; }
+.app-shell .club-slot { border: 1px solid var(--line); border-top: 3px solid var(--court); border-radius: 12px; box-shadow: none; scroll-margin-top: 90px; }
+.app-shell .club-slot.slot-card--booked { border-top-color: var(--booked); }
+.app-shell .club-slot.slot-card--ready { border-top-color: var(--pending); }
+.app-shell .club-slot .slot-card__header { display: grid; grid-template-columns: 48px minmax(0, 1fr) auto; gap: 12px; padding: 16px; }
+.app-shell .club-slot .slot-date { width: 48px; min-width: 0; padding: 7px 4px; border-radius: 8px; }
+.app-shell .club-slot .slot-date strong { font-size: 28px; }
+.app-shell .club-slot .slot-date span { font-size: 10px; }
+.app-shell .club-slot .slot-time > strong { font-size: 34px; line-height: 1; }
+.app-shell .club-slot .slot-time > span { font-size: 12px; }
+.app-shell .club-slot .slot-time__certainty { margin-top: 5px; padding: 3px 5px; font-size: 10px; }
+.app-shell .club-slot .slot-card__status { align-items: flex-end; gap: 8px; }
+.app-shell .club-slot .status-pill { max-width: 142px; padding: 6px 8px; font-size: 11px; }
+.club-slot-menu { position: relative; }
+.club-slot-menu summary { display: flex; min-height: 44px; align-items: center; gap: 5px; color: var(--muted); font-size: 11px; font-weight: 700; cursor: pointer; list-style: none; }
+.club-slot-menu summary::-webkit-details-marker, .club-participation summary::-webkit-details-marker, .club-player-picker summary::-webkit-details-marker { display: none; }
+.app-shell .club-slot .slot-card__management { display: grid; gap: 4px; padding: 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--chalk); }
+.app-shell .club-slot .slot-card__management button { display: flex; gap: 8px; width: 100%; height: auto; min-height: 44px; justify-content: flex-start; padding: 8px; border: 0; background: transparent; color: var(--deep); border-radius: 6px; font-size: 12px; }
+.app-shell .club-slot .slot-card__management .slot-card__icon-action--delete { color: var(--danger); }
+.app-shell .club-slot .booking-strip { display: flex; padding: 8px 16px; border-top: 1px solid var(--line); border-bottom: 0; background: var(--chalk); color: var(--muted); }
+.app-shell .club-slot .booking-strip__pin { width: auto; height: auto; background: transparent; color: var(--court); }
+.app-shell .club-slot .booking-strip__copy strong { font-size: 12px; color: var(--ink); }
+.app-shell .club-slot .booking-strip__copy small { font-size: 11px; color: var(--muted); }
+.app-shell .club-slot .booking-strip__stamp { display: none; }
+.club-slot-roster-heading { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; padding: 6px 16px 0; font-size: 12px; }
+.club-slot-roster-heading > strong { color: var(--muted); font-size: 11px; }
+.club-slot-roster-heading button { display: flex; gap: 4px; align-items: center; min-height: 44px; margin-left: auto; padding: 6px 0 6px 6px; border: 0; background: transparent; color: var(--deep); font-size: 12px; font-weight: 700; }
+.club-slot-roster-heading button[aria-expanded=true] svg { transform: rotate(180deg); }
+.club-your-place { color: var(--booked-deep); font-size: 11px; font-weight: 800; }
+.app-shell .club-slot .court-lineup--compact {
+  min-height: 0; margin: 0; padding: 0 16px 12px; gap: 8px 12px;
+  grid-template-rows: auto auto; border: 0; outline: 0; background: transparent;
+}
+.app-shell .court-lineup--compact::before,
+.app-shell .court-lineup--compact::after,
+.app-shell .court-lineup--compact .court-lineup__net,
+.app-shell .court-lineup--compact .court-player__marker { display: none; }
+.app-shell .court-lineup--compact .court-player { min-height: 38px; padding: 0; gap: 7px; justify-content: flex-start; flex-direction: row; }
+.app-shell .court-lineup--compact .court-player__avatar { width: 30px; height: 30px; min-width: 30px; border-width: 2px; }
+.app-shell .court-lineup--compact .court-player__name { text-align: left; align-items: flex-start; min-width: 0; }
+.app-shell .court-lineup--compact .court-player__name strong { font-size: 13px; color: var(--ink); overflow-wrap: anywhere; }
+.app-shell .court-lineup--compact .court-player__name small { font-size: 10px; color: var(--court); }
+.app-shell .court-lineup--compact .court-player__name--empty { color: var(--muted); font-size: 12px; }
+.app-shell .court-lineup--compact .guest-remove-action { color: var(--danger); min-width: 32px; min-height: 38px; background: var(--white); border-color: var(--line); }
+.app-shell .club-slot .reserve-list { padding: 8px 16px 12px; min-height: 0; }
+.app-shell .club-slot .reserve-list--empty { padding: 0 16px 8px; }
+.app-shell .club-slot .reserve-list--empty p { display: none; }
+.app-shell .club-slot .reserve-list__heading { margin: 0; font-size: 10px; }
+.app-shell .club-slot .reserve-list__heading small { font-size: 11px; }
+.app-shell .club-slot .reserve-list li { padding: 8px 0; }
+.app-shell .club-slot .slot-card__actions { padding: 12px 16px; gap: 8px; margin: 0; }
+.app-shell .club-slot .join-choice { display: flex; width: 100%; gap: 8px; }
+.app-shell .club-slot .join-choice__label { display: none; }
+.app-shell .club-slot .join-option { display: flex; justify-content: center; flex: 1; width: auto; min-width: 0; min-height: 48px; padding: 10px; border-radius: 8px; gap: 8px; text-align: center; }
+.app-shell .club-slot .join-option strong { font-size: 13px; }
+.app-shell .club-slot .join-option small, .app-shell .club-slot .join-option__icon { display: none; }
+.app-shell .club-slot .join-option--starter:disabled { display: none; }
+.app-shell .club-slot .booking-action { min-height: 44px; margin: 0; padding: 8px 10px; border: 0; background: var(--aqua); border-radius: 8px; }
+.app-shell .club-slot .booking-action__icon { width: auto; height: auto; background: transparent; color: var(--court); }
+.app-shell .club-slot .booking-action__copy small { display: none; }
+.app-shell .club-slot .booking-action__copy strong { font-size: 12px; }
+.app-shell .club-slot .slot-card__unbook { min-height: 44px; margin: 0 0 0 auto; font-size: 12px; }
+.club-participation { flex: 1; min-width: 0; font-size: 13px; }
+.club-participation summary { min-height: 44px; display: flex; align-items: center; gap: 8px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; color: var(--deep); cursor: pointer; font-weight: 800; }
+.club-participation[open] { flex-basis: 100%; }
+.club-participation[open] .button { margin-top: 8px; }
+.club-participation p { margin: 8px 0; line-height: 1.6; color: var(--muted); }
+.app-shell .club-calendar { padding: 10px; font-size: 12px; }
+
+/* Consistent secondary pages, with the sport in the content not the chrome. */
+.club-match-switch, .club-period-switch { display: flex; gap: 8px; }
+.club-match-switch { width: min(1160px, calc(100% - 32px)); margin: 20px auto 0; }
+.club-match-switch button, .club-period-switch button { min-height: 44px; padding: 10px 18px; border: 1px solid var(--line); border-radius: 8px; color: var(--muted); background: var(--white); font-size: 14px; font-weight: 700; }
+.club-match-switch button[aria-pressed=true], .club-period-switch button[aria-pressed=true] { color: var(--ink); border-color: var(--deep); box-shadow: inset 0 -3px var(--deep); }
+.club-period-switch { margin: 16px 0 20px; }
+.club-period-switch button span { padding-left: 8px; color: var(--muted); }
+.app-shell :is(.personal-matches__back, .player-stats__back, .fantasy-page__back) { margin-bottom: 16px; padding: 8px 0; border: 0; min-height: 44px; background: transparent; font-size: 12px; }
+.app-shell .personal-matches__hero { padding: 20px; gap: 20px; border-radius: 12px; box-shadow: none; }
+.app-shell .personal-matches__hero h1 { font-size: 32px; }
+.app-shell .personal-matches__hero p { max-width: 60ch; font-size: 13px; }
+.app-shell .personal-matches__score { display: none; }
+.app-shell .personal-matches__grid { grid-template-columns: minmax(0, 1fr); gap: 16px; margin-top: 16px; }
+.app-shell .personal-matches__section { padding: 0; border: 0; background: transparent; box-shadow: none; }
+.app-shell .personal-matches__section-heading { margin: 12px 0; }
+.app-shell .personal-matches__section-heading .eyebrow { display: none; }
+.app-shell .personal-matches__section-heading h2 { font-size: 22px; }
+.app-shell .personal-matches__section-heading > strong { width: auto; height: auto; padding: 4px 8px; font-size: 18px; background: transparent; color: var(--muted); }
+.app-shell .personal-matches__list { gap: 16px; }
+.app-shell .personal-match { padding: 16px; gap: 12px; border-radius: 12px; border-left-width: 3px; box-shadow: none; }
+.app-shell .personal-match__date { width: 48px; min-width: 48px; padding: 8px 4px; border-radius: 8px; }
+.app-shell .personal-match__date strong { font-size: 30px; }
+.app-shell .personal-match__date :is(span, small) { font-size: 10px; }
+.app-shell .personal-match__heading h3 { font-size: 30px; }
+.app-shell .personal-match__heading p { font-size: 12px; }
+.app-shell .personal-match__details { gap: 8px; font-size: 12px; }
+.app-shell .personal-match__status { padding: 10px; font-size: 12px; }
+.app-shell .personal-match__rating { flex-wrap: wrap; gap: 6px; border-radius: 6px; padding: 6px 8px; }
+.app-shell .personal-match__rating small { font-size: 10px; }
+.app-shell .personal-match__report, .app-shell .group-match__panel { padding: 12px; border-radius: 8px; box-shadow: none; }
+.app-shell .personal-match__report-action { min-height: 44px; }
+.app-shell .group-match__content { gap: 12px; }
+.app-shell .group-match__players { gap: 0; }
+.app-shell .group-match__player { padding: 12px 0; border: 0; border-radius: 0; border-bottom: 1px solid var(--line); background: transparent; }
+.app-shell .group-match__avatar { width: 36px; height: 36px; }
+.app-shell .group-match__player-copy strong { font-size: 14px; }
+.app-shell .group-match__player-verdict { font-size: 12px; }
+.app-shell .group-match__player-count { font-size: 11px; }
+.app-shell .group-match__panel-heading > span { width: 32px; height: 32px; border-radius: 6px; }
+
+/* Fanta preserves every rule, timer and season transition. */
+.app-shell .fantasy-hero { min-height: 0; padding: 16px; border-radius: 12px; gap: 12px; }
+.app-shell .fantasy-hero > div:first-child { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; width: 100%; }
+.app-shell .fantasy-hero .eyebrow, .app-shell .fantasy-hero__mark { display: none; }
+.app-shell .fantasy-hero .fantasy-hero__intro { grid-column: 1 / -1; grid-row: 2; margin: 0; font-size: 12px; }
+.app-shell .fantasy-hero .fantasy-hero__rules-button { grid-column: 2; grid-row: 1; min-height: 44px; margin: 0; padding: 8px; font-size: 11px; }
+.app-shell .fantasy-hero .fantasy-hero__rules-button svg { display: none; }
+.app-shell .fantasy-hero h1 { font-size: clamp(30px, 7vw, 46px); }
+.app-shell .fantasy-hero h1 { margin: 0; }
+.app-shell .fantasy-hero p { font-size: 13px; max-width: 60ch; }
+.app-shell .fantasy-season { border-radius: 12px; margin: 16px 0; }
+.app-shell .fantasy-season__summary { padding: 16px; gap: 16px; }
+.app-shell .fantasy-season h2 { font-size: 26px; }
+.app-shell .fantasy-season p { font-size: 12px; }
+.app-shell .fantasy-season__summary > div > .eyebrow { display: none; }
+.app-shell .fantasy-hub-nav { top: var(--club-header); padding: 4px; border-radius: 10px; gap: 4px; margin: 16px 0; background: var(--chalk); }
+.app-shell .fantasy-hub-nav button { min-height: 52px; padding: 10px 8px; border-radius: 8px; gap: 6px; }
+.app-shell .fantasy-hub-nav button strong { font-size: 13px; }
+.app-shell .fantasy-hub-nav button small { display: none; }
+.app-shell .fantasy-hub-nav button em { width: auto; height: auto; min-width: 0; padding: 3px 5px; font-size: 13px; background: transparent; }
+.app-shell .fantasy-hub-nav button > svg { display: none; }
+.app-shell .fantasy-section__heading { margin: 20px 0 12px; }
+.app-shell .fantasy-section__heading .eyebrow { display: none; }
+.app-shell .fantasy-section__heading h2 { font-size: 25px; }
+.app-shell :is(.fantasy-round, .fantasy-result, .fantasy-leaderboard) { border-radius: 12px; box-shadow: none; }
+.app-shell .fantasy-leaderboard__entry { min-height: 64px; }
+.app-shell .fantasy-locked-round { border-radius: 12px; box-shadow: none; }
+.app-shell .fantasy-locked-round > header { padding: 18px; }
+.app-shell .fantasy-locked-round h3 { font-size: 16px; }
+.app-shell .fantasy-entry-list { padding: 0 18px; }
+.app-shell .fantasy-entry-list li { padding: 16px 0; }
+.app-shell .fantasy-locked-round > footer { padding: 14px 18px; font-size: 12px; align-items: flex-start; }
+.club-progress-time { display: block; margin-top: 5px; color: var(--muted); font-size: 11px; }
+.app-shell .notification-history__hero { padding: 20px; border-radius: 12px; }
+.app-shell .notification-history__hero h1 { font-size: 32px; }
+.app-shell .notification-history__score { display: none; }
+.app-shell .notification-history__inbox { padding: 0; margin-top: 20px; border: 0; background: transparent; box-shadow: none; }
+.app-shell .notification-history-item { padding: 16px; border-radius: 10px; box-shadow: none; }
+.app-shell .notification-history-item h2 { font-family: 'Manrope Variable', Manrope, sans-serif; font-size: 15px; text-transform: none; }
+.app-shell .notification-history-item p { font-size: 14px; line-height: 1.6; }
+
+/* Player identity: a compact scoreboard, a regulation court used as detail. */
+.app-shell .player-stats__hero { padding: 20px; gap: 24px; border-radius: 12px; }
+.app-shell .player-stats__hero-avatar { width: 68px; height: 68px; box-shadow: 5px 5px 0 var(--ball); }
+.app-shell .player-stats__identity { gap: 18px; }
+.app-shell .player-stats__identity h1 { font-size: 38px; }
+.app-shell .player-stats__identity p { font-size: 11px; letter-spacing: 0; text-transform: none; }
+.app-shell .player-stats__identity span { font-size: 12px; }
+.club-stats-score { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); padding: 16px 0 0; border-top: 1px solid rgb(255 255 255 / 25%); gap: 12px; }
+.club-stats-score > span { display: grid; gap: 5px; min-width: 0; font-size: 11px; color: #c9e0e9; }
+.club-stats-score strong { font-family: var(--display); line-height: 1; font-size: 36px; color: var(--ball); }
+.app-shell .player-stats__controls { display: grid; grid-template-columns: minmax(0, 1fr); padding: 12px; gap: 12px; border-radius: 10px; margin: 16px 0; }
+.app-shell .player-stats__controls > label { display: flex; gap: 12px; justify-content: space-between; font-size: 12px; }
+.app-shell .player-stats__controls select { min-width: 0; max-width: 100%; font-size: 14px; min-height: 44px; }
+.club-player-picker summary { display: flex; gap: 10px; align-items: center; min-height: 48px; cursor: pointer; list-style: none; }
+.club-player-picker summary .profile-avatar { width: 36px; height: 36px; }
+.club-player-picker summary > span { display: grid; gap: 3px; }
+.club-player-picker summary small { color: var(--muted); font-size: 11px; }
+.club-player-picker summary strong { font-size: 14px; }
+.club-player-picker summary svg { margin-left: auto; }
+.club-player-picker[open] summary svg { transform: rotate(90deg); }
+.club-player-search { display: grid; gap: 6px; margin: 16px 0; font-size: 12px; }
+.club-player-search input { width: 100%; min-width: 0; min-height: 44px; }
+.app-shell .player-stats__player-picker { display: grid; grid-template-columns: 1fr 1fr; max-height: 240px; overflow-y: auto; gap: 6px; }
+.app-shell .player-stats__player-picker button { min-width: 0; min-height: 44px; padding: 8px; border-radius: 8px; font-size: 12px; }
+.app-shell .player-stats__player-picker button span { overflow-wrap: anywhere; }
+.app-shell .player-stats__tabs { gap: 4px; padding: 4px; border-radius: 10px; }
+.app-shell .player-stats__tabs button { padding: 10px 6px; min-height: 52px; font-size: 11px; border-radius: 8px; }
+.app-shell .player-stats__tabs button svg { width: 17px; height: 17px; }
+.app-shell :is(.player-stats__scorecard, .player-stats__curiosities, .player-stats__verdict, .player-stats__relationship-list, .player-stats__history) { padding: 18px; border-radius: 12px; box-shadow: none; }
+.app-shell .player-stats__overview { gap: 16px; margin-top: 16px; }
+.app-shell .player-stats__overview h2 { font-size: 26px; }
+.app-shell .player-stats__overview header p { font-size: 11px; letter-spacing: 0; text-transform: none; }
+
+/* One scroll surface for forms, above all persistent navigation. */
+.app-shell .modal { padding: 20px; border-radius: 14px; }
+.app-shell .modal h2 { font-size: 30px; }
+.app-shell .modal__header { gap: 16px; margin-bottom: 24px; }
+.app-shell .modal__header .icon-button { flex-shrink: 0; }
+.app-shell .modal :is(input, select, textarea) { font-size: 16px; min-width: 0; max-width: 100%; }
+.app-shell .modal :is(input, select) { min-height: 46px; }
+.app-shell .modal .button { min-height: 48px; }
+.app-shell .toast { bottom: calc(84px + env(safe-area-inset-bottom)); }
+body.modal-open .club-navigation { visibility: hidden; }
+body.modal-open .app-shell .toast { visibility: hidden; }
+
+@media (max-width: 600px) {
+  .app-shell .modal-backdrop { padding: 0; align-items: stretch; overflow: hidden; }
+  .app-shell .modal { width: 100%; max-width: none; height: 100dvh; max-height: 100dvh; padding: max(18px, env(safe-area-inset-top)) 18px max(24px, env(safe-area-inset-bottom)); border-radius: 0; overscroll-behavior: contain; }
+  .app-shell .modal__header { position: sticky; top: -18px; z-index: 5; padding: 18px 0 12px; margin-top: -18px; background: var(--white); border-bottom: 1px solid var(--line); }
+  .app-shell .modal__header .eyebrow { display: none; }
+  .app-shell .modal h2 { font-size: 28px; }
+}
+
+@media (max-width: 360px) {
+  .app-shell .dashboard { width: calc(100% - 24px); }
+  .app-shell .dashboard-intro { flex-wrap: wrap; gap: 12px; }
+  .app-shell .dashboard-intro h1 { font-size: 28px; }
+  .app-shell .club-slot .slot-card__header { grid-template-columns: 42px minmax(0, 1fr); gap: 10px; padding: 12px; }
+  .app-shell .club-slot .slot-card__status { grid-column: 1 / -1; flex-direction: row; align-items: center; justify-content: space-between; }
+  .club-next-match { flex-wrap: wrap; }
+  .club-next-match > span:last-child { flex-basis: 100%; text-align: left; padding-left: 37px; }
+  .app-shell .club-slot .court-player__avatar { width: 26px; height: 26px; min-width: 26px; }
+}
+
+@media (min-width: 760px) {
+  .app-shell { --club-header: 76px; }
+  .app-shell .topbar { padding-right: max(24px, calc((100vw - 1160px) / 2)); }
+  .app-shell .club-filters .feed-filter__inner { flex-wrap: nowrap; }
+  .app-shell .club-filters button { flex: 0 0 auto; padding: 10px 16px; }
+  .club-booking-filter { flex: 0 0 auto; margin-left: auto; }
+  .app-shell .dashboard { padding-top: 28px; }
+  .app-shell .dashboard-intro h1 { font-size: 38px; }
+  .app-shell .dashboard-intro { justify-content: space-between; }
+  .app-shell .poll-card__action-label { display: inline; }
+  .app-shell .poll-card__action { padding: 8px 12px; }
+  .app-shell .club-slot .slot-card__header { grid-template-columns: 52px minmax(0, 1fr) auto; }
+  .app-shell .club-slot .slot-card__status { flex-direction: row; align-items: center; gap: 16px; }
+  .app-shell .club-slot .slot-card__management { position: absolute; z-index: 5; right: 0; top: 44px; width: 210px; box-shadow: var(--shadow); }
+  .app-shell .club-slot .court-lineup--compact { grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-rows: auto; padding: 0 20px 16px; gap: 12px; }
+  .app-shell .court-lineup--compact .court-player { grid-area: auto; }
+  .app-shell .club-slot .slot-card__actions { align-items: center; }
+  .app-shell .club-slot .join-choice { width: auto; flex: 1; }
+  .app-shell .club-slot .booking-action { width: auto; flex: 1; }
+  .club-participation { flex: 0 1 auto; }
+  .app-shell .personal-matches__hero { display: flex; justify-content: space-between; }
+  .app-shell .personal-matches__score { display: flex; }
+  .app-shell .personal-matches__score strong { font-size: 32px; }
+  .app-shell .player-stats__hero { grid-template-columns: 1fr 1fr; align-items: center; }
+  .club-stats-score { padding: 0 0 0 24px; border-top: 0; border-left: 1px solid rgb(255 255 255 / 25%); }
+  .club-stats-score strong { font-size: 40px; }
+  .app-shell .player-stats__controls { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
+  .app-shell .player-stats__tabs button { font-size: 14px; }
+  .app-shell .personal-matches__list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .app-shell .fantasy-hub-nav button > svg { display: block; }
+  .app-shell .toast { bottom: 24px; }
+}
+
+@media (min-width: 1050px) {
+  .app-shell { padding-bottom: 0; }
+  .club-navigation { inset: 0 auto auto 50%; transform: translateX(-50%); display: flex; height: 76px; align-items: center; gap: 2px; border: 0; padding: 0; background: transparent; }
+  .club-navigation button { min-height: 44px; flex-direction: row; padding: 10px 12px; gap: 7px; font-size: 13px; }
+  .club-navigation button svg { width: 18px; }
+  .app-shell .dashboard--feed { display: grid; grid-template-columns: minmax(0, 1fr) 280px; column-gap: 28px; align-items: start; }
+  .dashboard--feed > * { grid-column: 1; }
+  .dashboard--feed > .dashboard-intro { grid-column: 1 / -1; }
+  .dashboard--feed > .club-board-aside { grid-column: 2; grid-row: 2 / span 4; position: sticky; top: 100px; margin-top: 26px; }
+  .club-board-tools { display: grid; gap: 8px; padding: 20px; margin-top: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--chalk); }
+  .app-shell .club-board-tools h2 { font-size: 24px; margin-bottom: 8px; }
+  .club-board-tools button { display: flex; min-height: 44px; gap: 8px; align-items: center; padding: 8px 0; border: 0; border-bottom: 1px solid var(--line); color: var(--deep); background: transparent; font-size: 13px; text-align: left; cursor: pointer; }
+  .club-board-tools strong { margin-left: auto; }
+  .club-board-tools p { margin: 12px 0 0; font-size: 12px; color: var(--muted); line-height: 1.5; }
+  .club-board-aside .club-next-match { flex-wrap: wrap; }
+  .club-board-aside .club-next-match > span:last-child { text-align: left; margin-left: 37px; }
+  .app-shell .club-slot .court-lineup--compact { gap: 8px; }
+  .app-shell .club-slot .court-lineup--compact .court-player__name strong { font-size: 12px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-shell *, .app-shell *::before, .app-shell *::after { animation: none; transition: none; scroll-behavior: auto; }
+}

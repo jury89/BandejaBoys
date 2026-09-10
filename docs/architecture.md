@@ -14,6 +14,16 @@
 
 ## Flusso settimanale
 
+### Presentazione Clubhouse
+
+`src/clubhouse.css` viene caricato dopo gli stili esistenti e ridefinisce solo la presentazione dell’area autenticata, conservando il componente `Brand`, i colori e gli stati di dominio. La navigazione espone quattro destinazioni e conserva gli hash preesistenti (inclusi i deep link da push). `usePageScroll` ricorda lo scroll per sezione durante la sessione; una destinazione esplicita di slot ha precedenza sul ripristino.
+
+`matchesSlotFilter` in `src/lib/slotFilters.ts` centralizza i filtri visivi: “Posti liberi” richiede una proposta aperta con meno di quattro titolari; “Sono iscritto” include titolari e riserve. Non cambia dati né precedenza. Il campo compatto/espanso usa gli stessi nodi e lo stesso ordine derivato da `getStarters`. I menu mantengono le autorizzazioni esistenti; i moduli mobili usano un solo contenitore scorrevole e il componente `Modal` mantiene e ripristina il focus.
+
+Lo storico personale e degli altri mostra otto elementi per blocco dal dataset già disponibile: questa paginazione riduce il rendering, **non** è paginazione Firestore e non viene presentata come riduzione delle letture. Non sono aggiunti listener, collezioni, migrazioni o scritture del backend. I round Fanta espongono `updatedAt` nel riepilogo di attesa, senza fingere un aggiornamento in tempo reale dei giudizi. Regole, calcoli, stagioni e notifiche restano invariati.
+
+### Organizzazione degli slot
+
 1. Un membro pubblica uno o più slot scegliendo direttamente data, ora e durata di ciascuno, senza selezionare una settimana. Firestore non salva una settimana né un titolo per gli slot: `getUpcomingSlotWeeks` raccoglie tutte le proposte future, calcola il lunedì dalla data effettiva in `Europe/Rome` e le raggruppa al volo in intervalli lunedì-domenica. Pubblicazioni separate che ricadono nella stessa settimana compaiono quindi in una sola scheda **Padel · 27 lug – 2 ago 2026**, anche quando la settimana attraversa Capodanno.
 2. L’interfaccia usa controlli separati per data, ora e minuti, così anche i selettori nativi di iOS espongono soltanto i minuti ammessi `00` e `30`. `hasExistingSlotAtDateTime` confronta ogni proposta con tutti gli slot già caricati allo stesso minuto nel fuso di Roma: le collisioni ricevono un avviso rosso per riga ma restano pubblicabili, perché il controllo è informativo. Finché uno slot non ha una prenotazione, il suo orario è automaticamente considerato indicativo.
    Qualunque membro può aggiungere, spostare o eliminare slot; le operazioni restano transazionali sul documento tecnico che conserva lo slot. `rescheduleSlot` modifica soltanto la data dello slot: il raggruppamento visivo cambia automaticamente senza sincronizzare altri campi. Anche l’ultimo slot del documento può essere eliminato. La conferma esplicita la perdita di adesioni e riserve e, se il campo risulta prenotato, ricorda che va annullato direttamente con l’Oasi Boschetto.

@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { vi } from 'vitest'
 import type { MatchReport, MemberProfile, PadelPoll } from '../types'
@@ -105,6 +105,15 @@ describe('pagina statistiche giocatore', () => {
     expect(screen.getByRole('heading', { name: 'Il tabellino' })).toBeInTheDocument()
     expect(screen.getByText('Pavone gonfiato')).toBeInTheDocument()
     expect(screen.getByText(/Referto disponibile per 1 partita su 1/)).toBeInTheDocument()
+
+    const picker = screen.getByLabelText('Cerca giocatore').closest('details')!
+    fireEvent.click(picker.querySelector('summary')!)
+    await browserUser.type(screen.getByLabelText('Cerca giocatore'), 'aLeX')
+    expect(within(screen.getByRole('group', { name: 'Giocatori' })).getAllByRole('button')).toHaveLength(1)
+    await browserUser.clear(screen.getByLabelText('Cerca giocatore'))
+    await browserUser.type(screen.getByLabelText('Cerca giocatore'), 'nessuno')
+    expect(screen.getByText('Nessun giocatore trovato.')).toBeInTheDocument()
+    await browserUser.clear(screen.getByLabelText('Cerca giocatore'))
 
     await browserUser.click(screen.getByRole('button', { name: /Coppie e rivali/ }))
     expect(screen.getByText('Compagno portafortuna')).toBeInTheDocument()

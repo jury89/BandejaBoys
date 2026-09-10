@@ -34,6 +34,17 @@ const poll: PadelPoll = {
 }
 
 describe('azioni dello slot', () => {
+  it('espande il campo mantenendo gli stessi giocatori e la posizione personale', () => {
+    render(<SlotCard poll={poll} slot={slot} user={user} members={[user]} onPollChange={vi.fn()} onNotify={vi.fn()} onError={vi.fn()} />)
+    const lineup = screen.getByRole('region', { name: 'Titolari' })
+    expect(lineup).toHaveClass('court-lineup--compact')
+    expect(screen.getByText('Sei titolare')).toBeInTheDocument()
+    const initialRoster = lineup.textContent
+    fireEvent.click(screen.getByRole('button', { name: 'Mostra campo' }))
+    expect(lineup).not.toHaveClass('court-lineup--compact')
+    expect(lineup.textContent).toBe(initialRoster)
+    expect(screen.getByRole('button', { name: 'Riduci campo' })).toHaveAttribute('aria-expanded', 'true')
+  })
   afterEach(() => {
     vi.useRealTimers()
     vi.restoreAllMocks()
@@ -105,11 +116,9 @@ describe('azioni dello slot', () => {
     )
 
     const action = screen.getByRole('button', { name: 'Passo il posto' })
-    const help = screen.getByRole('button', { name: 'Come funziona Passo il posto' })
-    const tooltip = screen.getByRole('tooltip')
+    const tooltip = screen.getByText(/Ritirandoti lasci il posto alla prima riserva/)
 
     expect(action).toHaveAttribute('aria-describedby', tooltip.id)
-    expect(help).toHaveAttribute('aria-describedby', tooltip.id)
     expect(tooltip).toHaveTextContent('prenderà la tua posizione e tu uscirai dallo slot')
     expect(tooltip).toHaveTextContent('Se era in riserva')
   })
@@ -264,9 +273,10 @@ describe('azioni dello slot', () => {
     const edit = screen.getByRole('button', { name: 'Modifica data e ora dello slot' })
     const remove = screen.getByRole('button', { name: /Elimina lo slot/ })
 
-    expect(actions).toContainElement(calendar)
-    expect(edit).toHaveTextContent('')
-    expect(remove).toHaveTextContent('')
+    expect(actions).not.toContainElement(calendar)
+    expect(calendar).toHaveTextContent('Calendario')
+    expect(edit).toHaveTextContent('Modifica data e ora')
+    expect(remove).toHaveTextContent('Elimina slot')
     fireEvent.click(calendar)
 
     expect(createObjectURL).toHaveBeenCalledWith(expect.any(Blob))
@@ -297,7 +307,7 @@ describe('azioni dello slot', () => {
     const actions = screen.getByRole('group', { name: 'Azioni dello slot' })
     const history = screen.getByRole('button', { name: /Vedi la cronologia dello slot/ })
     expect(actions).toContainElement(history)
-    expect(history).toHaveTextContent('')
+    expect(history).toHaveTextContent('Cronologia')
 
     fireEvent.click(history)
 
