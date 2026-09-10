@@ -1,3 +1,17 @@
+/* Shared preference controls; experimental layout stays scoped to .ux-new. */
+.classic-slot-menu, .classic-participation, .classic-player-picker { display: contents; }
+.classic-slot-menu > summary, .classic-player-picker > summary { display: none; }
+.profile-interface { margin: 0; padding: 16px; min-width: 0; border: 1px solid var(--line); border-radius: 12px; }
+.profile-interface legend { padding: 0 6px; font-weight: 800; }
+.profile-interface p { margin: 0 0 12px; color: var(--muted); font-size: 13px; line-height: 1.6; }
+.profile-interface label { display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 12px; margin-top: 8px; border: 1px solid var(--line); border-radius: 10px; cursor: pointer; }
+.profile-interface label.is-selected { border-color: var(--deep); background: var(--aqua); }
+.profile-interface input { width: 20px; height: 20px; flex: 0 0 20px; margin: 0; accent-color: var(--deep); }
+.profile-interface label > span { display: grid; gap: 4px; min-width: 0; }
+.profile-interface strong { font-size: 14px; }
+.profile-interface small { font-size: 12px; color: var(--muted); line-height: 1.5; }
+.profile-interface .profile-interface__notice { margin: 14px 0 0; }
+
 :root {
   font-family: 'Manrope Variable', Manrope, system-ui, sans-serif;
   color: #102a3a;
@@ -421,7 +435,8 @@ p {
   display: grid;
   width: min(390px, 86%);
   aspect-ratio: 2 / 0.86;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(2, 1fr);
+  grid-template-rows: repeat(2, 1fr);
   align-items: center;
   justify-items: center;
   border: 1px solid rgba(255, 255, 255, 0.65);

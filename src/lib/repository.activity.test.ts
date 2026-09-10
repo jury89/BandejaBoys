@@ -46,6 +46,19 @@ function activity(): { events: LocalActivityEvent[]; views: LocalSlotView[] } {
 describe('repository activity log in demo mode', () => {
   beforeEach(() => localStorage.clear())
 
+  it('promuove la propria riserva e registra il passaggio una sola volta senza ritiro', async () => {
+    await repository.createPoll({ slots: [{ startsAt: '2027-01-05T19:30', durationMinutes: 90 }] }, user)
+    const poll = polls()[0], slot = poll.slots[0]
+    await repository.joinSlot(poll.id, slot.id, user, 'reserve')
+    const before = polls()[0].slots[0].signups[0]
+    await repository.takeStarterPlace(poll.id, slot.id, user)
+    await repository.takeStarterPlace(poll.id, slot.id, user)
+    expect(polls()[0].slots[0].signups).toEqual([{ ...before, role: 'starter' }])
+    expect(activity().events.filter(event => event.details.previousRole === 'reserve')).toHaveLength(1)
+    expect(activity().events.at(-1)).toMatchObject({ type: 'signup_joined', actorId: user.id, details: { role: 'starter', previousRole: 'reserve' } })
+    expect(activity().events.some(event => event.type === 'signup_left')).toBe(false)
+  })
+
   it('registra creazione, adesione, ritiro e modifica dello slot', async () => {
     await repository.createPoll({
       slots: [{ startsAt: '2027-01-05T19:30', durationMinutes: 90 }],

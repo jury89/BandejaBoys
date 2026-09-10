@@ -1624,6 +1624,17 @@ export function addSignup(
   }
 }
 
+/** Claim a free starter place without deleting/recreating the member's signup. */
+export function promoteOwnSignup(slot: PadelSlot, userId: string): PadelSlot {
+  const signup = slot.signups.find((entry) => entry.userId === userId && !isGuestSignup(entry))
+  if (!signup) throw new Error('Non risulti iscritto a questo slot.')
+  if (isStarter(slot, userId)) return slot
+  if (getStarters(slot).length >= MAX_STARTERS) {
+    throw new Error('I quattro posti da titolare sono già occupati. Rimani in riserva.')
+  }
+  return setSignupRole(slot, signup.id, 'starter')
+}
+
 export function setSignupRole(
   slot: PadelSlot,
   signupId: string,

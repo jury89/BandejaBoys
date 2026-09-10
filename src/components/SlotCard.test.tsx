@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { SlotCard } from './SlotCard'
+
+vi.mock('../InterfaceContext', () => ({ useInterfaceMode: () => 'nuova', clearInterfaceOverride: vi.fn() }))
 import type { PadelPoll, PadelSlot, SessionUser } from '../types'
 import { DEFAULT_VENUE, setSlotBooking } from '../lib/domain'
 import { repository } from '../lib/repository'
@@ -34,6 +36,14 @@ const poll: PadelPoll = {
 }
 
 describe('azioni dello slot', () => {
+  it('mostra una sola rosa compatta con iniziali e posizione personale', () => {
+    render(<SlotCard poll={poll} slot={slot} user={user} members={[user]} onPollChange={vi.fn()} onNotify={vi.fn()} onError={vi.fn()} />)
+    const lineup = screen.getByRole('region', { name: 'Titolari' })
+    expect(lineup).toHaveClass('club-roster')
+    expect(screen.getByText('Sei titolare')).toBeInTheDocument()
+    expect(lineup.querySelector('.club-roster__avatar')).toHaveTextContent('J')
+    expect(screen.queryByRole('button', { name: /Mostra campo|Riduci campo/ })).not.toBeInTheDocument()
+  })
   afterEach(() => {
     vi.useRealTimers()
     vi.restoreAllMocks()
@@ -87,7 +97,7 @@ describe('azioni dello slot', () => {
     )
 
     const avatar = screen.getByRole('img', { name: 'Foto profilo di Jury' })
-    expect(avatar).toHaveClass('court-player__avatar')
+    expect(avatar).toHaveClass('club-roster__avatar')
     expect(avatar).toHaveAttribute('src', avatarUser.avatarDataUrl)
   })
 
@@ -105,13 +115,52 @@ describe('azioni dello slot', () => {
     )
 
     const action = screen.getByRole('button', { name: 'Passo il posto' })
-    const help = screen.getByRole('button', { name: 'Come funziona Passo il posto' })
-    const tooltip = screen.getByRole('tooltip')
+    const tooltip = screen.getByText(/Con “Passo il posto” scegli chi ti sostituisce/)
 
     expect(action).toHaveAttribute('aria-describedby', tooltip.id)
-    expect(help).toHaveAttribute('aria-describedby', tooltip.id)
-    expect(tooltip).toHaveTextContent('prenderà la tua posizione e tu uscirai dallo slot')
-    expect(tooltip).toHaveTextContent('Se era in riserva')
+    expect(tooltip).not.toHaveTextContent('entra la prima riserva')
+  })
+
+  it('permette alla riserva di prendere un posto libero senza uscire e rientrare', async () => {
+    const reserveSlot: PadelSlot = { ...slot, signups: [{ ...slot.signups[0], role: 'reserve' }] }
+    const promote = vi.spyOn(repository, 'takeStarterPlace').mockResolvedValue(poll)
+    const leave = vi.spyOn(repository, 'leaveSlot')
+    const notify = vi.fn()
+    function Harness() {
+      const [current, setCurrent] = useState({ ...poll, slots: [reserveSlot] })
+      return <SlotCard poll={current} slot={current.slots[0]} user={user} members={[user]} onPollChange={setCurrent} onNotify={notify} onError={vi.fn()} />
+    }
+    render(<Harness />)
+    expect(screen.getByLabelText('Lista d’attesa').querySelector('.club-roster__avatar')).toHaveTextContent('J')
+    fireEvent.click(screen.getByRole('button', { name: 'Passa a titolare' }))
+    await waitFor(() => expect(screen.getByText('Sei titolare')).toBeInTheDocument())
+    expect(promote).toHaveBeenCalledWith(poll.id, slot.id, user)
+    expect(leave).not.toHaveBeenCalled()
+    expect(notify).toHaveBeenCalledWith('Sei passato da riserva a titolare.')
+  })
+
+  it('non propone il passaggio a titolare se il campo è pieno o lo slot è disabilitato', () => {
+    const reserveSlot: PadelSlot = { ...slot, signups: [
+      ...['a', 'b', 'c', 'd'].map((id, i) => ({ id, userId: id, displayName: id, joinedAt: i })),
+      { ...slot.signups[0], role: 'reserve', joinedAt: 10 },
+    ] }
+    const props = { poll: { ...poll, slots: [reserveSlot] }, slot: reserveSlot, user, members: [user], onPollChange: vi.fn(), onNotify: vi.fn(), onError: vi.fn() }
+    const { rerender } = render(<SlotCard {...props} />)
+    expect(screen.queryByRole('button', { name: 'Passa a titolare' })).not.toBeInTheDocument()
+    rerender(<SlotCard {...props} slot={{ ...reserveSlot, signups: [reserveSlot.signups[4]] }} disabled />)
+    expect(screen.queryByRole('button', { name: 'Passa a titolare' })).not.toBeInTheDocument()
+  })
+
+  it('se il posto viene occupato nel frattempo mostra l’errore e mantiene la riserva', async () => {
+    const reserveSlot: PadelSlot = { ...slot, signups: [{ ...slot.signups[0], role: 'reserve' }] }
+    vi.spyOn(repository, 'takeStarterPlace').mockRejectedValue(new Error('Posti già occupati.'))
+    const onError = vi.fn(), onPollChange = vi.fn(), onNotify = vi.fn()
+    render(<SlotCard poll={{ ...poll, slots: [reserveSlot] }} slot={reserveSlot} user={user} members={[user]} onPollChange={onPollChange} onNotify={onNotify} onError={onError} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Passa a titolare' }))
+    await waitFor(() => expect(onError).toHaveBeenCalledWith('Posti già occupati.'))
+    expect(onPollChange).not.toHaveBeenCalled()
+    expect(onNotify).not.toHaveBeenCalled()
+    expect(screen.getByText('Sei la riserva n° 1')).toBeInTheDocument()
   })
 
   it('prenota con un tocco all’Oasi Boschetto anche con meno di quattro giocatori', async () => {
@@ -264,9 +313,10 @@ describe('azioni dello slot', () => {
     const edit = screen.getByRole('button', { name: 'Modifica data e ora dello slot' })
     const remove = screen.getByRole('button', { name: /Elimina lo slot/ })
 
-    expect(actions).toContainElement(calendar)
-    expect(edit).toHaveTextContent('')
-    expect(remove).toHaveTextContent('')
+    expect(actions).not.toContainElement(calendar)
+    expect(calendar).toHaveTextContent('Calendario')
+    expect(edit).toHaveTextContent('Modifica data e ora')
+    expect(remove).toHaveTextContent('Elimina slot')
     fireEvent.click(calendar)
 
     expect(createObjectURL).toHaveBeenCalledWith(expect.any(Blob))
@@ -297,7 +347,7 @@ describe('azioni dello slot', () => {
     const actions = screen.getByRole('group', { name: 'Azioni dello slot' })
     const history = screen.getByRole('button', { name: /Vedi la cronologia dello slot/ })
     expect(actions).toContainElement(history)
-    expect(history).toHaveTextContent('')
+    expect(history).toHaveTextContent('Cronologia')
 
     fireEvent.click(history)
 

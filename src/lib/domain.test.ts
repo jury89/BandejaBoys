@@ -29,6 +29,7 @@ import {
   nextMondayDate,
   padelDateTimeToTimestamp,
   profileNameError,
+  promoteOwnSignup,
   removeGuestSignup,
   removeSignup,
   removeSlotFromPoll,
@@ -198,6 +199,27 @@ describe('ordine adesioni', () => {
     const current = slot(['a', 'b', 'c', 'd'].map((id, index) => signup(id, index, 'starter')))
 
     expect(() => addSignup(current, member('e'), 5, 'starter')).toThrow('quattro posti da titolare')
+  })
+
+  it('la riserva prende un posto libero conservando id, data di adesione e gli altri giocatori', () => {
+    const current = slot([signup('a', 1, 'starter'), signup('b', 2, 'reserve'), signup('c', 3, 'reserve')])
+    const updated = promoteOwnSignup(current, 'b')
+    expect(getStarters(updated).map((item) => item.userId)).toEqual(['a', 'b'])
+    expect(updated.signups.find((item) => item.userId === 'b')).toEqual({ ...current.signups[1], role: 'starter' })
+    expect(getReserves(updated)).toEqual([current.signups[2]])
+    expect(current.signups[1].role).toBe('reserve')
+    expect(promoteOwnSignup(updated, 'b')).toBe(updated)
+  })
+
+  it('non promuove una riserva se il posto è stato occupato nel frattempo', () => {
+    const current = slot([...['a', 'b', 'c', 'd'].map((id, i) => signup(id, i, 'starter')), signup('e', 5, 'reserve')])
+    expect(() => promoteOwnSignup(current, 'e')).toThrow('Rimani in riserva')
+    expect(getReserves(current).map((item) => item.userId)).toEqual(['e'])
+  })
+
+  it('richiede una propria adesione esistente e non gestisce gli ospiti', () => {
+    expect(() => promoteOwnSignup(slot([]), 'a')).toThrow('Non risulti iscritto')
+    expect(() => promoteOwnSignup(slot([{ ...signup('guest-a', 1, 'reserve'), isGuest: true }]), 'guest-a')).toThrow('Non risulti iscritto')
   })
 
   it('permette all’amministratore di spostare un titolare tra le riserve', () => {

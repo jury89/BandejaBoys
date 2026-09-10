@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { BarChart3, Bell, BellRing, CalendarCheck2, CalendarClock, CalendarDays, CalendarPlus, CheckCircle2, ChevronDown, CircleUserRound, History, LogOut, PhoneCall, RefreshCw, Trophy, UsersRound } from 'lucide-react'
+import { BarChart3, Bell, BellRing, CalendarCheck2, CalendarDays, CalendarPlus, CheckCircle2, ChevronDown, CircleUserRound, History, LayoutList, LogOut, PhoneCall, RefreshCw, Trophy, UsersRound } from 'lucide-react'
 import { useAuth } from '../AuthContext'
+import { clearInterfaceOverride, useInterfaceMode } from '../InterfaceContext'
+import { ClassicBoardFilters, ClassicBoardSummary } from './ClassicBoard'
 import type {
   FantasyEntry,
   FantasyRound,
@@ -20,9 +22,7 @@ import {
   getPendingMatchFeedbackPrompts,
   getPlayerMatches,
   getSlotEndsAt,
-  getSlotPhase,
   getUpcomingSlotWeeks,
-  isBookingCandidate,
   DEFAULT_VENUE_PHONE,
 } from '../lib/domain'
 import { firstName, slotDateParts } from '../lib/format'
@@ -46,6 +46,8 @@ import { notificationStateLabel, usePushNotifications } from '../lib/notificatio
 import { FEEDBACK_TEST_QUERY_PARAM, isFeedbackTestRequested, makeFeedbackTestPrompt } from '../lib/feedbackTest'
 import { repository } from '../lib/repository'
 import { slotElementId, type SlotNavigationTarget } from '../lib/slotNavigation'
+import { matchesSlotFilter } from '../lib/slotFilters'
+import { usePageScroll } from '../lib/usePageScroll'
 import { Brand } from './Brand'
 import { CreatePollModal } from './CreatePollModal'
 import { FantasyBandejaPage } from './FantasyBandejaPage'
@@ -99,9 +101,19 @@ const feedCopy: Record<FeedFilter, {
 }> = {
   all: {
     eyebrow: 'Bacheca completa',
-    heading: 'Tutti gli slot',
-    emptyHeading: 'Ancora nessun sondaggio.',
-    emptyBody: 'Proponi gli slot della prossima settimana e fai partire le adesioni.',
+    heading: 'Prossimi slot',
+    emptyHeading: 'Il campo aspetta voi.',
+    emptyBody: 'Crea uno slot e scegli quando giocare.',
+  },
+  available: {
+    eyebrow: 'C’è posto per te', heading: 'Posti liberi',
+    emptyHeading: 'Per ora i posti sono tutti occupati.',
+    emptyBody: 'Puoi entrare in riserva da Tutti o proporre un nuovo slot.',
+  },
+  joined: {
+    eyebrow: 'Le tue adesioni', heading: 'I tuoi slot',
+    emptyHeading: 'Non sei ancora iscritto.',
+    emptyBody: 'Scegli uno slot da Tutti: qui ritroverai le tue iscrizioni, anche in riserva.',
   },
   booking: {
     eyebrow: 'Campi da organizzare',
@@ -118,6 +130,7 @@ const feedCopy: Record<FeedFilter, {
 }
 
 export function Dashboard() {
+  const isNewInterface = useInterfaceMode() === 'nuova'
   const { user, signOut, updateProfile } = useAuth()
   const [polls, setPolls] = useState<PadelPoll[]>([])
   const [members, setMembers] = useState<MemberProfile[]>([])
@@ -465,6 +478,13 @@ export function Dashboard() {
     }
   }, [user?.id])
 
+  const pageReady = !loading && (
+    dashboardView === 'fantasy' ? fantasyRoundsLoaded
+      : dashboardView === 'statistics' || dashboardView === 'group-matches' ? groupMatchReportsLoaded
+        : dashboardView === 'matches' ? matchReportsLoaded : true
+  )
+  usePageScroll(dashboardView, pageReady, dashboardView === 'feed' && Boolean(slotNavigationTarget))
+
   useEffect(() => {
     if (dashboardView !== 'feed' || loading || !slotNavigationTarget) return
 
@@ -642,40 +662,19 @@ export function Dashboard() {
     window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`)
   }, [feedbackTestOpen])
 
-  const stats = useMemo(() => {
-    const openWeeks = upcomingSlotWeeks.filter((group) => (
-      group.entries.some(({ poll }) => poll.status === 'open')
-    ))
-    const slots = openWeeks.flatMap((group) => (
-      group.entries.filter(({ poll }) => poll.status === 'open').map(({ slot }) => slot)
-    ))
-    const ready = slots.filter((slot) => getSlotPhase(slot) === 'ready').length
-    const booked = slots.filter((slot) => getSlotPhase(slot) === 'booked')
-    const nextBooked = booked.sort((left, right) => left.startsAt.localeCompare(right.startsAt))[0]
-    return { open: openWeeks.length, ready, nextBooked }
-  }, [upcomingSlotWeeks])
-
   if (!user) return null
 
-  const totalSlotCount = upcomingSlotWeeks.reduce((total, group) => total + group.entries.length, 0)
-  const bookedSlotCount = upcomingSlotWeeks.reduce(
-    (total, group) => total + group.entries.filter(({ slot }) => getSlotPhase(slot) === 'booked').length,
-    0,
-  )
-  const bookingCandidateSlotCount = upcomingSlotWeeks.reduce(
-    (total, group) => total + group.entries.filter(({ slot }) => isBookingCandidate(slot)).length,
-    0,
-  )
+  const slotCountFor = (filter: FeedFilter) => upcomingSlotWeeks.reduce((total, group) => (
+    total + group.entries.filter(({ poll, slot }) => matchesSlotFilter(poll, slot, filter, user.id)).length
+  ), 0)
+  const totalSlotCount = slotCountFor('all')
+  const bookedSlotCount = slotCountFor('booked')
+  const bookingCandidateSlotCount = slotCountFor('booking')
   const visibleSlotWeeks = upcomingSlotWeeks.filter(
-    (group) => group.entries.some(({ slot }) => (
-      feedFilter === 'all'
-      || (feedFilter === 'booked' && getSlotPhase(slot) === 'booked')
-      || (feedFilter === 'booking' && isBookingCandidate(slot))
-    )),
+    (group) => group.entries.some(({ poll, slot }) => matchesSlotFilter(poll, slot, feedFilter, user.id)),
   )
-  const visibleSlotCount = feedFilter === 'all'
-    ? totalSlotCount
-    : feedFilter === 'booked' ? bookedSlotCount : bookingCandidateSlotCount
+  const visibleSlotCount = slotCountFor(feedFilter)
+  const nextPersonalMatch = playerMatches.upcoming[0]
   const currentFeedCopy = feedCopy[feedFilter]
   const notify = (message: string) => setToast({ message, tone: 'success' })
   const reportError = (message: string) => setToast({ message, tone: 'error' })
@@ -690,15 +689,7 @@ export function Dashboard() {
     window.history.pushState({ ...currentState, bandejaView: 'matches' }, '', url)
   }
   const closePlayerMatches = () => {
-    if (window.history.state?.bandejaView === 'matches') {
-      window.history.back()
-      return
-    }
-
-    const url = new URL(window.location.href)
-    url.hash = ''
-    window.history.replaceState(window.history.state, '', url)
-    setDashboardView('feed')
+    openBoard()
   }
   const openGroupMatches = () => {
     setAccountOpen(false)
@@ -714,15 +705,7 @@ export function Dashboard() {
     window.history.pushState({ ...currentState, bandejaView: 'group-matches' }, '', url)
   }
   const closeGroupMatches = () => {
-    if (window.history.state?.bandejaView === 'group-matches') {
-      window.history.back()
-      return
-    }
-
-    const url = new URL(window.location.href)
-    url.hash = ''
-    window.history.replaceState(window.history.state, '', url)
-    setDashboardView('feed')
+    openBoard()
   }
   const openStatistics = (playerId = user.id) => {
     setAccountOpen(false)
@@ -746,15 +729,7 @@ export function Dashboard() {
     window.history.replaceState(window.history.state, '', url)
   }
   const closeStatistics = () => {
-    if (window.history.state?.bandejaView === 'statistics') {
-      window.history.back()
-      return
-    }
-
-    const url = new URL(window.location.href)
-    url.hash = ''
-    window.history.replaceState(window.history.state, '', url)
-    setDashboardView('feed')
+    openBoard()
   }
   const openFantasy = () => {
     setAccountOpen(false)
@@ -777,15 +752,7 @@ export function Dashboard() {
     setFantasySubscriptionAttempt((attempt) => attempt + 1)
   }
   const closeFantasy = () => {
-    if (window.history.state?.bandejaView === 'fantasy') {
-      window.history.back()
-      return
-    }
-
-    const url = new URL(window.location.href)
-    url.hash = ''
-    window.history.replaceState(window.history.state, '', url)
-    setDashboardView('feed')
+    openBoard()
   }
   const openNotificationHistory = () => {
     setAccountOpen(false)
@@ -799,15 +766,7 @@ export function Dashboard() {
     window.history.pushState({ ...currentState, bandejaView: 'notifications' }, '', url)
   }
   const closeNotificationHistory = () => {
-    if (window.history.state?.bandejaView === 'notifications') {
-      window.history.back()
-      return
-    }
-
-    const url = new URL(window.location.href)
-    url.hash = ''
-    window.history.replaceState(window.history.state, '', url)
-    setDashboardView('feed')
+    openBoard()
   }
   const showPlayerMatchOnBoard = (match: PlayerMatch) => {
     setFeedFilter('all')
@@ -862,8 +821,22 @@ export function Dashboard() {
     notify('Collaudo completato: nessun giudizio è stato salvato.')
   }
 
+  const openBoard = () => {
+    if (dashboardView === 'feed') return
+    const url = new URL(window.location.href)
+    url.hash = ''
+    window.history.pushState({ bandejaView: 'feed' }, '', url)
+    setDashboardView('feed')
+  }
+  const mainSections = [
+    { label: 'Bacheca', icon: LayoutList, active: dashboardView === 'feed', open: openBoard },
+    { label: 'Partite', icon: CalendarDays, active: dashboardView === 'matches' || dashboardView === 'group-matches', open: openPlayerMatches },
+    { label: 'Fanta', icon: Trophy, active: dashboardView === 'fantasy', open: openFantasy },
+    { label: 'Statistiche', icon: BarChart3, active: dashboardView === 'statistics', open: () => openStatistics() },
+  ]
+
   return (
-    <div className="app-shell">
+    <div className={`app-shell ${isNewInterface ? 'ux-new' : 'ux-classic'}`} data-ux={isNewInterface ? 'nuova' : 'classica'}>
       <PullToRefresh />
       <header className="topbar">
         <Brand compact />
@@ -949,48 +922,29 @@ export function Dashboard() {
         </div>
       </header>
 
-      {dashboardView === 'feed' && <nav className="feed-filter" aria-label="Filtra gli slot">
-        <div className="feed-filter__inner">
-          <button
-            className={feedFilter === 'all' ? 'is-active' : ''}
-            type="button"
-            aria-label={`Tutti, ${totalSlotCount} slot`}
-            aria-pressed={feedFilter === 'all'}
-            onClick={() => setFeedFilter('all')}
-          >
-            <CalendarDays size={17} />
-            <span>Tutti</span>
-            <strong>{totalSlotCount}</strong>
-          </button>
-          <button
-            className={feedFilter === 'booking' ? 'is-active' : ''}
-            type="button"
-            aria-label={`Slot da prenotare, ${bookingCandidateSlotCount}`}
-            aria-pressed={feedFilter === 'booking'}
-            onClick={() => setFeedFilter('booking')}
-          >
-            <CalendarClock size={17} />
-            <span>Da prenotare</span>
-            <strong>{bookingCandidateSlotCount}</strong>
-          </button>
-          <button
-            className={feedFilter === 'booked' ? 'is-active' : ''}
-            type="button"
-            aria-label={`Slot prenotati, ${bookedSlotCount}`}
-            aria-pressed={feedFilter === 'booked'}
-            onClick={() => setFeedFilter('booked')}
-          >
-            <CalendarCheck2 size={17} />
-            <span>Prenotati</span>
-            <strong>{bookedSlotCount}</strong>
-          </button>
-        </div>
+      {isNewInterface && <nav className="club-navigation" aria-label="Navigazione principale">
+        {mainSections.map(({ label, icon: Icon, active, open }) => (
+          <button key={label} type="button" aria-current={active ? 'page' : undefined} onClick={() => {
+            setAccountOpen(false)
+            if (active) return
+            open()
+          }}><Icon size={21} aria-hidden="true" /><span>{label}</span></button>
+        ))}
       </nav>}
+
+      {!isNewInterface && dashboardView === 'feed' && <ClassicBoardFilters value={feedFilter} counts={{ all: totalSlotCount, booking: bookingCandidateSlotCount, booked: bookedSlotCount }} onChange={setFeedFilter} />}
 
       {!hasRemoteBackend && (
         <div className="demo-banner">
           <span /> <strong>Demo locale:</strong> i dati restano in questo browser finché Firebase non viene collegato.
         </div>
+      )}
+
+      {isNewInterface && (dashboardView === 'matches' || dashboardView === 'group-matches') && (
+        <nav className="club-match-switch" aria-label="Quali partite">
+          <button type="button" aria-pressed={dashboardView === 'matches'} onClick={openPlayerMatches}>Le mie</button>
+          <button type="button" aria-pressed={dashboardView === 'group-matches'} onClick={openGroupMatches}>Gli altri</button>
+        </nav>
       )}
 
       {dashboardView === 'matches' ? (
@@ -1012,11 +966,10 @@ export function Dashboard() {
         />
       ) : dashboardView === 'statistics' ? (
         <PlayerStatisticsPage
-          key={statisticsPlayerId || user.id}
           polls={polls}
           members={matchNameMembers}
           user={user}
-          initialPlayerId={statisticsPlayerId || user.id}
+          selectedPlayerId={statisticsPlayerId || user.id}
           feedbackSummaries={feedbackSummaries}
           matchReports={groupMatchReports}
           now={now}
@@ -1046,43 +999,65 @@ export function Dashboard() {
           error={notificationHistoryError}
           onBack={closeNotificationHistory}
         />
-      ) : <main className="dashboard">
+      ) : <main className={`dashboard ${isNewInterface ? 'dashboard--feed' : ''}`}>
         <section className="dashboard-intro">
           <div>
             <p className="eyebrow">Ciao, {firstName(user.displayName)}</p>
-            <h1>Mettiamo in campo<br />la prossima partita.</h1>
+            <h1>{isNewInterface ? 'Ci vediamo in campo.' : <>Mettiamo in campo<br />la prossima partita.</>}</h1>
           </div>
           <button className="button button--primary button--large" type="button" onClick={() => setCreateOpen(true)}>
-            <CalendarPlus size={20} /> Nuovi slot
+            <CalendarPlus size={20} /> {isNewInterface ? 'Nuovo slot' : 'Nuovi slot'}
           </button>
         </section>
 
-        <section className="scoreboard" aria-label="Riepilogo">
-          <div>
-            <span className="scoreboard__icon"><UsersRound size={20} /></span>
-            <p><strong>{stats.open}</strong><span>Settimane<br />attive</span></p>
+        {isNewInterface ? <aside className={`club-board-aside ${nextPersonalMatch ? 'has-next-match' : ''}`} aria-label="Il tuo Bandeja">
+        {nextPersonalMatch && (
+          <button type="button" className="club-next-match" onClick={() => showPlayerMatchOnBoard(nextPersonalMatch)}>
+            <CalendarCheck2 size={23} aria-hidden="true" />
+            <span><small>La tua prossima partita</small><strong>{slotDateParts(nextPersonalMatch.slot.startsAt).full} · {slotDateParts(nextPersonalMatch.slot.startsAt).time}</strong></span>
+            <span>{nextPersonalMatch.slot.bookedAt ? 'Campo prenotato' : 'Da prenotare'}</span>
+          </button>
+        )}
+          <div className="club-board-tools">
+            <h2>Il tuo Bandeja</h2>
+            <button type="button" onClick={() => setFeedFilter('joined')}><span>Le tue iscrizioni</span><strong>{slotCountFor('joined')}</strong></button>
+            <button type="button" onClick={openPlayerMatches}><CalendarDays size={18} /> I tuoi match</button>
+            <p>Hai un giorno fisso per giocare?</p>
+            <button type="button" onClick={() => setProfileOpen(true)}><CircleUserRound size={18} /> Configura il posto fisso</button>
           </div>
-          <div className={stats.ready > 0 ? 'scoreboard__urgent' : ''}>
-            <span className="scoreboard__icon"><BellRing size={20} /></span>
-            <p><strong>{stats.ready}</strong><span>Pronti da<br />prenotare</span></p>
-          </div>
-          <div className="scoreboard__next">
-            <span className="scoreboard__icon"><CheckCircle2 size={20} /></span>
-            {stats.nextBooked ? (
-              <p><strong>{slotDateParts(stats.nextBooked.startsAt).day} {slotDateParts(stats.nextBooked.startsAt).month}</strong><span>Prossima partita<br />alle {slotDateParts(stats.nextBooked.startsAt).time}</span></p>
-            ) : (
-              <p><strong>—</strong><span>Nessun campo<br />confermato</span></p>
-            )}
-          </div>
-        </section>
+        </aside> : <ClassicBoardSummary groups={upcomingSlotWeeks} />}
 
         <section className="feed-heading">
           <div>
             <p className="eyebrow">{currentFeedCopy.eyebrow}</p>
-            <h2>{currentFeedCopy.heading}</h2>
+            <h2>{!isNewInterface && feedFilter === 'all' ? 'Tutti gli slot' : currentFeedCopy.heading}</h2>
           </div>
           <span>{visibleSlotCount} slot</span>
         </section>
+
+        {isNewInterface && <nav className="feed-filter club-filters" aria-label="Filtra gli slot">
+          <div className="feed-filter__inner">
+            <button className={feedFilter === 'all' ? 'is-active' : ''} type="button"
+              aria-label={`Tutti, ${totalSlotCount} slot`} aria-pressed={feedFilter === 'all'} onClick={() => setFeedFilter('all')}>
+              <span>Tutti</span><strong>{totalSlotCount}</strong>
+            </button>
+            {(['available', 'joined'] as const).map((filter) => (
+              <button key={filter} className={feedFilter === filter ? 'is-active' : ''} type="button"
+                aria-pressed={feedFilter === filter} onClick={() => setFeedFilter(filter)}>
+                <span>{filter === 'available' ? 'Posti liberi' : 'Sono iscritto'}</span><strong>{slotCountFor(filter)}</strong>
+              </button>
+            ))}
+            <label className="club-booking-filter">
+              <span className="sr-only">Filtra per prenotazione</span>
+              <select value={feedFilter === 'booking' || feedFilter === 'booked' ? feedFilter : ''}
+                onChange={(event) => setFeedFilter((event.target.value || 'all') as FeedFilter)}>
+                <option value="">Tutti</option>
+                <option value="booking">Da prenotare ({bookingCandidateSlotCount})</option>
+                <option value="booked">Prenotati ({bookedSlotCount})</option>
+              </select>
+            </label>
+          </div>
+        </nav>}
 
         {loading ? (
           <div className="loading-state"><span /><p>Prepariamo il campo…</p></div>
@@ -1138,7 +1113,11 @@ export function Dashboard() {
           user={user}
           members={members}
           onClose={() => setProfileOpen(false)}
-          onSave={updateProfile}
+          onSave={async (...values) => {
+            await updateProfile(...values)
+            clearInterfaceOverride()
+            setFeedFilter('all')
+          }}
           onDone={notify}
         />
       )}

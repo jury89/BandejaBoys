@@ -17,6 +17,7 @@ import {
 import type {
   FixedSeatPreference,
   FixedSeatWeekday,
+  InterfaceMode,
   MemberProfile,
   NotificationPreferences,
   SessionUser,
@@ -32,6 +33,7 @@ import {
 } from '../lib/fixedSeat'
 import { Modal } from './Modal'
 import { ProfileAvatar } from './ProfileAvatar'
+import { interfaceOverride, resolveInterfaceMode } from '../lib/interfaceMode'
 
 const NOTIFICATION_OPTIONS: {
   key: keyof NotificationPreferences
@@ -121,11 +123,13 @@ interface ProfileModalProps {
     avatarDataUrl?: string,
     notificationPreferences?: NotificationPreferences,
     fixedSeatPreference?: FixedSeatPreference,
+    interfaceMode?: InterfaceMode,
   ) => Promise<void>
   onDone: (message: string) => void
 }
 
 export function ProfileModal({ user, members = [user], onClose, onSave, onDone }: ProfileModalProps) {
+  const [interfaceMode, setInterfaceMode] = useState<InterfaceMode>(() => resolveInterfaceMode(window.location.search, user.interfaceMode))
   const fileInput = useRef<HTMLInputElement>(null)
   const savedFixedSeatPreference = normalizeFixedSeatPreference(user.fixedSeatPreference)
   const [displayName, setDisplayName] = useState(user.displayName)
@@ -202,7 +206,7 @@ export function ProfileModal({ user, members = [user], onClose, onSave, onDone }
     setError('')
     setSaving(true)
     try {
-      await onSave(displayName.trim(), avatarDataUrl, notificationPreferences, fixedSeatPreference)
+      await onSave(displayName.trim(), avatarDataUrl, notificationPreferences, fixedSeatPreference, interfaceMode)
       onDone('Profilo aggiornato.')
       onClose()
     } catch (saveError) {
@@ -270,6 +274,18 @@ export function ProfileModal({ user, members = [user], onClose, onSave, onDone }
           <span><small>Email dell’account</small><strong>{user.email}</strong></span>
           <em>Non modificabile</em>
         </div>
+
+        <fieldset className="profile-interface">
+          <legend>Interfaccia</legend>
+          <p>Scegli come vedere Bandeja. La scelta vale per il tuo account, su tutti i dispositivi. Puoi cambiarla quando vuoi.</p>
+          {(['classica', 'nuova'] as const).map((mode) => (
+            <label key={mode} className={interfaceMode === mode ? 'is-selected' : ''}>
+              <input type="radio" name="interface-mode" value={mode} checked={interfaceMode === mode} disabled={saving} onChange={() => setInterfaceMode(mode)} />
+              <span><strong>{mode === 'classica' ? 'Classica' : 'Nuova — anteprima'}</strong><small>{mode === 'classica' ? 'L’interfaccia che conosci già.' : 'Navigazione rapida e schede compatte, pensate per il telefono.'}</small></span>
+            </label>
+          ))}
+          {interfaceOverride(window.location.search) && <p className="profile-interface__notice">Stai provando l’interfaccia dal link. Salvando il profilo, questa scelta diventa la tua preferenza e il parametro viene rimosso.</p>}
+        </fieldset>
 
         <section
           className={`profile-fixed-seat${fixedSeatEnabled ? ' is-enabled' : ''}`}

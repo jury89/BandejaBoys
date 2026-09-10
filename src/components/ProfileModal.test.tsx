@@ -12,6 +12,32 @@ const player: SessionUser = {
 }
 
 describe('profilo giocatore', () => {
+  afterEach(() => window.history.replaceState(null, '', '/'))
+
+  it('propone la classica e salva esplicitamente la nuova interfaccia', async () => {
+    const user = userEvent.setup()
+    const onSave = vi.fn().mockResolvedValue(undefined)
+    render(<ProfileModal user={player} onClose={vi.fn()} onSave={onSave} onDone={vi.fn()} />)
+    expect(screen.getByRole('radio', { name: /^Classica/ })).toBeChecked()
+    await user.click(screen.getByRole('radio', { name: /^Nuova/ }))
+    expect(onSave).not.toHaveBeenCalled()
+    await user.click(screen.getByRole('button', { name: 'Salva profilo' }))
+    expect(onSave.mock.calls[0][4]).toBe('nuova')
+  })
+
+  it('mostra la scelta temporanea del link e non la salva se si annulla', async () => {
+    window.history.replaceState(null, '', '/?ux=classica')
+    const onSave = vi.fn()
+    const onClose = vi.fn()
+    render(<ProfileModal user={{ ...player, interfaceMode: 'nuova' }} onClose={onClose} onSave={onSave} onDone={vi.fn()} />)
+    expect(screen.getByRole('radio', { name: /^Classica/ })).toBeChecked()
+    expect(screen.getByText(/Stai provando/)).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Annulla' }))
+    expect(onSave).not.toHaveBeenCalled()
+    expect(onClose).toHaveBeenCalled()
+    expect(window.location.search).toBe('?ux=classica')
+  })
+
   it('permette di cambiare soltanto il nome', async () => {
     const user = userEvent.setup()
     const onSave = vi.fn().mockResolvedValue(undefined)
@@ -27,6 +53,7 @@ describe('profilo giocatore', () => {
       undefined,
       DEFAULT_NOTIFICATION_PREFERENCES,
       undefined,
+      'classica',
     )
     expect(screen.queryByLabelText('Password')).not.toBeInTheDocument()
     expect(screen.queryByRole('textbox', { name: /Email/ })).not.toBeInTheDocument()
@@ -69,7 +96,7 @@ describe('profilo giocatore', () => {
       ...DEFAULT_NOTIFICATION_PREFERENCES,
       mondayMotivation: false,
       reminder2h: false,
-    }, undefined)
+    }, undefined, 'classica')
   })
 
   it('salva giorno e fascia del posto fisso', async () => {
@@ -88,6 +115,7 @@ describe('profilo giocatore', () => {
       undefined,
       DEFAULT_NOTIFICATION_PREFERENCES,
       { weekday: 3, startMinutes: 18 * 60 + 30, endMinutes: 20 * 60 + 30 },
+      'classica',
     )
   })
 

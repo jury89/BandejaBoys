@@ -273,6 +273,26 @@ const fixedSeatProfile = {
 }
 
 const tests: TestDefinition[] = [
+  ...[
+    { mode: 'classica', expectation: 'ALLOW' as const, uid: userId },
+    { mode: 'nuova', expectation: 'ALLOW' as const, uid: userId },
+    { mode: 'altro', expectation: 'DENY' as const, uid: userId },
+    { mode: 1, expectation: 'DENY' as const, uid: userId },
+    { mode: 'nuova', expectation: 'DENY' as const, uid: outsiderId },
+  ].map(({ mode, expectation, uid }): TestDefinition => ({
+    label: `preferenza interfaccia ${String(mode)} modificata da ${uid}`,
+    testCase: {
+      expectation,
+      request: {
+        auth: auth(uid),
+        path: fixedSeatProfilePath,
+        method: 'update',
+        resource: { data: { ...fixedSeatProfile, interfaceMode: mode } },
+      },
+      resource: { data: fixedSeatProfile },
+      expressionReportLevel: 'FULL',
+    },
+  })),
   {
     label: 'profilo con posto fisso valido',
     testCase: {

@@ -6,6 +6,13 @@ import { App } from '../App'
 describe('accesso locale', () => {
   beforeEach(() => localStorage.clear())
 
+  it('il campo illustrato ha esattamente quattro giocatori, senza elementi che occupano celle aggiuntive', async () => {
+    const { container } = render(<AuthProvider><App /></AuthProvider>)
+    await screen.findByRole('button', { name: 'Entra' })
+    const court = container.querySelector('.mini-court')
+    expect(Array.from(court?.children ?? []).map(child => child.textContent)).toEqual(['1', '2', '3', '4'])
+  })
+
   it('permette di creare un account e apre la bacheca', async () => {
     const user = userEvent.setup()
     render(
@@ -21,6 +28,7 @@ describe('accesso locale', () => {
     await user.click(screen.getByRole('button', { name: /Crea il mio account/ }))
 
     expect(await screen.findByText(/Mettiamo in campo/)).toBeInTheDocument()
+    expect(document.querySelector('.app-shell')).toHaveAttribute('data-ux', 'classica')
     expect(screen.getByText('Jury')).toBeInTheDocument()
     expect(screen.queryByText('jury.rossi')).not.toBeInTheDocument()
     expect(screen.getByText(/Demo locale/)).toBeInTheDocument()
@@ -66,16 +74,15 @@ describe('accesso locale', () => {
     await user.click(screen.getByRole('button', { name: /Crea il mio account/ }))
 
     const allFilter = await screen.findByRole('button', { name: /^Tutti/ })
-    const unbookedFilter = screen.getByRole('button', { name: /^Slot da prenotare/ })
-    const bookedFilter = screen.getByRole('button', { name: /^Slot prenotati/ })
+    const bookingFilter = screen.getByRole('button', { name: /^Slot da prenotare,/ })
     expect(allFilter).toHaveAttribute('aria-pressed', 'true')
 
-    await user.click(unbookedFilter)
-    expect(unbookedFilter).toHaveAttribute('aria-pressed', 'true')
-    expect(unbookedFilter).toHaveAccessibleName('Slot da prenotare, 1')
+    await user.click(bookingFilter)
+    expect(bookingFilter).toHaveAttribute('aria-pressed', 'true')
     expect(await screen.findByRole('heading', { name: 'Slot da prenotare' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: /^Padel · .* \d{4}$/ })).toBeInTheDocument()
 
+    const bookedFilter = screen.getByRole('button', { name: /^Slot prenotati,/ })
     await user.click(bookedFilter)
     expect(bookedFilter).toHaveAttribute('aria-pressed', 'true')
     expect(await screen.findByText('Nessuno slot prenotato.')).toBeInTheDocument()

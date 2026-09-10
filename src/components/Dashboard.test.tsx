@@ -15,6 +15,8 @@ import { repository } from '../lib/repository'
 import { slotElementId } from '../lib/slotNavigation'
 import { Dashboard } from './Dashboard'
 
+vi.mock('../InterfaceContext', () => ({ useInterfaceMode: () => 'nuova', clearInterfaceOverride: vi.fn() }))
+
 const dashboardTestState = vi.hoisted(() => {
   const defaultDelivery = {
     id: 'delivery-1',
@@ -134,6 +136,7 @@ vi.mock('../lib/repository', () => ({
 describe('menu account', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
     dashboardTestState.polls = []
     dashboardTestState.members = []
     dashboardTestState.feedbackResponses = []
@@ -151,6 +154,22 @@ describe('menu account', () => {
     vi.useRealTimers()
   })
 
+  it('rende le quattro sezioni raggiungibili direttamente e conserva il filtro tornando in bacheca', async () => {
+    const user = userEvent.setup()
+    render(<Dashboard />)
+    const navigation = screen.getByRole('navigation', { name: 'Navigazione principale' })
+    expect(navigation.querySelectorAll('button')).toHaveLength(4)
+    await user.click(screen.getByRole('button', { name: /Posti liberi/ }))
+    await user.click(screen.getByRole('button', { name: 'Partite' }))
+    expect(screen.getByRole('button', { name: 'Partite' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('navigation', { name: 'Quali partite' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Gli altri' }))
+    expect(window.location.hash).toBe('#gli-altri-match')
+    await user.click(screen.getByRole('button', { name: 'Bacheca' }))
+    expect(window.location.hash).toBe('')
+    expect(screen.getByRole('button', { name: /Posti liberi/ })).toHaveAttribute('aria-pressed', 'true')
+  })
+
   it('resta aperto al suo interno e si chiude con un clic esterno o con Escape', async () => {
     const user = userEvent.setup()
     render(<Dashboard />)
@@ -162,7 +181,7 @@ describe('menu account', () => {
     expect(screen.getByRole('link', { name: /Chiama Oasi Boschetto/ }))
       .toHaveAttribute('href', 'tel:+390376290058')
 
-    await user.click(screen.getByRole('heading', { name: /Mettiamo in campo/ }))
+    await user.click(screen.getByRole('heading', { name: /Ci vediamo in campo/ }))
     expect(screen.queryByRole('button', { name: /Profilo/ })).not.toBeInTheDocument()
 
     await user.click(trigger)
@@ -188,7 +207,7 @@ describe('menu account', () => {
       window.dispatchEvent(new PopStateEvent('popstate'))
     })
 
-    expect(screen.getByRole('heading', { name: /Mettiamo in campo/ })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /Ci vediamo in campo/ })).toBeInTheDocument()
   })
 
   it('apre le statistiche sul giocatore corrente e mantiene la route dedicata', async () => {
@@ -196,7 +215,7 @@ describe('menu account', () => {
     render(<Dashboard />)
 
     await user.click(screen.getByRole('button', { name: 'Apri menu account di Jury' }))
-    await user.click(screen.getByRole('button', { name: /Statistiche/ }))
+    await user.click(screen.getByRole('button', { name: 'Statistiche' }))
 
     expect(window.location.hash).toBe('#statistiche/jury')
     expect(screen.getByRole('heading', { name: 'Jury' })).toBeInTheDocument()
@@ -261,7 +280,7 @@ describe('menu account', () => {
       window.dispatchEvent(new PopStateEvent('popstate'))
     })
 
-    expect(screen.getByRole('heading', { name: /Mettiamo in campo/ })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /Ci vediamo in campo/ })).toBeInTheDocument()
   })
 
   it('apre FantaBandeja dal menu account e mantiene la route dedicata', async () => {
@@ -301,7 +320,7 @@ describe('menu account', () => {
       window.dispatchEvent(new PopStateEvent('popstate'))
     })
 
-    expect(screen.getByRole('heading', { name: /Mettiamo in campo/ })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /Ci vediamo in campo/ })).toBeInTheDocument()
   })
 
   it('segna come letta la notifica specifica quando l’app viene aperta dalla push', async () => {
@@ -341,7 +360,7 @@ describe('menu account', () => {
 
     expect(dashboardTestState.pollSubscriptionCalls).toBe(2)
     expect(screen.queryByText('Prepariamo il campo…')).not.toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Ancora nessun sondaggio.' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Il campo aspetta voi.' })).toBeInTheDocument()
   })
 
   it('non lascia lo spinner infinito se Firestore non risponde', async () => {
@@ -406,7 +425,7 @@ describe('menu account', () => {
     window.history.replaceState({}, '', '/')
     render(<Dashboard />)
 
-    await user.click(screen.getByRole('button', { name: /^Slot prenotati/ }))
+    await user.selectOptions(screen.getByLabelText('Filtra per prenotazione'), 'booked')
     expect(screen.queryByText('Padel futuro')).not.toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Apri menu account di Jury' }))
@@ -468,6 +487,7 @@ describe('menu account', () => {
     await user.click(screen.getByRole('button', { name: 'Apri menu account di Jury' }))
     await user.click(screen.getByRole('button', { name: /I miei match/ }))
 
+    await user.click(screen.getByRole('button', { name: /Giocate/ }))
     expect(screen.getByText('Padel · 27 lug – 2 ago 2020')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: /Aggiungi il referto/ }))
 

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { CalendarDays, CalendarPlus, ChevronDown, ChevronUp } from 'lucide-react'
 import type { MemberProfile, PadelPoll, SessionUser, SlotInput, SlotWeekGroup } from '../types'
-import { getSlotPhase, isBookingCandidate } from '../lib/domain'
+import { matchesSlotFilter, type PollSlotFilter } from '../lib/slotFilters'
 import { pollWeekTitle } from '../lib/format'
 import { resolveMemberName } from '../lib/memberNames'
 import { repository } from '../lib/repository'
@@ -18,18 +18,14 @@ interface PollCardProps {
   onError: (message: string) => void
 }
 
-export type PollSlotFilter = 'all' | 'booking' | 'booked'
+export type { PollSlotFilter } from '../lib/slotFilters'
 
 export function PollCard({ group, user, members, slotFilter = 'all', onPollChange, onNotify, onError }: PollCardProps) {
   const [showAddSlot, setShowAddSlot] = useState(false)
   const [slotsCollapsed, setSlotsCollapsed] = useState(false)
   const pollTitle = pollWeekTitle(group.weekStart)
   const slotsRegionId = `slot-week-${group.weekStart}`
-  const visibleEntries = group.entries.filter(({ slot }) => (
-    slotFilter === 'all'
-    || (slotFilter === 'booked' && getSlotPhase(slot) === 'booked')
-    || (slotFilter === 'booking' && isBookingCandidate(slot))
-  ))
+  const visibleEntries = group.entries.filter(({ poll, slot }) => matchesSlotFilter(poll, slot, slotFilter, user.id))
   const creatorNames = Array.from(new Set(group.entries.map(({ poll, slot }) => (
     resolveMemberName(
       members,

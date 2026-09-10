@@ -1,5 +1,13 @@
 # Architettura e regole di dominio
 
+## Selezione dell’interfaccia
+
+`users.interfaceMode` è facoltativo e vale `classica` oppure `nuova`. Il campo è letto dal listener del profilo già esistente, senza nuove query, e aggiornato dalla stessa transazione del profilo (le regole restano limitate al proprietario). I profili legacy senza campo usano la classica; non viene riscritta la raccolta utenti. La demo implementa la stessa preferenza per account nel proprio archivio locale.
+
+`InterfaceProvider` risolve parametro URL `ux` valido, preferenza profilo, default classica, in quest’ordine. Il parametro è un override temporaneo, non una scrittura; il salvataggio esplicito del profilo persiste la scelta del modulo e poi rimuove solo `ux`, preservando query rimanente, hash e stato di history. Il cambio account non riutilizza la preferenza dell’utente precedente.
+
+Le presentazioni classica e Clubhouse condividono controller, listener e mutazioni. I componenti classici aggiunti contengono soltanto presentazione; `clubhouse.css` applica gli override generali sotto `.app-shell.ux-new`. Non esistono database o punteggi separati per la preview e non cambiano il notifier o la chiusura delle stagioni Fanta. Per pubblicare occorrono Hosting e regole profilo aggiornate; nessun deploy scheduler.
+
 ## Produzione
 
 - URL: [bandeja-boys.web.app](https://bandeja-boys.web.app)
@@ -13,6 +21,20 @@
 - Repository: pubblico per l’uso gratuito dei runner standard; nessun dato utente o segreto è versionato
 
 ## Flusso settimanale
+
+### Presentazione Clubhouse
+
+`src/clubhouse.css` viene caricato dopo gli stili esistenti e ridefinisce solo la presentazione dell’area autenticata, conservando il componente `Brand`, i colori e gli stati di dominio. La navigazione espone quattro destinazioni e conserva gli hash preesistenti (inclusi i deep link da push). `usePageScroll` ricorda lo scroll per sezione durante la sessione; una destinazione esplicita di slot ha precedenza sul ripristino.
+
+Le dimensioni degli avatar nelle statistiche includono la base flex, per mantenere circolari sia immagini sia iniziali. L’altezza minima dei campi testuali nei moduli non si applica a checkbox e radio: gli interruttori conservano la geometria del cursore e una superficie di etichetta cliccabile. Il menu account limita l’altezza allo spazio fra header e navigazione e scorre internamente anche in orizzontale; su desktop la navigazione inferiore non occupa spazio. Il selettore giocatore delle statistiche restituisce il focus al proprio riepilogo dopo la scelta, senza lasciarlo in un pannello appena chiuso. `PlayerStatisticsPage` riceve `selectedPlayerId` dal contenitore invece di duplicarlo nello stato locale; un cambio giocatore non rimonta la pagina e conserva la vista corrente, mentre il selettore reimposta il periodo a tutto lo storico.
+
+`matchesSlotFilter` in `src/lib/slotFilters.ts` centralizza i filtri visivi: “Posti liberi” richiede una proposta aperta con meno di quattro titolari; “Sono iscritto” include titolari e riserve. Il selettore di prenotazione usa “Tutti”, senza confondersi con un filtro per circolo. La rosa unica usa l’ordine derivato da `getStarters`, senza un secondo campo espandibile. Avatar, ospiti e riserve hanno stili dedicati, separati dalle vecchie classi del campo. “Altre azioni” è sovrapposto a ogni larghezza e si chiude con Escape o clic esterno. I menu mantengono le autorizzazioni esistenti; i moduli mobili usano un solo contenitore scorrevole e il componente `Modal` mantiene e ripristina il focus.
+
+`takeStarterPlace` permette a un membro già in riserva di richiedere un posto libero. La regola pura `promoteOwnSignup` conserva id e `joinedAt`, non modifica altri giocatori e rifiuta la richiesta se i titolari sono già quattro. Il repository remoto usa la stessa transazione centrale per rileggere lo slot, applicare la modifica, sincronizzare l’eventuale round Fanta e scrivere l’audit `signup_joined` con `previousRole: reserve`; la demo implementa lo stesso contratto. Non avvengono ritiro e nuova iscrizione separati, né una promozione automatica quando il giocatore ha scelto volontariamente la riserva.
+
+Lo storico personale e degli altri mostra otto elementi per blocco dal dataset già disponibile: questa paginazione riduce il rendering, **non** è paginazione Firestore e non viene presentata come riduzione delle letture. Il restyling non aggiunge listener, collezioni, migrazioni o scritture automatiche del backend; il passaggio a titolare scrive solo su richiesta del membro, come le altre azioni della rosa. I round Fanta espongono `updatedAt` nel riepilogo di attesa, senza fingere un aggiornamento in tempo reale dei giudizi. Regole, calcoli, stagioni e notifiche restano invariati.
+
+### Organizzazione degli slot
 
 1. Un membro pubblica uno o più slot scegliendo direttamente data, ora e durata di ciascuno, senza selezionare una settimana. Firestore non salva una settimana né un titolo per gli slot: `getUpcomingSlotWeeks` raccoglie tutte le proposte future, calcola il lunedì dalla data effettiva in `Europe/Rome` e le raggruppa al volo in intervalli lunedì-domenica. Pubblicazioni separate che ricadono nella stessa settimana compaiono quindi in una sola scheda **Padel · 27 lug – 2 ago 2026**, anche quando la settimana attraversa Capodanno.
 2. L’interfaccia usa controlli separati per data, ora e minuti, così anche i selettori nativi di iOS espongono soltanto i minuti ammessi `00` e `30`. `hasExistingSlotAtDateTime` confronta ogni proposta con tutti gli slot già caricati allo stesso minuto nel fuso di Roma: le collisioni ricevono un avviso rosso per riga ma restano pubblicabili, perché il controllo è informativo. Finché uno slot non ha una prenotazione, il suo orario è automaticamente considerato indicativo.

@@ -2,6 +2,7 @@ import { useAuth } from './AuthContext'
 import { AuthScreen } from './components/AuthScreen'
 import { Brand } from './components/Brand'
 import { Dashboard } from './components/Dashboard'
+import { InterfaceProvider } from './InterfaceContext'
 
 export function App() {
   const { user, loading } = useAuth()
@@ -15,6 +16,5 @@ export function App() {
     )
   }
 
-  return user ? <Dashboard /> : <AuthScreen />
+  return <InterfaceProvider preference={user?.interfaceMode}>{user ? <Dashboard /> : <AuthScreen />}</InterfaceProvider>
 }
-
