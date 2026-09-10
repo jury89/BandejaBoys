@@ -1,4 +1,5 @@
 export type PollStatus = 'open' | 'closed'
+export type InterfaceMode = 'classica' | 'nuova'
 
 export interface NotificationPreferences {
   mondayMotivation: boolean
@@ -31,6 +32,7 @@ export interface MemberProfile {
   avatarDataUrl?: string
   notificationPreferences?: NotificationPreferences
   fixedSeatPreference?: FixedSeatPreference
+  interfaceMode?: InterfaceMode
 }
 
 export type SessionUser = MemberProfile

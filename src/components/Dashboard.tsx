@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { BarChart3, Bell, BellRing, CalendarCheck2, CalendarDays, CalendarPlus, CheckCircle2, ChevronDown, CircleUserRound, History, LayoutList, LogOut, PhoneCall, RefreshCw, Trophy, UsersRound } from 'lucide-react'
 import { useAuth } from '../AuthContext'
+import { clearInterfaceOverride, useInterfaceMode } from '../InterfaceContext'
+import { ClassicBoardFilters, ClassicBoardSummary } from './ClassicBoard'
 import type {
   FantasyEntry,
   FantasyRound,
@@ -128,6 +130,7 @@ const feedCopy: Record<FeedFilter, {
 }
 
 export function Dashboard() {
+  const isNewInterface = useInterfaceMode() === 'nuova'
   const { user, signOut, updateProfile } = useAuth()
   const [polls, setPolls] = useState<PadelPoll[]>([])
   const [members, setMembers] = useState<MemberProfile[]>([])
@@ -833,7 +836,7 @@ export function Dashboard() {
   ]
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell ${isNewInterface ? 'ux-new' : 'ux-classic'}`} data-ux={isNewInterface ? 'nuova' : 'classica'}>
       <PullToRefresh />
       <header className="topbar">
         <Brand compact />
@@ -919,7 +922,7 @@ export function Dashboard() {
         </div>
       </header>
 
-      <nav className="club-navigation" aria-label="Navigazione principale">
+      {isNewInterface && <nav className="club-navigation" aria-label="Navigazione principale">
         {mainSections.map(({ label, icon: Icon, active, open }) => (
           <button key={label} type="button" aria-current={active ? 'page' : undefined} onClick={() => {
             setAccountOpen(false)
@@ -927,7 +930,9 @@ export function Dashboard() {
             open()
           }}><Icon size={21} aria-hidden="true" /><span>{label}</span></button>
         ))}
-      </nav>
+      </nav>}
+
+      {!isNewInterface && dashboardView === 'feed' && <ClassicBoardFilters value={feedFilter} counts={{ all: totalSlotCount, booking: bookingCandidateSlotCount, booked: bookedSlotCount }} onChange={setFeedFilter} />}
 
       {!hasRemoteBackend && (
         <div className="demo-banner">
@@ -935,7 +940,7 @@ export function Dashboard() {
         </div>
       )}
 
-      {(dashboardView === 'matches' || dashboardView === 'group-matches') && (
+      {isNewInterface && (dashboardView === 'matches' || dashboardView === 'group-matches') && (
         <nav className="club-match-switch" aria-label="Quali partite">
           <button type="button" aria-pressed={dashboardView === 'matches'} onClick={openPlayerMatches}>Le mie</button>
           <button type="button" aria-pressed={dashboardView === 'group-matches'} onClick={openGroupMatches}>Gli altri</button>
@@ -961,11 +966,10 @@ export function Dashboard() {
         />
       ) : dashboardView === 'statistics' ? (
         <PlayerStatisticsPage
-          key={statisticsPlayerId || user.id}
           polls={polls}
           members={matchNameMembers}
           user={user}
-          initialPlayerId={statisticsPlayerId || user.id}
+          selectedPlayerId={statisticsPlayerId || user.id}
           feedbackSummaries={feedbackSummaries}
           matchReports={groupMatchReports}
           now={now}
@@ -995,18 +999,18 @@ export function Dashboard() {
           error={notificationHistoryError}
           onBack={closeNotificationHistory}
         />
-      ) : <main className="dashboard dashboard--feed">
+      ) : <main className={`dashboard ${isNewInterface ? 'dashboard--feed' : ''}`}>
         <section className="dashboard-intro">
           <div>
             <p className="eyebrow">Ciao, {firstName(user.displayName)}</p>
-            <h1>Ci vediamo in campo.</h1>
+            <h1>{isNewInterface ? 'Ci vediamo in campo.' : <>Mettiamo in campo<br />la prossima partita.</>}</h1>
           </div>
           <button className="button button--primary button--large" type="button" onClick={() => setCreateOpen(true)}>
-            <CalendarPlus size={20} /> Nuovo slot
+            <CalendarPlus size={20} /> {isNewInterface ? 'Nuovo slot' : 'Nuovi slot'}
           </button>
         </section>
 
-        <aside className={`club-board-aside ${nextPersonalMatch ? 'has-next-match' : ''}`} aria-label="Il tuo Bandeja">
+        {isNewInterface ? <aside className={`club-board-aside ${nextPersonalMatch ? 'has-next-match' : ''}`} aria-label="Il tuo Bandeja">
         {nextPersonalMatch && (
           <button type="button" className="club-next-match" onClick={() => showPlayerMatchOnBoard(nextPersonalMatch)}>
             <CalendarCheck2 size={23} aria-hidden="true" />
@@ -1021,17 +1025,17 @@ export function Dashboard() {
             <p>Hai un giorno fisso per giocare?</p>
             <button type="button" onClick={() => setProfileOpen(true)}><CircleUserRound size={18} /> Configura il posto fisso</button>
           </div>
-        </aside>
+        </aside> : <ClassicBoardSummary groups={upcomingSlotWeeks} />}
 
         <section className="feed-heading">
           <div>
             <p className="eyebrow">{currentFeedCopy.eyebrow}</p>
-            <h2>{currentFeedCopy.heading}</h2>
+            <h2>{!isNewInterface && feedFilter === 'all' ? 'Tutti gli slot' : currentFeedCopy.heading}</h2>
           </div>
           <span>{visibleSlotCount} slot</span>
         </section>
 
-        <nav className="feed-filter club-filters" aria-label="Filtra gli slot">
+        {isNewInterface && <nav className="feed-filter club-filters" aria-label="Filtra gli slot">
           <div className="feed-filter__inner">
             <button className={feedFilter === 'all' ? 'is-active' : ''} type="button"
               aria-label={`Tutti, ${totalSlotCount} slot`} aria-pressed={feedFilter === 'all'} onClick={() => setFeedFilter('all')}>
@@ -1047,13 +1051,13 @@ export function Dashboard() {
               <span className="sr-only">Filtra per prenotazione</span>
               <select value={feedFilter === 'booking' || feedFilter === 'booked' ? feedFilter : ''}
                 onChange={(event) => setFeedFilter((event.target.value || 'all') as FeedFilter)}>
-                <option value="">Campo: tutti</option>
+                <option value="">Tutti</option>
                 <option value="booking">Da prenotare ({bookingCandidateSlotCount})</option>
                 <option value="booked">Prenotati ({bookedSlotCount})</option>
               </select>
             </label>
           </div>
-        </nav>
+        </nav>}
 
         {loading ? (
           <div className="loading-state"><span /><p>Prepariamo il campo…</p></div>
@@ -1109,7 +1113,11 @@ export function Dashboard() {
           user={user}
           members={members}
           onClose={() => setProfileOpen(false)}
-          onSave={updateProfile}
+          onSave={async (...values) => {
+            await updateProfile(...values)
+            clearInterfaceOverride()
+            setFeedFilter('all')
+          }}
           onDone={notify}
         />
       )}

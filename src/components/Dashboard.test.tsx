@@ -15,6 +15,8 @@ import { repository } from '../lib/repository'
 import { slotElementId } from '../lib/slotNavigation'
 import { Dashboard } from './Dashboard'
 
+vi.mock('../InterfaceContext', () => ({ useInterfaceMode: () => 'nuova', clearInterfaceOverride: vi.fn() }))
+
 const dashboardTestState = vi.hoisted(() => {
   const defaultDelivery = {
     id: 'delivery-1',

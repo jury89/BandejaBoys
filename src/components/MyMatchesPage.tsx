@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useInterfaceMode } from '../InterfaceContext'
 import {
   ArrowLeft,
   ArrowRight,
@@ -178,6 +179,7 @@ export function MyMatchesPage({
   onSelectMatch,
   onEditReport,
 }: MyMatchesPageProps) {
+  const isNewInterface = useInterfaceMode() === 'nuova'
   const [period, setPeriod] = useState<'upcoming' | 'past'>('upcoming')
   const [visiblePast, setVisiblePast] = useState(8)
   return (
@@ -199,33 +201,34 @@ export function MyMatchesPage({
         </div>
       </section>
 
-      <nav className="club-period-switch" aria-label="Periodo delle tue partite">
+      {isNewInterface && <nav className="club-period-switch" aria-label="Periodo delle tue partite">
         <button type="button" aria-pressed={period === 'upcoming'} onClick={() => setPeriod('upcoming')}>Prossime <span>{matches.upcoming.length}</span></button>
         <button type="button" aria-pressed={period === 'past'} onClick={() => setPeriod('past')}>Giocate <span>{matches.past.length}</span></button>
-      </nav>
+      </nav>}
 
       {loading ? (
         <div className="loading-state"><span /><p>Recuperiamo i tuoi match…</p></div>
       ) : (
         <div className="personal-matches__grid">
-          {period === 'upcoming' ? <MatchList
+          {(!isNewInterface || period === 'upcoming') && <MatchList
             eyebrow="In agenda"
             title="Prossimi match"
             matches={matches.upcoming}
             onSelectMatch={onSelectMatch}
             emptyTitle="Nessun match in programma"
             emptyBody="Uno slot comparirà qui quando avrà quattro titolari e tu sarai tra loro."
-          /> : <MatchList
+          />}
+          {(!isNewInterface || period === 'past') && <MatchList
             past
             eyebrow="Il tuo storico"
             title="Partite giocate"
-            matches={matches.past.slice(0, visiblePast)}
+            matches={isNewInterface ? matches.past.slice(0, visiblePast) : matches.past}
             totalCount={matches.past.length}
             onEditReport={onEditReport}
             emptyTitle="Nessuna partita nello storico"
             emptyBody="Qui trovi i match conclusi per cui il campo era stato confermato."
           />}
-          {period === 'past' && visiblePast < matches.past.length && (
+          {isNewInterface && period === 'past' && visiblePast < matches.past.length && (
             <button className="button button--secondary" type="button" onClick={() => setVisiblePast((count) => count + 8)}>Mostra altre partite</button>
           )}
         </div>

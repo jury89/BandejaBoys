@@ -1,11 +1,11 @@
 import { useEffect, useId, useRef, useState } from 'react'
+import { useInterfaceMode } from '../InterfaceContext'
 import {
   ArrowRight,
   ArrowLeftRight,
   CalendarCheck2,
   CalendarPlus,
   Check,
-  ChevronDown,
   Clock3,
   History,
   LogOut,
@@ -59,6 +59,7 @@ const phaseCopy = {
 }
 
 export function SlotCard({ poll, slot, user, members, disabled, onPollChange, onNotify, onError }: SlotCardProps) {
+  const isNewInterface = useInterfaceMode() === 'nuova'
   const participationHelpId = useId()
   const cardRef = useRef<HTMLElement>(null)
   const menuRef = useRef<HTMLDetailsElement>(null)
@@ -68,8 +69,6 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
   const [scheduleOpen, setScheduleOpen] = useState(false)
   const [substitutionOpen, setSubstitutionOpen] = useState(false)
   const [busy, setBusy] = useState(false)
-  const [courtExpanded, setCourtExpanded] = useState(false)
-  const courtId = useId()
   const date = slotDateParts(slot.startsAt)
   const starters = getStarters(slot)
   const reserves = getReserves(slot)
@@ -85,13 +84,14 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
     memberProfile(userId)?.displayName ?? resolveMemberName(members, userId, savedName)
 
   useEffect(() => {
+    if (!isNewInterface) return
     const closeMenu = (event: PointerEvent) => {
       const menu = menuRef.current
       if (menu?.open && event.target instanceof Node && !menu.contains(event.target)) menu.open = false
     }
     document.addEventListener('pointerdown', closeMenu)
     return () => document.removeEventListener('pointerdown', closeMenu)
-  }, [])
+  }, [isNewInterface])
 
   useEffect(() => {
     const element = cardRef.current
@@ -135,6 +135,11 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
       role === 'starter' ? 'Sei tra i titolari.' : `Sei la riserva n° ${reserves.length + 1}.`,
     )
   }
+
+  const takeStarterPlace = () => run(
+    () => repository.takeStarterPlace(poll.id, slot.id, user),
+    'Sei passato da riserva a titolare.',
+  )
 
   const removeGuest = async (guest: Signup) => {
     const guestIsStarter = starters.some((signup) => signup.id === guest.id)
@@ -181,7 +186,7 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
     <article
       id={slotElementId({ pollId: poll.id, slotId: slot.id })}
       ref={cardRef}
-      className={`slot-card slot-card--${phase} club-slot ${courtExpanded ? 'club-slot--expanded' : ''}`}
+      className={`slot-card slot-card--${phase} ${isNewInterface ? 'club-slot' : ''}`}
     >
       <header className="slot-card__header">
         <div className="slot-date" aria-label={`${date.full} alle ${date.time}`}>
@@ -202,15 +207,15 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
             <PhaseIcon size={14} />
             {phaseCopy[phase].label}
           </div>
-          <details ref={menuRef} className="club-slot-menu" onKeyDown={(event) => {
-            if (event.key === 'Escape') {
+          <details ref={menuRef} className={isNewInterface ? 'club-slot-menu' : 'classic-slot-menu'} open={isNewInterface ? undefined : true} onKeyDown={(event) => {
+            if (isNewInterface && event.key === 'Escape') {
               event.currentTarget.open = false
               event.currentTarget.querySelector('summary')?.focus()
             }
           }}>
-            <summary aria-label={`Altre azioni per lo slot di ${date.full} alle ${date.time}`}><MoreHorizontal size={19} /><span>Altre azioni</span></summary>
+            <summary hidden={!isNewInterface} aria-label={`Altre azioni per lo slot di ${date.full} alle ${date.time}`}><MoreHorizontal size={19} /><span>Altre azioni</span></summary>
           <div className="slot-card__management" role="group" aria-label="Azioni dello slot" onClick={(event) => {
-            if (event.target instanceof Element && event.target.closest('button') && menuRef.current) menuRef.current.open = false
+            if (isNewInterface && event.target instanceof Element && event.target.closest('button') && menuRef.current) menuRef.current.open = false
           }}>
             {userIsAdmin && (
               <button
@@ -222,7 +227,7 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
                 aria-label={`Gestisci i giocatori dello slot di ${date.full} alle ${date.time}`}
               >
                 <ShieldCheck size={16} />
-                <span>Gestisci giocatori</span>
+                {isNewInterface && <span>Gestisci giocatori</span>}
               </button>
             )}
             {!disabled && (
@@ -235,9 +240,10 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
                 aria-label={`Aggiungi un ospite allo slot di ${date.full} alle ${date.time}`}
               >
                 <UserRoundPlus size={16} />
-                <span>Aggiungi ospite</span>
+                {isNewInterface && <span>Aggiungi ospite</span>}
               </button>
             )}
+            {!isNewInterface && <button className="slot-card__icon-action slot-card__icon-action--calendar" type="button" onClick={addToCalendar} title="Aggiungi al calendario" aria-label={`Aggiungi lo slot di ${date.full} alle ${date.time} al calendario`}><CalendarPlus size={16} /></button>}
             <button
               className="slot-card__icon-action slot-card__icon-action--history"
               type="button"
@@ -246,7 +252,7 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
               aria-label={`Vedi la cronologia dello slot di ${date.full} alle ${date.time}`}
             >
               <History size={16} />
-              <span>Cronologia</span>
+              {isNewInterface && <span>Cronologia</span>}
             </button>
             {!disabled && (
               <>
@@ -259,7 +265,7 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
                   aria-label="Modifica data e ora dello slot"
                 >
                   <PencilLine size={15} />
-                  <span>Modifica data e ora</span>
+                  {isNewInterface && <span>Modifica data e ora</span>}
                 </button>
                 <button
                   className="slot-card__icon-action slot-card__icon-action--delete"
@@ -270,7 +276,7 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
                   aria-label={`Elimina lo slot di ${date.full} alle ${date.time}`}
                 >
                   <Trash2 size={15} />
-                  <span>Elimina slot</span>
+                  {isNewInterface && <span>Elimina slot</span>}
                 </button>
               </>
             )}
@@ -301,38 +307,35 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
         </div>
       )}
 
-      <div className="club-slot-roster-heading">
+      {isNewInterface && <div className="club-slot-roster-heading">
         <strong>{starters.length}/4 titolari</strong>
         {joined && <span className="club-your-place">{userIsStarter ? 'Sei titolare' : `Sei la riserva n° ${reserves.findIndex((signup) => signup.userId === user.id) + 1}`}</span>}
-        <button type="button" aria-expanded={courtExpanded} aria-controls={courtId} onClick={() => setCourtExpanded(!courtExpanded)}>
-          {courtExpanded ? 'Riduci campo' : 'Mostra campo'}<ChevronDown size={16} />
-        </button>
-      </div>
-      <section id={courtId} className={`court-lineup ${courtExpanded ? '' : 'court-lineup--compact'}`} aria-label="Titolari">
-        <div className="court-lineup__net" aria-hidden="true" />
+      </div>}
+      <section className={isNewInterface ? 'club-roster' : 'court-lineup'} aria-label="Titolari">
+        {!isNewInterface && <div className="court-lineup__net" aria-hidden="true" />}
         {Array.from({ length: 4 }, (_, index) => {
           const signup = starters[index]
           return (
-            <div className={`court-player court-player--${index + 1} ${signup?.userId === user.id ? 'is-you' : ''}`} key={signup?.id ?? `empty-${index}`}>
-              <span className="court-player__marker">{index + 1}</span>
+            <div className={`${isNewInterface ? 'club-roster__player' : `court-player court-player--${index + 1}`} ${signup?.userId === user.id ? 'is-you' : ''}`} key={signup?.id ?? `empty-${index}`}>
+              {!isNewInterface && <span className="court-player__marker">{index + 1}</span>}
               {signup ? (
                 <>
-                    <ProfileAvatar
-                      displayName={memberName(signup.userId, signup.displayName)}
-                      avatarDataUrl={memberProfile(signup.userId)?.avatarDataUrl}
-                      className="court-player__avatar"
-                    />
-                  <span className="court-player__name">
+                  {(isNewInterface || memberProfile(signup.userId)?.avatarDataUrl) && <ProfileAvatar
+                    displayName={memberName(signup.userId, signup.displayName)}
+                    avatarDataUrl={memberProfile(signup.userId)?.avatarDataUrl}
+                    className={isNewInterface ? 'club-roster__avatar' : 'court-player__avatar'}
+                  />}
+                  <span className={isNewInterface ? 'club-roster__name' : 'court-player__name'}>
                     <strong>{memberName(signup.userId, signup.displayName)}</strong>
                     {signup.userId === user.id && <small>Tu</small>}
-                    {isGuestSignup(signup) && <small className="guest-pass">Ospite</small>}
+                    {isGuestSignup(signup) && <small className={isNewInterface ? undefined : 'guest-pass'}>Ospite</small>}
                     {signup.substitutedFor && (
                       <small>per {memberName(signup.substitutedFor.userId, signup.substitutedFor.displayName)}</small>
                     )}
                   </span>
                   {!disabled && isGuestSignup(signup) && (
                     <button
-                      className="guest-remove-action guest-remove-action--court"
+                      className={isNewInterface ? 'club-guest-remove' : 'guest-remove-action guest-remove-action--court'}
                       type="button"
                       onClick={() => removeGuest(signup)}
                       disabled={busy}
@@ -344,15 +347,15 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
                   )}
                 </>
               ) : (
-                <span className="court-player__name court-player__name--empty">Posto libero</span>
+                <span className={isNewInterface ? 'club-roster__empty' : 'court-player__name court-player__name--empty'}>{isNewInterface && <UserRoundPlus size={18} aria-hidden="true" />}Posto libero</span>
               )}
             </div>
           )
         })}
       </section>
 
-      <section className={`reserve-list ${reserves.length === 0 ? 'reserve-list--empty' : ''}`} aria-label="Lista d’attesa">
-        <div className="reserve-list__heading">
+      <section className={isNewInterface ? `club-reserves ${reserves.length === 0 ? 'club-reserves--empty' : ''}` : 'reserve-list'} aria-label="Lista d’attesa">
+        <div className={isNewInterface ? 'club-reserves__heading' : 'reserve-list__heading'}>
           <span>Riserve</span>
           <small>{reserves.length ? 'ordine di adesione' : 'nessuna lista d’attesa'}</small>
         </div>
@@ -360,20 +363,24 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
           <ol>
             {reserves.map((reserve, index) => (
               <li className={reserve.userId === user.id ? 'is-you' : ''} key={reserve.id}>
-                <span>{index + 1}</span>
-                {memberProfile(reserve.userId)?.avatarDataUrl && (
-                  <ProfileAvatar
-                    displayName={memberName(reserve.userId, reserve.displayName)}
-                    avatarDataUrl={memberProfile(reserve.userId)?.avatarDataUrl}
-                    className="reserve-list__avatar"
-                  />
-                )}
-                <strong>{memberName(reserve.userId, reserve.displayName)}</strong>
-                {reserve.userId === user.id && <small>Tu</small>}
-                {isGuestSignup(reserve) && <small className="guest-pass guest-pass--reserve">Ospite</small>}
+                <span className={isNewInterface ? 'club-reserves__position' : undefined} aria-label={`Riserva numero ${index + 1}`}>{index + 1}</span>
+                {(isNewInterface || memberProfile(reserve.userId)?.avatarDataUrl) && <ProfileAvatar
+                  displayName={memberName(reserve.userId, reserve.displayName)}
+                  avatarDataUrl={memberProfile(reserve.userId)?.avatarDataUrl}
+                  className={isNewInterface ? 'club-roster__avatar' : 'reserve-list__avatar'}
+                />}
+                {isNewInterface ? <span className="club-roster__name">
+                  <strong>{memberName(reserve.userId, reserve.displayName)}</strong>
+                  {reserve.userId === user.id && <small>Tu</small>}
+                  {isGuestSignup(reserve) && <small>Ospite</small>}
+                </span> : <>
+                  <strong>{memberName(reserve.userId, reserve.displayName)}</strong>
+                  {reserve.userId === user.id && <small>Tu</small>}
+                  {isGuestSignup(reserve) && <small className="guest-pass guest-pass--reserve">Ospite</small>}
+                </>}
                 {!disabled && isGuestSignup(reserve) && (
                   <button
-                    className="guest-remove-action guest-remove-action--reserve"
+                    className={isNewInterface ? 'club-guest-remove' : 'guest-remove-action guest-remove-action--reserve'}
                     type="button"
                     onClick={() => removeGuest(reserve)}
                     disabled={busy}
@@ -386,24 +393,26 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
               </li>
             ))}
           </ol>
-        ) : (
-          <p>Chi sceglie Riserva o arriva dopo i primi quattro comparirà qui.</p>
-        )}
+        ) : !isNewInterface && <p>Chi sceglie Riserva o arriva dopo i primi quattro comparirà qui.</p>}
       </section>
 
       <footer className="slot-card__actions">
         {!disabled && (
           joined ? (
-            <details className="club-participation">
-              <summary>Gestisci iscrizione <ChevronDown size={16} /></summary>
-            <button className="button button--secondary button--grow" type="button" onClick={leave} disabled={busy}>
-              <LogOut size={17} /> {userIsStarter ? 'Ritirati' : 'Lascia la riserva'}
-            </button>
-            {userIsStarter && <button className="button button--ghost" type="button" onClick={() => setSubstitutionOpen(true)} disabled={busy} aria-describedby={participationHelpId}>
-              <ArrowLeftRight size={17} /> Passo il posto
-            </button>}
-            <p id={participationHelpId}>Ritirandoti lasci il posto alla prima riserva. Con “Passo il posto” scegli chi ti sostituisce: prenderà la tua posizione e tu uscirai dallo slot. Se era in riserva, verrà rimosso dalla lista d’attesa.</p>
-            </details>
+            <div className={isNewInterface ? 'club-participation' : 'classic-participation'} role="group" aria-label="Gestisci iscrizione">
+              {!userIsStarter && starters.length < MAX_STARTERS && (
+                <button className="button button--primary" type="button" onClick={takeStarterPlace} disabled={busy}>
+                  <UserRoundPlus size={17} /> Passa a titolare
+                </button>
+              )}
+              <button className="button button--secondary button--grow" type="button" onClick={leave} disabled={busy}>
+                <LogOut size={17} /> {userIsStarter ? 'Ritirati' : 'Lascia la riserva'}
+              </button>
+              {userIsStarter && <button className="button button--ghost" type="button" onClick={() => setSubstitutionOpen(true)} disabled={busy} aria-describedby={participationHelpId}>
+                <ArrowLeftRight size={17} /> Passo il posto
+              </button>}
+              {userIsStarter && <p className={isNewInterface ? undefined : 'sr-only'} id={participationHelpId}>Con “Passo il posto” scegli chi ti sostituisce.{reserves.length > 0 ? ' Se ti ritiri, entra la prima riserva.' : ''}</p>}
+            </div>
           ) : (
             <div className="join-choice" role="group" aria-label="Scegli come partecipare">
               <p className="join-choice__label">Come vuoi segnarti?</p>
@@ -416,7 +425,7 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
               >
                 <span className="join-option__icon" aria-hidden="true"><UserRoundPlus size={17} /></span>
                 <span>
-                  <strong>{starters.length >= MAX_STARTERS ? 'Titolari al completo' : 'Mi iscrivo'}</strong>
+                  <strong>{isNewInterface ? (starters.length >= MAX_STARTERS ? 'Titolari al completo' : 'Mi iscrivo') : 'Titolare'}</strong>
                   <small>{starters.length >= MAX_STARTERS ? '4/4 completi' : `${starters.length}/4 occupati`}</small>
                 </span>
               </button>
@@ -429,7 +438,7 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
               >
                 <span className="join-option__icon" aria-hidden="true"><Clock3 size={17} /></span>
                 <span>
-                  <strong>Entra in riserva</strong>
+                  <strong>{isNewInterface ? 'Entra in riserva' : 'Riserva'}</strong>
                   <small>In lista d’attesa</small>
                 </span>
               </button>
@@ -437,9 +446,9 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
           )
         )}
 
-        <button className="button button--ghost club-calendar" type="button" onClick={addToCalendar} aria-label={`Aggiungi lo slot di ${date.full} alle ${date.time} al calendario`}>
+        {isNewInterface && <button className="button button--ghost club-calendar" type="button" onClick={addToCalendar} aria-label={`Aggiungi lo slot di ${date.full} alle ${date.time} al calendario`}>
           <CalendarPlus size={17} /><span>Calendario</span>
-        </button>
+        </button>}
 
         {!disabled && phase !== 'booked' && (
           <button

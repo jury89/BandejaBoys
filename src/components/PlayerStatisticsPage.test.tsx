@@ -1,9 +1,20 @@
 import { fireEvent, render, screen, within } from '@testing-library/react'
+import { useState, type ComponentProps } from 'react'
 import userEvent from '@testing-library/user-event'
 import { vi } from 'vitest'
 import type { MatchReport, MemberProfile, PadelPoll } from '../types'
 import styles from '../styles.css?raw'
 import { PlayerStatisticsPage } from './PlayerStatisticsPage'
+
+vi.mock('../InterfaceContext', () => ({ useInterfaceMode: () => 'nuova', clearInterfaceOverride: vi.fn() }))
+
+function StatisticsHarness(props: ComponentProps<typeof PlayerStatisticsPage>) {
+  const [selectedPlayerId, setSelectedPlayerId] = useState(props.selectedPlayerId)
+  return <PlayerStatisticsPage {...props} selectedPlayerId={selectedPlayerId} onSelectPlayer={(id) => {
+    setSelectedPlayerId(id)
+    props.onSelectPlayer(id)
+  }} />
+}
 
 const user: MemberProfile = {
   id: 'jury',
@@ -77,11 +88,11 @@ describe('pagina statistiche giocatore', () => {
     const onSelectPlayer = vi.fn()
     const browserUser = userEvent.setup()
     render(
-      <PlayerStatisticsPage
+      <StatisticsHarness
         polls={[poll]}
         members={members}
         user={user}
-        initialPlayerId="jury"
+        selectedPlayerId="jury"
         feedbackSummaries={[{
           id: 'poll-statistics__slot-statistics__jury',
           pollId: 'poll-statistics',
@@ -131,13 +142,14 @@ describe('pagina statistiche giocatore', () => {
     expect(screen.getByText('2–1')).toBeInTheDocument()
   })
 
-  it('spiega lo stato vuoto senza mostrare zeri come prestazioni', () => {
+  it('spiega lo stato vuoto e mantiene il focus sul selettore dopo il cambio giocatore', async () => {
+    const browserUser = userEvent.setup()
     render(
-      <PlayerStatisticsPage
+      <StatisticsHarness
         polls={[]}
         members={members}
         user={user}
-        initialPlayerId="ale"
+        selectedPlayerId="ale"
         feedbackSummaries={[]}
         matchReports={[]}
         now={Date.parse('2026-08-01T12:00:00.000Z')}
@@ -150,5 +162,32 @@ describe('pagina statistiche giocatore', () => {
 
     expect(screen.getByRole('heading', { name: 'Ancora nessuna partita' })).toBeInTheDocument()
     expect(screen.getByText(/dopo la prima partita conclusa e prenotata/)).toBeInTheDocument()
+
+    const picker = screen.getByLabelText('Cerca giocatore').closest('details')!
+    const summary = picker.querySelector('summary')!
+    await browserUser.click(summary)
+    await browserUser.click(within(screen.getByRole('group', { name: 'Giocatori' })).getByRole('button', { name: 'Tu' }))
+    expect(picker).not.toHaveAttribute('open')
+    expect(summary).toHaveFocus()
+    expect(screen.getByRole('heading', { name: 'Jury' })).toBeInTheDocument()
+  })
+
+  it('segue il giocatore scelto dal contenitore senza perdere la vista corrente', async () => {
+    const browserUser = userEvent.setup()
+    const props = {
+      polls: [poll], members, user, feedbackSummaries: [], matchReports: [report],
+      now: Date.parse('2026-08-01T12:00:00.000Z'), loading: false, error: null,
+      onBack: vi.fn(), onSelectPlayer: vi.fn(),
+    }
+    const { rerender } = render(<PlayerStatisticsPage {...props} selectedPlayerId="jury" />)
+    await browserUser.click(screen.getByRole('button', { name: /Storico/ }))
+
+    rerender(<PlayerStatisticsPage {...props} selectedPlayerId="ale" />)
+    expect(screen.getByRole('heading', { name: 'Alex' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Storico/ })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('heading', { name: 'Storico personale' })).toBeInTheDocument()
+
+    rerender(<PlayerStatisticsPage {...props} selectedPlayerId="sconosciuto" />)
+    expect(screen.getByRole('heading', { name: 'Jury' })).toBeInTheDocument()
   })
 })

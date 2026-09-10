@@ -372,6 +372,36 @@ describe('repository remoto della scelta MVP', () => {
     )
   })
 
+  it('promuove la propria riserva e sincronizza il Fanta in una sola transazione con audit', async () => {
+    const poll = futureRosterPoll()
+    poll.slots[0].signups = poll.slots[0].signups.slice(0, 4).map(signup => (
+      signup.userId === voter.id ? { ...signup, role: 'reserve' as const } : signup
+    ))
+    const round = { ...futureFantasyRound(), status: 'pending' }
+    firestoreMocks.transaction.get.mockImplementation(async (reference: string) => {
+      if (reference === `polls/${poll.id}`) return { exists: () => true, id: poll.id, data: () => poll }
+      if (reference === `fantasyRounds/${round.id}`) return { exists: () => true, id: round.id, data: () => round }
+      return { exists: () => false }
+    })
+    const updated = await repository.takeStarterPlace(poll.id, poll.slots[0].id, voter)
+    expect(updated.slots[0].signups[0]).toEqual({ ...poll.slots[0].signups[0], role: 'starter' })
+    expect(firestoreMocks.runTransaction).toHaveBeenCalledOnce()
+    expect(firestoreMocks.transaction.set).toHaveBeenCalledWith(`fantasyRounds/${round.id}`,
+      expect.objectContaining({ status: 'open', participantIds: ['jury', 'ale', 'luca', 'teo'] }))
+    expect(firestoreMocks.transaction.set).toHaveBeenCalledWith('activityEvents/generated',
+      expect.objectContaining({ actorId: voter.id, type: 'signup_joined', details: { role: 'starter', previousRole: 'reserve' } }))
+    const lastRead = Math.max(...firestoreMocks.transaction.get.mock.invocationCallOrder)
+    expect(lastRead).toBeLessThan(Math.min(...firestoreMocks.transaction.update.mock.invocationCallOrder, ...firestoreMocks.transaction.set.mock.invocationCallOrder))
+  })
+
+  it('non scrive se una promozione concorrente ha già riempito lo slot', async () => {
+    const poll = futureRosterPoll()
+    firestoreMocks.transaction.get.mockResolvedValue({ exists: () => true, id: poll.id, data: () => poll })
+    await expect(repository.takeStarterPlace(poll.id, poll.slots[0].id, { ...voter, id: 'reserve' })).rejects.toThrow('Rimani in riserva')
+    expect(firestoreMocks.transaction.update).not.toHaveBeenCalled()
+    expect(firestoreMocks.transaction.set).not.toHaveBeenCalled()
+  })
+
   it('riallinea il round fantasy nella stessa transazione quando cambia un titolare', async () => {
     const poll = futureRosterPoll()
     const round = futureFantasyRound()

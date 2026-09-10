@@ -15,12 +15,14 @@ import {
 } from 'firebase/firestore'
 import type {
   FixedSeatPreference,
+  InterfaceMode,
   MemberProfile,
   NotificationPreferences,
   SessionUser,
 } from '../types'
 import { firebaseAuth, firestore, hasRemoteBackend } from './firebase'
 import { makeId, profileNameError } from './domain'
+import { normalizeInterfaceMode } from './interfaceMode'
 import {
   DEFAULT_NOTIFICATION_PREFERENCES,
   normalizeNotificationPreferences,
@@ -64,6 +66,7 @@ function accountProfile(account: LocalAccount): MemberProfile {
     avatarDataUrl: account.avatarDataUrl,
     notificationPreferences: normalizeNotificationPreferences(account.notificationPreferences),
     fixedSeatPreference: normalizeFixedSeatPreference(account.fixedSeatPreference),
+    interfaceMode: normalizeInterfaceMode(account.interfaceMode),
   }
 }
 
@@ -124,6 +127,7 @@ export function subscribeToSession(listener: (user: SessionUser | null) => void)
             email: profile.email ?? fallback.email,
             notificationPreferences: normalizeNotificationPreferences(profile.notificationPreferences),
             fixedSeatPreference: normalizeFixedSeatPreference(profile.fixedSeatPreference),
+            interfaceMode: normalizeInterfaceMode(profile.interfaceMode),
           })
         },
         () => listener(fallback),
@@ -189,6 +193,7 @@ export async function updateAccountProfile(
   avatarDataUrl?: string,
   notificationPreferences?: NotificationPreferences,
   fixedSeatPreference?: FixedSeatPreference,
+  interfaceMode?: InterfaceMode,
 ): Promise<SessionUser> {
   const cleanName = displayName.trim()
   const error = profileNameError(cleanName)
@@ -204,6 +209,7 @@ export async function updateAccountProfile(
     avatarDataUrl: avatarDataUrl || undefined,
     notificationPreferences: normalizeNotificationPreferences(notificationPreferences),
     fixedSeatPreference: normalizedFixedSeatPreference,
+    interfaceMode: normalizeInterfaceMode(interfaceMode ?? current.interfaceMode),
   }
 
   if (hasRemoteBackend && firebaseAuth?.currentUser && firestore) {
@@ -247,6 +253,7 @@ export async function updateAccountProfile(
         avatarDataUrl: avatarDataUrl || deleteField(),
         notificationPreferences: nextProfile.notificationPreferences,
         fixedSeatPreference: normalizedFixedSeatPreference || deleteField(),
+        ...(interfaceMode !== undefined ? { interfaceMode: normalizeInterfaceMode(interfaceMode) } : {}),
       })
       bucketReferences.forEach((reference, index) => {
         const members = nextBuckets[index]
@@ -271,6 +278,7 @@ export async function updateAccountProfile(
     avatarDataUrl: avatarDataUrl || undefined,
     notificationPreferences: nextProfile.notificationPreferences,
     fixedSeatPreference: normalizedFixedSeatPreference,
+    ...(interfaceMode !== undefined ? { interfaceMode: normalizeInterfaceMode(interfaceMode) } : {}),
   }
   writeAccounts(accounts)
   emitAuthChange()

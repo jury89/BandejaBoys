@@ -57,6 +57,7 @@ import {
   makeMatchReport,
   makeId,
   makePoll,
+  promoteOwnSignup,
   removeGuestSignup,
   removeSignup,
   removeSlotFromPoll,
@@ -124,6 +125,7 @@ export interface PadelRepository {
   createPoll(input: CreatePollInput, creator: SessionUser): Promise<void>
   addSlot(pollId: string, input: SlotInput, creator: SessionUser): Promise<PadelPoll>
   joinSlot(pollId: string, slotId: string, member: SessionUser, role: SignupRole): Promise<PadelPoll>
+  takeStarterPlace(pollId: string, slotId: string, member: SessionUser): Promise<PadelPoll>
   leaveSlot(pollId: string, slotId: string, member: SessionUser): Promise<PadelPoll>
   addGuest(
     pollId: string,
@@ -731,6 +733,19 @@ function remoteRepository(): PadelRepository {
           const wasJoined = previous?.signups.some((signup) => signup.userId === member.id)
           return updated && !wasJoined
             ? makeActivityEvent('signup_joined', member, after, updated, { role })
+            : null
+        },
+      )
+    },
+    async takeStarterPlace(pollId, slotId, member) {
+      return mutatePoll(
+        pollId,
+        (poll) => updateSlot(poll, slotId, (slot) => promoteOwnSignup(slot, member.id)),
+        (before, after) => {
+          const previous = slotById(before, slotId)
+          const updated = slotById(after, slotId)
+          return previous && updated && !getStarters(previous).some((signup) => signup.userId === member.id)
+            ? makeActivityEvent('signup_joined', member, after, updated, { role: 'starter', previousRole: 'reserve' })
             : null
         },
       )
@@ -1376,6 +1391,19 @@ function localRepository(): PadelRepository {
           const wasJoined = previous?.signups.some((signup) => signup.userId === member.id)
           return updated && !wasJoined
             ? makeActivityEvent('signup_joined', member, after, updated, { role })
+            : null
+        },
+      )
+    },
+    async takeStarterPlace(pollId, slotId, member) {
+      return mutate(
+        pollId,
+        (poll) => updateSlot(poll, slotId, (slot) => promoteOwnSignup(slot, member.id)),
+        (before, after) => {
+          const previous = slotById(before, slotId)
+          const updated = slotById(after, slotId)
+          return previous && updated && !getStarters(previous).some((signup) => signup.userId === member.id)
+            ? makeActivityEvent('signup_joined', member, after, updated, { role: 'starter', previousRole: 'reserve' })
             : null
         },
       )

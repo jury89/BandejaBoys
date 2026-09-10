@@ -4,6 +4,8 @@ import { vi } from 'vitest'
 import type { PlayerMatchLists } from '../types'
 import { MyMatchesPage } from './MyMatchesPage'
 
+vi.mock('../InterfaceContext', () => ({ useInterfaceMode: () => 'nuova', clearInterfaceOverride: vi.fn() }))
+
 const matches: PlayerMatchLists = {
   upcoming: [{
     pollId: 'poll-future',

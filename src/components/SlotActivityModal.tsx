@@ -102,8 +102,10 @@ function activityPresentation(event: LocalActivityEvent): ActivityPresentation {
     }
     case 'signup_joined':
       return {
-        title: 'Adesione aggiunta',
-        description: `Ingresso come ${signupRoleLabel(event)}.`,
+        title: detailString(event, 'previousRole') === 'reserve' ? 'Da riserva a titolare' : 'Adesione aggiunta',
+        description: detailString(event, 'previousRole') === 'reserve'
+          ? 'Ha preso un posto libero tra i titolari, mantenendo la sua iscrizione.'
+          : `Ingresso come ${signupRoleLabel(event)}.`,
         icon: UserRoundPlus,
         tone: 'joined',
       }

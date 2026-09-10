@@ -69,9 +69,7 @@ export function AuthScreen() {
           </p>
         </div>
         <div className="mini-court" aria-hidden="true">
-          <span className="mini-court__line" />
           {[1, 2, 3, 4].map((number) => <i key={number}>{number}</i>)}
-          <b>4/4</b>
         </div>
       </section>
 
@@ -154,4 +152,3 @@ export function AuthScreen() {
     </main>
   )
 }
-

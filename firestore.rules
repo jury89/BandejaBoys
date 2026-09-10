@@ -63,7 +63,7 @@ service cloud.firestore {
       return request.resource.data.keys()
           .hasOnly([
             'id', 'displayName', 'email', 'createdAt', 'avatarDataUrl',
-            'notificationPreferences', 'fixedSeatPreference'
+            'notificationPreferences', 'fixedSeatPreference', 'interfaceMode'
           ])
         && request.resource.data.id == userId
         && request.resource.data.displayName is string
@@ -73,6 +73,8 @@ service cloud.firestore {
         && request.resource.data.createdAt is number
         && validAvatar()
         && validNotificationPreferences()
+        && (!request.resource.data.keys().hasAny(['interfaceMode'])
+          || request.resource.data.interfaceMode in ['classica', 'nuova'])
         && (!request.resource.data.keys().hasAny(['fixedSeatPreference'])
           || (request.resource.data.fixedSeatPreference is map
             && request.resource.data.fixedSeatPreference.keys()
