@@ -8,7 +8,7 @@ Per provare senza cambiare la preferenza: [nuova interfaccia](https://bandeja-bo
 
 Dettagli, perimetro del rilascio e collaudi in [docs/restyling.md](docs/restyling.md).
 
-Anche nella nuova interfaccia la bacheca mostra il campo con quattro posti: titolari con nome e foto/iniziale, oppure “Posto libero”. Le riserve restano sotto il campo; i numeri indicano l’ordine di iscrizione, non la composizione delle coppie.
+Anche nella nuova interfaccia la bacheca mostra il campo con quattro posti: titolari con nome e foto/iniziale, oppure “Posto libero”. Il campo è compatto in altezza, senza ridurne la larghezza; può crescere quando servono più righe per nomi lunghi o ospiti. Le riserve restano sotto il campo; i numeri indicano l’ordine di iscrizione, non la composizione delle coppie.
 
 Mini sito privato per organizzare le partite di padel del gruppo: sondaggi settimanali, quattro titolari in ordine di adesione, riserve, sostituzioni, conferma del campo e campionato FantaBandeja.
 

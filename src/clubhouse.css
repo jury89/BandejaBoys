@@ -128,7 +128,7 @@
 .club-slot-roster-heading { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; padding: 14px 16px 10px; font-size: 12px; }
 .club-slot-roster-heading > strong { color: var(--muted); font-size: 11px; }
 .club-your-place { color: var(--booked-deep); font-size: 11px; font-weight: 800; }
-.club-roster { position: relative; isolation: isolate; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); min-height: 260px; margin: 0 16px 16px; padding: 16px 12px; gap: 32px 24px; border: 8px solid var(--court); background: var(--court); }
+.club-roster { position: relative; isolation: isolate; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); min-height: 220px; margin: 0 16px 16px; padding: 12px; gap: 24px; border: 8px solid var(--court); background: var(--court); }
 .club-roster::before { position: absolute; inset: 0; z-index: -1; border: 1px solid rgb(255 255 255 / 75%); content: ''; }
 .club-roster::after { position: absolute; inset-block: 0; left: 50%; z-index: -1; border-left: 1px solid rgb(255 255 255 / 65%); content: ''; }
 .club-roster__net { position: absolute; top: 50%; left: -3px; width: calc(100% + 6px); height: 5px; transform: translateY(-50%); border-block: 1px solid rgb(255 255 255 / 85%); background: repeating-linear-gradient(90deg, rgb(255 255 255 / 32%) 0 2px, transparent 2px 5px); pointer-events: none; }
@@ -338,7 +338,7 @@ body.modal-open .app-shell.ux-new .toast { visibility: hidden; }
   .app-shell.ux-new .poll-card__action { padding: 8px 12px; }
   .app-shell.ux-new .club-slot .slot-card__header { grid-template-columns: 52px minmax(0, 1fr) auto; }
   .app-shell.ux-new .club-slot .slot-card__status { flex-direction: row; align-items: center; gap: 16px; }
-  .club-roster { padding: 20px; min-height: 250px; }
+  .club-roster { padding: 16px 20px; min-height: 210px; }
   .club-roster__player { grid-template-columns: 26px 32px minmax(0, 1fr); }
   .club-roster .club-roster__name, .club-roster__empty { grid-column: 3; grid-row: 1; }
   .club-roster__empty { grid-column: 2 / -1; }

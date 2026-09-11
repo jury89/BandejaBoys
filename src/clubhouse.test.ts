@@ -17,6 +17,19 @@ describe('geometria Clubhouse', () => {
     expect(styles).not.toContain('.club-roster { grid-template-columns: repeat(4,')
     expect(declarations('.club-roster__net')).toContain('top: 50%')
   })
+  it('riduce solo lo spazio verticale senza bloccare la crescita per nomi lunghi e ospiti', () => {
+    const court = declarations('.club-roster')
+    expect(court).toContain('min-height: 220px;')
+    expect(court).toContain('margin: 0 16px 16px;')
+    expect(court).toContain('padding: 12px;')
+    expect(court).toContain('gap: 24px;')
+    const courtRules = [...styles.matchAll(/\.club-roster \{([^}]+)\}/g)].map((match) => match[1])
+    expect(courtRules).toHaveLength(2)
+    expect(courtRules[1]).toContain('padding: 16px 20px; min-height: 210px;')
+    for (const rule of courtRules) {
+      expect(rule).not.toMatch(/(?:^|;)\s*(?:height|max-height|width|max-width|overflow)\s*:/)
+    }
+  })
   it('mantiene circolari foto e iniziali del profilo statistiche', () => {
     const avatar = declarations('.app-shell.ux-new .player-stats__hero-avatar')
     expect(avatar).toContain('width: 68px; height: 68px; flex: 0 0 68px;')

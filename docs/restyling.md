@@ -27,6 +27,10 @@ In seguito al feedback del gruppo, il campo colorato torna al posto della lista 
 
 Il collaudo deve includere campo pieno e vuoto, posti parzialmente occupati, nomi lunghi, foto e iniziali, ospite titolare/riserve, menu sovrapposto e ritorno alla classica a larghezze telefono e desktop.
 
+Affinamento compatto: altezza minima da 260 a 220 px su mobile e da 250 a 210 px su desktop, con meno spazio verticale interno. Larghezza, margini e spaziatura orizzontale restano invariati, così come dimensioni di testo, avatar e pulsanti. Nessuna altezza fissa o ritaglio: il campo cresce ancora se nomi lunghi e ospiti richiedono spazio. La classica non cambia.
+
+Collaudo dell’affinamento: a 320 / 390 / 520 / 760 / 1280 px la larghezza coincide con quella precedente. La riduzione misurata è di 40 px nei campi standard e di 16 px nel caso mobile con nome lungo su più righe. Ripetuti i controlli su campo pieno/vuoto, ospiti, riserva → titolare, menu sovrapposto e ritorno alla classica, senza sovrapposizioni, errori JavaScript o richieste a Firebase.
+
 Esito: suite completa con 365 test in 51 file, lint, build, typecheck notifiche e dry-run scheduler superati. Chromium in demo isolata a 320 / 390 / 520 / 760 / 1280 px: quattro posti su due colonne, rete centrata e nessuna sovrapposizione del contenuto; verificati foto circolari, nomi lunghi, ospite titolare, passaggio riserva → titolare e rimozione ospite. Menu aperto senza cambiamenti all’altezza dell’header; ritorno alla classica verificato. Nessuna richiesta a Firebase e nessun errore JavaScript. Mobile verificato con viewport emulati, non su dispositivo fisico.
 
 Il restyling non attiva la chiusura del Fanta e non cambia voti, calcoli, stagioni o storico. L’unica estensione alle Firestore Rules è la preferenza facoltativa `users.interfaceMode`; nessuna modifica al notifier. I test di dominio e repository restano parte della validazione completa.
