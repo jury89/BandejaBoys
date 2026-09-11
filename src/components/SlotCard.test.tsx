@@ -36,13 +36,32 @@ const poll: PadelPoll = {
 }
 
 describe('azioni dello slot', () => {
-  it('mostra una sola rosa compatta con iniziali e posizione personale', () => {
+  it('mostra sempre il campo con quattro posti, iniziali e posizione personale', () => {
     render(<SlotCard poll={poll} slot={slot} user={user} members={[user]} onPollChange={vi.fn()} onNotify={vi.fn()} onError={vi.fn()} />)
     const lineup = screen.getByRole('region', { name: 'Titolari' })
     expect(lineup).toHaveClass('club-roster')
     expect(screen.getByText('Sei titolare')).toBeInTheDocument()
     expect(lineup.querySelector('.club-roster__avatar')).toHaveTextContent('J')
+    expect(lineup.querySelector('.club-roster__net')).toHaveAttribute('aria-hidden', 'true')
+    expect(lineup.querySelectorAll('.club-roster__player')).toHaveLength(4)
+    expect(Array.from(lineup.querySelectorAll('.club-roster__marker'), marker => marker.textContent)).toEqual(['1', '2', '3', '4'])
+    expect(lineup.querySelectorAll('.club-roster__empty')).toHaveLength(3)
     expect(screen.queryByRole('button', { name: /Mostra campo|Riduci campo/ })).not.toBeInTheDocument()
+  })
+  it('mantiene quattro posti liberi quando lo slot è vuoto', () => {
+    render(<SlotCard poll={poll} slot={{ ...slot, signups: [] }} user={user} members={[user]} onPollChange={vi.fn()} onNotify={vi.fn()} onError={vi.fn()} />)
+    const lineup = screen.getByRole('region', { name: 'Titolari' })
+    expect(lineup.querySelectorAll('.club-roster__player.is-empty')).toHaveLength(4)
+    expect(screen.getAllByText('Posto libero')).toHaveLength(4)
+  })
+  it('mostra solo i quattro titolari in ordine nel campo, con la riserva separata', () => {
+    const signups = ['Uno', 'Due', 'Tre', 'Quattro', 'Riserva'].map((name, index) => ({ id: `signup-${index}`, userId: name, displayName: name, joinedAt: index + 1 }))
+    render(<SlotCard poll={poll} slot={{ ...slot, signups: [...signups].reverse() }} user={user} members={[]} onPollChange={vi.fn()} onNotify={vi.fn()} onError={vi.fn()} />)
+    const lineup = screen.getByRole('region', { name: 'Titolari' })
+    expect(Array.from(lineup.querySelectorAll('.club-roster__name strong'), name => name.textContent)).toEqual(['Uno', 'Due', 'Tre', 'Quattro'])
+    expect(lineup.querySelectorAll('.club-roster__player.is-filled')).toHaveLength(4)
+    expect(lineup).not.toHaveTextContent('Riserva')
+    expect(screen.getByLabelText('Lista d’attesa')).toHaveTextContent('Riserva')
   })
   afterEach(() => {
     vi.useRealTimers()

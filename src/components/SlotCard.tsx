@@ -312,12 +312,12 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
         {joined && <span className="club-your-place">{userIsStarter ? 'Sei titolare' : `Sei la riserva n° ${reserves.findIndex((signup) => signup.userId === user.id) + 1}`}</span>}
       </div>}
       <section className={isNewInterface ? 'club-roster' : 'court-lineup'} aria-label="Titolari">
-        {!isNewInterface && <div className="court-lineup__net" aria-hidden="true" />}
+        <div className={isNewInterface ? 'club-roster__net' : 'court-lineup__net'} aria-hidden="true" />
         {Array.from({ length: 4 }, (_, index) => {
           const signup = starters[index]
           return (
-            <div className={`${isNewInterface ? 'club-roster__player' : `court-player court-player--${index + 1}`} ${signup?.userId === user.id ? 'is-you' : ''}`} key={signup?.id ?? `empty-${index}`}>
-              {!isNewInterface && <span className="court-player__marker">{index + 1}</span>}
+            <div className={`${isNewInterface ? `club-roster__player club-roster__player--${index + 1} ${signup ? 'is-filled' : 'is-empty'}` : `court-player court-player--${index + 1}`} ${signup?.userId === user.id ? 'is-you' : ''}`} key={signup?.id ?? `empty-${index}`}>
+              <span className={isNewInterface ? 'club-roster__marker' : 'court-player__marker'}>{index + 1}</span>
               {signup ? (
                 <>
                   {(isNewInterface || memberProfile(signup.userId)?.avatarDataUrl) && <ProfileAvatar
@@ -347,7 +347,7 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
                   )}
                 </>
               ) : (
-                <span className={isNewInterface ? 'club-roster__empty' : 'court-player__name court-player__name--empty'}>{isNewInterface && <UserRoundPlus size={18} aria-hidden="true" />}Posto libero</span>
+                <span className={isNewInterface ? 'club-roster__empty' : 'court-player__name court-player__name--empty'}>Posto libero</span>
               )}
             </div>
           )

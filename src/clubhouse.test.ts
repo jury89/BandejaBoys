@@ -9,6 +9,14 @@ function declarations(selector: string) {
 }
 
 describe('geometria Clubhouse', () => {
+  it('mantiene il campo a due colonne e due metà anche su desktop', () => {
+    const court = declarations('.club-roster')
+    expect(court).toContain('grid-template-columns: repeat(2, minmax(0, 1fr))')
+    expect(court).toContain('grid-template-rows: repeat(2, minmax(0, 1fr))')
+    expect(court).toContain('background: var(--court)')
+    expect(styles).not.toContain('.club-roster { grid-template-columns: repeat(4,')
+    expect(declarations('.club-roster__net')).toContain('top: 50%')
+  })
   it('mantiene circolari foto e iniziali del profilo statistiche', () => {
     const avatar = declarations('.app-shell.ux-new .player-stats__hero-avatar')
     expect(avatar).toContain('width: 68px; height: 68px; flex: 0 0 68px;')
