@@ -6,13 +6,13 @@ Direzione approvata: mobile-first, stessa identità Bandeja, partite e azioni pr
 
 - Inchiostro `#102A3A`, blu Bandeja `#075985`, campo `#0E7490`, lime `#D9FF43`, fondo `#EEF5F7`, bianco `#FFFFFF`.
 - Barlow Condensed per titoli brevi e punteggi; Manrope Variable per contenuti e controlli. Il logo `Brand` non viene modificato.
-- Una scheda per partita, separatori leggeri per le settimane e un’unica rosa compatta sempre visibile. Su desktop una colonna di partite e un riepilogo personale laterale evitano schede eccessivamente larghe.
+- Una scheda per partita, separatori leggeri per le settimane e un campo con quattro posti sempre visibile. Su desktop una colonna di partite e un riepilogo personale laterale evitano schede eccessivamente larghe.
 - Quattro destinazioni persistenti. Dentro Partite restano i percorsi “Le mie” e “Gli altri”; il Fanta conserva le sue tre tab e le transizioni stagionali esistenti.
 
 ## Interazioni
 
 - Filtri Tutti / Posti liberi / Sono iscritto; prenotazione selezionabile separatamente (il selettore cambia il filtro corrente, non aggiunge una seconda condizione).
-- Rosa unica in ordine cronologico, con foto o iniziale centrata. La posizione personale viene esplicitata e non dipende dallo stato del campo. Le riserve sono righe con posizione, avatar, nome e l’eventuale etichetta Ospite e pulsante di rimozione.
+- Campo a due colonne e due metà, con rete centrale, quattro posti numerati in ordine cronologico e foto o iniziale centrata. I numeri indicano l’ordine di iscrizione, non le coppie del referto. Ogni posto non occupato mostra “Posto libero”; la posizione personale viene esplicitata e non dipende dallo stato della prenotazione. Le riserve restano righe separate con posizione, avatar, nome e l’eventuale etichetta Ospite e pulsante di rimozione.
 - Mi iscrivo / Entra in riserva conservano la scelta volontaria del ruolo. Ritirati / Passo il posto sono visibili senza aprire un pannello; una riserva vede Passa a titolare quando ci sono meno di quattro titolari. La richiesta conserva l’iscrizione e verifica di nuovo la disponibilità durante il salvataggio.
 - Calendario rimane diretto; modifica, ospiti, cronologia e amministrazione sono nel menu con etichette testuali. Nessun cambiamento alle autorizzazioni.
 - Statistiche: selettore giocatore ricercabile, periodo e tre viste; i numeri sono separati dalle linee del campo per evitare sovrapposizioni.
@@ -20,6 +20,14 @@ Direzione approvata: mobile-first, stessa identità Bandeja, partite e azioni pr
 - Movimento ridotto rispettato, controlli principali di almeno 44 px, safe area inferiore e header opaco.
 
 ## Perimetro e verifica
+
+### Campo ripristinato nella nuova interfaccia — 11 settembre 2026
+
+In seguito al feedback del gruppo, il campo colorato torna al posto della lista compatta dei titolari. È sempre visibile, senza controllo Mostra/Nascondi. La griglia resta 2 × 2 anche su desktop; su mobile nomi e descrizioni possono andare a capo sotto foto e numero. Menu sovrapposti, navigazione, riserve e scelta Classica/Nuova rimangono invariati. Nessuna modifica a dati, ordine di iscrizione, Fanta, regole o notifiche: per questo aggiornamento serve soltanto il deploy Hosting.
+
+Il collaudo deve includere campo pieno e vuoto, posti parzialmente occupati, nomi lunghi, foto e iniziali, ospite titolare/riserve, menu sovrapposto e ritorno alla classica a larghezze telefono e desktop.
+
+Esito: suite completa con 365 test in 51 file, lint, build, typecheck notifiche e dry-run scheduler superati. Chromium in demo isolata a 320 / 390 / 520 / 760 / 1280 px: quattro posti su due colonne, rete centrata e nessuna sovrapposizione del contenuto; verificati foto circolari, nomi lunghi, ospite titolare, passaggio riserva → titolare e rimozione ospite. Menu aperto senza cambiamenti all’altezza dell’header; ritorno alla classica verificato. Nessuna richiesta a Firebase e nessun errore JavaScript. Mobile verificato con viewport emulati, non su dispositivo fisico.
 
 Il restyling non attiva la chiusura del Fanta e non cambia voti, calcoli, stagioni o storico. L’unica estensione alle Firestore Rules è la preferenza facoltativa `users.interfaceMode`; nessuna modifica al notifier. I test di dominio e repository restano parte della validazione completa.
 
