@@ -40,6 +40,7 @@ import { GuestPlayerModal } from './GuestPlayerModal'
 import { ProfileAvatar } from './ProfileAvatar'
 import { SlotActivityModal } from './SlotActivityModal'
 import { SubstitutionModal } from './SubstitutionModal'
+import { useSlotMenuPosition } from './useSlotMenuPosition'
 
 interface SlotCardProps {
   poll: PadelPoll
@@ -63,6 +64,7 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
   const participationHelpId = useId()
   const cardRef = useRef<HTMLElement>(null)
   const menuRef = useRef<HTMLDetailsElement>(null)
+  useSlotMenuPosition(menuRef, isNewInterface)
   const [activityOpen, setActivityOpen] = useState(false)
   const [adminRosterOpen, setAdminRosterOpen] = useState(false)
   const [guestPlayerOpen, setGuestPlayerOpen] = useState(false)

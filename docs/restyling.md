@@ -14,12 +14,18 @@ Direzione approvata: mobile-first, stessa identità Bandeja, partite e azioni pr
 - Filtri Tutti / Posti liberi / Sono iscritto; prenotazione selezionabile separatamente (il selettore cambia il filtro corrente, non aggiunge una seconda condizione).
 - Campo a due colonne e due metà, con rete centrale, quattro posti numerati in ordine cronologico e foto o iniziale centrata. I numeri indicano l’ordine di iscrizione, non le coppie del referto. Ogni posto non occupato mostra “Posto libero”; la posizione personale viene esplicitata e non dipende dallo stato della prenotazione. Le riserve restano righe separate con posizione, avatar, nome e l’eventuale etichetta Ospite e pulsante di rimozione.
 - Mi iscrivo / Entra in riserva conservano la scelta volontaria del ruolo. Ritirati / Passo il posto sono visibili senza aprire un pannello; una riserva vede Passa a titolare quando ci sono meno di quattro titolari. La richiesta conserva l’iscrizione e verifica di nuovo la disponibilità durante il salvataggio.
-- Calendario rimane diretto; modifica, ospiti, cronologia e amministrazione sono nel menu con etichette testuali. Nessun cambiamento alle autorizzazioni.
+- Calendario rimane diretto; modifica, ospiti, cronologia e amministrazione sono nel menu con etichette testuali. Il menu si apre sotto se c’è spazio, altrimenti sopra; esclude l’header e la barra inferiore dall’area disponibile e scorre internamente sugli schermi più bassi. Nessun cambiamento alle autorizzazioni.
 - Statistiche: selettore giocatore ricercabile, periodo e tre viste; i numeri sono separati dalle linee del campo per evitare sovrapposizioni.
 - Moduli a schermo intero fino a 600 px, gestione della tastiera, focus confinato al dialogo e restituito al controllo di apertura alla chiusura.
 - Movimento ridotto rispettato, controlli principali di almeno 44 px, safe area inferiore e header opaco.
 
 ## Perimetro e verifica
+
+### Menu delle azioni entro lo schermo — 11 settembre 2026
+
+Il posizionamento della sola nuova interfaccia misura il viewport visibile e le barre fisse, incluse le safe area. Il menu resta sovrapposto senza cambiare l’altezza dello slot; sceglie il lato più adatto, limita la sua altezza allo spazio disponibile e mantiene raggiungibili tutte le azioni tramite scorrimento interno. Si aggiorna su scroll, ridimensionamento e variazioni del viewport mobile, chiudendosi quando il pulsante esce dall’area visibile. Gli ascoltatori di posizionamento sono attivi solo a menu aperto. Escape restituisce il focus al pulsante; clic esterno e scelta di un’azione chiudono il menu, che alla riapertura riparte dalla prima voce.
+
+Collaudo demo isolato: cinque azioni amministratore a 390 × 844, 320 × 568, 844 × 390 e 1280 × 900 px; apertura sopra vicino al bordo inferiore e sotto vicino all’header, ultima azione raggiungibile anche in orizzontale, header invariato, riposizionamento su scroll/resize, Escape/focus, clic esterno e apertura del modulo. Classica invariata; nessuna richiesta a Firebase o errore JavaScript. Test automatici dedicati alla geometria e al ciclo apertura/chiusura. Rilascio solo Hosting, nessun cambiamento a dati, autorizzazioni, Fanta o notifiche.
 
 ### Campo ripristinato nella nuova interfaccia — 11 settembre 2026
 
