@@ -1,3 +1,4 @@
+import { DEFAULT_VENUE_ID, slotVenueId, slotVenueName, validateVenueId } from './venues'
 import type {
   AdminSlotRosterAction,
   CreatePollInput,
@@ -175,7 +176,8 @@ export function padelDateTimeToTimestamp(value: string): number {
 
 export function hasExistingSlotAtDateTime(
   startsAt: string,
-  existingSlots: ReadonlyArray<Pick<PadelSlot, 'startsAt'>>,
+  existingSlots: ReadonlyArray<Pick<PadelSlot, 'startsAt' | 'venueId'> & Partial<Pick<PadelSlot, 'venue'>>>,
+  venueId = DEFAULT_VENUE_ID,
 ): boolean {
   const candidateTimestamp = padelDateTimeToTimestamp(startsAt)
   if (!Number.isFinite(candidateTimestamp)) return false
@@ -183,7 +185,7 @@ export function hasExistingSlotAtDateTime(
   const candidateMinute = Math.floor(candidateTimestamp / 60_000)
   return existingSlots.some((slot) => {
     const existingTimestamp = padelDateTimeToTimestamp(slot.startsAt)
-    return Number.isFinite(existingTimestamp)
+    return slotVenueId(slot) === venueId && Number.isFinite(existingTimestamp)
       && Math.floor(existingTimestamp / 60_000) === candidateMinute
   })
 }
@@ -1580,7 +1582,7 @@ export function setSlotBooking(
   if (bookedBy) {
     return {
       ...slot,
-      venue: DEFAULT_VENUE,
+      venue: slotVenueName(slot),
       bookedAt,
       bookedBy: bookedBy.id,
       bookedByName: bookedBy.displayName,
@@ -1807,7 +1809,8 @@ export function rescheduleSlot(
   updatedAt = Date.now(),
 ): PadelPoll {
   const normalizedStartsAt = normalizeStartsAt(startsAt)
-  if (poll.slots.some((slot) => slot.id !== slotId && slot.startsAt === normalizedStartsAt)) {
+  const currentSlot = poll.slots.find((slot) => slot.id === slotId)
+  if (poll.slots.some((slot) => slot.id !== slotId && slot.startsAt === normalizedStartsAt && currentSlot && slotVenueId(slot) === slotVenueId(currentSlot))) {
     throw new Error('Esiste già uno slot con questa data e questo orario.')
   }
 
@@ -1847,6 +1850,7 @@ function normalizeSlotInput(input: SlotInput) {
   return {
     startsAt: normalizeStartsAt(input.startsAt),
     durationMinutes: input.durationMinutes,
+    venueId: validateVenueId(input.venueId),
   }
 }
 
@@ -1860,7 +1864,7 @@ export function addSlotToPoll(
   if (poll.slots.length >= MAX_SLOTS) throw new Error(`Puoi inserire al massimo ${MAX_SLOTS} slot.`)
 
   const normalized = normalizeSlotInput(input)
-  if (poll.slots.some((slot) => slot.startsAt === normalized.startsAt)) {
+  if (poll.slots.some((slot) => slot.startsAt === normalized.startsAt && slotVenueId(slot) === normalized.venueId)) {
     throw new Error('Esiste già uno slot con questa data e questo orario.')
   }
 
@@ -1890,7 +1894,7 @@ export function makePoll(
   if (input.slots.length > MAX_SLOTS) throw new Error(`Puoi inserire al massimo ${MAX_SLOTS} slot.`)
 
   const normalizedSlots = input.slots.map(normalizeSlotInput)
-  if (new Set(normalizedSlots.map((slot) => slot.startsAt)).size !== normalizedSlots.length) {
+  if (new Set(normalizedSlots.map((slot) => `${slot.startsAt}:${slot.venueId}`)).size !== normalizedSlots.length) {
     throw new Error('Hai inserito due slot uguali.')
   }
   const targetWeekStart = weekStartForDateTime(normalizedSlots[0].startsAt)
@@ -1909,6 +1913,7 @@ export function makePoll(
         id: makeId(`slot${index + 1}`),
         startsAt: slot.startsAt,
         durationMinutes: slot.durationMinutes,
+        venueId: slot.venueId,
         createdAt: now,
         createdBy: creator.id,
         createdByName: creator.displayName,

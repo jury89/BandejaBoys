@@ -23,7 +23,6 @@ import {
   getPlayerMatches,
   getSlotEndsAt,
   getUpcomingSlotWeeks,
-  DEFAULT_VENUE_PHONE,
 } from '../lib/domain'
 import { firstName, slotDateParts } from '../lib/format'
 import { hasRemoteBackend } from '../lib/firebase'
@@ -62,9 +61,13 @@ import { ProfileAvatar } from './ProfileAvatar'
 import { ProfileModal } from './ProfileModal'
 import { PlayerStatisticsPage } from './PlayerStatisticsPage'
 import { PullToRefresh } from './PullToRefresh'
+import { matchesVenueFilter, normalizePreferredVenueIds } from '../lib/venues'
+import type { VenueId } from '../types'
+import { VenueChoices } from './VenuePicker'
+import { VenuesPage } from './VenuesPage'
 
 type FeedFilter = PollSlotFilter
-type DashboardView = 'feed' | 'matches' | 'group-matches' | 'statistics' | 'fantasy' | 'notifications'
+type DashboardView = 'feed' | 'matches' | 'group-matches' | 'statistics' | 'fantasy' | 'notifications' | 'venues'
 
 const PERSONAL_MATCHES_HASH = '#i-miei-match'
 const GROUP_MATCHES_HASH = '#gli-altri-match'
@@ -75,6 +78,7 @@ const INITIAL_DATA_TIMEOUT_MS = 6_000
 const INITIAL_DATA_AUTO_RETRIES = 2
 
 function dashboardViewFromLocation(): DashboardView {
+  if (window.location.hash === '#campi' || window.location.hash.startsWith('#campi/')) return 'venues'
   if (window.location.hash === PERSONAL_MATCHES_HASH) return 'matches'
   if (window.location.hash === GROUP_MATCHES_HASH) return 'group-matches'
   if (window.location.hash.startsWith(STATISTICS_HASH)) return 'statistics'
@@ -138,6 +142,11 @@ export function Dashboard() {
   const [loadingError, setLoadingError] = useState<string | null>(null)
   const [dataSubscriptionAttempt, setDataSubscriptionAttempt] = useState(0)
   const [feedFilter, setFeedFilter] = useState<FeedFilter>('all')
+  const [venueFilterOverride, setVenueFilterOverride] = useState<{ key: string; ids: VenueId[] } | null>(null)
+  const [venuePageId, setVenuePageId] = useState(() => window.location.hash.slice('#campi/'.length))
+  const preferredVenueIds = normalizePreferredVenueIds(user?.preferredVenueIds)
+  const venueFilterKey = `${user?.id}:${preferredVenueIds.join(',')}`
+  const selectedVenueIds = venueFilterOverride?.key === venueFilterKey ? venueFilterOverride.ids : preferredVenueIds
   const [dashboardView, setDashboardView] = useState<DashboardView>(dashboardViewFromLocation)
   const [statisticsPlayerId, setStatisticsPlayerId] = useState(
     () => statisticsPlayerIdFromLocation() ?? user?.id ?? '',
@@ -468,6 +477,7 @@ export function Dashboard() {
   useEffect(() => {
     const syncViewWithHistory = () => {
       setDashboardView(dashboardViewFromLocation())
+      setVenuePageId(window.location.hash.slice('#campi/'.length))
       setStatisticsPlayerId(statisticsPlayerIdFromLocation() ?? user?.id ?? '')
     }
     window.addEventListener('popstate', syncViewWithHistory)
@@ -664,13 +674,16 @@ export function Dashboard() {
 
   if (!user) return null
 
-  const slotCountFor = (filter: FeedFilter) => upcomingSlotWeeks.reduce((total, group) => (
+  const venueSlotWeeks = upcomingSlotWeeks.map((group) => ({ ...group,
+    entries: group.entries.filter(({ slot }) => matchesVenueFilter(slot, selectedVenueIds)),
+  })).filter((group) => group.entries.length > 0)
+  const slotCountFor = (filter: FeedFilter) => venueSlotWeeks.reduce((total, group) => (
     total + group.entries.filter(({ poll, slot }) => matchesSlotFilter(poll, slot, filter, user.id)).length
   ), 0)
   const totalSlotCount = slotCountFor('all')
   const bookedSlotCount = slotCountFor('booked')
   const bookingCandidateSlotCount = slotCountFor('booking')
-  const visibleSlotWeeks = upcomingSlotWeeks.filter(
+  const visibleSlotWeeks = venueSlotWeeks.filter(
     (group) => group.entries.some(({ poll, slot }) => matchesSlotFilter(poll, slot, feedFilter, user.id)),
   )
   const visibleSlotCount = slotCountFor(feedFilter)
@@ -770,6 +783,7 @@ export function Dashboard() {
   }
   const showPlayerMatchOnBoard = (match: PlayerMatch) => {
     setFeedFilter('all')
+    setVenueFilterOverride({ key: venueFilterKey, ids: [] })
     setSlotNavigationTarget({ pollId: match.pollId, slotId: match.slot.id })
     closePlayerMatches()
   }
@@ -907,11 +921,11 @@ export function Dashboard() {
                 )}
                 <a
                   className="account-menu__call"
-                  href={`tel:${DEFAULT_VENUE_PHONE}`}
+                  href="#campi"
                   onClick={() => setAccountOpen(false)}
                 >
                   <PhoneCall size={16} />
-                  <span>Chiama Oasi Boschetto <small>0376 290058</small></span>
+                  <span>Campi e costi <small>Circoli, prenotazioni e iscrizioni</small></span>
                 </a>
                 <button type="button" onClick={() => {
                   void signOut()
@@ -947,7 +961,7 @@ export function Dashboard() {
         </nav>
       )}
 
-      {dashboardView === 'matches' ? (
+      {dashboardView === 'venues' ? <VenuesPage selectedId={venuePageId} onBack={openBoard} /> : dashboardView === 'matches' ? (
         <MyMatchesPage
           matches={playerMatches}
           loading={loading || !feedbackSummariesLoaded || !matchReportsLoaded}
@@ -1025,7 +1039,7 @@ export function Dashboard() {
             <p>Hai un giorno fisso per giocare?</p>
             <button type="button" onClick={() => setProfileOpen(true)}><CircleUserRound size={18} /> Configura il posto fisso</button>
           </div>
-        </aside> : <ClassicBoardSummary groups={upcomingSlotWeeks} />}
+        </aside> : <ClassicBoardSummary groups={venueSlotWeeks} />}
 
         <section className="feed-heading">
           <div>
@@ -1033,6 +1047,19 @@ export function Dashboard() {
             <h2>{!isNewInterface && feedFilter === 'all' ? 'Tutti gli slot' : currentFeedCopy.heading}</h2>
           </div>
           <span>{visibleSlotCount} slot</span>
+        </section>
+
+        <section className="venue-filter" aria-labelledby="venue-filter-title">
+          <div className="venue-filter__heading"><strong id="venue-filter-title">Dove vuoi giocare?</strong><a href="#campi">Campi e costi ↗</a></div>
+          <details className="venue-filter__details">
+          <summary>Scegli i campi <span>{selectedVenueIds.length === 0 ? 'Tutti' : `${selectedVenueIds.length} selezionati`}</span></summary>
+          <div className="venue-filter__actions">
+            <button type="button" aria-pressed={selectedVenueIds.length === 0} onClick={() => setVenueFilterOverride({ key: venueFilterKey, ids: [] })}>Tutti i campi</button>
+            {preferredVenueIds.length > 0 && <button type="button" onClick={() => setVenueFilterOverride(null)}>Ripristina i preferiti</button>}
+          </div>
+          <VenueChoices value={selectedVenueIds} onChange={(ids) => setVenueFilterOverride({ key: venueFilterKey, ids })} />
+          <p>{selectedVenueIds.length === 0 ? 'Vedi tutti i circoli.' : `Stai filtrando ${selectedVenueIds.length} ${selectedVenueIds.length === 1 ? 'circolo' : 'circoli'}.`} Questa vista non modifica i preferiti del profilo.</p>
+          </details>
         </section>
 
         {isNewInterface && <nav className="feed-filter club-filters" aria-label="Filtra gli slot">
@@ -1090,8 +1117,9 @@ export function Dashboard() {
           <section className="empty-state">
             <div className="empty-state__court" aria-hidden="true"><span /><i /><i /><i /><i /></div>
             <p className="eyebrow">Campo libero</p>
-            <h2>{currentFeedCopy.emptyHeading}</h2>
-            <p>{currentFeedCopy.emptyBody}</p>
+            <h2>{selectedVenueIds.length > 0 ? 'Nessuno slot in questi campi.' : currentFeedCopy.emptyHeading}</h2>
+            <p>{selectedVenueIds.length > 0 ? 'Cambia i filtri, guarda tutti i circoli oppure proponi un nuovo slot.' : currentFeedCopy.emptyBody}</p>
+            {selectedVenueIds.length > 0 && <button className="button button--secondary" type="button" onClick={() => setVenueFilterOverride({ key: venueFilterKey, ids: [] })}>Vedi tutti i campi</button>}
             {feedFilter === 'all' && <button className="button button--primary" type="button" onClick={() => setCreateOpen(true)}><CalendarPlus size={18} /> Crea i primi slot</button>}
           </section>
         )}

@@ -91,6 +91,14 @@ Browser Chromium locale, account e partite demo isolati: nessuna scrittura su Fi
 - Ingresso volontario in riserva e passaggio diretto a titolare verificati conservando id e orario di adesione. I test di dominio e repository coprono anche campo pieno, idempotenza, audit e riallineamento atomico del Fanta.
 - Quattro bollini del login verificati al centro dei quattro quadranti; nessuna richiesta a Firebase e nessun errore JavaScript. I dati di prova del browser dell’utente non sono stati azzerati. Nessun merge o deploy.
 
+### Circoli multipli (15 settembre 2026)
+
+Entrambe le UX condividono il selettore del circolo per slot, i preferiti multipli nel profilo e il filtro della bacheca. Il filtro parte compatto (“Scegli i campi”), evitando tre righe di caselle sempre aperte sul telefono. “Tutti i campi” e “Ripristina i preferiti” modificano soltanto la vista corrente. Se non ci sono risultati nei circoli selezionati, il messaggio lo chiarisce e offre un ritorno immediato a tutti.
+
+Il nome del circolo è leggibile sia in raccolta adesioni sia dopo la prenotazione. Le nuove schede dei circoli sono raggiungibili dallo slot e da “Campi e costi”, senza aggiungere un quinto pulsante alla navigazione principale mobile. Tariffe con periodo di validità e dati da confermare sono distinti; la prenotazione resta esterna all’app. Collaudare preferenze/ricaricamento, filtri combinati, creazione simultanea in circoli diversi, vincolo del posto fisso, conferma prenotazione e link diretti alle due schede, a 390 e 1280 px in entrambe le UX.
+
+Collaudo completato nel browser integrato, con account e slot esclusivamente demo: preferiti multipli persistenti, filtri Tutti/Ripristina, slot simultanei Oasi/Sport City e auto-iscrizione solo al circolo preferito, creazione TCM, prenotazione e schede informative. Verificate entrambe le UX su desktop e telefono; nessun overflow orizzontale a 390 px né errore JavaScript. La versione classica mobile mantiene visibile anche il circolo non ancora prenotato. Suite completa: 385 test; regole Firestore: 38 casi. Nessun dato di produzione modificato dal collaudo.
+
 ### Collaudo esplorativo della demo
 
 Correzioni emerse utilizzando l’app con una sessione e dati finti separati:

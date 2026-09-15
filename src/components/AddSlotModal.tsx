@@ -10,6 +10,8 @@ import {
 import { pollWeekTitle } from '../lib/format'
 import { Modal } from './Modal'
 import { SlotDateTimeField } from './SlotDateTimeField'
+import { DEFAULT_VENUE_ID, slotVenueId } from '../lib/venues'
+import { VenuePicker } from './VenuePicker'
 
 interface AddSlotModalProps {
   poll: PadelPoll
@@ -33,6 +35,7 @@ function initialSlot(poll: PadelPoll): SlotInput {
       1,
     ),
     durationMinutes: latest.durationMinutes,
+    venueId: slotVenueId(latest),
   }
 }
 
@@ -40,6 +43,7 @@ export function AddSlotModal({ poll, onClose, onSave, onDone }: AddSlotModalProp
   const initial = useMemo(() => initialSlot(poll), [poll])
   const [startsAt, setStartsAt] = useState(initial.startsAt)
   const [durationMinutes, setDurationMinutes] = useState(initial.durationMinutes)
+  const [venueId, setVenueId] = useState(initial.venueId ?? DEFAULT_VENUE_ID)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
@@ -53,7 +57,7 @@ export function AddSlotModal({ poll, onClose, onSave, onDone }: AddSlotModalProp
     setBusy(true)
     setError('')
     try {
-      await onSave({ startsAt, durationMinutes })
+      await onSave({ startsAt, durationMinutes, venueId })
       onDone('Slot aggiunto. Gli altri riceveranno un unico avviso raggruppato.')
       onClose()
     } catch (caught) {
@@ -70,6 +74,7 @@ export function AddSlotModal({ poll, onClose, onSave, onDone }: AddSlotModalProp
           Se aggiungi più slot entro pochi minuti, gli amici riceveranno una sola notifica.
         </p>
         <SlotDateTimeField value={startsAt} onChange={setStartsAt} />
+        <VenuePicker value={venueId} onChange={setVenueId} disabled={busy} />
         <label className="field">
           <span>Durata</span>
           <select

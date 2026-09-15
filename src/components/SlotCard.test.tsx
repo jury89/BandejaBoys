@@ -200,11 +200,12 @@ describe('azioni dello slot', () => {
     )
 
     expect(slot.signups).toHaveLength(1)
-    expect(screen.getByLabelText('Campo da prenotare')).toHaveTextContent('Prenotazione non ancora confermata')
-    expect(screen.getByText(DEFAULT_VENUE)).toBeInTheDocument()
+    expect(screen.getByLabelText('Campo da prenotare')).toHaveTextContent('Oasi Boschetto')
+    expect(screen.getByLabelText('Campo da prenotare')).toHaveTextContent('prenotazione non ancora confermata')
+    expect(screen.getAllByText(DEFAULT_VENUE)).toHaveLength(2)
     expect(screen.getByText('Segna come prenotato')).toBeInTheDocument()
     fireEvent.click(
-      screen.getByRole('button', { name: 'Segna il campo come prenotato all’Oasi Boschetto' }),
+      screen.getByRole('button', { name: 'Segna il campo come prenotato: Oasi Boschetto' }),
     )
 
     await waitFor(() => expect(setBooking).toHaveBeenCalledWith(
@@ -215,7 +216,7 @@ describe('azioni dello slot', () => {
     ))
     expect(onPollChange).toHaveBeenCalledWith(updatedPoll)
     expect(onNotify).toHaveBeenCalledWith(
-      'Campo prenotato all’Oasi Boschetto. L’orario è confermato.',
+      'Campo prenotato: Oasi Boschetto. L’orario è confermato.',
     )
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
@@ -427,7 +428,7 @@ describe('azioni dello slot', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Elimina lo slot/ }))
 
-    expect(confirm).toHaveBeenCalledWith(expect.stringContaining('annullarlo direttamente con l’Oasi Boschetto'))
+    expect(confirm).toHaveBeenCalledWith(expect.stringContaining('annullarlo direttamente con Oasi Boschetto'))
   })
 
   it('permette di eliminare anche l’unico slot rimasto nel gruppo tecnico', () => {

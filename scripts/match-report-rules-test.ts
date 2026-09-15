@@ -274,6 +274,18 @@ const fixedSeatProfile = {
 
 const tests: TestDefinition[] = [
   ...[
+    { value: [], expectation: 'ALLOW' as const, uid: userId },
+    { value: ['sport-city-mantova', 'tennis-club-mantova'], expectation: 'ALLOW' as const, uid: userId },
+    { value: ['oasi-boschetto', 'sport-city-mantova', 'tennis-club-mantova'], expectation: 'ALLOW' as const, uid: userId },
+    { value: ['sconosciuto'], expectation: 'DENY' as const, uid: userId },
+    { value: ['oasi-boschetto', 'oasi-boschetto'], expectation: 'DENY' as const, uid: userId },
+    { value: 'sport-city-mantova', expectation: 'DENY' as const, uid: userId },
+    { value: ['sport-city-mantova'], expectation: 'DENY' as const, uid: outsiderId },
+  ].map(({ value, expectation, uid }): TestDefinition => ({
+    label: `campi preferiti ${JSON.stringify(value)} modificati da ${uid}`,
+    testCase: { expectation, request: { auth: auth(uid), path: fixedSeatProfilePath, method: 'update', resource: { data: { ...fixedSeatProfile, preferredVenueIds: value } } }, resource: { data: fixedSeatProfile }, expressionReportLevel: 'FULL' },
+  })),
+  ...[
     { mode: 'classica', expectation: 'ALLOW' as const, uid: userId },
     { mode: 'nuova', expectation: 'ALLOW' as const, uid: userId },
     { mode: 'altro', expectation: 'DENY' as const, uid: userId },

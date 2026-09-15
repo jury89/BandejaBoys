@@ -1,3 +1,53 @@
+/* Venue selection is shared by classic and preview interfaces. */
+.profile-venues, .venue-filter { min-width: 0; margin: 0 0 20px; padding: 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--white); }
+.profile-venues legend { padding: 0 6px; font-weight: 800; }
+.profile-venues p, .venue-filter p { margin: 10px 0; color: var(--muted); font-size: 13px; line-height: 1.6; }
+.venue-choices { display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; }
+.venue-choices label { display: flex; align-items: center; gap: 9px; min-height: 44px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; cursor: pointer; font-size: 14px; font-weight: 750; }
+.venue-choices label.is-selected { background: var(--aqua); border-color: var(--deep); }
+.venue-choices input { flex: 0 0 18px; width: 18px; height: 18px; margin: 0; accent-color: var(--deep); }
+.venue-filter__heading, .venue-filter__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 12px; }
+.venue-filter__heading { justify-content: space-between; }
+.venue-filter a { color: var(--deep); font-weight: 750; font-size: 14px; text-underline-offset: 3px; }
+.venue-filter__actions button { min-height: 44px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 10px; background: white; color: var(--deep); font-weight: 800; cursor: pointer; }
+.venue-filter__actions button[aria-pressed="true"] { background: var(--ball); border-color: var(--deep); }
+.venue-filter__details > summary { min-height: 44px; padding: 10px 0; cursor: pointer; font-weight: 750; color: var(--deep); }
+.venue-filter__details > summary span { float: right; margin-left: 8px; color: var(--muted); font-size: 13px; }
+.venue-filter__details[open] > summary { margin-bottom: 10px; }
+.venue-link { color: inherit; text-underline-offset: 4px; text-decoration-thickness: 1px; }
+.venue-link span { font-size: .85em; }
+.slot-editor__row > .venue-picker { grid-column: 1 / -1; }
+.slot-editor__row > .slot-editor__duplicate-warning { grid-row: auto; }
+.venues-page { width: min(1040px, calc(100% - 32px)); margin: 28px auto 60px; }
+.venues-page__hero { margin: 22px 0; padding: clamp(24px, 5vw, 44px); background: var(--deep); color: white; border-radius: 20px; }
+.venues-page__hero .eyebrow { color: var(--ball); }
+.venues-page__hero h1 { font-size: clamp(42px, 7vw, 64px); margin: 0 0 10px; }
+.venues-page__hero p:last-child { max-width: 620px; line-height: 1.7; margin-bottom: 0; }
+.venue-page-nav { display: flex; flex-wrap: wrap; gap: 10px; margin: 18px 0; }
+.venue-page-nav a { flex: 1 1 220px; border: 1px solid var(--line); padding: 16px; border-radius: 12px; background: white; color: var(--deep); font-weight: 800; text-decoration: none; }
+.venue-page-nav a[aria-current="page"] { border-color: var(--deep); background: var(--ball); }
+.venue-info-card { border: 1px solid var(--line); border-radius: 18px; padding: clamp(18px, 4vw, 32px); background: white; }
+.venue-info-card h2 { font-size: clamp(30px, 6vw, 46px); margin: 0; }
+.venue-info-card h3 { margin: 0 0 12px; font-size: 21px; }
+.venue-info-card p, .venue-info-card li { line-height: 1.75; }
+.venue-info-card a:not(.button) { color: var(--deep); text-underline-offset: 3px; overflow-wrap: anywhere; }
+.venue-info-card section { padding: 24px 0; border-top: 1px solid var(--line); }
+.venue-address { display: flex; align-items: center; gap: 8px; color: var(--muted); }
+.venue-address svg { flex-shrink: 0; }
+.venue-price-table { overflow-x: auto; }
+.venue-price-table table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.venue-price-table caption { text-align: left; padding: 0 0 12px; color: var(--muted); }
+.venue-price-table th, .venue-price-table td { padding: 12px 8px; border-bottom: 1px solid var(--line); text-align: left; }
+.venue-price-table thead { background: var(--aqua); }
+.venue-price-table td { font-weight: 800; white-space: nowrap; }
+.venue-notice { padding: 18px; border-left: 4px solid #bc8c26; border-radius: 8px; background: #fff8df; color: #58420d; }
+.venue-notice p { margin-bottom: 0; }
+.venue-price-lead { font-size: 30px; font-weight: 850; color: var(--deep); }
+.venue-price-lead span { display: block; font-size: 13px; font-weight: 600; color: var(--muted); }
+.venue-info-card__footer { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 24px; }
+.venue-info-card__footer small { flex-basis: 100%; color: var(--muted); line-height: 1.6; }
+@media (max-width: 480px) { .venue-choices label { flex: 1 1 100%; } .venues-page { margin-top: 18px; } }
+
 /* Shared preference controls; experimental layout stays scoped to .ux-new. */
 .classic-slot-menu, .classic-participation, .classic-player-picker { display: contents; }
 .classic-slot-menu > summary, .classic-player-picker > summary { display: none; }
@@ -8519,7 +8569,8 @@ p {
   }
 
   .booking-strip--pending {
-    display: none;
+    /* The planned venue must stay visible on mobile, even before booking. */
+    display: flex;
   }
 
   .site-footer {

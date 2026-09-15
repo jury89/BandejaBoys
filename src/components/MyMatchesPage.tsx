@@ -13,7 +13,8 @@ import {
   PencilLine,
   Plus,
 } from 'lucide-react'
-import { DEFAULT_VENUE, getMatchFeedbackDefinition } from '../lib/domain'
+import { getMatchFeedbackDefinition } from '../lib/domain'
+import { slotVenueName } from '../lib/venues'
 import { slotDateParts } from '../lib/format'
 import type { PlayerMatch, PlayerMatchLists } from '../types'
 import { MatchReportScoreboard } from './MatchReportScoreboard'
@@ -51,7 +52,7 @@ function MatchItem({
 }) {
   const date = slotDateParts(match.slot.startsAt)
   const booked = Boolean(match.slot.bookedAt)
-  const venue = booked ? (match.slot.venue || DEFAULT_VENUE) : 'Campo da prenotare'
+  const venue = slotVenueName(match.slot)
   const status = past ? 'Giocata' : booked ? 'Campo confermato' : 'Da prenotare'
   const receivedFeedback = past ? match.receivedFeedback : undefined
   const report = past ? match.report : undefined

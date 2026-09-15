@@ -14,6 +14,7 @@ import {
   setDoc,
 } from 'firebase/firestore'
 import type {
+  VenueId,
   FixedSeatPreference,
   InterfaceMode,
   MemberProfile,
@@ -23,6 +24,7 @@ import type {
 import { firebaseAuth, firestore, hasRemoteBackend } from './firebase'
 import { makeId, profileNameError } from './domain'
 import { normalizeInterfaceMode } from './interfaceMode'
+import { normalizePreferredVenueIds, validatePreferredVenueIds } from './venues'
 import {
   DEFAULT_NOTIFICATION_PREFERENCES,
   normalizeNotificationPreferences,
@@ -67,6 +69,7 @@ function accountProfile(account: LocalAccount): MemberProfile {
     notificationPreferences: normalizeNotificationPreferences(account.notificationPreferences),
     fixedSeatPreference: normalizeFixedSeatPreference(account.fixedSeatPreference),
     interfaceMode: normalizeInterfaceMode(account.interfaceMode),
+    preferredVenueIds: normalizePreferredVenueIds(account.preferredVenueIds),
   }
 }
 
@@ -128,6 +131,7 @@ export function subscribeToSession(listener: (user: SessionUser | null) => void)
             notificationPreferences: normalizeNotificationPreferences(profile.notificationPreferences),
             fixedSeatPreference: normalizeFixedSeatPreference(profile.fixedSeatPreference),
             interfaceMode: normalizeInterfaceMode(profile.interfaceMode),
+            preferredVenueIds: normalizePreferredVenueIds(profile.preferredVenueIds),
           })
         },
         () => listener(fallback),
@@ -194,10 +198,14 @@ export async function updateAccountProfile(
   notificationPreferences?: NotificationPreferences,
   fixedSeatPreference?: FixedSeatPreference,
   interfaceMode?: InterfaceMode,
+  preferredVenueIds?: VenueId[],
 ): Promise<SessionUser> {
   const cleanName = displayName.trim()
   const error = profileNameError(cleanName)
   if (error) throw new Error(error)
+  const nextVenueIds = preferredVenueIds === undefined
+    ? normalizePreferredVenueIds(current.preferredVenueIds)
+    : validatePreferredVenueIds(preferredVenueIds)
   const normalizedFixedSeatPreference = normalizeFixedSeatPreference(fixedSeatPreference)
   if (fixedSeatPreference && !normalizedFixedSeatPreference) {
     throw new Error(fixedSeatPreferenceError(fixedSeatPreference) ?? 'La fascia del posto fisso non è valida.')
@@ -210,6 +218,7 @@ export async function updateAccountProfile(
     notificationPreferences: normalizeNotificationPreferences(notificationPreferences),
     fixedSeatPreference: normalizedFixedSeatPreference,
     interfaceMode: normalizeInterfaceMode(interfaceMode ?? current.interfaceMode),
+    preferredVenueIds: nextVenueIds,
   }
 
   if (hasRemoteBackend && firebaseAuth?.currentUser && firestore) {
@@ -254,6 +263,7 @@ export async function updateAccountProfile(
         notificationPreferences: nextProfile.notificationPreferences,
         fixedSeatPreference: normalizedFixedSeatPreference || deleteField(),
         ...(interfaceMode !== undefined ? { interfaceMode: normalizeInterfaceMode(interfaceMode) } : {}),
+        ...(preferredVenueIds !== undefined ? { preferredVenueIds: nextVenueIds } : {}),
       })
       bucketReferences.forEach((reference, index) => {
         const members = nextBuckets[index]
@@ -279,6 +289,7 @@ export async function updateAccountProfile(
     notificationPreferences: nextProfile.notificationPreferences,
     fixedSeatPreference: normalizedFixedSeatPreference,
     ...(interfaceMode !== undefined ? { interfaceMode: normalizeInterfaceMode(interfaceMode) } : {}),
+    ...(preferredVenueIds !== undefined ? { preferredVenueIds: nextVenueIds } : {}),
   }
   writeAccounts(accounts)
   emitAuthChange()

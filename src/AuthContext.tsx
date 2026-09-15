@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
-import type { FixedSeatPreference, InterfaceMode, NotificationPreferences, SessionUser } from './types'
+import type { FixedSeatPreference, InterfaceMode, NotificationPreferences, SessionUser, VenueId } from './types'
 import {
   registerAccount,
   resetPassword,
@@ -22,6 +22,7 @@ interface AuthContextValue {
     notificationPreferences?: NotificationPreferences,
     fixedSeatPreference?: FixedSeatPreference,
     interfaceMode?: InterfaceMode,
+    preferredVenueIds?: VenueId[],
   ) => Promise<void>
 }
 
@@ -51,6 +52,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     notificationPreferences?: NotificationPreferences,
     fixedSeatPreference?: FixedSeatPreference,
     interfaceMode?: InterfaceMode,
+    preferredVenueIds?: VenueId[],
   ) => {
     if (!user) throw new Error('Devi accedere per modificare il profilo.')
     const profile = await updateAccountProfile(
@@ -60,6 +62,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       notificationPreferences,
       fixedSeatPreference,
       interfaceMode,
+      preferredVenueIds,
     )
     setUser(profile)
   }, [user])

@@ -12,6 +12,8 @@ Run `npm run check` before every commit or push. It must complete lint, all test
 - A direct substitution keeps the outgoing starter's position and removes an existing reserve entry for the replacement.
 - Fixed-seat preferences use `Europe/Rome` half-hour buckets, with at most three users in every overlapping bucket.
 - Fixed-seat auto-signup runs only when a slot is created; rescheduling or changing a preference never adds or removes historical signups.
+- Fixed-seat auto-signup is limited to the user's preferred venues; empty/absent preferences mean all venues. The three-user overlap cap remains global, not per venue.
+- A slot's planned `venueId` is separate from booking facts. Missing legacy ids default to Oasi without migrations; never clear the planned venue when cancelling a booking.
 - `collecting` and `ready` are derived states. Persist only booking facts (`bookedAt`, venue and actor).
 - Mutations of a Firestore poll must remain transactional.
 

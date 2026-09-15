@@ -25,6 +25,7 @@ export interface FixedSeatPreference {
 }
 
 export interface MemberProfile {
+  preferredVenueIds?: VenueId[]
   id: string
   displayName: string
   email: string
@@ -75,6 +76,8 @@ export type AdminSlotRosterAction =
   }
 
 export interface PadelSlot {
+  /** Planned club, independent of booking confirmation. Legacy slots default to Oasi. */
+  venueId?: VenueId
   id: string
   startsAt: string
   durationMinutes: number
@@ -200,7 +203,10 @@ export interface PlayerStatistics {
   performances: PlayerMatchPerformance[]
 }
 
+export type VenueId = 'oasi-boschetto' | 'tennis-club-mantova' | 'sport-city-mantova'
+
 export interface SlotInput {
+  venueId?: VenueId
   startsAt: string
   durationMinutes: number
 }

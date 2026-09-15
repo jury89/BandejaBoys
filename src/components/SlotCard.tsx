@@ -1,5 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { useInterfaceMode } from '../InterfaceContext'
+import { slotVenueName } from '../lib/venues'
+import { VenueLabel } from './VenueLabel'
 import {
   ArrowRight,
   ArrowLeftRight,
@@ -19,7 +21,6 @@ import {
 } from 'lucide-react'
 import type { MemberProfile, PadelPoll, PadelSlot, SessionUser, Signup, SignupRole } from '../types'
 import {
-  DEFAULT_VENUE,
   getReserves,
   getSlotPhase,
   getStarters,
@@ -166,7 +167,7 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
 
   const deleteSlot = async () => {
     const bookingWarning = phase === 'booked'
-      ? ` Il campo risulta prenotato: dovrai annullarlo direttamente con l’Oasi Boschetto.`
+      ? ` Il campo risulta prenotato: dovrai annullarlo direttamente con ${slotVenueName(slot)}.`
       : ''
     if (!window.confirm(
       `Eliminare lo slot di ${date.full} alle ${date.time}? Verranno rimosse tutte le adesioni e le riserve.${bookingWarning}`,
@@ -176,7 +177,7 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
 
   const book = () => run(
     () => repository.setBooking(poll.id, slot.id, { bookedBy: user }, user),
-    `Campo prenotato all’Oasi Boschetto. L’orario è confermato.`,
+    `Campo prenotato: ${slotVenueName(slot)}. L’orario è confermato.`,
   )
 
   const addToCalendar = () => {
@@ -291,7 +292,7 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
         <div className="booking-strip">
           <span className="booking-strip__pin" aria-hidden="true"><MapPin size={16} /></span>
           <span className="booking-strip__copy">
-            <strong>{DEFAULT_VENUE}</strong>
+            <strong><VenueLabel slot={slot} /></strong>
             <small>Prenotazione confermata da {memberName(slot.bookedBy, slot.bookedByName)}</small>
           </span>
           <span className="booking-strip__stamp"><Check size={13} /> Confermato</span>
@@ -302,8 +303,8 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
         <div className="booking-strip booking-strip--pending" aria-label="Campo da prenotare">
           <span className="booking-strip__pin" aria-hidden="true"><CalendarCheck2 size={16} /></span>
           <span className="booking-strip__copy">
-            <strong>Campo da prenotare</strong>
-            <small>Prenotazione non ancora confermata</small>
+            <strong><VenueLabel slot={slot} /></strong>
+            <small>Campo da prenotare · prenotazione non ancora confermata</small>
           </span>
           <span className="booking-strip__stamp"><Clock3 size={13} /> In attesa</span>
         </div>
@@ -458,11 +459,11 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
             type="button"
             onClick={book}
             disabled={busy}
-            aria-label="Segna il campo come prenotato all’Oasi Boschetto"
+            aria-label={`Segna il campo come prenotato: ${slotVenueName(slot)}`}
           >
             <span className="booking-action__icon" aria-hidden="true"><CalendarCheck2 size={19} /></span>
             <span className="booking-action__copy">
-              <small>{DEFAULT_VENUE}</small>
+              <small>{slotVenueName(slot)}</small>
               <strong>{busy ? 'Salvataggio…' : 'Segna come prenotato'}</strong>
             </span>
             <ArrowRight className="booking-action__arrow" size={18} aria-hidden="true" />

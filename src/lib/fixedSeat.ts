@@ -1,3 +1,4 @@
+import { matchesVenueFilter, normalizePreferredVenueIds } from './venues'
 import type {
   FixedSeatPreference,
   FixedSeatWeekday,
@@ -140,13 +141,15 @@ export function fixedSeatMaxOtherOverlap(
 }
 
 export function fixedSeatMatchingMembers(
-  slot: Pick<PadelSlot, 'startsAt' | 'durationMinutes'>,
+  slot: Pick<PadelSlot, 'startsAt' | 'durationMinutes' | 'venueId'> & Partial<Pick<PadelSlot, 'venue'>>,
   members: MemberProfile[],
 ): MemberProfile[] {
   return members
     .filter((member) => {
       const preference = normalizeFixedSeatPreference(member.fixedSeatPreference)
-      return preference ? fixedSeatPreferenceMatchesSlot(preference, slot) : false
+      return preference
+        ? fixedSeatPreferenceMatchesSlot(preference, slot) && matchesVenueFilter(slot, normalizePreferredVenueIds(member.preferredVenueIds))
+        : false
     })
     .sort((left, right) => left.createdAt - right.createdAt || left.id.localeCompare(right.id))
     .slice(0, FIXED_SEAT_MAX_PLAYERS)

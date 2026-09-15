@@ -110,6 +110,26 @@ describe('repository activity log in demo mode', () => {
     ])
   })
 
+  it('applica i preferiti al posto fisso solo alla creazione, senza toccare lo storico', async () => {
+    const fixed = { ...user, id: 'fixed-player', passwordHash: 'test', preferredVenueIds: ['sport-city-mantova'], fixedSeatPreference: { weekday: 2, startMinutes: 19 * 60, endMinutes: 21 * 60 } }
+    localStorage.setItem(ACCOUNTS_KEY, JSON.stringify([fixed]))
+    await repository.createPoll({ slots: [
+      { startsAt: '2027-01-05T19:30', durationMinutes: 90, venueId: 'oasi-boschetto' },
+      { startsAt: '2027-01-05T19:30', durationMinutes: 90, venueId: 'sport-city-mantova' },
+    ] }, user)
+    const poll = polls()[0]
+    const oasi = poll.slots.find((slot) => slot.venueId === 'oasi-boschetto')!
+    const sport = poll.slots.find((slot) => slot.venueId === 'sport-city-mantova')!
+    expect(oasi.signups).toEqual([])
+    expect(sport.signups).toEqual([expect.objectContaining({ userId: fixed.id, role: 'starter', source: 'fixed-seat' })])
+    const originalSignups = sport.signups
+    localStorage.setItem(ACCOUNTS_KEY, JSON.stringify([{ ...fixed, preferredVenueIds: ['oasi-boschetto'] }]))
+    const rescheduled = await repository.rescheduleSlot(poll.id, oasi.id, '2027-01-12T19:30', user)
+    expect(rescheduled.slots.find((slot) => slot.id === oasi.id)?.signups).toEqual([])
+    expect(rescheduled.slots.find((slot) => slot.id === sport.id)?.signups).toEqual(originalSignups)
+    expect(activity().events.filter((event) => event.type === 'fixed_seat_auto_joined')).toHaveLength(1)
+  })
+
   it('registra le modifiche amministrative alla formazione e le limita a Jury', async () => {
     await repository.createPoll({
       slots: [{ startsAt: '2027-01-05T19:30', durationMinutes: 90 }],

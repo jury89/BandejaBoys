@@ -10,6 +10,19 @@ const user: SessionUser = {
 }
 
 describe('editor degli slot', () => {
+  it('salva un campo diverso per ogni slot e avverte solo per duplicati nello stesso circolo', async () => {
+    const onCreate = vi.fn().mockResolvedValue(undefined)
+    render(<CreatePollModal user={{ ...user, preferredVenueIds: ['sport-city-mantova'] }} existingSlots={[{ startsAt: '2026-08-25T19:30', venueId: 'oasi-boschetto' }]} onClose={vi.fn()} onCreate={onCreate} onDone={vi.fn()} />)
+    expect(screen.getByLabelText('Campo dello slot 1')).toHaveValue('sport-city-mantova')
+    fireEvent.change(screen.getAllByLabelText('Data')[0], { target: { value: '2026-08-25' } })
+    expect(screen.queryByText(/Esiste già uno slot/)).not.toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Campo dello slot 1'), { target: { value: 'oasi-boschetto' } })
+    expect(screen.getByText(/Esiste già uno slot/)).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Campo dello slot 2'), { target: { value: 'tennis-club-mantova' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Pubblica slot' }))
+    await waitFor(() => expect(onCreate).toHaveBeenCalled())
+    expect(onCreate.mock.calls[0][0].slots.map((slot: { venueId: string }) => slot.venueId)).toEqual(['oasi-boschetto', 'tennis-club-mantova'])
+  })
   it('crea gli slot dalle singole date senza richiedere nome o settimana', async () => {
     const onCreate = vi.fn().mockResolvedValue(undefined)
     render(
