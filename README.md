@@ -1,5 +1,15 @@
 # Bandeja Boys
 
+## Campi, preferiti e posto fisso
+
+Ogni nuovo slot permette di scegliere **Oasi Boschetto**, **Tennis Club Mantova** oppure **Sport City Mantova**. Il circolo è visibile anche prima della prenotazione e viene usato per promemoria e calendario; la conferma della prenotazione resta un’azione separata. Gli slot precedenti senza identificativo del circolo restano all’Oasi, senza migrazioni o modifiche allo storico.
+
+In **Profilo → Campi preferiti** puoi selezionare più circoli. La bacheca si apre filtrata sui preferiti; **Tutti i campi** e le caselle del filtro cambiano soltanto la vista corrente. **Ripristina i preferiti** recupera la scelta salvata. Nessun preferito significa tutti i campi. Il posto fisso si applica **soltanto ai nuovi slot nei circoli preferiti**, mantenendo il limite globale di tre utenti per fascia sovrapposta. Cambiare preferenze o riprogrammare uno slot non altera iscrizioni già presenti.
+
+**Campi e costi** è raggiungibile dalla bacheca e dal menu account; il nome di Tennis Club e Sport City sullo slot apre la relativa scheda. Link diretti: `#campi/tennis-club-mantova` e `#campi/sport-city-mantova`. Fonti ufficiali consultate il 15 settembre 2026: il listino estivo TCM scade il 31 ottobre; per Sport City il prezzo “da 40 €/ora” non è presentato come costo a persona o prezzo di 90 minuti. Quote associative, requisiti e listini non verificati sono marcati **da confermare**. I contenuti editoriali e le fonti sono in `src/components/VenuesPage.tsx`; il catalogo in `src/lib/venues.ts`.
+
+Rilascio: pubblicare Hosting e Firestore Rules (campo profilo `preferredVenueIds`). Non occorrono migrazioni, nuove letture periodiche o deploy dello scheduler.
+
 ## Interfaccia classica e anteprima
 
 La classica resta la visualizzazione predefinita. In **Profilo → Interfaccia** ogni giocatore può scegliere **Nuova — anteprima** e premere **Salva profilo**: la scelta viene conservata per il suo account, anche sugli altri dispositivi. È sempre possibile tornare alla classica.

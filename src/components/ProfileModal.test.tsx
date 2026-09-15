@@ -12,6 +12,16 @@ const player: SessionUser = {
 }
 
 describe('profilo giocatore', () => {
+  it('salva una selezione multipla di campi e spiega il vincolo del posto fisso', async () => {
+    const user = userEvent.setup()
+    const onSave = vi.fn().mockResolvedValue(undefined)
+    render(<ProfileModal user={player} onClose={vi.fn()} onSave={onSave} onDone={vi.fn()} />)
+    await user.click(screen.getByRole('checkbox', { name: 'Sport City Mantova' }))
+    await user.click(screen.getByRole('checkbox', { name: 'Tennis Club Mantova' }))
+    expect(screen.getByText(/sarai iscritto automaticamente solo ai nuovi slot/)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Salva profilo' }))
+    expect(onSave.mock.calls[0][5]).toEqual(['sport-city-mantova', 'tennis-club-mantova'])
+  })
   afterEach(() => window.history.replaceState(null, '', '/'))
 
   it('propone la classica e salva esplicitamente la nuova interfaccia', async () => {
@@ -54,6 +64,7 @@ describe('profilo giocatore', () => {
       DEFAULT_NOTIFICATION_PREFERENCES,
       undefined,
       'classica',
+      [],
     )
     expect(screen.queryByLabelText('Password')).not.toBeInTheDocument()
     expect(screen.queryByRole('textbox', { name: /Email/ })).not.toBeInTheDocument()
@@ -96,7 +107,7 @@ describe('profilo giocatore', () => {
       ...DEFAULT_NOTIFICATION_PREFERENCES,
       mondayMotivation: false,
       reminder2h: false,
-    }, undefined, 'classica')
+    }, undefined, 'classica', [])
   })
 
   it('salva giorno e fascia del posto fisso', async () => {
@@ -116,6 +127,7 @@ describe('profilo giocatore', () => {
       DEFAULT_NOTIFICATION_PREFERENCES,
       { weekday: 3, startMinutes: 18 * 60 + 30, endMinutes: 20 * 60 + 30 },
       'classica',
+      [],
     )
   })
 

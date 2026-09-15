@@ -2,6 +2,7 @@ import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, vi } from 'vitest'
 import type {
+  VenueId,
   FantasyEntry,
   FantasyRound,
   MatchFeedbackResponse,
@@ -30,6 +31,7 @@ const dashboardTestState = vi.hoisted(() => {
   } satisfies NotificationDelivery
   return {
     polls: [] as PadelPoll[],
+    preferredVenueIds: [] as VenueId[],
     members: [] as MemberProfile[],
     feedbackResponses: [] as MatchFeedbackResponse[],
     feedbackSummaries: [] as MatchFeedbackSummary[],
@@ -50,6 +52,7 @@ vi.mock('../AuthContext', () => ({
       displayName: 'Jury',
       email: 'jury@example.test',
       createdAt: 1,
+      preferredVenueIds: dashboardTestState.preferredVenueIds,
     },
     signOut: vi.fn(),
     updateProfile: vi.fn(),
@@ -138,6 +141,7 @@ describe('menu account', () => {
     vi.clearAllMocks()
     vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
     dashboardTestState.polls = []
+    dashboardTestState.preferredVenueIds = []
     dashboardTestState.members = []
     dashboardTestState.feedbackResponses = []
     dashboardTestState.feedbackSummaries = []
@@ -152,6 +156,35 @@ describe('menu account', () => {
 
   afterEach(() => {
     vi.useRealTimers()
+  })
+
+  it('parte dai campi preferiti, permette più circoli o tutti e ripristina il filtro senza salvare il profilo', async () => {
+    const user = userEvent.setup()
+    dashboardTestState.preferredVenueIds = ['tennis-club-mantova']
+    const venueIds: VenueId[] = ['oasi-boschetto', 'tennis-club-mantova', 'sport-city-mantova']
+    dashboardTestState.polls = [{ id: 'venues', title: 'Padel', targetWeekStart: '2030-09-09', createdAt: 1, updatedAt: 1, createdBy: 'jury', createdByName: 'Jury', status: 'open', slots: venueIds.map((venueId) => ({ id: venueId, venueId, startsAt: '2030-09-10T18:00:00+02:00', durationMinutes: 90, venue: '', signups: [] })) }]
+    render(<Dashboard />)
+    const cards = () => Array.from(document.querySelectorAll('.slot-card'))
+    expect(cards()).toHaveLength(1)
+    expect(cards()[0]).toHaveTextContent('Tennis Club Mantova')
+    await user.click(screen.getByText('Scegli i campi'))
+    await user.click(screen.getByRole('checkbox', { name: 'Sport City Mantova' }))
+    expect(cards()).toHaveLength(2)
+    await user.click(screen.getByRole('button', { name: 'Tutti i campi' }))
+    expect(cards()).toHaveLength(3)
+    await user.click(screen.getByRole('button', { name: 'Ripristina i preferiti' }))
+    expect(cards()).toHaveLength(1)
+    expect(dashboardTestState.preferredVenueIds).toEqual(['tennis-club-mantova'])
+  })
+
+  it('apre le pagine dei circoli con link diretto e cambia scheda tramite hash', () => {
+    window.history.replaceState({}, '', '/#campi/tennis-club-mantova')
+    render(<Dashboard />)
+    expect(screen.getByRole('heading', { name: 'Tennis Club Mantova' })).toBeInTheDocument()
+    expect(screen.getByText(/Tariffe estive 2026/)).toBeInTheDocument()
+    act(() => { window.history.replaceState({}, '', '/#campi/sport-city-mantova'); window.dispatchEvent(new HashChangeEvent('hashchange')) })
+    expect(screen.getByRole('heading', { name: 'Sport City Mantova' })).toBeInTheDocument()
+    expect(screen.getByText(/Da 40 €/)).toBeInTheDocument()
   })
 
   it('rende le quattro sezioni raggiungibili direttamente e conserva il filtro tornando in bacheca', async () => {
@@ -178,8 +211,8 @@ describe('menu account', () => {
     await user.click(trigger)
     await user.click(screen.getByText('jury@example.test'))
     expect(screen.getByRole('button', { name: /Profilo/ })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /Chiama Oasi Boschetto/ }))
-      .toHaveAttribute('href', 'tel:+390376290058')
+    expect(screen.getByRole('link', { name: /Campi e costi.*Circoli/ }))
+      .toHaveAttribute('href', '#campi')
 
     await user.click(screen.getByRole('heading', { name: /Ci vediamo in campo/ }))
     expect(screen.queryByRole('button', { name: /Profilo/ })).not.toBeInTheDocument()

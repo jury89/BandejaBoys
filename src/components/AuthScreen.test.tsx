@@ -73,7 +73,7 @@ describe('accesso locale', () => {
     await user.type(screen.getByLabelText('Password'), 'segreto123')
     await user.click(screen.getByRole('button', { name: /Crea il mio account/ }))
 
-    const allFilter = await screen.findByRole('button', { name: /^Tutti/ })
+    const allFilter = await screen.findByRole('button', { name: /^Tutti,/ })
     const bookingFilter = screen.getByRole('button', { name: /^Slot da prenotare,/ })
     expect(allFilter).toHaveAttribute('aria-pressed', 'true')
 

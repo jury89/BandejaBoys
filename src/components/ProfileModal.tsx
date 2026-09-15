@@ -15,6 +15,7 @@ import {
   UserRound,
 } from 'lucide-react'
 import type {
+  VenueId,
   FixedSeatPreference,
   FixedSeatWeekday,
   InterfaceMode,
@@ -34,6 +35,8 @@ import {
 import { Modal } from './Modal'
 import { ProfileAvatar } from './ProfileAvatar'
 import { interfaceOverride, resolveInterfaceMode } from '../lib/interfaceMode'
+import { normalizePreferredVenueIds } from '../lib/venues'
+import { VenueChoices } from './VenuePicker'
 
 const NOTIFICATION_OPTIONS: {
   key: keyof NotificationPreferences
@@ -124,11 +127,13 @@ interface ProfileModalProps {
     notificationPreferences?: NotificationPreferences,
     fixedSeatPreference?: FixedSeatPreference,
     interfaceMode?: InterfaceMode,
+    preferredVenueIds?: VenueId[],
   ) => Promise<void>
   onDone: (message: string) => void
 }
 
 export function ProfileModal({ user, members = [user], onClose, onSave, onDone }: ProfileModalProps) {
+  const [preferredVenueIds, setPreferredVenueIds] = useState(() => normalizePreferredVenueIds(user.preferredVenueIds))
   const [interfaceMode, setInterfaceMode] = useState<InterfaceMode>(() => resolveInterfaceMode(window.location.search, user.interfaceMode))
   const fileInput = useRef<HTMLInputElement>(null)
   const savedFixedSeatPreference = normalizeFixedSeatPreference(user.fixedSeatPreference)
@@ -206,7 +211,7 @@ export function ProfileModal({ user, members = [user], onClose, onSave, onDone }
     setError('')
     setSaving(true)
     try {
-      await onSave(displayName.trim(), avatarDataUrl, notificationPreferences, fixedSeatPreference, interfaceMode)
+      await onSave(displayName.trim(), avatarDataUrl, notificationPreferences, fixedSeatPreference, interfaceMode, preferredVenueIds)
       onDone('Profilo aggiornato.')
       onClose()
     } catch (saveError) {
@@ -275,6 +280,13 @@ export function ProfileModal({ user, members = [user], onClose, onSave, onDone }
           <em>Non modificabile</em>
         </div>
 
+        <fieldset className="profile-venues">
+          <legend>Campi preferiti</legend>
+          <p>Seleziona uno o più circoli: la bacheca partirà da questi campi. Potrai sempre scegliere “Tutti i campi” senza cambiare i preferiti.</p>
+          <VenueChoices value={preferredVenueIds} onChange={setPreferredVenueIds} disabled={saving} />
+          <p><strong>Vale anche per il posto fisso:</strong> sarai iscritto automaticamente solo ai nuovi slot nei campi preferiti. Nessuna selezione = tutti i campi. Le iscrizioni già fatte non cambiano.</p>
+        </fieldset>
+
         <fieldset className="profile-interface">
           <legend>Interfaccia</legend>
           <p>Scegli come vedere Bandeja. La scelta vale per il tuo account, su tutti i dispositivi. Puoi cambiarla quando vuoi.</p>
@@ -315,7 +327,7 @@ export function ProfileModal({ user, members = [user], onClose, onSave, onDone }
             </label>
           </div>
           <p>
-            Ti aggiungiamo come titolare agli slot futuri che iniziano e finiscono interamente nella fascia scelta.
+            Ti aggiungiamo come titolare ai nuovi slot nei campi preferiti che iniziano e finiscono interamente nella fascia scelta.
           </p>
 
           {fixedSeatEnabled && (

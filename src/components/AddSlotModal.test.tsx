@@ -48,6 +48,7 @@ describe('aggiunta di uno slot', () => {
     await waitFor(() => expect(onSave).toHaveBeenCalledWith({
       startsAt: '2026-07-29T18:30',
       durationMinutes: 120,
+      venueId: 'oasi-boschetto',
     }))
     expect(onDone).toHaveBeenCalledWith(
       'Slot aggiunto. Gli altri riceveranno un unico avviso raggruppato.',

@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useInterfaceMode } from '../InterfaceContext'
+import { slotVenueName } from '../lib/venues'
 import {
   Activity,
   ArrowLeft,
@@ -474,7 +475,7 @@ export function PlayerStatisticsPage({
                   <div className="player-stats__history-match">
                     <p>{match.pollTitle}</p>
                     <h3>{date.time}</h3>
-                    <span>{match.slot.durationMinutes} min · {match.slot.venue}</span>
+                    <span>{match.slot.durationMinutes} min · {slotVenueName(match.slot)}</span>
                   </div>
                   {performance && performance.setsPlayed > 0 ? (
                     <div className="player-stats__history-result">

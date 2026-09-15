@@ -4,13 +4,15 @@ import type { CreatePollInput, PadelSlot, SessionUser, SlotInput } from '../type
 import { defaultSlotForWeek, hasExistingSlotAtDateTime, nextMondayDate } from '../lib/domain'
 import { Modal } from './Modal'
 import { SlotDateTimeField } from './SlotDateTimeField'
+import { DEFAULT_VENUE_ID } from '../lib/venues'
+import { VenuePicker } from './VenuePicker'
 
 interface CreatePollModalProps {
   user: SessionUser
   onClose: () => void
   onCreate: (input: CreatePollInput, creator: SessionUser) => Promise<void>
   onDone: (message: string) => void
-  existingSlots: ReadonlyArray<Pick<PadelSlot, 'startsAt'>>
+  existingSlots: ReadonlyArray<Pick<PadelSlot, 'startsAt' | 'venueId'> & Partial<Pick<PadelSlot, 'venue'>>>
 }
 
 interface EditableSlot extends SlotInput {
@@ -30,8 +32,8 @@ export function CreatePollModal({ user, onClose, onCreate, onDone, existingSlots
   const initialWeekStart = useMemo(() => nextMondayDate(), [])
   const nextEditorId = useRef(3)
   const [slots, setSlots] = useState<EditableSlot[]>([
-    { editorId: 'slot-1', startsAt: defaultSlotForWeek(initialWeekStart, 1), durationMinutes: 90 },
-    { editorId: 'slot-2', startsAt: defaultSlotForWeek(initialWeekStart, 3), durationMinutes: 90 },
+    { editorId: 'slot-1', startsAt: defaultSlotForWeek(initialWeekStart, 1), durationMinutes: 90, venueId: user.preferredVenueIds?.[0] ?? DEFAULT_VENUE_ID },
+    { editorId: 'slot-2', startsAt: defaultSlotForWeek(initialWeekStart, 3), durationMinutes: 90, venueId: user.preferredVenueIds?.[0] ?? DEFAULT_VENUE_ID },
   ])
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -59,7 +61,7 @@ export function CreatePollModal({ user, onClose, onCreate, onDone, existingSlots
     setBusy(true)
     setError('')
     try {
-      const slotInputs = slots.map(({ startsAt, durationMinutes }) => ({ startsAt, durationMinutes }))
+      const slotInputs = slots.map(({ startsAt, durationMinutes, venueId }) => ({ startsAt, durationMinutes, venueId }))
       await onCreate({ slots: slotInputs }, user)
       onDone('Slot pubblicati. È ora di raccogliere le adesioni.')
       onClose()
@@ -92,6 +94,7 @@ export function CreatePollModal({ user, onClose, onCreate, onDone, existingSlots
                       ? nextDayAtSameTime(previous.startsAt)
                       : defaultSlotForWeek(initialWeekStart, 1),
                     durationMinutes: previous?.durationMinutes ?? 90,
+                    venueId: previous?.venueId ?? DEFAULT_VENUE_ID,
                   },
                 ]
               })}
@@ -102,7 +105,7 @@ export function CreatePollModal({ user, onClose, onCreate, onDone, existingSlots
 
           <div className="slot-editor__list">
             {slots.map((slot, index) => {
-              const alreadyExists = hasExistingSlotAtDateTime(slot.startsAt, existingSlots)
+              const alreadyExists = hasExistingSlotAtDateTime(slot.startsAt, existingSlots, slot.venueId)
               return (
               /* La chiave non dipende dai valori editabili: il controllo nativo mantiene il focus tra gli aggiornamenti. */
               <div className={`slot-editor__row ${alreadyExists ? 'slot-editor__row--duplicate' : ''}`} key={slot.editorId}>
@@ -142,6 +145,7 @@ export function CreatePollModal({ user, onClose, onCreate, onDone, existingSlots
                     <Trash2 size={18} />
                   </button>
                 </div>
+                <VenuePicker label={`Campo dello slot ${index + 1}`} value={slot.venueId ?? DEFAULT_VENUE_ID} onChange={(venueId) => updateSlotInput(index, { venueId })} disabled={busy} />
                 {alreadyExists && (
                   <p className="slot-editor__duplicate-warning" role="status">
                     <AlertTriangle size={16} /> Esiste già uno slot con questa data e ora. Puoi comunque pubblicarlo.

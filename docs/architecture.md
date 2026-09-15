@@ -1,5 +1,17 @@
 # Architettura e regole di dominio
 
+## Circoli e filtri preferiti
+
+- `PadelSlot.venueId` identifica il **circolo proposto** (`oasi-boschetto`, `tennis-club-mantova`, `sport-city-mantova`) ed è separato dal precedente `venue`, etichetta della prenotazione confermata. Tutte le creazioni nuove persistono l’id, anche prima di prenotare. La conferma riempie `venue` con il nome del circolo scelto; la revoca svuota i fatti di prenotazione ma non `venueId`.
+- `slotVenueId` / `slotVenueName` risolvono i dati legacy senza scritture: nome noto oppure default Oasi; un’etichetta storica sconosciuta resta leggibile. Nessuna riscrittura di slot, giocatori, referti, giudizi o Fanta. Le modifiche alla data conservano il circolo e la formazione.
+- Duplicati di data/ora vengono confrontati nello stesso circolo. Due circoli diversi possono avere slot simultanei. Gli avvisi in creazione restano non bloccanti per slot già pubblicati; duplicati identici nello stesso invio continuano a essere rifiutati dal dominio.
+- `MemberProfile.preferredVenueIds` è opzionale. Array vuoto/assente = tutti; l’input deve essere un elenco senza duplicati di id noti. Letture normalize in ordine di catalogo, scritture validate; Firestore consente soltanto al proprietario di aggiornare il profilo. Remote e demo condividono il contratto. Vecchi chiamanti che omettono il parametro non cancellano i preferiti.
+- Dashboard usa il profilo come filtro iniziale e applica un override locale associato a utente e versione dei preferiti. Nessuna lettura/scrittura aggiuntiva per i filtri; conteggi e gruppi settimanali derivano dai soli slot visibili. La navigazione a uno slot dai propri match toglie il filtro del circolo per non nascondere la destinazione. Storico, Fanta e statistiche non vengono filtrati dai preferiti.
+- Posto fisso: `fixedSeatMatchingMembers` interseca la fascia `Europe/Rome` con i preferiti **nella transazione di creazione**. Usa i profili già letti dal lookup dei bucket, senza query aggiuntive. Il tetto di tre rimane globale per fascia, anche se gli utenti hanno circoli diversi: non si introducono contingenti separati per circolo. Aggiornare i preferiti e riprogrammare uno slot non generano auto-iscrizioni né rimuovono quelle esistenti.
+- Le pagine `#campi/...` sono editoriali statiche con data della ricerca, fonti e informazioni mancanti esplicite; non implicano un’integrazione con le prenotazioni dei circoli. Sport City indica la sede indoor di via Palmiro Azzi 5. Prezzi a partire da e listini scaduti non vengono estrapolati come tariffe attuali.
+
+Validazione: suite completa, test semantici Firestore (profili propri/altrui, id ignoti, duplicati, tipi errati) e browser demo isolato nelle due UX su desktop/mobile. Pubblicare soltanto Hosting + Rules; scheduler invariato.
+
 ## Selezione dell’interfaccia
 
 `users.interfaceMode` è facoltativo e vale `classica` oppure `nuova`. Il campo è letto dal listener del profilo già esistente, senza nuove query, e aggiornato dalla stessa transazione del profilo (le regole restano limitate al proprietario). I profili legacy senza campo usano la classica; non viene riscritta la raccolta utenti. La demo implementa la stessa preferenza per account nel proprio archivio locale.

@@ -1,3 +1,4 @@
+import { slotVenueName } from './venues'
 import type {
   FantasyEntry,
   FantasyRound,
@@ -8,7 +9,6 @@ import type {
   MatchReport,
 } from '../types'
 import {
-  DEFAULT_VENUE,
   MAX_STARTERS,
   getMatchFeedbackDueAt,
   getMatchFeedbackResponseId,
@@ -277,7 +277,7 @@ function collectFixedSeatNotifications(poll: PadelPoll, now: number): ScheduledN
         id: `fixed-seat-auto-join:${poll.id}:${slot.id}:${signup.userId}`,
         kind: 'fixed-seat-auto-join' as const,
         title: 'Posto fisso confermato',
-        body: `Ti abbiamo aggiunto automaticamente come titolare per ${formatSession(slot.startsAt)}.`,
+        body: `Ti abbiamo aggiunto automaticamente come titolare per ${formatSession(slot.startsAt)} · ${slotVenueName(slot)}.`,
         url: `/?poll=${encodeURIComponent(poll.id)}`,
         tag: `fixed-seat-auto-join-${poll.id}-${slot.id}-${signup.userId}`,
         ttlSeconds: Math.max(60, Math.floor(
@@ -619,7 +619,7 @@ export function collectScheduledNotifications(
         id: `${kind}:${poll.id}:${slot.id}:${slot.startsAt}`,
         kind,
         title: 'Sveglia fagianotto!',
-        body: `${isTwoHourReminder ? 'Guarda che tra 2 ore giochi' : 'Guarda che domani giochi'}: ${formatSession(slot.startsAt)} · ${DEFAULT_VENUE}.`,
+        body: `${isTwoHourReminder ? 'Guarda che tra 2 ore giochi' : 'Guarda che domani giochi'}: ${formatSession(slot.startsAt)} · ${slotVenueName(slot)}.`,
         url: `/?poll=${encodeURIComponent(poll.id)}`,
         tag: `${timing}-${poll.id}-${slot.id}`,
         ttlSeconds: Math.max(60, Math.floor(remaining / 1000)),

@@ -1,10 +1,10 @@
 import {
-  DEFAULT_VENUE,
   getSlotPhase,
   padelDateTimeToTimestamp,
   toDateTimeInput,
 } from './domain'
 import type { PadelPoll, PadelSlot } from '../types'
+import { slotVenueName } from './venues'
 
 const CALENDAR_TIME_ZONE = 'Europe/Rome'
 const CALENDAR_EVENT_TITLE = 'Padel'
@@ -88,7 +88,7 @@ export function buildSlotCalendar(poll: PadelPoll, slot: PadelSlot, now = Date.n
     `DTSTART;TZID=${CALENDAR_TIME_ZONE}:${formatLocalCalendarDate(event.startsAt)}`,
     `DTEND;TZID=${CALENDAR_TIME_ZONE}:${formatLocalCalendarDate(event.endsAt)}`,
     `SUMMARY:${escapeCalendarText(event.title)}`,
-    `LOCATION:${escapeCalendarText(DEFAULT_VENUE)}`,
+    `LOCATION:${escapeCalendarText(slotVenueName(slot))}`,
     `DESCRIPTION:${escapeCalendarText(event.description)}`,
     `STATUS:${confirmed ? 'CONFIRMED' : 'TENTATIVE'}`,
     `URL:${APP_URL}`,

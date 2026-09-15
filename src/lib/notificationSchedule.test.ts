@@ -293,12 +293,12 @@ describe('pianificazione notifiche', () => {
     const createdAt = NOW - 15 * 60 * 1000
     const future = new Date(NOW + 7 * 24 * 60 * 60 * 1000).toISOString()
     const notifications = collectScheduledNotifications([
-      poll([slot(
+      poll([{ ...slot(
         future,
         [signup('fisso', createdAt, 'fixed-seat')],
         false,
         { at: createdAt, by: 'jury' },
-      )], createdAt),
+      ), venueId: 'sport-city-mantova' }], createdAt),
     ], NOW)
 
     expect(notifications).toHaveLength(2)
@@ -307,6 +307,7 @@ describe('pianificazione notifiche', () => {
       kind: 'fixed-seat-auto-join',
       recipientUserIds: ['fisso'],
       title: 'Posto fisso confermato',
+      body: expect.stringContaining('Sport City Mantova'),
     })
     expect(notifications[1]).toMatchObject({
       kind: 'new-slots',

@@ -9,7 +9,8 @@ import {
   MapPin,
   UsersRound,
 } from 'lucide-react'
-import { DEFAULT_VENUE, getMatchFeedbackDefinition, getStarters, isGuestSignup } from '../lib/domain'
+import { getMatchFeedbackDefinition, getStarters, isGuestSignup } from '../lib/domain'
+import { slotVenueName } from '../lib/venues'
 import { slotDateParts } from '../lib/format'
 import type { GroupMatch, MemberProfile } from '../types'
 import { MatchReportScoreboard } from './MatchReportScoreboard'
@@ -35,7 +36,7 @@ function GroupMatchCard({
 }) {
   const date = slotDateParts(match.slot.startsAt)
   const starters = getStarters(match.slot)
-  const venue = match.slot.venue || DEFAULT_VENUE
+  const venue = slotVenueName(match.slot)
   const memberById = new Map(members.map((member) => [member.id, member]))
 
   return (
