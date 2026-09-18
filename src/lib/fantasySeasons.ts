@@ -6,6 +6,7 @@ export interface FantasySeason {
   eyebrow: string
   startsAt: number
   endsAt?: number
+  courtScoring: 'presence-v1' | 'placement-v2'
 }
 
 // Midnight at the start of 28 September 2026 in Europe/Rome (CEST, UTC+2).
@@ -18,12 +19,14 @@ export const FANTASY_SEASONS: readonly FantasySeason[] = [
     eyebrow: 'Prima stagione',
     startsAt: 0,
     endsAt: FANTASY_SUMMER_2026_ENDS_AT,
+    courtScoring: 'presence-v1',
   },
   {
     id: 'winter-2026-27',
     label: 'Inverno 2026/27',
     eyebrow: 'Seconda stagione',
     startsAt: FANTASY_SUMMER_2026_ENDS_AT,
+    courtScoring: 'placement-v2',
   },
 ]
 

@@ -6,6 +6,8 @@ Run `npm run check` before every commit or push. It must complete lint, all test
 
 ## Domain invariants
 
+- Fantasy court points are versioned by the match season (`locksAt`), never settlement/current time. Summer keeps 2/3 attendance points; winter uses individual fantasy-score rank 5/3/1/0 with shared ties and skipped occupied places. Do not change manager scoring or the best-mean captain bonus.
+
 - Signup precedence is chronological. Never reorder signups manually in UI code.
 - The first four ordered signups are starters; all later signups are reserves.
 - Removing a starter promotes the first reserve by derivation, not by a second write.
