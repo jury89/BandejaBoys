@@ -1,8 +1,10 @@
 import { DEFAULT_VENUE_ID, slotVenueId, slotVenueName, validateVenueId } from './venues'
+import { getFantasySeasonForRound } from './fantasySeasons'
 import type {
   AdminSlotRosterAction,
   CreatePollInput,
   FantasyEntry,
+  FantasyCourtStanding,
   FantasyLeaderboardContribution,
   FantasyLeaderboardRow,
   FantasyPlayerScore,
@@ -1424,6 +1426,30 @@ export function reconcileFantasyRounds(
   ))
 }
 
+/** Use the match's season, never today's date or the later settlement date. */
+export function getFantasyCourtStandings(round: FantasyRound): FantasyCourtStanding[] {
+  if (round.status !== 'scored' || getFantasySeasonForRound(round).courtScoring !== 'placement-v2') return []
+  const scoresByPlayer = new Map((round.playerScores ?? []).map((score) => [score.userId, score]))
+  // An incomplete/corrupt score snapshot must not award invented placement points.
+  if (round.participants.length !== MAX_STARTERS
+    || new Set(round.participants.map((player) => player.userId)).size !== MAX_STARTERS
+    || round.participants.some((player) => !Number.isFinite(scoresByPlayer.get(player.userId)?.fantasyScore))) return []
+  const players = round.participants.map((player) => ({
+    ...player,
+    fantasyScore: scoresByPlayer.get(player.userId)!.fantasyScore,
+  }))
+  return players.map((player) => {
+    // Competition ranking: two first places occupy positions 1 and 2, next is third.
+    const rank = 1 + players.filter((other) => other.fantasyScore > player.fantasyScore).length
+    return {
+      ...player,
+      rank,
+      tied: players.filter((other) => other.fantasyScore === player.fantasyScore).length > 1,
+      leaguePoints: fantasyStandingLeaguePoints(rank),
+    }
+  }).sort((left, right) => left.rank - right.rank || left.userId.localeCompare(right.userId))
+}
+
 export function getFantasyLeaderboard(rounds: FantasyRound[]): FantasyLeaderboardRow[] {
   const rows = new Map<string, Omit<FantasyLeaderboardRow, 'rank'>>()
 
@@ -1473,6 +1499,28 @@ export function getFantasyLeaderboard(rounds: FantasyRound[]): FantasyLeaderboar
           },
         })
       })
+
+      if (getFantasySeasonForRound(round).courtScoring === 'placement-v2') {
+        getFantasyCourtStandings(round).forEach((standing) => {
+          addContribution({
+            managerId: standing.userId,
+            managerName: standing.displayName,
+            // Preserve the existing general-ranking tiebreak: wins of fantasy formations.
+            wins: 0,
+            contribution: {
+              roundId: round.id,
+              pollTitle: round.pollTitle,
+              playedAt: round.locksAt,
+              source: 'court-placement',
+              leaguePoints: standing.leaguePoints,
+              rawFantasyPoints: standing.fantasyScore,
+              rank: standing.rank,
+              tied: standing.tied,
+            },
+          })
+        })
+        return
+      }
 
       const scoresByPlayer = new Map(
         (round.playerScores ?? []).map((score) => [score.userId, score]),

@@ -341,6 +341,14 @@ export interface FantasyRoundStanding {
   leaguePoints: number
 }
 
+/** Derived from a scored winter round; never a manager entry or a new stored result. */
+export interface FantasyCourtStanding extends FantasyRoundPlayer {
+  fantasyScore: number
+  rank: number
+  tied: boolean
+  leaguePoints: number
+}
+
 export interface FantasyRound {
   id: string
   pollId: string
@@ -400,8 +408,9 @@ export interface FantasyLeaderboardContribution {
   roundId: string
   pollTitle: string
   playedAt: number
-  source: 'formation' | 'starter' | 'mvp' | 'top-performer'
+  source: 'formation' | 'starter' | 'mvp' | 'top-performer' | 'court-placement'
   leaguePoints: number
   rawFantasyPoints: number
   rank?: number
+  tied?: boolean
 }

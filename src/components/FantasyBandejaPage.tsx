@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 import type {
   FantasyEntry,
+  FantasyCourtStanding,
   FantasyLeaderboardContribution,
   FantasyLeaderboardRow,
   FantasyPlayerScore,
@@ -31,6 +32,7 @@ import {
   FANTASY_TOP_PERFORMER_LEAGUE_POINTS,
   fantasyEntryIsCurrent,
   getFantasyLeaderboard,
+  getFantasyCourtStandings,
   getMatchFeedbackDefinition,
 } from '../lib/domain'
 import { PADEL_TIME_ZONE } from '../lib/format'
@@ -167,7 +169,7 @@ function PlayerAvatar({
   )
 }
 
-function FantasyRulesModal({ onClose }: { onClose: () => void }) {
+function FantasyRulesModal({ onClose, season }: { onClose: () => void; season: FantasySeason }) {
   return (
     <Modal
       title="Come si gioca"
@@ -219,13 +221,25 @@ function FantasyRulesModal({ onClose }: { onClose: () => void }) {
               <h3>Scala la classifica</h3>
               <p>
                 I primi tre del round ricevono 5, 3 e 1 punto. La classifica
-                generale somma i punti ottenuti in tutte le partite. Chi gioca
-                in campo riceve {FANTASY_STARTER_LEAGUE_POINTS} punti;
-                {' '}chi ottiene il giudizio medio migliore ne riceve {FANTASY_TOP_PERFORMER_LEAGUE_POINTS}.
+                generale somma i punti ottenuti in tutte le partite della stagione.
               </p>
             </div>
           </li>
         </ol>
+
+        <section className="fantasy-rulebook__score" aria-labelledby="fantasy-court-rules-title">
+          <h3 id="fantasy-court-rules-title">Punti in campo · {season.label}</h3>
+          {season.courtScoring === 'placement-v2' ? <>
+            <p>I quattro titolari vengono ordinati per il totale individuale: media dei giudizi + bilancio set + bonus differenza game.</p>
+            <p><strong>1°: 5 punti · 2°: 3 punti · 3°: 1 punto · 4°: 0 punti.</strong> Sostituiscono i vecchi punti presenza, non si sommano.</p>
+            <p>Chi arriva primo è il Miglior giocatore della partita. A pari totale, stesso piazzamento e stessi punti: due primi ricevono 5 punti ciascuno, poi il terzo ne riceve 1 e il quarto 0.</p>
+            <p>Il Miglior giocatore può essere diverso da chi ha il Miglior giudizio medio: il bonus capitano resta legato soltanto al giudizio medio. I punti e gli spareggi delle formazioni Fanta non cambiano.</p>
+          </> : <>
+            <p>Chi gioca in campo riceve {FANTASY_STARTER_LEAGUE_POINTS} punti; chi ottiene il giudizio medio migliore ne riceve {FANTASY_TOP_PERFORMER_LEAGUE_POINTS}.</p>
+            <p>Dal 28 settembre 2026, con Inverno 2026/27, i titolari riceveranno 5, 3, 1 e 0 punti in base al totale individuale, con pari merito condivisi. Le partite estive conservano le regole attuali anche se calcolate più tardi.</p>
+          </>}
+          <p>La stagione dipende dall’inizio della partita, nel fuso italiano, non dal giorno del calcolo. Senza referto non si assegnano punti; senza giudizi resta il valore base d’ufficio previsto dal Fanta.</p>
+        </section>
 
         <section className="fantasy-rulebook__score" aria-labelledby="fantasy-score-title">
           <header>
@@ -573,6 +587,12 @@ function RoundResult({
   const winnerName = winner
     ? resolveMemberName(members, winner.managerId, winner.managerName)
     : null
+  const courtStandings = getFantasyCourtStandings(round)
+  const courtByPlayer = new Map(courtStandings.map((standing) => [standing.userId, standing]))
+  const playerScores = [...(round.playerScores ?? [])].sort((left, right) => (
+    (courtByPlayer.get(left.userId)?.rank ?? 0) - (courtByPlayer.get(right.userId)?.rank ?? 0)
+  ))
+  const ownCourtStanding = courtByPlayer.get(user.id)
 
   return (
     <article className={`fantasy-result ${expanded ? 'is-expanded' : ''}`}>
@@ -599,6 +619,7 @@ function RoundResult({
               Tu: {fantasyNumber(ownStanding.totalScore)} punti · +{ownStanding.leaguePoints} campionato
             </span>
           )}
+          {ownCourtStanding && <span>Tu in campo: {ownCourtStanding.rank}°{ownCourtStanding.tied ? ' ex aequo' : ''} · +{ownCourtStanding.leaguePoints} campionato</span>}
         </div>
         <ChevronDown className="fantasy-result__chevron" size={20} aria-hidden="true" />
       </button>
@@ -639,12 +660,14 @@ function RoundResult({
           <p className="fantasy-result__empty">Nessuna formazione valida è stata schierata.</p>
         )}
         <div className="fantasy-player-scores">
-          {(round.playerScores ?? []).map((score) => (
+          {courtStandings.length > 0 && <h4>Giocatori in campo · punti campionato</h4>}
+          {playerScores.map((score) => (
             <FantasyPlayerScoreRow
               key={score.userId}
               roundId={round.id}
               score={score}
               members={members}
+              courtStanding={courtByPlayer.get(score.userId)}
             />
           ))}
         </div>
@@ -691,10 +714,12 @@ function FantasyPlayerScoreRow({
   roundId,
   score,
   members,
+  courtStanding,
 }: {
   roundId: string
   score: FantasyPlayerScore
   members: MemberProfile[]
+  courtStanding?: FantasyCourtStanding
 }) {
   const [expanded, setExpanded] = useState(false)
   const playerName = resolveMemberName(members, score.userId, score.displayName)
@@ -729,6 +754,9 @@ function FantasyPlayerScoreRow({
               ? `Base ${fantasyNumber(score.baseRating)} · ${mvpVoteSource(score)}`
               : `Pagella ${fantasyNumber(score.baseRating)}${score.usedDefaultRating ? ' d’ufficio' : ''}`}
           </small>
+          {courtStanding && <small className="fantasy-player-score__court-points">
+            {courtStanding.rank}° in campo{courtStanding.tied ? ' ex aequo' : ''} · +{courtStanding.leaguePoints} pt campionato
+          </small>}
         </span>
         <strong className="fantasy-player-score__total">{fantasyNumber(score.fantasyScore)}</strong>
         {(score.isTopPerformer || score.isMvp) && (
@@ -783,6 +811,10 @@ function FantasyPlayerScoreRow({
             <span>Totale FantaBandeja</span>
             <strong>{fantasyNumber(score.fantasyScore)}</strong>
           </footer>
+          {courtStanding && <p className="fantasy-player-score__court-award">
+            <strong>{courtStanding.rank === 1 ? 'Miglior giocatore della partita' : `${courtStanding.rank}° posto in campo`}{courtStanding.tied ? ' · ex aequo' : ''}</strong>
+            {' '}Il totale di {fantasyNumber(score.fantasyScore)} vale <strong>{courtStanding.leaguePoints} punti in classifica</strong>. Nessun bonus presenza aggiuntivo.
+          </p>}
         </div>
       )}
     </div>
@@ -826,6 +858,7 @@ function Leaderboard({
 }
 
 function contributionLabel(contribution: FantasyLeaderboardContribution): string {
+  if (contribution.source === 'court-placement') return `${contribution.rank}° in campo${contribution.tied ? ' ex aequo' : ''}${contribution.rank === 1 ? ' · Miglior giocatore' : ''} · ${fantasyNumber(contribution.rawFantasyPoints)} fantasy pt`
   if (contribution.source === 'top-performer') return 'Miglior giudizio medio · bonus presenza'
   if (contribution.source === 'mvp') return 'MVP in campo · bonus presenza'
   if (contribution.source === 'starter') return 'Titolare in campo · bonus presenza'
@@ -860,7 +893,7 @@ function LeaderboardRow({
             <strong>{displayName}</strong>
             {isCurrentUser && <small>Tu</small>}
           </span>
-          <small>{row.wins} vittorie · {row.roundsPlayed} round · {fantasyNumber(row.rawFantasyPoints)} fantasy pt</small>
+          <small>{row.wins} vittorie Fanta · {row.roundsPlayed} round · {fantasyNumber(row.rawFantasyPoints)} fantasy pt</small>
         </span>
         <strong>{row.leaguePoints}<small>pt</small></strong>
         <ChevronDown className="fantasy-leaderboard__chevron" size={18} aria-hidden="true" />
@@ -1006,7 +1039,7 @@ export function FantasyBandejaPage({
         </div>
       </section>
 
-      {rulesOpen && <FantasyRulesModal onClose={() => setRulesOpen(false)} />}
+      {rulesOpen && <FantasyRulesModal onClose={() => setRulesOpen(false)} season={selectedSeason} />}
 
       <section className={`fantasy-season${selectedSeasonIsArchived ? ' is-archived' : ''}`} aria-labelledby="fantasy-season-title">
         <div className="fantasy-season__summary">
@@ -1018,7 +1051,9 @@ export function FantasyBandejaPage({
                 ? 'Stagione conclusa: classifica e risultati restano consultabili.'
                 : selectedSeasonIsUpcoming
                   ? 'La nuova classifica parte con le partite del 28 settembre.'
-                  : 'Si chiude domenica 27 settembre alle 23:59.'}
+                  : selectedSeason.courtScoring === 'placement-v2'
+                    ? 'In campo si gioca per il podio: 5, 3, 1 e 0 punti. Formazioni Fanta, stesse regole.'
+                    : 'Si chiude domenica 27 settembre alle 23:59.'}
             </p>
           </div>
           {typeof selectedSeason.endsAt === 'number' ? (

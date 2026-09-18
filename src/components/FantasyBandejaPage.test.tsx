@@ -56,7 +56,69 @@ function renderPage(overrides: Partial<Parameters<typeof FantasyBandejaPage>[0]>
   return { onRetry, onSave }
 }
 
+function courtRound(locksAt: number, totals = [10, 8, 8.5, 3.5]): FantasyRound {
+  return {
+    ...round, id: `court-${locksAt}`, locksAt, slotStartsAt: new Date(locksAt).toISOString(), status: 'scored',
+    playerScores: round.participants.map((player, index) => ({
+      ...player, scoringModel: 'feedback-v3', baseRating: [8, 6, 9, 4][index], ratingCount: 3, usedDefaultRating: false,
+      feedbackLevel: 4, setWins: index < 2 ? 2 : 0, setLosses: index < 2 ? 0 : 2,
+      gameDifference: index < 2 ? 12 : -12, resultBonus: index < 2 ? 1.5 : -0.5, differenceBonus: index < 2 ? 0.5 : 0,
+      fantasyScore: totals[index], isMvp: false, isTopPerformer: index === 2,
+    })),
+  }
+}
+
 describe('FantaBandeja', () => {
+  it('mostra piazzamenti invernali, zero punti e somma auditabile senza cambiare l’archivio estivo', async () => {
+    const user = userEvent.setup()
+    const summer = courtRound(FANTASY_SUMMER_2026_ENDS_AT - 1)
+    const winter = courtRound(FANTASY_SUMMER_2026_ENDS_AT)
+    renderPage({ rounds: [summer, winter], now: winter.locksAt + 3 * 86_400_000 })
+    expect(screen.getByText('In campo si gioca per il podio: 5, 3, 1 e 0 punti. Formazioni Fanta, stesse regole.')).toBeInTheDocument()
+    expect(screen.queryByText('Si chiude domenica 27 settembre alle 23:59.')).not.toBeInTheDocument()
+    expect(screen.getByText('1° in campo · +5 pt campionato')).toBeInTheDocument()
+    expect(screen.getByText('4° in campo · +0 pt campionato')).toBeInTheDocument()
+    expect(screen.getByLabelText('Miglior giudizio medio')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Mostra il calcolo del punteggio di Ale' }))
+    const details = screen.getByRole('region', { name: 'Calcolo punteggio di Ale' })
+    expect(within(details).getByText('Miglior giocatore della partita')).toBeInTheDocument()
+    expect(within(details).getByText('5 punti in classifica')).toBeInTheDocument()
+    await user.click(screen.getByRole('tab', { name: /Classifica/i }))
+    await user.click(screen.getByRole('button', { name: 'Mostra dettaglio punti di Ale' }))
+    expect(screen.getByRole('region', { name: 'Dettaglio punti di Ale' })).toHaveTextContent('1° in campo · Miglior giocatore · 10 fantasy pt')
+    expect(screen.getByRole('region', { name: 'Dettaglio punti di Ale' })).toHaveTextContent('5 = 5 pt')
+    await user.click(screen.getByRole('button', { name: /Estate 2026.*Archivio/ }))
+    expect(screen.getByRole('button', { name: /dettaglio punti di Ale/ })).toHaveTextContent('2pt')
+    expect(screen.getByRole('button', { name: /dettaglio punti di Brescio/ })).toHaveTextContent('3pt')
+    expect(screen.queryByText(/1° in campo/)).not.toBeInTheDocument()
+  })
+
+  it('spiega i pari merito invernali e il riepilogo personale di chi è in campo', async () => {
+    const user = userEvent.setup()
+    const winter = courtRound(FANTASY_SUMMER_2026_ENDS_AT, [10, 10, 8, 7])
+    renderPage({ rounds: [winter], now: winter.locksAt + 3 * 86_400_000, user: members[0] })
+    expect(screen.getByText('Tu in campo: 1° ex aequo · +5 campionato')).toBeInTheDocument()
+    expect(screen.getAllByText('1° in campo ex aequo · +5 pt campionato')).toHaveLength(2)
+    expect(screen.getByText('3° in campo · +1 pt campionato')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Come si gioca' }))
+    const dialog = screen.getByRole('dialog', { name: 'Come si gioca' })
+    expect(within(dialog).getByRole('heading', { name: 'Punti in campo · Inverno 2026/27' })).toBeInTheDocument()
+    expect(within(dialog).getByText(/due primi ricevono 5 punti ciascuno/)).toBeInTheDocument()
+    expect(within(dialog).getByText(/bonus capitano resta legato soltanto al giudizio medio/)).toBeInTheDocument()
+    expect(within(dialog).queryByText(/Chi gioca in campo riceve 2 punti/)).not.toBeInTheDocument()
+  })
+
+  it('in estate annuncia la novità senza applicarla e il regolamento segue la stagione consultata', async () => {
+    const user = userEvent.setup()
+    renderPage({ now: FANTASY_SUMMER_2026_ENDS_AT + 1 })
+    await user.click(screen.getByRole('button', { name: /Estate 2026.*Archivio/ }))
+    await user.click(screen.getByRole('button', { name: 'Come si gioca' }))
+    const dialog = screen.getByRole('dialog', { name: 'Come si gioca' })
+    expect(within(dialog).getByRole('heading', { name: 'Punti in campo · Estate 2026' })).toBeInTheDocument()
+    expect(within(dialog).getByText(/Chi gioca in campo riceve 2 punti/)).toBeInTheDocument()
+    expect(within(dialog).getByText(/Le partite estive conservano le regole attuali anche se calcolate più tardi/)).toBeInTheDocument()
+  })
+
   it('mostra soltanto la stagione corrente e il countdown prima della chiusura', () => {
     renderPage()
 

@@ -7781,6 +7781,31 @@ p {
   gap: 7px;
 }
 
+.fantasy-player-scores > h4 {
+  grid-column: 1 / -1;
+  margin: 4px 0;
+  color: var(--court);
+  font-size: 0.7rem;
+}
+
+.fantasy-player-score__identity .fantasy-player-score__court-points {
+  margin-top: 4px;
+  color: var(--court);
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.fantasy-player-score__court-award {
+  margin: 12px 0 0;
+  font-size: 0.65rem;
+  line-height: 1.6;
+}
+
+.fantasy-rulebook__score > p {
+  font-size: 0.65rem;
+  line-height: 1.6;
+}
+
 .fantasy-player-score {
   min-width: 0;
   border: 1px solid #d7e4e7;

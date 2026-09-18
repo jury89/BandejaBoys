@@ -1,5 +1,19 @@
 # Architettura e regole di dominio
 
+## Punti in campo dalla stagione invernale
+
+La scheda della stagione invernale presenta il nuovo podio senza riutilizzare la data di chiusura estiva: una scadenza invernale non è ancora configurata.
+
+`FantasySeason.courtScoring` versiona esplicitamente la sola contribuzione dei titolari: `presence-v1` per Estate 2026 e `placement-v2` per Inverno 2026/27. La selezione usa sempre `getFantasySeasonForRound(round)` / `locksAt`, mai l’orologio corrente, `createdAt` o `settledAt`. Il confine rimane `2026-09-27T22:00:00Z` (28 settembre ore 00:00 a Roma). Una partita estiva che termina o viene calcolata/ricalcolata dopo il confine mantiene i punti precedenti.
+
+`getFantasyCourtStandings` deriva il piazzamento solo da round invernali `scored` con quattro partecipanti distinti e tutti i punteggi individuali finiti. Ordina per il `fantasyScore` materializzato: media dei giudizi, bonus/malus bilancio set e bonus miglior differenza game positiva già applicati dal calcolo comune. Nessun secondo calcolo dei voti, nessuno spareggio per nome, ordine della rosa, giudizio o game. Il rango è uno più il numero di giocatori con totale strettamente maggiore: punti `5/3/1/0`, ex aequo condivisi e posizioni occupate saltate (esempi `5/5/1/0`, `5/3/3/0`, quattro pari `5/5/5/5`). I nomi/ID servono soltanto a stabilizzare la visualizzazione, non i punti.
+
+`getFantasyLeaderboard` usa la nuova contribuzione `court-placement` (`rank`, `tied`, `leaguePoints`, `rawFantasyPoints`), sostituendo del tutto i vecchi 2/3 punti soltanto in inverno. Anche il quarto compare con contributo zero. Uno snapshot incompleto non riceve premi inventati; i manager validi rimangono visibili. Per l’estate, i modelli legacy e tutti i ricalcoli estivi resta intatto il ramo presenza descritto sotto. Punteggi, capitano, classifiche dei manager e spareggi della generale non cambiano: il contatore `wins` continua a contare le vittorie delle formazioni Fanta, esplicitate come “vittorie Fanta” nella UI.
+
+La UI usa la stessa derivazione per i punti nei risultati e nei dettagli espandibili; “Miglior giocatore” (totale complessivo) e “Miglior giudizio medio” (`isTopPerformer`, bonus capitano) restano distinti. Il regolamento segue la stagione selezionata e nell’estiva annuncia la novità futura. Nessun nuovo campo Firestore, riscrittura dello storico, lettura aggiuntiva o aggiornamento delle notifiche dei manager. Deploy del solo Hosting, senza Rules o scheduler.
+
+Validazione: test sul confine di stagione e sui ricalcoli tardivi, premi 5/3/1/0, pari merito, snapshot incompleti, invariabilità di capitano e formazioni; collaudo browser con round fittizi isolati da Firebase a 390×844 e 1280×900 nelle due interfacce, inclusi cambio stagione, dettaglio punti e regolamento.
+
 ## Circoli e filtri preferiti
 
 - `PadelSlot.venueId` identifica il **circolo proposto** (`oasi-boschetto`, `tennis-club-mantova`, `sport-city-mantova`) ed è separato dal precedente `venue`, etichetta della prenotazione confermata. Tutte le creazioni nuove persistono l’id, anche prima di prenotare. La conferma riempie `venue` con il nome del circolo scelto; la revoca svuota i fatti di prenotazione ma non `venueId`.
