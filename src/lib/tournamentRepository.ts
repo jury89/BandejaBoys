@@ -1,8 +1,8 @@
 import { collection, doc, limit, onSnapshot, or, orderBy, query, runTransaction, where, type Firestore, type Unsubscribe } from 'firebase/firestore'
 import type { SessionUser } from '../types'
 import { isSlotAdmin } from './admin'
-import { advanceTournament, cancelTournament, canManageTournament, editTournament, leaveTournament, makeTournament, makeTournamentScore, publishTournament, registerForTournament, removeTournamentGuest, saveTournamentGuest, startTournament, startTournamentRound } from './domain'
-import type { Tournament, TournamentInput, TournamentScore } from './tournamentTypes'
+import { advanceTournament, cancelTournament, canManageTournament, editTournament, editTournamentOrganization, leaveTournament, makeTournament, makeTournamentScore, publishTournament, registerForTournament, removeTournamentGuest, saveTournamentGuest, startTournament, startTournamentRound } from './domain'
+import type { Tournament, TournamentInput, TournamentOrganization, TournamentScore } from './tournamentTypes'
 
 type Action = 'publish' | 'cancel' | 'start' | 'start-round' | 'advance'
 export interface TournamentRepository {
@@ -11,6 +11,7 @@ export interface TournamentRepository {
   subscribeTournamentScores(id: string, listener: (scores: TournamentScore[]) => void, onError: (error: Error) => void): Unsubscribe
   createTournament(input: TournamentInput, actor: SessionUser): Promise<string>
   editTournament(id: string, input: TournamentInput, actor: SessionUser): Promise<void>
+  editTournamentOrganization(id: string, input: TournamentOrganization, actor: SessionUser): Promise<void>
   actOnTournament(id: string, action: Action, actor: SessionUser): Promise<void>
   registerForTournament(id: string, partnerId: string | null, actor: SessionUser): Promise<void>
   leaveTournament(id: string, actor: SessionUser): Promise<void>
@@ -59,6 +60,7 @@ export function remoteTournamentRepository(db: Firestore): TournamentRepository 
       return ref.id
     },
     editTournament: (id, input, actor) => mutate(id, t => editTournament(t, input, actor.id)),
+    editTournamentOrganization: (id, input, actor) => mutate(id, t => editTournamentOrganization(t, input, actor.id)),
     registerForTournament: (id, partnerId, actor) => mutate(id, t => registerForTournament(t, actor, partnerId)),
     leaveTournament: (id, actor) => mutate(id, t => leaveTournament(t, actor.id)),
     saveTournamentGuest: (id, guestId, name, partnerId, actor) => {
@@ -129,6 +131,7 @@ export function localTournamentRepository(): TournamentRepository {
       store.tournaments.push(tournament); localWrite(store); return tournament.id
     },
     editTournament: (id, input, actor) => mutate(id, t => editTournament(t, input, actor.id)),
+    editTournamentOrganization: (id, input, actor) => mutate(id, t => editTournamentOrganization(t, input, actor.id)),
     registerForTournament: (id, partnerId, actor) => mutate(id, t => registerForTournament(t, actor, partnerId)),
     leaveTournament: (id, actor) => mutate(id, t => leaveTournament(t, actor.id)),
     saveTournamentGuest: (id, guestId, name, partnerId, actor) => mutate(id, t => saveTournamentGuest(t, guestId ?? `guest:${crypto.randomUUID()}`, name, partnerId, actor.id)),

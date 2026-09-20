@@ -1,7 +1,7 @@
 import { DEFAULT_VENUE_ID, slotVenueId, slotVenueName, validateVenueId } from './venues'
 import { getFantasySeasonForRound } from './fantasySeasons'
 import { isSlotAdmin } from './admin'
-import type { Tournament, TournamentInput, TournamentMatch, TournamentRegistration, TournamentScore, TournamentStanding, TournamentTeam } from './tournamentTypes'
+import type { Tournament, TournamentInput, TournamentMatch, TournamentOrganization, TournamentRegistration, TournamentScore, TournamentStanding, TournamentTeam } from './tournamentTypes'
 import type {
   AdminSlotRosterAction,
   CreatePollInput,
@@ -2026,10 +2026,17 @@ export function tournamentUsesTimedMatches(tournament: Pick<TournamentInput, 'fo
 
 export function getTimedTournamentPlan(input: TournamentInput, playerCount = input.capacity) {
   const teams = playerCount / 2
-  const rounds = teams % 2 ? teams : teams - 1
-  const minutes = input.matchMinutes ?? 15, warmup = input.warmupMinutes ?? 5, changeover = input.changeoverMinutes ?? 2
-  return { teams, rounds, requiredCourts: Math.floor(teams / 2), matchesPerPair: teams - 1,
-    playingMinutes: (teams - 1) * minutes, totalMinutes: warmup + rounds * minutes + (rounds - 1) * changeover,
+  const adaptive = input.totalMinutes != null
+  const matchCount = teams * (teams - 1) / 2
+  const rounds = Math.max(teams % 2 ? teams : teams - 1, adaptive ? Math.ceil(matchCount / Math.max(1, input.courts)) : 0)
+  const warmup = input.warmupMinutes ?? 5, changeover = input.changeoverMinutes ?? 2
+  const overhead = warmup + (rounds - 1) * changeover
+  const minutes = adaptive ? Math.max(0, Math.floor((input.totalMinutes! - overhead) / rounds)) : input.matchMinutes ?? 15
+  const totalMinutes = overhead + rounds * minutes
+  return { teams, rounds, requiredCourts: adaptive ? 1 : Math.floor(teams / 2), matchesPerPair: teams - 1,
+    matchCount, matchMinutes: minutes, adaptive, feasible: minutes >= 5, minimumMinutes: overhead + rounds * 5,
+    availableMinutes: input.totalMinutes ?? totalMinutes, bufferMinutes: (input.totalMinutes ?? totalMinutes) - totalMinutes,
+    restRounds: rounds - (teams - 1), playingMinutes: (teams - 1) * minutes, totalMinutes,
     schedule: Array.from({ length: rounds }, (_, i) => ({ round: i + 1,
       startsAt: input.startsAt + (warmup + i * (minutes + changeover)) * 60_000,
       endsAt: input.startsAt + (warmup + i * (minutes + changeover) + minutes) * 60_000 })) }
@@ -2059,13 +2066,17 @@ export function validateTournamentInput(input: TournamentInput, now: number): To
   const scoringMode = input.scoringMode ?? 'standard'
   if (!['standard', 'timed'].includes(scoringMode) || (scoringMode === 'timed' && input.format !== 'round-robin')) throw new Error('Le partite a tempo sono disponibili nel girone all’italiana.')
   const matchMinutes = input.matchMinutes ?? 15, warmupMinutes = input.warmupMinutes ?? 5, changeoverMinutes = input.changeoverMinutes ?? 2
-  if (!Number.isInteger(matchMinutes) || matchMinutes < 5 || matchMinutes > 30) throw new Error('La durata della partita deve essere tra 5 e 30 minuti.')
+  const totalMinutes = input.totalMinutes ?? null
+  if (totalMinutes !== null && (scoringMode !== 'timed' || !Number.isInteger(totalMinutes) || totalMinutes < 15 || totalMinutes > 720)) throw new Error('Scegli una durata totale tra 15 e 720 minuti per il girone a tempo.')
+  if (totalMinutes === null && (!Number.isInteger(matchMinutes) || matchMinutes < 5 || matchMinutes > 30)) throw new Error('La durata della partita deve essere tra 5 e 30 minuti.')
   if (!Number.isInteger(warmupMinutes) || warmupMinutes < 0 || warmupMinutes > 15) throw new Error('Il riscaldamento deve essere tra 0 e 15 minuti.')
   if (!Number.isInteger(changeoverMinutes) || changeoverMinutes < 0 || changeoverMinutes > 5) throw new Error('Il cambio campo deve essere tra 0 e 5 minuti.')
-  if (scoringMode === 'timed' && input.courts < Math.floor(input.capacity / 4)) throw new Error(`Servono almeno ${Math.floor(input.capacity / 4)} campi: le partite del turno a tempo iniziano insieme.`)
+  if (scoringMode === 'timed' && totalMinutes === null && input.courts < Math.floor(input.capacity / 4)) throw new Error(`Servono almeno ${Math.floor(input.capacity / 4)} campi: le partite del turno a tempo iniziano insieme.`)
+  const plan = totalMinutes === null ? null : getTimedTournamentPlan(input)
+  if (plan && !plan.feasible) throw new Error(`Tempo insufficiente: con ${input.capacity} giocatori e ${input.courts} campi servono almeno ${plan.minimumMinutes} minuti per incontri da 5 minuti. Aumenta la durata o i campi, oppure riduci la capienza.`)
   return { title, startsAt: input.startsAt, venueId: validateVenueId(input.venueId), format: input.format,
     pairing: input.pairing, capacity: input.capacity, courts: input.courts, rounds: input.rounds,
-    pointsPerMatch: input.pointsPerMatch, scoreAccess: input.scoreAccess, scoringMode, matchMinutes, warmupMinutes, changeoverMinutes }
+    pointsPerMatch: input.pointsPerMatch, scoreAccess: input.scoreAccess, scoringMode, matchMinutes: plan?.matchMinutes ?? matchMinutes, warmupMinutes, changeoverMinutes, totalMinutes }
 }
 
 function tournamentPlayerCountError(count: number, format: TournamentInput['format']): void {
@@ -2093,6 +2104,16 @@ export function editTournament(tournament: Tournament, input: TournamentInput, a
   requireTournamentManager(tournament, actorId)
   if (tournament.status !== 'draft') throw new Error('Le impostazioni sono bloccate dopo la pubblicazione.')
   return { ...tournament, ...validateTournamentInput(input, now), updatedAt: now }
+}
+
+export function editTournamentOrganization(tournament: Tournament, organization: TournamentOrganization, actorId: string, now = Date.now()): Tournament {
+  requireTournamentManager(tournament, actorId)
+  if (!tournamentUsesTimedMatches(tournament) || !tournamentRegistrationsOpen(tournament, now)) throw new Error('Puoi cambiare l’organizzazione di un girone a tempo solo prima della chiusura delle iscrizioni.')
+  if (organization.capacity < Object.keys(tournament.registrations).length) throw new Error('La capienza non può essere inferiore agli iscritti: nessun partecipante verrà rimosso.')
+  // Explicit fields prevent a logistics edit from changing identities, dates or pairing consent.
+  const input = validateTournamentInput({ ...tournament, capacity: organization.capacity, courts: organization.courts,
+    totalMinutes: organization.totalMinutes, warmupMinutes: organization.warmupMinutes ?? 5, changeoverMinutes: organization.changeoverMinutes ?? 2 }, now)
+  return { ...tournament, ...input, updatedAt: now }
 }
 
 export function publishTournament(tournament: Tournament, actorId: string, now = Date.now()): Tournament {
@@ -2171,6 +2192,59 @@ function circlePairs<T>(items: T[], roundIndex: number): Array<[T | null, T | nu
   return Array.from({ length: circle.length / 2 }, (_, i) => [circle[i], circle[circle.length - 1 - i]])
 }
 
+/** Pack a complete round robin into the minimum number of simultaneous court slots.
+ * Circle matchings give a proper edge colouring. Alternating-path swaps balance its
+ * colour classes without ever putting a team on two courts in the same time slot.
+ * Each class ends up at floor/ceil(matches / rounds), at most the booked courts.
+ */
+export function getAdaptiveTournamentRounds(teamCount: number, courts: number): Array<Array<[number, number]>> {
+  if (!Number.isInteger(teamCount) || teamCount < 3 || teamCount > 16 || !Number.isInteger(courts) || courts < 1 || courts > 8) throw new Error('Numero di coppie o campi non valido.')
+  const baseRounds = teamCount % 2 ? teamCount : teamCount - 1
+  const count = Math.max(baseRounds, Math.ceil(teamCount * (teamCount - 1) / 2 / courts))
+  const teams = Array.from({ length: teamCount }, (_, i) => i)
+  const rounds: Array<Array<[number, number]>> = Array.from({ length: count }, (_, r) => r < baseRounds
+    ? circlePairs(teams, r).filter((pair): pair is [number, number] => pair[0] !== null && pair[1] !== null) : [])
+  while (true) {
+    const largest = rounds.reduce((best, round, i) => round.length > rounds[best].length ? i : best, 0)
+    const smallest = rounds.reduce((best, round, i) => round.length < rounds[best].length ? i : best, 0)
+    if (rounds[largest].length - rounds[smallest].length <= 1) break
+    const edges = [...rounds[largest].map(pair => ({ pair, large: true })), ...rounds[smallest].map(pair => ({ pair, large: false }))]
+    const seen = new Set<number>()
+    let swapped = false
+    for (let i = 0; i < edges.length && !swapped; i++) {
+      if (seen.has(i)) continue
+      const component: number[] = [i]; seen.add(i)
+      for (let p = 0; p < component.length; p++) {
+        const edge = edges[component[p]]
+        edges.forEach((other, j) => {
+          if (!seen.has(j) && other.pair.some(id => edge.pair.includes(id))) { seen.add(j); component.push(j) }
+        })
+      }
+      if (component.reduce((sum, j) => sum + (edges[j].large ? 1 : -1), 0) !== 1) continue
+      const moved = new Set(component)
+      rounds[largest] = edges.filter((e, j) => e.large !== moved.has(j)).map(e => e.pair)
+      rounds[smallest] = edges.filter((e, j) => e.large === moved.has(j)).map(e => e.pair)
+      swapped = true
+    }
+    if (!swapped) throw new Error('Impossibile bilanciare il calendario del torneo.')
+  }
+  // Order the packed rounds to limit consecutive rests; total play remains equal.
+  const result: typeof rounds = [], rests = Array(teamCount).fill(0) as number[]
+  const pending = [...rounds]
+  while (pending.length) {
+    const cost = (round: Array<[number, number]>) => {
+      const active = new Set(round.flat())
+      const next = rests.map((rest, team) => active.has(team) ? 0 : rest + 1)
+      return Math.max(...next) * 10000 + next.reduce((sum, rest) => sum + rest * rest, 0)
+    }
+    const best = pending.reduce((index, round, i) => cost(round) < cost(pending[index]) ? i : index, 0)
+    const [round] = pending.splice(best, 1), active = new Set(round.flat())
+    rests.forEach((rest, team) => { rests[team] = active.has(team) ? 0 : rest + 1 })
+    result.push(round)
+  }
+  return result
+}
+
 function rotatingTournamentRound(tournament: Tournament, orderedIds: string[], round: number): TournamentMatch[] {
   const teams = tournament.format === 'americano'
     ? circlePairs(orderedIds, round - 1).map(([a, b]) => tournamentTeam(a!, b!))
@@ -2185,7 +2259,10 @@ export function startTournament(tournament: Tournament, actorId: string, seed: n
   const ids = Object.keys(tournament.registrations).sort()
   tournamentPlayerCountError(ids.length, tournament.format)
   if (ids.length > tournament.capacity) throw new Error('Gli iscritti superano la capienza del torneo.')
-  if (tournamentUsesTimedMatches(tournament) && tournament.courts < Math.floor(ids.length / 4)) throw new Error('Non ci sono abbastanza campi per avviare tutte le partite insieme.')
+  const adaptive = tournamentUsesTimedMatches(tournament) && tournament.totalMinutes != null
+  const plan = adaptive ? getTimedTournamentPlan(tournament, ids.length) : null
+  if (plan && !plan.feasible) throw new Error(`Tempo insufficiente: servono almeno ${plan.minimumMinutes} minuti con gli iscritti effettivi.`)
+  if (tournamentUsesTimedMatches(tournament) && !adaptive && tournament.courts < Math.floor(ids.length / 4)) throw new Error('Non ci sono abbastanza campi per avviare tutte le partite insieme.')
   if (!Number.isInteger(seed) || seed < 0 || seed > 4294967295) throw new Error('Sorteggio non valido.')
   const shuffled = tournamentShuffle(ids, seed)
   let teams: TournamentTeam[] = []
@@ -2205,9 +2282,15 @@ export function startTournament(tournament: Tournament, actorId: string, seed: n
       teams = tournamentShuffle(teams, seed)
     } else teams = shuffled.flatMap((id, i) => i % 2 === 0 ? [tournamentTeam(id, shuffled[i + 1])] : [])
     if (tournament.format === 'round-robin') {
-      totalRounds = teams.length % 2 ? teams.length : teams.length - 1
-      for (let r = 1; r <= totalRounds; r += 1) {
-        circlePairs(teams, r - 1).filter((pair) => pair[0] && pair[1]).forEach(([a, b], i) => matches.push(tournamentMatch(tournament, r, i, a!, b!)))
+      if (adaptive) {
+        const calendar = getAdaptiveTournamentRounds(teams.length, tournament.courts)
+        totalRounds = calendar.length
+        calendar.forEach((round, r) => round.forEach(([a, b], i) => matches.push(tournamentMatch(tournament, r + 1, i, teams[a], teams[b]))))
+      } else {
+        totalRounds = teams.length % 2 ? teams.length : teams.length - 1
+        for (let r = 1; r <= totalRounds; r += 1) {
+          circlePairs(teams, r - 1).filter((pair) => pair[0] && pair[1]).forEach(([a, b], i) => matches.push(tournamentMatch(tournament, r, i, a!, b!)))
+        }
       }
     } else {
       totalRounds = Math.log2(teams.length)
@@ -2215,7 +2298,8 @@ export function startTournament(tournament: Tournament, actorId: string, seed: n
     }
   }
   return { ...tournament, status: 'running', seed, teams, totalRounds, currentRound: 1,
-    matches: Object.fromEntries(matches.map((match) => [match.id, match])), updatedAt: now, roundStartedAt: null }
+    matches: Object.fromEntries(matches.map((match) => [match.id, match])), updatedAt: now, roundStartedAt: null,
+    ...(plan ? { matchMinutes: plan.matchMinutes } : {}) }
 }
 
 export function startTournamentRound(tournament: Tournament, actorId: string, now = Date.now()): Tournament {

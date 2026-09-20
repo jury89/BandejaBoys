@@ -28,12 +28,53 @@ function tournamentName(t: Tournament, members: MemberProfile[], id: string): st
   return members.find(m => m.id === id)?.displayName ?? t.registrations[id]?.displayName ?? 'Giocatore'
 }
 
+function TournamentPlan({ input, count = input.capacity }: { input: TournamentInput; count?: number }) {
+  const plan = getTimedTournamentPlan(input, count)
+  return <div className="tournament-plan" aria-live="polite">
+    <p><strong>{count} giocatori · {plan.teams} coppie · {input.courts} {input.courts === 1 ? 'campo' : 'campi'}</strong></p>
+    {plan.feasible ? <><p>{plan.rounds} turni da <strong>{plan.matchMinutes} minuti</strong> · {plan.matchCount} incontri totali.</p>
+      <p>Ogni coppia gioca {plan.matchesPerPair} partite ({plan.playingMinutes} minuti in campo) e riposa {plan.restRounds} {plan.restRounds === 1 ? 'turno' : 'turni'}.</p>
+      <p>Programma: <strong>{plan.totalMinutes} minuti</strong>{plan.adaptive ? ` sui ${plan.availableMinutes} disponibili · ${plan.bufferMinutes} minuti di margine` : ''}, inclusi riscaldamento e cambi.</p></> : <p className="form-error" role="alert">Il tempo non basta: servono almeno {plan.minimumMinutes} minuti per partite da 5 minuti. Aumenta la durata o i campi, oppure riduci la capienza senza escludere chi è già iscritto.</p>}
+    {input.courts < plan.requiredCourts && <p role="alert" className="form-error">Servono almeno {plan.requiredCourts} campi per questo programma a durata fissa.</p>}
+  </div>
+}
+
+function TournamentTimingFields({ input, update }: { input: TournamentInput; update: <K extends keyof TournamentInput>(key: K, value: TournamentInput[K]) => void }) {
+  return <><div className="tournament-form__grid">
+    {input.totalMinutes != null ? <label>Durata totale disponibile (minuti)<input type="number" min={15} max={720} required value={input.totalMinutes} onChange={e => update('totalMinutes', Number(e.target.value))} /></label> : <label>Minuti per partita<input type="number" min={5} max={30} required value={input.matchMinutes ?? 15} onChange={e => update('matchMinutes', Number(e.target.value))} /></label>}
+    <label>Minuti di riscaldamento<input type="number" min={0} max={15} required value={input.warmupMinutes ?? 5} onChange={e => update('warmupMinutes', Number(e.target.value))} /></label>
+    <label>Minuti tra i turni<input type="number" min={0} max={5} required value={input.changeoverMinutes ?? 2} onChange={e => update('changeoverMinutes', Number(e.target.value))} /></label>
+  </div><TournamentPlan input={input} /><p>Stima a capienza piena. Al sorteggio durata e calendario si adattano agli iscritti effettivi; le coppie restano fisse e incontrano tutte le altre. Minimo 6 giocatori, in numero pari. Gli ospiti contano come tutti gli altri.</p></>
+}
+
+function TournamentOrganizationEditor({ tournament, user, onClose }: { tournament: Tournament; user: SessionUser; onClose: () => void }) {
+  const [input, setInput] = useState<TournamentInput>({ ...tournament, totalMinutes: tournament.totalMinutes ?? getTimedTournamentPlan(tournament).totalMinutes })
+  const [busy, setBusy] = useState(false), [error, setError] = useState('')
+  const update = <K extends keyof TournamentInput>(key: K, value: TournamentInput[K]) => setInput(current => ({ ...current, [key]: value }))
+  async function save(event: FormEvent) {
+    event.preventDefault(); setBusy(true); setError('')
+    try {
+      await repository.editTournamentOrganization(tournament.id, { capacity: input.capacity, courts: input.courts, totalMinutes: input.totalMinutes!, warmupMinutes: input.warmupMinutes, changeoverMinutes: input.changeoverMinutes }, user)
+      onClose()
+    } catch (reason) { setError(reason instanceof Error ? reason.message : 'Organizzazione non salvata. Riprova.') }
+    finally { setBusy(false) }
+  }
+  return <Modal title="Modifica organizzazione" onClose={onClose} size="wide"><form className="tournament-form" onSubmit={save}>
+    <p>Puoi adattare il torneo fino alla chiusura delle iscrizioni. Nessun iscritto verrà rimosso. Data, formula e scelta delle coppie restano invariate.</p>
+    <div className="tournament-form__grid"><label>Massimo giocatori<select value={input.capacity} onChange={e => update('capacity', Number(e.target.value))}>{Array.from({ length: 14 }, (_, i) => 6 + i * 2).map(n => <option key={n} disabled={n < Object.keys(tournament.registrations).length}>{n}</option>)}</select></label>
+      <label>Campi disponibili<input type="number" min={1} max={8} required value={input.courts} onChange={e => update('courts', Number(e.target.value))} /></label></div>
+    <TournamentTimingFields input={input} update={update} />
+    {error && <p className="form-error" role="alert">{error}</p>}
+    <button className="button button--primary" disabled={busy}>{busy ? 'Salvataggio…' : 'Salva organizzazione'}</button>
+  </form></Modal>
+}
+
 function TournamentEditor({ tournament, user, onClose, onSaved }: { tournament?: Tournament; user: SessionUser; onClose: () => void; onSaved: (id: string) => void }) {
   const [input, setInput] = useState<TournamentInput>(() => tournament ?? { title: '', startsAt: Math.ceil(Date.now() / 1_800_000) * 1_800_000 + 7 * 86_400_000, venueId: 'oasi-boschetto', format: 'americano', pairing: 'rotating', capacity: 8, courts: 1, rounds: 7, pointsPerMatch: 24, scoreAccess: 'players' })
   const [date, setDate] = useState(toDateTimeInput(new Date(input.startsAt)))
   const [error, setError] = useState(''), [busy, setBusy] = useState(false)
   const rotating = tournamentUsesRotatingPairs(input)
-  const timed = tournamentUsesTimedMatches(input), plan = timed ? getTimedTournamentPlan(input) : null
+  const timed = tournamentUsesTimedMatches(input)
   const update = <K extends keyof TournamentInput>(key: K, value: TournamentInput[K]) => setInput(current => ({ ...current, [key]: value }))
   async function submit(event: FormEvent) {
     event.preventDefault(); setError(''); setBusy(true)
@@ -46,28 +87,22 @@ function TournamentEditor({ tournament, user, onClose, onSaved }: { tournament?:
   }
   return <Modal title={tournament ? 'Modifica bozza' : 'Nuovo torneo'} eyebrow="Organizza il tuo torneo" onClose={onClose} size="wide">
     <form className="tournament-form" onSubmit={submit}>
-      <button type="button" className="button" onClick={() => setInput(current => ({ ...current, format: 'round-robin', pairing: 'random-fixed', capacity: 10, courts: 2, scoringMode: 'timed', matchMinutes: 15, warmupMinutes: 5, changeoverMinutes: 2 }))}>Imposta 10 giocatori · 2 campi · 90 minuti</button>
       <label>Nome del torneo<input required minLength={3} maxLength={80} value={input.title} onChange={e => update('title', e.target.value)} placeholder="Il torneo dei fagiani" /></label>
       <SlotDateTimeField value={date} onChange={setDate} />
       <p>Orario italiano. Le iscrizioni chiudono automaticamente un’ora prima.</p>
       <label>Circolo<select value={input.venueId} onChange={e => update('venueId', e.target.value as TournamentInput['venueId'])}>{VENUES.map(v => <option value={v.id} key={v.id}>{v.name}</option>)}</select></label>
       <fieldset className="tournament-formats"><legend>Formula</legend>{TOURNAMENT_FORMATS.map(format => <label key={format.id} className={input.format === format.id ? 'is-selected' : ''}>
-        <input type="radio" name="format" value={format.id} checked={input.format === format.id} onChange={() => setInput(current => ({ ...current, format: format.id, pairing: format.id === 'americano' || format.id === 'mexicano' ? 'rotating' : 'random-fixed', capacity: 8, scoringMode: 'standard' }))} />
+        <input type="radio" name="format" value={format.id} checked={input.format === format.id} onChange={() => setInput(current => ({ ...current, format: format.id, pairing: format.id === 'americano' || format.id === 'mexicano' ? 'rotating' : 'random-fixed', capacity: 8, scoringMode: 'standard', totalMinutes: null }))} />
         <span><strong>{format.name}</strong><small>{format.description}</small></span>
       </label>)}</fieldset>
       {!rotating && <label>Coppie fisse<select value={input.pairing} onChange={e => update('pairing', e.target.value as TournamentInput['pairing'])}><option value="random-fixed">Sorteggiate dal computer</option><option value="chosen-fixed">Scelte dai giocatori, con conferma reciproca</option></select></label>}
-      {input.format === 'round-robin' && <label>Durata delle partite<select value={input.scoringMode ?? 'standard'} onChange={e => update('scoringMode', e.target.value as TournamentInput['scoringMode'])}><option value="standard">Un set a 6 game</option><option value="timed">Partite a tempo</option></select></label>}
+      {input.format === 'round-robin' && <label>Durata delle partite<select value={input.scoringMode ?? 'standard'} onChange={e => setInput(current => ({ ...current, scoringMode: e.target.value as TournamentInput['scoringMode'], totalMinutes: e.target.value === 'timed' ? 90 : null }))}><option value="standard">Un set a 6 game</option><option value="timed">Partite a tempo · durata totale disponibile</option></select></label>}
       <div className="tournament-form__grid">
-        <label>Massimo giocatori<select value={input.capacity} onChange={e => update('capacity', Number(e.target.value))}>{(input.format === 'knockout' ? [8, 16, 32] : rotating ? [4, 8, 12, 16, 20, 24, 28, 32] : [6, 8, 10, 12, 14, 16, 20, 24, 28, 32]).map(n => <option key={n}>{n}</option>)}</select></label>
+        <label>Massimo giocatori<select value={input.capacity} onChange={e => update('capacity', Number(e.target.value))}>{(input.format === 'knockout' ? [8, 16, 32] : rotating ? [4, 8, 12, 16, 20, 24, 28, 32] : Array.from({ length: 14 }, (_, i) => 6 + i * 2)).map(n => <option key={n}>{n}</option>)}</select></label>
         <label>Campi disponibili<input type="number" required min={1} max={8} value={input.courts} onChange={e => update('courts', Number(e.target.value))} /></label>
         {rotating && <><label>Turni<input required type="number" min={1} max={31} value={input.rounds} onChange={e => update('rounds', Number(e.target.value))} /></label><label>Punti totali per incontro<select value={input.pointsPerMatch} onChange={e => update('pointsPerMatch', Number(e.target.value))}>{[16, 24, 32].map(n => <option key={n}>{n}</option>)}</select></label></>}
       </div>
-      {timed && <><div className="tournament-form__grid">
-        <label>Minuti per partita<input type="number" min={5} max={30} required value={input.matchMinutes ?? 15} onChange={e => update('matchMinutes', Number(e.target.value))} /></label>
-        <label>Minuti di riscaldamento<input type="number" min={0} max={15} required value={input.warmupMinutes ?? 5} onChange={e => update('warmupMinutes', Number(e.target.value))} /></label>
-        <label>Minuti tra i turni<input type="number" min={0} max={5} required value={input.changeoverMinutes ?? 2} onChange={e => update('changeoverMinutes', Number(e.target.value))} /></label>
-      </div><p className="tournament-plan">Con {input.capacity} iscritti: {plan!.teams} coppie, {plan!.rounds} turni, {plan!.matchesPerPair} partite e {plan!.playingMinutes} minuti in campo a testa. Durata indicativa: <strong>{plan!.totalMinutes} minuti</strong>, inclusi riscaldamento e cambi. {plan!.teams % 2 ? 'Ogni coppia riposa un turno.' : 'Nessun turno di riposo.'}</p>
-      {input.courts < plan!.requiredCourts && <p role="alert" className="form-error">Servono almeno {plan!.requiredCourts} campi per giocare il turno contemporaneamente.</p>}</>}
+      {timed && <TournamentTimingFields input={input} update={update} />}
       <p>{timed ? `${timedRules} ${timedRanking}` : rotating ? `Ogni coppia guadagna i punti segnati: per esempio ${input.pointsPerMatch / 2 + 2}–${input.pointsPerMatch / 2 - 2}. Tutti giocano in ogni turno, anche in ondate su meno campi.` : 'Ogni partita è un set a 6 game, tie-break sul 6–6 (si registra 7–6). Il calendario viene calcolato dagli iscritti effettivi.'}</p>
       <label>Chi può inserire i risultati<select value={input.scoreAccess} onChange={e => update('scoreAccess', e.target.value as TournamentInput['scoreAccess'])}><option value="players">Organizzatore e giocatori della partita</option><option value="admin">Solo organizzatore</option></select></label>
       <p className="tournament-note">Salvi una bozza visibile solo a te e all’amministratore. La pubblicherai dopo averla controllata. L’amministratore può sempre aiutarti nella gestione e nei risultati. Il torneo non prenota i campi e non assegna punti Fanta.</p>
@@ -136,6 +171,7 @@ function TournamentDetail({ id, user, members, onBack }: { id: string; user: Ses
   const [scores, setScores] = useState<TournamentScore[]>([])
   const [error, setError] = useState(''), [busy, setBusy] = useState(false), [attempt, setAttempt] = useState(0)
   const [editor, setEditor] = useState(false), [matchId, setMatchId] = useState('')
+  const [organizationEditor, setOrganizationEditor] = useState(false)
   const [guestEditor, setGuestEditor] = useState<{ id: string | null } | null>(null)
   const [confirmation, setConfirmation] = useState<'publish' | 'start' | 'advance' | 'cancel' | null>(null)
   const [message, setMessage] = useState(''), [now, setNow] = useState(Date.now)
@@ -164,18 +200,26 @@ function TournamentDetail({ id, user, members, onBack }: { id: string; user: Ses
   const matches = Object.values(t.matches).sort((a, b) => a.round - b.round || a.wave - b.wave || a.court - b.court)
   const nextLabel = t.currentRound === t.totalRounds ? 'Concludi torneo e assegna il podio' : 'Conferma turno e prosegui'
   const timed = tournamentUsesTimedMatches(t), clock = getTournamentRoundClock(t, now)
-  const plan = timed ? getTimedTournamentPlan(t, t.currentRound > 0 ? registrations.length : t.capacity) : null
+  const validCount = registrations.length >= 6 && registrations.length % 2 === 0
+  const plannedCount = validCount ? registrations.length : t.capacity
+  const plan = timed ? getTimedTournamentPlan(t, plannedCount) : null
   return <main className="dashboard tournament-page">
     <button className="button button--ghost" onClick={onBack}><ArrowLeft size={18} /> Tutti i tornei</button>
     <section className="tournament-hero"><div><span className="tournament-status">{tournamentStatus(t, now)}</span><h1>{t.title}</h1><p><CalendarDays size={18} /> {dateLabel(t.startsAt)}</p><p>{VENUES.find(v => v.id === t.venueId)?.name} · {t.courts} {t.courts === 1 ? 'campo' : 'campi'}</p></div><Trophy size={44} aria-hidden="true" /></section>
-    <section className="tournament-panel"><h2>{format.name}{timed ? ' a tempo' : ''}</h2><p>{format.description}</p><p>{timed ? timedRanking : format.scoring}</p><p>{timed ? `${t.matchMinutes ?? 15} minuti a partita. ${timedRules}` : tournamentUsesRotatingPairs(t) ? `${t.rounds} turni · ${t.pointsPerMatch} punti totali a partita.` : `Coppie ${t.pairing === 'random-fixed' ? 'sorteggiate' : 'scelte dai giocatori'}. Un set a 6, tie-break sul 6–6.`}</p><p>Risultati: {t.scoreAccess === 'admin' ? 'solo organizzatore' : 'organizzatore e giocatori di ciascuna partita'}, con assistenza dell’amministratore. I risultati si possono correggere prima di confermare il turno.</p></section>
-    {plan && <section className="tournament-panel"><h2>Il programma in {plan.totalMinutes} minuti</h2><p>{plan.teams} coppie · {plan.rounds} turni · {plan.matchesPerPair} partite a testa ({plan.playingMinutes} minuti in campo). {plan.teams % 2 ? 'Un turno di riposo per ogni coppia.' : 'Tutti giocano a ogni turno.'}</p><p>{t.warmupMinutes ?? 5} minuti di riscaldamento e {t.changeoverMinutes ?? 2} minuti tra i turni, inclusi nel totale. {t.currentRound === 0 ? 'Stima con capienza piena: il programma verrà adattato agli iscritti effettivi.' : 'Programma basato sugli iscritti effettivi.'}</p><details><summary>Orari indicativi dei turni</summary><ol className="tournament-schedule">{plan.schedule.map(r => <li key={r.round}><span>Turno {r.round}</span><strong>{timeLabel(r.startsAt)}–{timeLabel(r.endsAt)}</strong></li>)}</ol><p>Gli orari sono indicativi: l’organizzatore avvia ogni timer quando tutti sono pronti, dopo il riscaldamento o il cambio campo. Nessun turno parte automaticamente.</p></details></section>}
+    <section className="tournament-panel"><h2>{format.name}{timed ? ' a tempo' : ''}</h2><p>{format.description}</p><p>{timed ? timedRanking : format.scoring}</p><p>{timed ? timedRules : tournamentUsesRotatingPairs(t) ? `${t.rounds} turni · ${t.pointsPerMatch} punti totali a partita.` : `Coppie ${t.pairing === 'random-fixed' ? 'sorteggiate' : 'scelte dai giocatori'}. Un set a 6, tie-break sul 6–6.`}</p><p>Risultati: {t.scoreAccess === 'admin' ? 'solo organizzatore' : 'organizzatore e giocatori di ciascuna partita'}, con assistenza dell’amministratore. I risultati si possono correggere prima di confermare il turno.</p></section>
+    {plan && <section className="tournament-panel"><h2>{t.currentRound > 0 ? 'Il programma del torneo' : 'Il programma previsto'}</h2>
+      <TournamentPlan input={t} count={plannedCount} />
+      <p>{t.warmupMinutes ?? 5} minuti di riscaldamento e {t.changeoverMinutes ?? 2} minuti tra i turni, inclusi nel totale. {t.currentRound > 0 ? 'Calendario definitivo, basato sugli iscritti al sorteggio.' : validCount ? 'Stima aggiornata sugli iscritti attuali: diventa definitiva al sorteggio.' : 'Stima a capienza piena: servono almeno 6 iscritti e un numero pari per preparare il tabellone.'}</p>
+      {t.status === 'open' && !validCount && <p className="tournament-note">Iscritti attuali: {registrations.length}. {registrations.length % 2 ? 'Il numero è dispari: manca un compagno per completare le coppie.' : 'Non è ancora raggiunto il minimo di 6.'} Nessuno verrà escluso automaticamente.</p>}
+      {plan.feasible && <details><summary>Orari indicativi dei turni</summary><ol className="tournament-schedule">{plan.schedule.map(r => <li key={r.round}><span>Turno {r.round}</span><strong>{timeLabel(r.startsAt)}–{timeLabel(r.endsAt)}</strong></li>)}</ol><p>Gli orari sono indicativi: l’organizzatore avvia ogni timer quando tutti sono pronti, dopo il riscaldamento o il cambio campo. Eventuali ritardi consumano il margine disponibile: nessun turno parte automaticamente.</p></details>}
+    </section>}
     {error && <p className="form-error tournament-panel" role="alert">{error} <button onClick={() => setAttempt(a => a + 1)}>Ricarica dati</button></p>}
     {message && <p className="tournament-message" role="status">{message}</p>}
     {manager && <section className="tournament-panel tournament-actions" aria-label="Gestione torneo">
       {t.status === 'draft' && <><button className="button" disabled={busy} onClick={() => setEditor(true)}>Modifica bozza</button><button className="button button--primary" disabled={busy} onClick={() => setConfirmation('publish')}>Pubblica al gruppo</button></>}
+      {timed && open && <button className="button" disabled={busy} onClick={() => setOrganizationEditor(true)}>Modifica organizzazione</button>}
       {t.published && <button className="button" onClick={() => { void navigator.clipboard.writeText(`${window.location.origin}${window.location.pathname}#tornei/${encodeURIComponent(t.id)}`).then(() => setMessage('Link copiato. Puoi mandarlo nel gruppo.')).catch(() => setMessage(`Link: ${window.location.origin}/#tornei/${encodeURIComponent(t.id)}`)) }}><Copy size={17} /> Copia link torneo</button>}
-      {t.status === 'open' && <button className="button button--primary" disabled={busy || open} onClick={() => setConfirmation('start')}>Sorteggia e prepara tabellone</button>}
+      {t.status === 'open' && <button className="button button--primary" disabled={busy || open || (timed && (!validCount || !plan?.feasible))} onClick={() => setConfirmation('start')}>Sorteggia e prepara tabellone</button>}
       {t.status === 'running' && <button className="button button--primary" disabled={busy || (timed && clock.state !== 'expired')} onClick={() => setConfirmation('advance')}>{nextLabel}</button>}
       {t.status !== 'completed' && t.status !== 'cancelled' && <button className="button button--ghost" disabled={busy} onClick={() => setConfirmation('cancel')}>Annulla torneo</button>}
     </section>}
@@ -204,9 +248,10 @@ function TournamentDetail({ id, user, members, onBack }: { id: string; user: Ses
     </section>}
     <p className="tournament-note">Torneo del gruppo, separato dal Fanta e dalle partite ordinarie. Nessuna prenotazione automatica dei campi.</p>
     {editor && <TournamentEditor tournament={t} user={user} onClose={() => setEditor(false)} onSaved={() => setEditor(false)} />}
+    {organizationEditor && <TournamentOrganizationEditor tournament={t} user={user} onClose={() => setOrganizationEditor(false)} />}
     {guestEditor && <TournamentGuestEditor tournament={t} guestId={guestEditor.id} user={user} members={members} onClose={() => setGuestEditor(null)} />}
     {matchId && t.matches[matchId] && <TournamentScoreEditor tournament={t} match={t.matches[matchId]} score={scores.find(s => s.matchId === matchId)} members={members} user={user} onClose={() => setMatchId('')} />}
-    {confirmation && <Modal title={confirmation === 'publish' ? 'Pubblica il torneo?' : confirmation === 'cancel' ? 'Annulla il torneo?' : confirmation === 'start' ? 'Conferma il sorteggio?' : nextLabel} onClose={() => !busy && setConfirmation(null)}><div className="tournament-form"><p>{confirmation === 'publish' ? 'Gli altri membri potranno aprire il link e iscriversi. Le impostazioni non saranno più modificabili.' : confirmation === 'cancel' ? 'Le iscrizioni e i risultati resteranno consultabili, ma non si potrà più giocare. Non vengono cancellati dati.' : confirmation === 'start' ? 'Coppie e calendario verranno salvati definitivamente usando gli iscritti attuali. Nessuna iscrizione verrà aggiunta dopo il sorteggio.' : 'Conferma solo dopo aver controllato tutti i risultati. I punteggi di questo turno non saranno più modificabili perché determinano classifica e abbinamenti successivi.'}</p><button className="button button--primary" disabled={busy} onClick={() => void perform(() => repository.actOnTournament(t.id, confirmation, user), confirmation === 'publish' ? 'Torneo pubblicato. Copia il link e condividilo con il gruppo.' : 'Torneo aggiornato.')}>{busy ? 'Attendi…' : 'Conferma'}</button>{error && <p role="alert" className="form-error">{error}</p>}</div></Modal>}
+    {confirmation && <Modal title={confirmation === 'publish' ? 'Pubblica il torneo?' : confirmation === 'cancel' ? 'Annulla il torneo?' : confirmation === 'start' ? 'Conferma il sorteggio?' : nextLabel} onClose={() => !busy && setConfirmation(null)}><div className="tournament-form"><p>{confirmation === 'publish' ? `Gli altri membri potranno aprire il link e iscriversi. ${timed ? 'Potrai adattare capienza, campi e durata totale finché le iscrizioni sono aperte; data e formula restano bloccate.' : 'Le impostazioni non saranno più modificabili.'}` : confirmation === 'cancel' ? 'Le iscrizioni e i risultati resteranno consultabili, ma non si potrà più giocare. Non vengono cancellati dati.' : confirmation === 'start' ? 'Coppie e calendario verranno salvati definitivamente usando gli iscritti attuali. Nessuna iscrizione verrà aggiunta dopo il sorteggio.' : 'Conferma solo dopo aver controllato tutti i risultati. I punteggi di questo turno non saranno più modificabili perché determinano classifica e abbinamenti successivi.'}</p>{confirmation === 'start' && timed && validCount && <TournamentPlan input={t} count={registrations.length} />}<button className="button button--primary" disabled={busy} onClick={() => void perform(() => repository.actOnTournament(t.id, confirmation, user), confirmation === 'publish' ? 'Torneo pubblicato. Copia il link e condividilo con il gruppo.' : 'Torneo aggiornato.')}>{busy ? 'Attendi…' : 'Conferma'}</button>{error && <p role="alert" className="form-error">{error}</p>}</div></Modal>}
   </main>
 }
 
