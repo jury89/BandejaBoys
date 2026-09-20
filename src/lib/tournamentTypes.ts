@@ -18,7 +18,10 @@ export interface TournamentInput {
   matchMinutes?: number
   warmupMinutes?: number
   changeoverMinutes?: number
+  // A total budget enables adaptive scheduling. Absent/null preserves legacy timed draws.
+  totalMinutes?: number | null
 }
+export type TournamentOrganization = Pick<TournamentInput, 'capacity' | 'courts' | 'warmupMinutes' | 'changeoverMinutes'> & { totalMinutes: number }
 export interface TournamentRegistration {
   userId: string
   displayName: string

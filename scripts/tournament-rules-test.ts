@@ -1,7 +1,7 @@
 /** Semantic Rules tests with synthetic resources and mocked get(): no Firestore writes or production document reads. */
 import { readFileSync } from 'node:fs'
 import { GoogleAuth } from 'google-auth-library'
-import { makeTournament, publishTournament, registerForTournament, saveTournamentGuest, removeTournamentGuest, startTournament, startTournamentRound } from '../src/lib/domain'
+import { editTournamentOrganization, makeTournament, publishTournament, registerForTournament, saveTournamentGuest, removeTournamentGuest, startTournament, startTournamentRound } from '../src/lib/domain'
 import { SLOT_ADMIN_USER_ID as admin } from '../src/lib/admin'
 import type { Tournament } from '../src/lib/tournamentTypes'
 
@@ -181,6 +181,55 @@ test('cannot change scoring after publication', 'DENY', 'update', owner, timedOp
 const legacyDraft = Object.fromEntries(Object.entries(draft).filter(([key]) => !['scoringMode', 'matchMinutes', 'warmupMinutes', 'changeoverMinutes', 'roundStartedAt'].includes(key)))
 test('legacy draft remains editable', 'ALLOW', 'update', admin, legacyDraft, { ...legacyDraft, title: 'Legacy title' })
 test('legacy tournament remains publishable', 'ALLOW', 'update', admin, legacyDraft, { ...legacyDraft, status: 'open', published: true })
+
+const adaptiveDraft = makeTournament('qa', { ...timedDraft, capacity: 12, totalMinutes: 90 }, owner, now)
+const adaptiveOpen = publishTournament(adaptiveDraft, owner, now)
+let adaptiveRegistered = adaptiveOpen
+for (let i = 0; i < 12; i++) adaptiveRegistered = registerForTournament(adaptiveRegistered, { id: `p${i}`, displayName: `Player ${i}` }, null, now)
+const adaptiveDrawn = startTournament(adaptiveRegistered, owner, 42, cutoff)
+const adaptiveStarted = startTournamentRound(adaptiveDrawn, owner, adaptiveOpen.startsAt)
+const adaptiveSettings = { capacity: 14, courts: 3, totalMinutes: 120, warmupMinutes: 5, changeoverMinutes: 2 }
+const adaptiveEdited = editTournamentOrganization(adaptiveRegistered, adaptiveSettings, owner, now)
+test('adaptive draft on fewer courts accepted', 'ALLOW', 'create', owner, undefined, adaptiveDraft)
+test('adaptive publication accepted', 'ALLOW', 'update', owner, adaptiveDraft, adaptiveOpen)
+test('adaptive self registration accepted', 'ALLOW', 'update', 'p0', adaptiveOpen, registerForTournament(adaptiveOpen, { id: 'p0', displayName: 'Zero' }, null, now))
+const adaptiveChosen = registerForTournament({ ...adaptiveOpen, pairing: 'chosen-fixed' }, { id: 'p0', displayName: 'Zero' }, null, now)
+const adaptivePartner = registerForTournament(adaptiveChosen, { id: 'p1', displayName: 'One' }, 'p0', now)
+test('adaptive chosen partner registration accepted within expression budget', 'ALLOW', 'update', 'p1', adaptiveChosen, adaptivePartner)
+test('adaptive reciprocal partner update accepted', 'ALLOW', 'update', 'p0', adaptivePartner, registerForTournament(adaptivePartner, { id: 'p0', displayName: 'Zero' }, 'p1', now))
+test('adaptive self withdrawal accepted', 'ALLOW', 'update', 'p1', adaptivePartner, adaptiveChosen)
+test('budget cannot be negative', 'DENY', 'create', owner, undefined, { ...adaptiveDraft, totalMinutes: -1 })
+test('budget cannot exceed 12 hours', 'DENY', 'create', owner, undefined, { ...adaptiveDraft, totalMinutes: 721 })
+test('budget must be integer', 'DENY', 'create', owner, undefined, { ...adaptiveDraft, totalMinutes: 90.5 })
+test('budget cannot be insufficient', 'DENY', 'create', owner, undefined, { ...adaptiveDraft, totalMinutes: 30 })
+test('budget requires timed matches', 'DENY', 'create', owner, undefined, { ...adaptiveDraft, scoringMode: 'standard' })
+test('derived duration cannot be forged', 'DENY', 'create', owner, undefined, { ...adaptiveDraft, matchMinutes: 15 })
+test('adaptive capacity must be even', 'DENY', 'create', owner, undefined, { ...adaptiveDraft, capacity: 11 })
+test('organizer edits organization before cutoff', 'ALLOW', 'update', owner, adaptiveRegistered, adaptiveEdited)
+test('admin edits organization before cutoff', 'ALLOW', 'update', admin, adaptiveRegistered, adaptiveEdited)
+test('other members cannot edit organization', 'DENY', 'update', 'p0', adaptiveRegistered, adaptiveEdited)
+test('organization cannot change at cutoff', 'DENY', 'update', owner, adaptiveRegistered, adaptiveEdited, { time: cutoff })
+test('organization edit cannot also move start', 'DENY', 'update', owner, adaptiveRegistered, { ...adaptiveEdited, startsAt: now + 86_400_000 })
+test('organization cannot remove existing registrants', 'DENY', 'update', owner, adaptiveRegistered, { ...adaptiveRegistered, capacity: 10, matchMinutes: 15 })
+test('legacy open tournament can explicitly adopt a budget', 'ALLOW', 'update', owner, timedRegistered, editTournamentOrganization(timedRegistered, { capacity: 12, courts: 2, totalMinutes: 90 }, owner, now))
+test('adaptive draw saves eight court slots for twelve players', 'ALLOW', 'update', owner, adaptiveRegistered, adaptiveDrawn, { time: cutoff })
+test('adaptive draw cannot precede registration cutoff', 'DENY', 'update', owner, adaptiveRegistered, adaptiveDrawn, { time: cutoff - 1 })
+const adaptiveTen = { ...adaptiveRegistered, registrations: timedRegistered.registrations }
+const adaptiveTenDrawn = startTournament(adaptiveTen, owner, 42, cutoff)
+test('draw recomputes duration from actual ten players', 'ALLOW', 'update', owner, adaptiveTen, adaptiveTenDrawn, { time: cutoff })
+test('recomputed draw cannot precede cutoff either', 'DENY', 'update', owner, adaptiveTen, adaptiveTenDrawn, { time: cutoff - 1 })
+test('draw cannot keep old capacity duration', 'DENY', 'update', owner, adaptiveTen, { ...adaptiveTenDrawn, matchMinutes: 8 }, { time: cutoff })
+test('draw cannot forge total rounds', 'DENY', 'update', owner, adaptiveRegistered, { ...adaptiveDrawn, totalRounds: 5 }, { time: cutoff })
+test('running tournament cannot change organization', 'DENY', 'update', owner, adaptiveDrawn, { ...adaptiveDrawn, totalMinutes: 120, matchMinutes: 12 }, { time: cutoff })
+test('running legacy cannot acquire budget', 'DENY', 'update', owner, timedDrawn, { ...timedDrawn, totalMinutes: 90 }, { time: cutoff })
+test('adaptive shared timer starts', 'ALLOW', 'update', owner, adaptiveDrawn, adaptiveStarted, { time: adaptiveOpen.startsAt })
+test('adaptive timer uses derived eight minutes', 'ALLOW', 'update', owner, adaptiveStarted, { ...adaptiveStarted, currentRound: 2, roundStartedAt: null }, { time: adaptiveOpen.startsAt + 480_000 })
+test('adaptive timer cannot advance early', 'DENY', 'update', owner, adaptiveStarted, { ...adaptiveStarted, currentRound: 2, roundStartedAt: null }, { time: adaptiveOpen.startsAt + 479_999 })
+const longDraft = makeTournament('qa', { ...adaptiveDraft, capacity: 24, courts: 1, totalMinutes: 720 }, owner, now)
+let longRegistered = publishTournament(longDraft, owner, now)
+for (let i = 0; i < 24; i++) longRegistered = registerForTournament(longRegistered, { id: `p${i}`, displayName: `Player ${i}` }, null, now)
+test('larger schedules may exceed thirty-one rounds', 'ALLOW', 'update', owner, longRegistered, startTournament(longRegistered, owner, 42, cutoff), { time: cutoff })
+test('longer available time supports matches over thirty minutes', 'ALLOW', 'create', owner, undefined, makeTournament('qa', { ...adaptiveDraft, capacity: 6, courts: 2, totalMinutes: 180 }, owner, now))
 
 const projectId = JSON.parse(readFileSync('.firebaserc', 'utf8')).projects.default as string
 const endpoint = `https://firebaserules.googleapis.com/v1/projects/${projectId}:test`

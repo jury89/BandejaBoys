@@ -504,11 +504,26 @@ service cloud.firestore {
         && resource.data.members[request.auth.uid] == true;
     }
 
+    // Same budget arithmetic as the pure planner; the draw freezes actual attendance.
+    function validAdaptiveTournamentPlan(data) {
+      let players = data.currentRound > 0 ? data.registrations.size() : data.capacity;
+      let teams = int(players / 2);
+      let matches = int(teams * (teams - 1) / 2);
+      let baseRounds = teams % 2 == 1 ? teams : teams - 1;
+      let courtRounds = int((matches + data.courts - 1) / data.courts);
+      let rounds = baseRounds > courtRounds ? baseRounds : courtRounds;
+      let minutes = int((data.totalMinutes - data.get('warmupMinutes', 5)
+        - (rounds - 1) * data.get('changeoverMinutes', 2)) / rounds);
+      return players >= 6 && players % 2 == 0 && minutes >= 5
+        && data.get('matchMinutes', 15) == minutes
+        && (data.currentRound == 0 || (data.totalRounds == rounds && data.currentRound <= rounds));
+    }
+
     function validTournament(data) {
       return data.keys().hasOnly(['id', 'title', 'startsAt', 'venueId', 'format', 'pairing', 'capacity',
           'courts', 'rounds', 'pointsPerMatch', 'scoreAccess', 'published', 'status', 'createdBy',
           'createdAt', 'updatedAt', 'registrations', 'teams', 'matches', 'currentRound', 'totalRounds', 'seed',
-          'scoringMode', 'matchMinutes', 'warmupMinutes', 'changeoverMinutes', 'roundStartedAt'])
+          'scoringMode', 'matchMinutes', 'warmupMinutes', 'changeoverMinutes', 'roundStartedAt', 'totalMinutes'])
         && data.title is string && data.title.size() >= 3 && data.title.size() <= 80
         && data.startsAt is number
         && data.venueId in ['oasi-boschetto', 'tennis-club-mantova', 'sport-city-mantova']
@@ -526,28 +541,46 @@ service cloud.firestore {
         && data.registrations is map && data.registrations.size() <= data.capacity
         && data.teams is list && data.teams.size() <= 16
         && data.matches is map && data.matches.size() <= 256
-        && data.currentRound is int && data.currentRound >= 0 && data.currentRound <= 31
-        && data.totalRounds is int && data.totalRounds >= 0 && data.totalRounds <= 31
+        && data.currentRound is int && data.currentRound >= 0 && data.currentRound <= (data.get('totalMinutes', null) == null ? 31 : 120)
+        && data.totalRounds is int && data.totalRounds >= 0 && data.totalRounds <= (data.get('totalMinutes', null) == null ? 31 : 120)
         && data.seed is int && data.seed >= 0 && data.seed <= 4294967295
         && data.get('scoringMode', 'standard') in ['standard', 'timed']
         && (data.get('scoringMode', 'standard') != 'timed'
-          || (data.format == 'round-robin' && data.courts >= int(data.capacity / 4)))
-        && data.get('matchMinutes', 15) is int && data.get('matchMinutes', 15) >= 5 && data.get('matchMinutes', 15) <= 30
+          || (data.format == 'round-robin' && (data.get('totalMinutes', null) != null || data.courts >= int(data.capacity / 4))))
+        && (data.get('totalMinutes', null) == null || (data.totalMinutes is int && data.totalMinutes >= 15 && data.totalMinutes <= 720
+          && data.get('scoringMode', 'standard') == 'timed' && data.capacity >= 6 && data.capacity % 2 == 0))
+        && data.get('matchMinutes', 15) is int && data.get('matchMinutes', 15) >= 5 && data.get('matchMinutes', 15) <= (data.get('totalMinutes', null) == null ? 30 : 240)
         && data.get('warmupMinutes', 5) is int && data.get('warmupMinutes', 5) >= 0 && data.get('warmupMinutes', 5) <= 15
         && data.get('changeoverMinutes', 2) is int && data.get('changeoverMinutes', 2) >= 0 && data.get('changeoverMinutes', 2) <= 5
-        && (data.get('roundStartedAt', null) == null || data.roundStartedAt is number);
+        && (data.get('roundStartedAt', null) == null || data.roundStartedAt is number)
+        && (data.get('totalMinutes', null) == null || validAdaptiveTournamentPlan(data));
     }
 
-    // Legacy tournaments have no clock fields. Once published, scoring cannot change.
+    function validTournamentOrganizationUpdate(before, after) {
+      let changed = after.diff(before).affectedKeys();
+      // Ordinary registrations/scores must not pay for budget-edit/draw validation.
+      return before.status == 'draft'
+        || !changed.hasAny(['capacity', 'courts', 'totalMinutes', 'matchMinutes', 'warmupMinutes', 'changeoverMinutes', 'scoringMode'])
+        || (
+        before.get('scoringMode', 'standard') == after.get('scoringMode', 'standard')
+        && ((before.status == 'open' && after.status == 'open'
+          && before.get('scoringMode', 'standard') == 'timed' && after.get('totalMinutes', null) != null
+          && request.time.toMillis() < before.startsAt - 3600000
+          && changed.hasOnly(['capacity', 'courts', 'totalMinutes', 'matchMinutes', 'warmupMinutes', 'changeoverMinutes', 'updatedAt'])) || (
+          before.status == 'open' && after.status == 'running' && before.get('totalMinutes', null) != null
+          && request.time.toMillis() >= before.startsAt - 3600000
+          && !changed.hasAny(['capacity', 'courts', 'totalMinutes', 'warmupMinutes', 'changeoverMinutes'])
+        ))
+      );
+    }
+
+    // Legacy tournaments retain their clock. A new budget is opt-in before cutoff.
     function validTournamentTimingUpdate(before, after) {
       let start = before.get('roundStartedAt', null);
       let nextStart = after.get('roundStartedAt', null);
       let expired = start != null && request.time.toMillis() >= start + before.get('matchMinutes', 15) * 60000;
-      return (before.status == 'draft' || (
-          before.get('scoringMode', 'standard') == after.get('scoringMode', 'standard')
-          && before.get('matchMinutes', 15) == after.get('matchMinutes', 15)
-          && before.get('warmupMinutes', 5) == after.get('warmupMinutes', 5)
-          && before.get('changeoverMinutes', 2) == after.get('changeoverMinutes', 2)))
+      return validTournamentOrganizationUpdate(before, after)
+        && (before.status != 'open' || after.status != 'running' || request.time.toMillis() >= before.startsAt - 3600000)
         && (after.get('scoringMode', 'standard') != 'timed' || (
           before.status != 'running' ? nextStart == null : (
             after.status == 'cancelled' ? nextStart == start : (
@@ -583,6 +616,18 @@ service cloud.firestore {
       );
     }
 
+    // A self-signup cannot touch logistics or the draw: validate only the changed
+    // map entry, not the unchanged budget again (Firestore's 1000-expression cap).
+    function validOwnTournamentUpdate(before, after) {
+      return after.diff(before).affectedKeys().hasOnly(['registrations', 'updatedAt'])
+        && after.registrations is map && after.registrations.size() <= before.capacity
+        && after.registrations.diff(before.registrations).affectedKeys().hasOnly([request.auth.uid])
+        && after.updatedAt is number
+        && before.published == true && before.status == 'open'
+        && request.time.toMillis() < before.startsAt - 3600000
+        && validOwnTournamentRegistration(after, before);
+    }
+
     match /tournaments/{tournamentId} {
       // Creation transactions first check that the generated document id is unused.
       allow get: if isMember() && !exists(/databases/$(database)/documents/tournaments/$(tournamentId));
@@ -594,7 +639,9 @@ service cloud.firestore {
         && request.resource.data.published == false && request.resource.data.registrations.size() == 0
         && request.resource.data.matches.size() == 0
         && request.resource.data.get('roundStartedAt', null) == null;
-      allow update: if isMember() && validTournament(request.resource.data)
+      allow update: if isMember() && (validOwnTournamentUpdate(resource.data, request.resource.data) || (
+        (isSlotAdmin() || resource.data.createdBy == request.auth.uid)
+        && validTournament(request.resource.data)
         && request.resource.data.id == resource.data.id
         && request.resource.data.createdBy == resource.data.createdBy
         && request.resource.data.createdAt == resource.data.createdAt
@@ -602,13 +649,7 @@ service cloud.firestore {
         && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['registrations'])
           || (resource.data.published == true && resource.data.status == 'open'
             && request.time.toMillis() < resource.data.startsAt - 3600000))
-        && (isSlotAdmin() || resource.data.createdBy == request.auth.uid || (
-          resource.data.published == true && resource.data.status == 'open'
-          && request.time.toMillis() < resource.data.startsAt - 3600000
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['registrations', 'updatedAt'])
-          && request.resource.data.registrations.diff(resource.data.registrations).affectedKeys().hasOnly([request.auth.uid])
-          && validOwnTournamentRegistration(request.resource.data, resource.data)
-        ));
+      ));
       allow delete: if false;
 
       match /scores/{matchId} {
