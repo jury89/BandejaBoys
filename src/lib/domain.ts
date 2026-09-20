@@ -2044,31 +2044,35 @@ function tournamentPlayerCountError(count: number, format: TournamentInput['form
   if ((format === 'americano' || format === 'mexicano') && count % 4) throw new Error('La formula richiede un numero di iscritti multiplo di 4, così tutti giocano a ogni turno.')
 }
 
-function requireTournamentAdmin(actorId: string): void {
-  if (!isSlotAdmin(actorId)) throw new Error('Solo l’amministratore può gestire i tornei.')
+export function canManageTournament(tournament: Pick<Tournament, 'createdBy'>, actorId: string): boolean {
+  return Boolean(actorId) && (tournament.createdBy === actorId || isSlotAdmin(actorId))
+}
+
+function requireTournamentManager(tournament: Tournament, actorId: string): void {
+  if (!canManageTournament(tournament, actorId)) throw new Error('Solo l’organizzatore e l’amministratore possono gestire questo torneo.')
 }
 
 export function makeTournament(id: string, input: TournamentInput, actorId: string, now = Date.now()): Tournament {
-  requireTournamentAdmin(actorId)
+  if (!actorId.trim()) throw new Error('Accedi per creare un torneo.')
   return { ...validateTournamentInput(input, now), id, published: false, status: 'draft', createdBy: actorId,
     createdAt: now, updatedAt: now, registrations: {}, teams: [], matches: {}, currentRound: 0, totalRounds: 0, seed: 0 }
 }
 
 export function editTournament(tournament: Tournament, input: TournamentInput, actorId: string, now = Date.now()): Tournament {
-  requireTournamentAdmin(actorId)
+  requireTournamentManager(tournament, actorId)
   if (tournament.status !== 'draft') throw new Error('Le impostazioni sono bloccate dopo la pubblicazione.')
   return { ...tournament, ...validateTournamentInput(input, now), updatedAt: now }
 }
 
 export function publishTournament(tournament: Tournament, actorId: string, now = Date.now()): Tournament {
-  requireTournamentAdmin(actorId)
+  requireTournamentManager(tournament, actorId)
   if (tournament.status !== 'draft') throw new Error('Il torneo non è una bozza.')
   validateTournamentInput(tournament, now)
   return { ...tournament, status: 'open', published: true, updatedAt: now }
 }
 
 export function cancelTournament(tournament: Tournament, actorId: string, now = Date.now()): Tournament {
-  requireTournamentAdmin(actorId)
+  requireTournamentManager(tournament, actorId)
   if (tournament.status === 'completed' || tournament.status === 'cancelled') throw new Error('Il torneo è già concluso.')
   return { ...tournament, status: 'cancelled', updatedAt: now }
 }
@@ -2129,7 +2133,7 @@ function rotatingTournamentRound(tournament: Tournament, orderedIds: string[], r
 }
 
 export function startTournament(tournament: Tournament, actorId: string, seed: number, now = Date.now()): Tournament {
-  requireTournamentAdmin(actorId)
+  requireTournamentManager(tournament, actorId)
   if (tournament.status !== 'open' || !tournament.published) throw new Error('Pubblica il torneo prima di preparare il tabellone.')
   if (now < tournament.startsAt - TOURNAMENT_SIGNUP_LEAD_MS) throw new Error('Aspetta la chiusura delle iscrizioni per il sorteggio.')
   const ids = Object.keys(tournament.registrations).sort()
@@ -2178,7 +2182,7 @@ export function makeTournamentScore(tournament: Tournament, matchId: string, a: 
   const match = tournament.matches[matchId]
   if (!match || tournament.status !== 'running' || match.round !== tournament.currentRound) throw new Error('Puoi correggere soltanto i risultati del turno corrente, prima di avanzare.')
   if (now < tournament.startsAt) throw new Error('I risultati si inseriscono dall’orario d’inizio del torneo.')
-  if (!isSlotAdmin(actorId) && (tournament.scoreAccess !== 'players' || ![...match.teamA.playerIds, ...match.teamB.playerIds].includes(actorId))) throw new Error('Puoi inserire solo i risultati delle tue partite.')
+  if (!canManageTournament(tournament, actorId) && (tournament.scoreAccess !== 'players' || ![...match.teamA.playerIds, ...match.teamB.playerIds].includes(actorId))) throw new Error('Puoi inserire solo i risultati delle tue partite.')
   if ((previous?.revision ?? 0) !== expectedRevision) throw new Error('Qualcuno ha aggiornato questo risultato. Riapri la partita per vedere l’ultima versione.')
   if (!tournamentScoreIsValid(tournament, a, b)) throw new Error(tournamentUsesRotatingPairs(tournament) ? `I punti delle due coppie devono sommare ${tournament.pointsPerMatch}.` : 'Risultato valido: 6–0 fino a 6–4, 7–5 oppure 7–6 (anche a squadre invertite).')
   return { matchId, scoreA: a, scoreB: b, updatedBy: actorId, updatedAt: now, revision: expectedRevision + 1 }
@@ -2223,7 +2227,7 @@ export function getTournamentStandings(tournament: Tournament, scores: Tournamen
 }
 
 export function advanceTournament(tournament: Tournament, scores: TournamentScore[], actorId: string, now = Date.now()): Tournament {
-  requireTournamentAdmin(actorId)
+  requireTournamentManager(tournament, actorId)
   if (tournament.status !== 'running') throw new Error('Il torneo non è in corso.')
   if (now < tournament.startsAt) throw new Error('Aspetta l’orario d’inizio del torneo.')
   const currentMatches = Object.values(tournament.matches).filter((m) => m.round === tournament.currentRound)

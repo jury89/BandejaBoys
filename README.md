@@ -2,11 +2,11 @@
 
 ## Tornei del gruppo
 
-Nel menu account dell’amministratore compare **Tornei** (`#tornei`). Solo Jury crea e gestisce i tornei: salva una bozza privata, sceglie data/ora italiana, circolo, campi disponibili e formula, poi pubblica e condivide il link. Gli altri membri possono aprire il torneo pubblicato e iscriversi fino a **un’ora prima dell’inizio**; nelle coppie scelte entrambi devono confermare il compagno. Sono disponibili **Americano**, **Mexicano**, **girone all’italiana** ed **eliminazione diretta con finalina**, con descrizioni e criteri di classifica nella pagina.
+Nel menu account di tutti i membri compare **Tornei** (`#tornei`). Chiunque può creare un torneo: salva una bozza privata, sceglie data/ora italiana, circolo, campi disponibili e formula, poi pubblica e condivide il link. La gestione spetta al creatore e a Jury; le bozze sono leggibili solo da loro. Gli altri membri vedono i tornei pubblicati nell’elenco e possono iscriversi fino a **un’ora prima dell’inizio**; nelle coppie scelte entrambi devono confermare il compagno. Sono disponibili **Americano**, **Mexicano**, **girone all’italiana** ed **eliminazione diretta con finalina**, con descrizioni e criteri di classifica nella pagina.
 
-Alla chiusura delle iscrizioni Jury prepara il tabellone. Dall’orario di inizio Jury e i giocatori coinvolti possono inserire/correggere i risultati della propria partita; l’amministratore può anche scegliere la modalità solo organizzatore. Confermando ogni turno si bloccano i relativi risultati; nell’ultimo turno viene assegnato il podio. Nessuna prenotazione automatica e nessuna modifica a Fanta, giudizi o storico ordinario. I pari merito completi sono espliciti, non risolti per ordine alfabetico.
+Alla chiusura delle iscrizioni l’organizzatore (o Jury) prepara il tabellone. Dall’orario di inizio organizzatore e Jury possono inserire/correggere qualsiasi risultato; i giocatori coinvolti possono farlo solo per la propria partita, salvo modalità solo organizzatore. Confermando ogni turno si bloccano i relativi risultati; nell’ultimo turno viene assegnato il podio. Nessuna prenotazione automatica e nessuna modifica a Fanta, giudizi o storico ordinario. I pari merito completi sono espliciti, non risolti per ordine alfabetico.
 
-Regole, limiti e fonti: [docs/tournaments.md](docs/tournaments.md). Rilascio: Hosting, Firestore Rules e indice `tournaments(published, startsAt)`; nessuna migrazione e nessun nuovo servizio. Collaudo permessi senza dati reali: `npm run test:rules:tournaments` (ADC autorizzato al progetto).
+Regole, limiti e fonti: [docs/tournaments.md](docs/tournaments.md). Rilascio: Hosting, Firestore Rules e indici `tournaments(published, startsAt)` e `tournaments(createdBy, startsAt)`; nessuna migrazione e nessun nuovo servizio. Collaudo permessi senza dati reali: `npm run test:rules:tournaments` (ADC autorizzato al progetto).
 
 ## Campi, preferiti e posto fisso
 

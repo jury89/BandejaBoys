@@ -31,8 +31,8 @@ describe('TournamentsPage', () => {
     vi.spyOn(Date, 'now').mockReturnValue(now)
   })
   afterEach(() => vi.restoreAllMocks())
-  it('admin chooses a described formula, venue, fixed pair mode and privately saves then publishes', async () => {
-    const u = userEvent.setup(); show()
+  it.each([admin, members[0]])('$displayName chooses a formula and privately saves then publishes their tournament', async creator => {
+    const u = userEvent.setup(); show(creator)
     await u.click(screen.getByRole('button', { name: /Crea torneo/ }))
     const modal = screen.getByRole('dialog')
     expect(within(modal).getAllByRole('radio')).toHaveLength(4)
@@ -50,12 +50,32 @@ describe('TournamentsPage', () => {
     expect(await screen.findByRole('button', { name: 'Iscriviti al torneo' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Modifica bozza' })).not.toBeInTheDocument()
   })
-  it('members never see the creation button or private drafts', () => {
+  it('members see the creation button but never see other members’ private drafts', () => {
     localStorage.setItem('bandeja-tournaments-v1', JSON.stringify({ tournaments: [makeTournament('secret', input, admin.id, now)], scores: {} }))
     show(members[0])
-    expect(screen.queryByRole('button', { name: /Crea torneo/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Crea torneo/ })).toBeInTheDocument()
     expect(screen.queryByText(input.title)).not.toBeInTheDocument()
     expect(screen.getByText('Il primo torneo aspetta voi')).toBeInTheDocument()
+  })
+  it('a member sees their own drafts and published tournaments without leaking other drafts', () => {
+    const own = makeTournament('mine', { ...input, title: 'La mia coppa' }, members[0].id, now)
+    const secret = makeTournament('secret', { ...input, title: 'Coppa segreta' }, members[1].id, now)
+    localStorage.setItem('bandeja-tournaments-v1', JSON.stringify({ tournaments: [own, secret, fixture()], scores: {} }))
+    show(members[0])
+    expect(screen.getByRole('heading', { name: 'La mia coppa' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: input.title })).toBeInTheDocument()
+    expect(screen.queryByText('Coppa segreta')).not.toBeInTheDocument()
+  })
+  it('a non-playing creator can score every match and advance in organizer-only mode', async () => {
+    const t = { ...startTournament(fixture({ startsAt: now, scoreAccess: 'admin' }, 4), admin.id, 42, now), createdBy: members[7].id }
+    seed(t); const u = userEvent.setup(); show(members[7])
+    await u.click(await screen.findByRole('button', { name: /Inserisci risultato/ }))
+    const modal = screen.getByRole('dialog'), fields = within(modal).getAllByRole('spinbutton')
+    await u.type(fields[0], '14'); await u.type(fields[1], '10')
+    await u.click(within(modal).getByRole('button', { name: 'Salva risultato' }))
+    await u.click(await screen.findByRole('button', { name: 'Conferma turno e prosegui' }))
+    await u.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Conferma' }))
+    expect(await screen.findByRole('heading', { name: 'Partite · turno 2 di 3' })).toBeInTheDocument()
   })
   it('members join, choose a partner and withdraw without writing for anyone else', async () => {
     seed(fixture({ format: 'round-robin', pairing: 'chosen-fixed' }, 2))

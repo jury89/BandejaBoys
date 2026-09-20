@@ -520,7 +520,7 @@ service cloud.firestore {
         && data.scoreAccess in ['players', 'admin']
         && data.published is bool
         && data.status in ['draft', 'open', 'running', 'completed', 'cancelled']
-        && data.createdBy == '4VSiYJso4YSWf35Rg8Cp0Q8hVmu2'
+        && data.createdBy is string && data.createdBy.size() > 0
         && data.createdAt is number && data.updatedAt is number
         && data.registrations is map && data.registrations.size() <= data.capacity
         && data.teams is list && data.teams.size() <= 16
@@ -548,8 +548,12 @@ service cloud.firestore {
     }
 
     match /tournaments/{tournamentId} {
-      allow read: if isSlotAdmin() || (isMember() && resource.data.published == true);
-      allow create: if isSlotAdmin() && validTournament(request.resource.data)
+      // Creation transactions first check that the generated document id is unused.
+      allow get: if isMember() && !exists(/databases/$(database)/documents/tournaments/$(tournamentId));
+      allow read: if isSlotAdmin() || (isMember()
+        && (resource.data.published == true || resource.data.createdBy == request.auth.uid));
+      allow create: if isMember() && validTournament(request.resource.data)
+        && request.resource.data.createdBy == request.auth.uid
         && request.resource.data.id == tournamentId && request.resource.data.status == 'draft'
         && request.resource.data.published == false && request.resource.data.registrations.size() == 0
         && request.resource.data.matches.size() == 0;
@@ -557,7 +561,7 @@ service cloud.firestore {
         && request.resource.data.id == resource.data.id
         && request.resource.data.createdBy == resource.data.createdBy
         && request.resource.data.createdAt == resource.data.createdAt
-        && (isSlotAdmin() || (
+        && (isSlotAdmin() || resource.data.createdBy == request.auth.uid || (
           resource.data.published == true && resource.data.status == 'open'
           && request.time.toMillis() < resource.data.startsAt - 3600000
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['registrations', 'updatedAt'])
@@ -578,7 +582,7 @@ service cloud.firestore {
           let low = data.scoreA < data.scoreB ? data.scoreA : data.scoreB;
           return parent.published == true && parent.status == 'running'
             && fixture.round == parent.currentRound && request.time.toMillis() >= parent.startsAt
-            && (isSlotAdmin() || (parent.scoreAccess == 'players'
+            && (isSlotAdmin() || parent.createdBy == request.auth.uid || (parent.scoreAccess == 'players'
               && (request.auth.uid in fixture.teamA.playerIds || request.auth.uid in fixture.teamB.playerIds)))
             && data.keys().hasOnly(['matchId', 'scoreA', 'scoreB', 'updatedBy', 'updatedAt', 'revision'])
             && data.matchId == matchId && data.updatedBy == request.auth.uid
@@ -588,7 +592,8 @@ service cloud.firestore {
               ? data.scoreA + data.scoreB == parent.pointsPerMatch
               : ((high == 6 && low <= 4) || (high == 7 && low in [5, 6])));
         }
-        allow read: if isSlotAdmin() || (isMember() && tournament().published == true);
+        allow read: if isSlotAdmin() || (isMember()
+          && (tournament().published == true || tournament().createdBy == request.auth.uid));
         allow create: if isMember() && validScore() && request.resource.data.revision == 1;
         allow update: if isMember() && validScore() && request.resource.data.revision == resource.data.revision + 1;
         allow delete: if false;

@@ -6,6 +6,13 @@
       { "fieldPath": "published", "order": "ASCENDING" },
       { "fieldPath": "startsAt", "order": "DESCENDING" }
     ]
+  }, {
+    "collectionGroup": "tournaments",
+    "queryScope": "COLLECTION",
+    "fields": [
+      { "fieldPath": "createdBy", "order": "ASCENDING" },
+      { "fieldPath": "startsAt", "order": "DESCENDING" }
+    ]
   }],
   "fieldOverrides": []
 }

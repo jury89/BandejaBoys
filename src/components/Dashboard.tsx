@@ -66,7 +66,6 @@ import type { VenueId } from '../types'
 import { VenueChoices } from './VenuePicker'
 import { VenuesPage } from './VenuesPage'
 import { TournamentsPage } from './TournamentsPage'
-import { isSlotAdmin } from '../lib/admin'
 
 type FeedFilter = PollSlotFilter
 type DashboardView = 'feed' | 'matches' | 'group-matches' | 'statistics' | 'fantasy' | 'notifications' | 'venues' | 'tournaments'
@@ -913,7 +912,7 @@ export function Dashboard() {
                   <Trophy size={16} />
                   <span>FantaBandeja <small>Schiera la coppia e scala la classifica</small></span>
                 </button>
-                {isSlotAdmin(user.id) && <a href="#tornei" onClick={() => setAccountOpen(false)}><Trophy size={16} /><span>Tornei <small>Crea e organizza un torneo del gruppo</small></span></a>}
+                <a href="#tornei" onClick={() => setAccountOpen(false)}><Trophy size={16} /><span>Tornei <small>Crea e organizza un torneo del gruppo</small></span></a>
                 {hasRemoteBackend && (
                   <button type="button" onClick={() => {
                     setAccountOpen(false)

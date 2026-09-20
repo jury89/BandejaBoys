@@ -19,11 +19,13 @@ function test(label: string, expectation: 'ALLOW' | 'DENY', method: string, acto
       auth: actor ? auth(actor) : null, time: new Date(options.time ?? now).toISOString(),
       ...(after ? { resource: { data: after } } : {}) },
     ...(before ? { resource: { data: before } } : {}),
-    ...(options.parent ? { functionMocks: [{ function: 'get', args: [{ exactValue: path }], result: { value: { data: options.parent } } }] } : {}),
+    functionMocks: options.parent
+      ? [{ function: 'get', args: [{ exactValue: path }], result: { value: { data: options.parent } } }]
+      : [{ function: 'exists', args: [{ exactValue: path }], result: { value: Boolean(before) } }],
   } })
 }
 test('admin creates draft', 'ALLOW', 'create', admin, undefined, draft)
-test('member cannot create', 'DENY', 'create', 'p0', undefined, draft)
+test('member cannot forge creator identity', 'DENY', 'create', 'p0', undefined, draft)
 test('anonymous cannot create', 'DENY', 'create', null, undefined, draft)
 test('admin reads draft', 'ALLOW', 'get', admin, draft)
 test('member cannot read draft', 'DENY', 'get', 'p0', draft)
@@ -32,6 +34,28 @@ test('anonymous cannot read published', 'DENY', 'get', null, open)
 test('admin publishes', 'ALLOW', 'update', admin, draft, open)
 test('member cannot publish', 'DENY', 'update', 'p0', draft, open)
 test('no deletion even by admin', 'DENY', 'delete', admin, open)
+const owner = 'organizer'
+const ownDraft = makeTournament('qa', draft, owner, now)
+const ownOpen = publishTournament(ownDraft, owner, now)
+test('member checks unused id before creation transaction', 'ALLOW', 'get', owner)
+test('anonymous cannot check unused id', 'DENY', 'get', null)
+test('member creates own draft', 'ALLOW', 'create', owner, undefined, ownDraft)
+test('cannot create directly published tournament', 'DENY', 'create', owner, undefined, ownOpen)
+test('owner reads own draft', 'ALLOW', 'get', owner, ownDraft)
+test('admin reads member draft', 'ALLOW', 'get', admin, ownDraft)
+test('another member cannot read draft by id', 'DENY', 'get', 'p0', ownDraft)
+test('member can list own drafts', 'ALLOW', 'list', owner, ownDraft)
+test('member can list published tournaments', 'ALLOW', 'list', 'p0', ownOpen)
+test('member cannot list another creator draft', 'DENY', 'list', 'p0', ownDraft)
+test('owner edits own draft', 'ALLOW', 'update', owner, ownDraft, { ...ownDraft, title: 'Nuovo titolo' })
+test('owner publishes own draft', 'ALLOW', 'update', owner, ownDraft, ownOpen)
+test('admin publishes member draft', 'ALLOW', 'update', admin, ownDraft, ownOpen)
+test('another member cannot publish member draft', 'DENY', 'update', 'p0', ownDraft, ownOpen)
+test('cannot take over ownership', 'DENY', 'update', 'p0', ownOpen, { ...ownOpen, createdBy: 'p0' })
+test('creator cannot transfer ownership', 'DENY', 'update', owner, ownOpen, { ...ownOpen, createdBy: 'p0' })
+test('owner cancels own tournament', 'ALLOW', 'update', owner, ownOpen, { ...ownOpen, status: 'cancelled' })
+test('another member cannot cancel tournament', 'DENY', 'update', 'p0', ownOpen, { ...ownOpen, status: 'cancelled' })
+test('owner cannot delete tournament history', 'DENY', 'delete', owner, ownOpen)
 const joined = registerForTournament(open, { id: 'p0', displayName: 'Player zero' }, null, now)
 test('member registers self', 'ALLOW', 'update', 'p0', open, joined)
 test('cannot register someone else', 'DENY', 'update', 'p1', open, joined)
@@ -57,6 +81,7 @@ let registered = open
 for (let i = 0; i < 8; i++) registered = registerForTournament(registered, { id: `p${i}`, displayName: `Player ${i}` }, null, now)
 const running = startTournament(registered, admin, 17, open.startsAt)
 test('admin saves draw', 'ALLOW', 'update', admin, registered, running, { time: open.startsAt })
+test('owner saves own draw', 'ALLOW', 'update', owner, { ...registered, createdBy: owner }, { ...running, createdBy: owner }, { time: open.startsAt })
 test('player cannot save draw', 'DENY', 'update', 'p0', registered, running, { time: open.startsAt })
 const match = running.matches['r1-m1'], player = match.teamA.playerIds[0]
 const other = Object.keys(running.registrations).find(id => ![...match.teamA.playerIds, ...match.teamB.playerIds].includes(id))!
@@ -85,6 +110,16 @@ test('admin-only scoring option', 'DENY', 'create', player, undefined, score, { 
 test('admin still scores admin-only option', 'ALLOW', 'create', admin, undefined, { ...score, updatedBy: admin }, { ...options, parent: { ...running, scoreAccess: 'admin' } })
 test('completed set accepted', 'ALLOW', 'create', player, undefined, { ...score, scoreA: 7, scoreB: 6 }, { ...options, parent: { ...running, format: 'round-robin' } })
 test('unfinished set rejected', 'DENY', 'create', player, undefined, { ...score, scoreA: 6, scoreB: 5 }, { ...options, parent: { ...running, format: 'knockout' } })
+const ownedOptions = { ...options, parent: { ...running, createdBy: owner, scoreAccess: 'admin' as const } }
+test('creator scores any match in organizer-only mode', 'ALLOW', 'create', owner, undefined, { ...score, updatedBy: owner }, ownedOptions)
+test('admin scores member tournament in organizer-only mode', 'ALLOW', 'create', admin, undefined, { ...score, updatedBy: admin }, ownedOptions)
+test('participant cannot score in organizer-only mode', 'DENY', 'create', player, undefined, score, ownedOptions)
+test('creator corrects current result', 'ALLOW', 'update', owner, score, { ...score, updatedBy: owner, scoreA: 16, scoreB: 8, revision: 2 }, ownedOptions)
+test('creator cannot overwrite stale result', 'DENY', 'update', owner, score, { ...score, updatedBy: owner }, ownedOptions)
+test('creator cannot score before start', 'DENY', 'create', owner, undefined, { ...score, updatedBy: owner }, { ...ownedOptions, time: open.startsAt - 1 })
+test('creator cannot change frozen results', 'DENY', 'update', owner, score, { ...score, updatedBy: owner, revision: 2 }, { ...ownedOptions, parent: { ...ownedOptions.parent, currentRound: 2 } })
+test('creator reads own draft score collection', 'ALLOW', 'list', owner, undefined, undefined, { ...options, parent: ownDraft })
+test('member cannot read another creator draft scores', 'DENY', 'list', 'p0', undefined, undefined, { ...options, parent: ownDraft })
 
 const projectId = JSON.parse(readFileSync('.firebaserc', 'utf8')).projects.default as string
 const endpoint = `https://firebaserules.googleapis.com/v1/projects/${projectId}:test`
