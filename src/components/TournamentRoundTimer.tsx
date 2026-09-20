@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { getTournamentRoundClock } from '../lib/domain'
 import type { Tournament } from '../lib/tournamentTypes'
 
-export function TournamentRoundTimer({ tournament, now, manager, busy, onStart }: {
-  tournament: Tournament; now: number; manager: boolean; busy: boolean; onStart: () => void
+export function TournamentRoundTimer({ tournament, now, manager, busy, onStart, simulation = false }: {
+  tournament: Tournament; now: number; manager: boolean; busy: boolean; onStart: () => void; simulation?: boolean
 }) {
   const clock = getTournamentRoundClock(tournament, now)
   const audio = useRef<AudioContext | null>(null), sounded = useRef<string | null>(null)
@@ -39,7 +39,7 @@ export function TournamentRoundTimer({ tournament, now, manager, busy, onStart }
       {manager && clock.state === 'waiting' && <button className="button button--primary" disabled={busy || now < tournament.startsAt} onClick={onStart}>Avvia timer del turno</button>}
       <button className="button" onClick={() => void toggleSound()} aria-pressed={sound}>{sound ? 'Disattiva avviso sonoro' : 'Attiva avviso sonoro'}</button>
     </div>
-    <p className="tournament-note">Il timer è condiviso e continua dopo un ricaricamento. Per il suono tieni la pagina aperta e il dispositivo attivo; in background usa anche un timer del telefono. Il turno successivo parte solo dopo la conferma dei risultati e un nuovo avvio.</p>
+    <p className="tournament-note">{simulation ? 'Questo timer è soltanto di prova e rimane su questo dispositivo, anche dopo un ricaricamento.' : 'Il timer è condiviso e continua dopo un ricaricamento.'} Per il suono tieni la pagina aperta e il dispositivo attivo; in background usa anche un timer del telefono. Il turno successivo parte solo dopo la conferma dei risultati e un nuovo avvio.</p>
     {soundError && <p role="alert">{soundError}</p>}
   </section>
 }
