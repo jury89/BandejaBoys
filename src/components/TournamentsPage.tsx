@@ -1,8 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { ArrowLeft, CalendarDays, Check, Copy, Plus, Trophy, UsersRound } from 'lucide-react'
 import type { MemberProfile, SessionUser } from '../types'
-import { isSlotAdmin } from '../lib/admin'
-import { getTournamentStandings, padelDateTimeToTimestamp, toDateTimeInput, tournamentRegistrationsOpen, tournamentUsesRotatingPairs, validateTournamentInput } from '../lib/domain'
+import { canManageTournament, getTournamentStandings, padelDateTimeToTimestamp, toDateTimeInput, tournamentRegistrationsOpen, tournamentUsesRotatingPairs, validateTournamentInput } from '../lib/domain'
 import { repository } from '../lib/repository'
 import { TOURNAMENT_FORMATS, type Tournament, type TournamentInput, type TournamentMatch, type TournamentScore } from '../lib/tournamentTypes'
 import { VENUES } from '../lib/venues'
@@ -40,7 +39,7 @@ function TournamentEditor({ tournament, user, onClose, onSaved }: { tournament?:
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'Salvataggio non riuscito. Riprova.') }
     finally { setBusy(false) }
   }
-  return <Modal title={tournament ? 'Modifica bozza' : 'Nuovo torneo'} eyebrow="Solo amministratore" onClose={onClose} size="wide">
+  return <Modal title={tournament ? 'Modifica bozza' : 'Nuovo torneo'} eyebrow="Organizza il tuo torneo" onClose={onClose} size="wide">
     <form className="tournament-form" onSubmit={submit}>
       <label>Nome del torneo<input required minLength={3} maxLength={80} value={input.title} onChange={e => update('title', e.target.value)} placeholder="Il torneo dei fagiani" /></label>
       <SlotDateTimeField value={date} onChange={setDate} />
@@ -57,8 +56,8 @@ function TournamentEditor({ tournament, user, onClose, onSaved }: { tournament?:
         {rotating && <><label>Turni<input required type="number" min={1} max={31} value={input.rounds} onChange={e => update('rounds', Number(e.target.value))} /></label><label>Punti totali per incontro<select value={input.pointsPerMatch} onChange={e => update('pointsPerMatch', Number(e.target.value))}>{[16, 24, 32].map(n => <option key={n}>{n}</option>)}</select></label></>}
       </div>
       <p>{rotating ? `Ogni coppia guadagna i punti segnati: per esempio ${input.pointsPerMatch / 2 + 2}–${input.pointsPerMatch / 2 - 2}. Tutti giocano in ogni turno, anche in ondate su meno campi.` : 'Ogni partita è un set a 6 game, tie-break sul 6–6 (si registra 7–6). Il calendario viene calcolato dagli iscritti effettivi.'}</p>
-      <label>Chi può inserire i risultati<select value={input.scoreAccess} onChange={e => update('scoreAccess', e.target.value as TournamentInput['scoreAccess'])}><option value="players">Amministratore e giocatori della partita</option><option value="admin">Solo amministratore</option></select></label>
-      <p className="tournament-note">Salvi una bozza visibile solo a te. La pubblicherai dopo averla controllata. Il torneo non prenota i campi e non assegna punti Fanta.</p>
+      <label>Chi può inserire i risultati<select value={input.scoreAccess} onChange={e => update('scoreAccess', e.target.value as TournamentInput['scoreAccess'])}><option value="players">Organizzatore e giocatori della partita</option><option value="admin">Solo organizzatore</option></select></label>
+      <p className="tournament-note">Salvi una bozza visibile solo a te e all’amministratore. La pubblicherai dopo averla controllata. L’amministratore può sempre aiutarti nella gestione e nei risultati. Il torneo non prenota i campi e non assegna punti Fanta.</p>
       {error && <p role="alert" className="form-error">{error}</p>}
       <button className="button button--primary" disabled={busy}>{busy ? 'Salvataggio…' : 'Salva bozza privata'}</button>
     </form>
@@ -95,9 +94,9 @@ function TournamentDetail({ id, user, members, onBack }: { id: string; user: Ses
   const [editor, setEditor] = useState(false), [matchId, setMatchId] = useState('')
   const [confirmation, setConfirmation] = useState<'publish' | 'start' | 'advance' | 'cancel' | null>(null)
   const [message, setMessage] = useState(''), [now, setNow] = useState(Date.now)
-  const admin = isSlotAdmin(user.id)
+  const manager = Boolean(record?.value && canManageTournament(record.value, user.id))
   useEffect(() => repository.subscribeTournament(id, user.id, value => { setRecord({ value }); setError('') }, err => setError(err.message)), [id, user.id, attempt])
-  const canReadScores = record?.value && (record.value.published || admin)
+  const canReadScores = record?.value && (record.value.published || manager)
   useEffect(() => {
     if (!canReadScores) return
     return repository.subscribeTournamentScores(id, setScores, err => setError(err.message))
@@ -122,10 +121,10 @@ function TournamentDetail({ id, user, members, onBack }: { id: string; user: Ses
   return <main className="dashboard tournament-page">
     <button className="button button--ghost" onClick={onBack}><ArrowLeft size={18} /> Tutti i tornei</button>
     <section className="tournament-hero"><div><span className="tournament-status">{tournamentStatus(t, now)}</span><h1>{t.title}</h1><p><CalendarDays size={18} /> {dateLabel(t.startsAt)}</p><p>{VENUES.find(v => v.id === t.venueId)?.name} · {t.courts} {t.courts === 1 ? 'campo' : 'campi'}</p></div><Trophy size={44} aria-hidden="true" /></section>
-    <section className="tournament-panel"><h2>{format.name}</h2><p>{format.description}</p><p>{format.scoring}</p><p>{tournamentUsesRotatingPairs(t) ? `${t.rounds} turni · ${t.pointsPerMatch} punti totali a partita.` : `Coppie ${t.pairing === 'random-fixed' ? 'sorteggiate' : 'scelte dai giocatori'}. Un set a 6, tie-break sul 6–6.`}</p><p>Risultati: {t.scoreAccess === 'admin' ? 'solo amministratore' : 'amministratore e giocatori di ciascuna partita'}. I risultati si possono correggere prima di confermare il turno.</p></section>
+    <section className="tournament-panel"><h2>{format.name}</h2><p>{format.description}</p><p>{format.scoring}</p><p>{tournamentUsesRotatingPairs(t) ? `${t.rounds} turni · ${t.pointsPerMatch} punti totali a partita.` : `Coppie ${t.pairing === 'random-fixed' ? 'sorteggiate' : 'scelte dai giocatori'}. Un set a 6, tie-break sul 6–6.`}</p><p>Risultati: {t.scoreAccess === 'admin' ? 'solo organizzatore' : 'organizzatore e giocatori di ciascuna partita'}, con assistenza dell’amministratore. I risultati si possono correggere prima di confermare il turno.</p></section>
     {error && <p className="form-error tournament-panel" role="alert">{error} <button onClick={() => setAttempt(a => a + 1)}>Ricarica dati</button></p>}
     {message && <p className="tournament-message" role="status">{message}</p>}
-    {admin && <section className="tournament-panel tournament-actions" aria-label="Gestione torneo">
+    {manager && <section className="tournament-panel tournament-actions" aria-label="Gestione torneo">
       {t.status === 'draft' && <><button className="button" disabled={busy} onClick={() => setEditor(true)}>Modifica bozza</button><button className="button button--primary" disabled={busy} onClick={() => setConfirmation('publish')}>Pubblica al gruppo</button></>}
       {t.published && <button className="button" onClick={() => { void navigator.clipboard.writeText(`${window.location.origin}${window.location.pathname}#tornei/${encodeURIComponent(t.id)}`).then(() => setMessage('Link copiato. Puoi mandarlo nel gruppo.')).catch(() => setMessage(`Link: ${window.location.origin}/#tornei/${encodeURIComponent(t.id)}`)) }}><Copy size={17} /> Copia link torneo</button>}
       {t.status === 'open' && <button className="button button--primary" disabled={busy || open} onClick={() => setConfirmation('start')}>Sorteggia e prepara tabellone</button>}
@@ -144,7 +143,7 @@ function TournamentDetail({ id, user, members, onBack }: { id: string; user: Ses
       {Array.from(new Set(matches.map(m => m.round))).map(round => <details className="tournament-round" key={round} open={round === t.currentRound}><summary>Turno {round}{t.status === 'completed' || round < t.currentRound ? ' · confermato' : round > t.currentRound ? ' · in programma' : ' · corrente'}</summary>
         <div className="tournament-matches">{matches.filter(m => m.round === round).map(match => {
           const score = scores.find(s => s.matchId === match.id)
-          const allowed = t.status === 'running' && round === t.currentRound && now >= t.startsAt && (admin || (t.scoreAccess === 'players' && [...match.teamA.playerIds, ...match.teamB.playerIds].includes(user.id)))
+          const allowed = t.status === 'running' && round === t.currentRound && now >= t.startsAt && (manager || (t.scoreAccess === 'players' && [...match.teamA.playerIds, ...match.teamB.playerIds].includes(user.id)))
           return <article key={match.id} className="tournament-match"><header>{match.stage === 'final' ? 'Finale · ' : match.stage === 'bronze' ? 'Finale 3° posto · ' : ''}Campo {match.court} · Ondata {match.wave}</header><div><span>{pairName(match.teamA.playerIds)}</span><strong>{score?.scoreA ?? '–'}</strong></div><div><span>{pairName(match.teamB.playerIds)}</span><strong>{score?.scoreB ?? '–'}</strong></div>{allowed && <button className="button" disabled={busy} onClick={() => setMatchId(match.id)}>{score ? 'Modifica risultato' : 'Inserisci risultato'}<span className="sr-only">: {pairName(match.teamA.playerIds)} contro {pairName(match.teamB.playerIds)}</span></button>}{!score && !allowed && <small>{now < t.startsAt ? 'Risultati disponibili dall’inizio' : 'In attesa del risultato'}</small>}</article>
         })}</div>
       </details>)}
@@ -172,10 +171,10 @@ export function TournamentsPage({ user, members, onBack }: { user: SessionUser; 
   const open = (nextId: string) => { setId(nextId); window.location.assign(nextId ? `#tornei/${encodeURIComponent(nextId)}` : '#tornei') }
   if (id) return <TournamentDetail key={id} id={id} user={user} members={members} onBack={() => open('')} />
   return <main className="dashboard tournament-page"><button className="button button--ghost" onClick={onBack}><ArrowLeft size={18} /> Torna alla bacheca</button><section className="tournament-hero"><div><h1>I tornei del gruppo</h1><p>Compagni diversi, stessa voglia di giocare.</p></div><Trophy size={42} /></section>
-    {isSlotAdmin(user.id) && <div className="tournament-actions"><button className="button button--primary" onClick={() => setCreating(true)}><Plus size={18} /> Crea torneo</button><p>Solo tu puoi creare tornei. Le bozze sono private.</p></div>}
+    <div className="tournament-actions"><button className="button button--primary" onClick={() => setCreating(true)}><Plus size={18} /> Crea torneo</button><p>Chi crea il torneo lo gestisce. Le bozze sono visibili solo al creatore e all’amministratore.</p></div>
     {error && <p role="alert">{error} <button onClick={() => setAttempt(a => a + 1)}>Riprova</button></p>}
     {!items && !error && <p>Caricamento tornei…</p>}
-    {items?.length === 0 && <section className="tournament-panel"><UsersRound /><h2>Il primo torneo aspetta voi</h2><p>{isSlotAdmin(user.id) ? 'Scegli una formula e prepara una bozza.' : 'Qui compariranno i tornei pubblicati dall’organizzatore.'}</p></section>}
+    {items?.length === 0 && <section className="tournament-panel"><UsersRound /><h2>Il primo torneo aspetta voi</h2><p>Scegli una formula e prepara una bozza, oppure aspetta un torneo pubblicato dal gruppo.</p></section>}
     <div className="tournament-list">{items?.map(t => <button className="tournament-panel" key={t.id} onClick={() => open(t.id)}><span>{tournamentStatus(t, now)}</span><h2>{t.title}</h2><p>{dateLabel(t.startsAt)}</p><p>{VENUES.find(v => v.id === t.venueId)?.name}</p><strong>{TOURNAMENT_FORMATS.find(f => f.id === t.format)?.name} · {Object.keys(t.registrations).length}/{t.capacity} iscritti</strong></button>)}</div>
     {items?.length === 50 && <p>Mostrati i 50 tornei più recenti. I precedenti rimangono accessibili dal loro link.</p>}
     {creating && <TournamentEditor user={user} onClose={() => setCreating(false)} onSaved={nextId => { setCreating(false); open(nextId) }} />}

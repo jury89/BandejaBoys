@@ -1,7 +1,7 @@
-import { collection, doc, limit, onSnapshot, orderBy, query, runTransaction, where, type Firestore, type Unsubscribe } from 'firebase/firestore'
+import { collection, doc, limit, onSnapshot, or, orderBy, query, runTransaction, where, type Firestore, type Unsubscribe } from 'firebase/firestore'
 import type { SessionUser } from '../types'
 import { isSlotAdmin } from './admin'
-import { advanceTournament, cancelTournament, editTournament, leaveTournament, makeTournament, makeTournamentScore, publishTournament, registerForTournament, startTournament } from './domain'
+import { advanceTournament, cancelTournament, canManageTournament, editTournament, leaveTournament, makeTournament, makeTournamentScore, publishTournament, registerForTournament, startTournament } from './domain'
 import type { Tournament, TournamentInput, TournamentScore } from './tournamentTypes'
 
 type Action = 'publish' | 'cancel' | 'start' | 'advance'
@@ -37,7 +37,7 @@ export function remoteTournamentRepository(db: Firestore): TournamentRepository 
     subscribeTournaments(userId, listener, onError) {
       const source = isSlotAdmin(userId)
         ? query(tournaments, orderBy('startsAt', 'desc'), limit(50))
-        : query(tournaments, where('published', '==', true), orderBy('startsAt', 'desc'), limit(50))
+        : query(tournaments, or(where('published', '==', true), where('createdBy', '==', userId)), orderBy('startsAt', 'desc'), limit(50))
       return onSnapshot(source, snapshot => listener(snapshot.docs.map(item => ({ ...item.data(), id: item.id } as Tournament))), onError)
     },
     subscribeTournament(id, _userId, listener, onError) {
@@ -106,12 +106,12 @@ export function localTournamentRepository(): TournamentRepository {
   }
   return {
     subscribeTournaments(userId, listener) {
-      return localSubscribe(() => listener(localRead().tournaments.filter(t => isSlotAdmin(userId) || t.published).sort((a, b) => b.startsAt - a.startsAt).slice(0, 50)))
+      return localSubscribe(() => listener(localRead().tournaments.filter(t => canManageTournament(t, userId) || t.published).sort((a, b) => b.startsAt - a.startsAt).slice(0, 50)))
     },
     subscribeTournament(id, userId, listener, onError) {
       return localSubscribe(() => {
         const t = localRead().tournaments.find(item => item.id === id)
-        if (t && !t.published && !isSlotAdmin(userId)) { onError(new Error('Questa bozza è privata.')); return }
+        if (t && !t.published && !canManageTournament(t, userId)) { onError(new Error('Questa bozza è privata.')); return }
         listener(t ?? null)
       })
     },

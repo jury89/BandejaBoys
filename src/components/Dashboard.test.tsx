@@ -166,7 +166,7 @@ describe('menu account', () => {
     vi.useRealTimers()
   })
 
-  it('mostra Tornei solo nel menu admin e apre la pagina di creazione senza uscire dall’app', async () => {
+  it('mantiene Tornei nel menu admin e apre la pagina di creazione senza uscire dall’app', async () => {
     dashboardTestState.userId = SLOT_ADMIN_USER_ID
     const user = userEvent.setup()
     render(<Dashboard />)
@@ -179,14 +179,13 @@ describe('menu account', () => {
     expect(screen.getByRole('heading', { name: /Ci vediamo in campo/ })).toBeInTheDocument()
   })
 
-  it('nasconde l’ingresso di gestione ai membri ma consente la pagina condivisa senza creazione', async () => {
+  it('mostra Tornei anche ai membri e permette di creare un torneo', async () => {
     const user = userEvent.setup()
     render(<Dashboard />)
     await user.click(screen.getByRole('button', { name: 'Apri menu account di Jury' }))
-    expect(screen.queryByRole('link', { name: /Tornei.*Crea e organizza/ })).not.toBeInTheDocument()
-    act(() => { window.history.replaceState({}, '', '/#tornei'); window.dispatchEvent(new HashChangeEvent('hashchange')) })
-    expect(screen.getByRole('heading', { name: 'I tornei del gruppo' })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Crea torneo' })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('link', { name: /Tornei.*Crea e organizza/ }))
+    expect(await screen.findByRole('heading', { name: 'I tornei del gruppo' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Crea torneo' })).toBeInTheDocument()
   })
 
   it('parte dai campi preferiti, permette più circoli o tutti e ripristina il filtro senza salvare il profilo', async () => {
