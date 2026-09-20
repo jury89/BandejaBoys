@@ -2356,7 +2356,6 @@ export function startTournament(tournament: Tournament, actorId: string, seed: n
 export function startTournamentRound(tournament: Tournament, actorId: string, now = Date.now()): Tournament {
   requireTournamentManager(tournament, actorId)
   if (!tournamentUsesTimedMatches(tournament) || tournament.status !== 'running') throw new Error('Il timer è disponibile solo per un girone a tempo in corso.')
-  if (now < tournament.startsAt) throw new Error('Aspetta l’orario d’inizio del torneo.')
   if (tournament.roundStartedAt != null) throw new Error('Il timer di questo turno è già stato avviato.')
   return { ...tournament, roundStartedAt: now, updatedAt: now }
 }
@@ -2372,7 +2371,6 @@ export function tournamentScoreIsValid(tournament: Pick<Tournament, 'format' | '
 export function makeTournamentScore(tournament: Tournament, matchId: string, a: number, b: number, actorId: string, previous: TournamentScore | undefined, expectedRevision: number, now = Date.now()): TournamentScore {
   const match = tournament.matches[matchId]
   if (!match || tournament.status !== 'running' || match.round !== tournament.currentRound) throw new Error('Puoi correggere soltanto i risultati del turno corrente, prima di avanzare.')
-  if (now < tournament.startsAt) throw new Error('I risultati si inseriscono dall’orario d’inizio del torneo.')
   if (tournamentUsesTimedMatches(tournament) && (tournament.roundStartedAt == null || now < tournament.roundStartedAt)) throw new Error('L’organizzatore deve prima avviare il timer del turno.')
   if (!canManageTournament(tournament, actorId) && (tournament.scoreAccess !== 'players' || ![...match.teamA.playerIds, ...match.teamB.playerIds].includes(actorId))) throw new Error('Puoi inserire solo i risultati delle tue partite.')
   if ((previous?.revision ?? 0) !== expectedRevision) throw new Error('Qualcuno ha aggiornato questo risultato. Riapri la partita per vedere l’ultima versione.')
@@ -2425,7 +2423,6 @@ export function getTournamentStandings(tournament: Tournament, scores: Tournamen
 export function advanceTournament(tournament: Tournament, scores: TournamentScore[], actorId: string, now = Date.now()): Tournament {
   requireTournamentManager(tournament, actorId)
   if (tournament.status !== 'running') throw new Error('Il torneo non è in corso.')
-  if (now < tournament.startsAt) throw new Error('Aspetta l’orario d’inizio del torneo.')
   if (tournamentUsesTimedMatches(tournament) && getTournamentRoundClock(tournament, now).state !== 'expired') throw new Error('Aspetta la fine del timer e del punto in corso prima di confermare il turno.')
   const currentMatches = Object.values(tournament.matches).filter((m) => m.round === tournament.currentRound)
   if (currentMatches.length === 0 || currentMatches.some((match) => {

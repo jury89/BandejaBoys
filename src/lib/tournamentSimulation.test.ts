@@ -67,7 +67,6 @@ describe('private tournament simulation', () => {
     let session = openTournamentSimulation(admin)
     session.jump('cutoff')
     await session.repository.actOnTournament('simulation-private', 'start', admin)
-    session.jump('start')
     for (let round = 0; round < 20 && read().tournaments[0].status === 'running'; round++) {
       const t = read().tournaments[0]
       if (tournamentUsesTimedMatches(t)) await session.repository.actOnTournament(t.id, 'start-round', admin)
