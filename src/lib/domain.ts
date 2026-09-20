@@ -2020,6 +2020,30 @@ export function tournamentUsesRotatingPairs(tournament: Pick<TournamentInput, 'f
   return tournament.format === 'americano' || tournament.format === 'mexicano'
 }
 
+export function tournamentUsesTimedMatches(tournament: Pick<TournamentInput, 'format' | 'scoringMode'>): boolean {
+  return tournament.format === 'round-robin' && tournament.scoringMode === 'timed'
+}
+
+export function getTimedTournamentPlan(input: TournamentInput, playerCount = input.capacity) {
+  const teams = playerCount / 2
+  const rounds = teams % 2 ? teams : teams - 1
+  const minutes = input.matchMinutes ?? 15, warmup = input.warmupMinutes ?? 5, changeover = input.changeoverMinutes ?? 2
+  return { teams, rounds, requiredCourts: Math.floor(teams / 2), matchesPerPair: teams - 1,
+    playingMinutes: (teams - 1) * minutes, totalMinutes: warmup + rounds * minutes + (rounds - 1) * changeover,
+    schedule: Array.from({ length: rounds }, (_, i) => ({ round: i + 1,
+      startsAt: input.startsAt + (warmup + i * (minutes + changeover)) * 60_000,
+      endsAt: input.startsAt + (warmup + i * (minutes + changeover) + minutes) * 60_000 })) }
+}
+
+export function getTournamentRoundClock(tournament: Tournament, now: number) {
+  const durationSeconds = (tournament.matchMinutes ?? 15) * 60
+  const endsAt = typeof tournament.roundStartedAt === 'number'
+    ? tournament.roundStartedAt + durationSeconds * 1000 : null
+  // The UI tick may be a fraction of a second older than the newly saved start.
+  return { endsAt, remainingSeconds: endsAt === null ? durationSeconds : Math.min(durationSeconds, Math.max(0, Math.ceil((endsAt - now) / 1000))),
+    state: endsAt === null ? 'waiting' as const : now < endsAt ? 'running' as const : 'expired' as const }
+}
+
 export function validateTournamentInput(input: TournamentInput, now: number): TournamentInput {
   const title = input.title.trim()
   if (title.length < 3 || title.length > 80) throw new Error('Il nome del torneo deve avere da 3 a 80 caratteri.')
@@ -2032,9 +2056,16 @@ export function validateTournamentInput(input: TournamentInput, now: number): To
   if (!Number.isInteger(input.rounds) || input.rounds < 1 || input.rounds > 31) throw new Error('Scegli da 1 a 31 turni.')
   if (![16, 24, 32].includes(input.pointsPerMatch)) throw new Error('Scegli 16, 24 o 32 punti per incontro.')
   if (!['players', 'admin'].includes(input.scoreAccess)) throw new Error('Scegli chi può inserire i risultati.')
+  const scoringMode = input.scoringMode ?? 'standard'
+  if (!['standard', 'timed'].includes(scoringMode) || (scoringMode === 'timed' && input.format !== 'round-robin')) throw new Error('Le partite a tempo sono disponibili nel girone all’italiana.')
+  const matchMinutes = input.matchMinutes ?? 15, warmupMinutes = input.warmupMinutes ?? 5, changeoverMinutes = input.changeoverMinutes ?? 2
+  if (!Number.isInteger(matchMinutes) || matchMinutes < 5 || matchMinutes > 30) throw new Error('La durata della partita deve essere tra 5 e 30 minuti.')
+  if (!Number.isInteger(warmupMinutes) || warmupMinutes < 0 || warmupMinutes > 15) throw new Error('Il riscaldamento deve essere tra 0 e 15 minuti.')
+  if (!Number.isInteger(changeoverMinutes) || changeoverMinutes < 0 || changeoverMinutes > 5) throw new Error('Il cambio campo deve essere tra 0 e 5 minuti.')
+  if (scoringMode === 'timed' && input.courts < Math.floor(input.capacity / 4)) throw new Error(`Servono almeno ${Math.floor(input.capacity / 4)} campi: le partite del turno a tempo iniziano insieme.`)
   return { title, startsAt: input.startsAt, venueId: validateVenueId(input.venueId), format: input.format,
     pairing: input.pairing, capacity: input.capacity, courts: input.courts, rounds: input.rounds,
-    pointsPerMatch: input.pointsPerMatch, scoreAccess: input.scoreAccess }
+    pointsPerMatch: input.pointsPerMatch, scoreAccess: input.scoreAccess, scoringMode, matchMinutes, warmupMinutes, changeoverMinutes }
 }
 
 function tournamentPlayerCountError(count: number, format: TournamentInput['format']): void {
@@ -2055,7 +2086,7 @@ function requireTournamentManager(tournament: Tournament, actorId: string): void
 export function makeTournament(id: string, input: TournamentInput, actorId: string, now = Date.now()): Tournament {
   if (!actorId.trim()) throw new Error('Accedi per creare un torneo.')
   return { ...validateTournamentInput(input, now), id, published: false, status: 'draft', createdBy: actorId,
-    createdAt: now, updatedAt: now, registrations: {}, teams: [], matches: {}, currentRound: 0, totalRounds: 0, seed: 0 }
+    createdAt: now, updatedAt: now, registrations: {}, teams: [], matches: {}, currentRound: 0, totalRounds: 0, seed: 0, roundStartedAt: null }
 }
 
 export function editTournament(tournament: Tournament, input: TournamentInput, actorId: string, now = Date.now()): Tournament {
@@ -2096,6 +2127,21 @@ export function leaveTournament(tournament: Tournament, userId: string, now = Da
   delete registrations[userId]
   // Other players' choices are not modified on their behalf. A non-reciprocal choice is visibly unconfirmed.
   return { ...tournament, registrations, updatedAt: now }
+}
+
+export function saveTournamentGuest(tournament: Tournament, guestId: string, displayName: string, partnerId: string | null, actorId: string, now = Date.now()): Tournament {
+  requireTournamentManager(tournament, actorId)
+  if (!guestId.startsWith('guest:') || (tournament.registrations[guestId] && !tournament.registrations[guestId].isGuest)) throw new Error('Ospite non valido.')
+  const name = displayName.trim()
+  if (!name || name.length > 80) throw new Error('Il nome dell’ospite deve avere da 1 a 80 caratteri.')
+  const next = registerForTournament(tournament, { id: guestId, displayName: name }, partnerId, now)
+  return { ...next, registrations: { ...next.registrations, [guestId]: { ...next.registrations[guestId], isGuest: true } } }
+}
+
+export function removeTournamentGuest(tournament: Tournament, guestId: string, actorId: string, now = Date.now()): Tournament {
+  requireTournamentManager(tournament, actorId)
+  if (!tournament.registrations[guestId]?.isGuest) throw new Error('Puoi rimuovere solo un ospite esterno.')
+  return leaveTournament(tournament, guestId, now)
 }
 
 function tournamentShuffle<T>(items: T[], seed: number): T[] {
@@ -2139,6 +2185,7 @@ export function startTournament(tournament: Tournament, actorId: string, seed: n
   const ids = Object.keys(tournament.registrations).sort()
   tournamentPlayerCountError(ids.length, tournament.format)
   if (ids.length > tournament.capacity) throw new Error('Gli iscritti superano la capienza del torneo.')
+  if (tournamentUsesTimedMatches(tournament) && tournament.courts < Math.floor(ids.length / 4)) throw new Error('Non ci sono abbastanza campi per avviare tutte le partite insieme.')
   if (!Number.isInteger(seed) || seed < 0 || seed > 4294967295) throw new Error('Sorteggio non valido.')
   const shuffled = tournamentShuffle(ids, seed)
   let teams: TournamentTeam[] = []
@@ -2168,11 +2215,20 @@ export function startTournament(tournament: Tournament, actorId: string, seed: n
     }
   }
   return { ...tournament, status: 'running', seed, teams, totalRounds, currentRound: 1,
-    matches: Object.fromEntries(matches.map((match) => [match.id, match])), updatedAt: now }
+    matches: Object.fromEntries(matches.map((match) => [match.id, match])), updatedAt: now, roundStartedAt: null }
 }
 
-export function tournamentScoreIsValid(tournament: Pick<Tournament, 'format' | 'pointsPerMatch'>, a: number, b: number): boolean {
+export function startTournamentRound(tournament: Tournament, actorId: string, now = Date.now()): Tournament {
+  requireTournamentManager(tournament, actorId)
+  if (!tournamentUsesTimedMatches(tournament) || tournament.status !== 'running') throw new Error('Il timer è disponibile solo per un girone a tempo in corso.')
+  if (now < tournament.startsAt) throw new Error('Aspetta l’orario d’inizio del torneo.')
+  if (tournament.roundStartedAt != null) throw new Error('Il timer di questo turno è già stato avviato.')
+  return { ...tournament, roundStartedAt: now, updatedAt: now }
+}
+
+export function tournamentScoreIsValid(tournament: Pick<Tournament, 'format' | 'pointsPerMatch' | 'scoringMode'>, a: number, b: number): boolean {
   if (!Number.isInteger(a) || !Number.isInteger(b) || a < 0 || b < 0) return false
+  if (tournamentUsesTimedMatches(tournament)) return a <= 99 && b <= 99
   if (tournamentUsesRotatingPairs(tournament)) return a + b === tournament.pointsPerMatch
   const high = Math.max(a, b), low = Math.min(a, b)
   return (high === 6 && low <= 4) || (high === 7 && (low === 5 || low === 6))
@@ -2182,16 +2238,17 @@ export function makeTournamentScore(tournament: Tournament, matchId: string, a: 
   const match = tournament.matches[matchId]
   if (!match || tournament.status !== 'running' || match.round !== tournament.currentRound) throw new Error('Puoi correggere soltanto i risultati del turno corrente, prima di avanzare.')
   if (now < tournament.startsAt) throw new Error('I risultati si inseriscono dall’orario d’inizio del torneo.')
+  if (tournamentUsesTimedMatches(tournament) && (tournament.roundStartedAt == null || now < tournament.roundStartedAt)) throw new Error('L’organizzatore deve prima avviare il timer del turno.')
   if (!canManageTournament(tournament, actorId) && (tournament.scoreAccess !== 'players' || ![...match.teamA.playerIds, ...match.teamB.playerIds].includes(actorId))) throw new Error('Puoi inserire solo i risultati delle tue partite.')
   if ((previous?.revision ?? 0) !== expectedRevision) throw new Error('Qualcuno ha aggiornato questo risultato. Riapri la partita per vedere l’ultima versione.')
-  if (!tournamentScoreIsValid(tournament, a, b)) throw new Error(tournamentUsesRotatingPairs(tournament) ? `I punti delle due coppie devono sommare ${tournament.pointsPerMatch}.` : 'Risultato valido: 6–0 fino a 6–4, 7–5 oppure 7–6 (anche a squadre invertite).')
+  if (!tournamentScoreIsValid(tournament, a, b)) throw new Error(tournamentUsesTimedMatches(tournament) ? 'Inserisci i game completati: numeri interi da 0 a 99, anche in pareggio.' : tournamentUsesRotatingPairs(tournament) ? `I punti delle due coppie devono sommare ${tournament.pointsPerMatch}.` : 'Risultato valido: 6–0 fino a 6–4, 7–5 oppure 7–6 (anche a squadre invertite).')
   return { matchId, scoreA: a, scoreB: b, updatedBy: actorId, updatedAt: now, revision: expectedRevision + 1 }
 }
 
 export function getTournamentStandings(tournament: Tournament, scores: TournamentScore[]): TournamentStanding[] {
   const individual = tournamentUsesRotatingPairs(tournament)
   const rows: TournamentStanding[] = (individual ? Object.keys(tournament.registrations).map((id) => ({ id, playerIds: [id] })) : tournament.teams)
-    .map((team) => ({ ...team, played: 0, wins: 0, pointsFor: 0, pointsAgainst: 0, rank: 0, tied: false }))
+    .map((team) => ({ ...team, played: 0, wins: 0, draws: 0, tablePoints: 0, pointsFor: 0, pointsAgainst: 0, rank: 0, tied: false }))
   const byId = new Map(rows.map((row) => [row.id, row]))
   const placements = new Map<string, number>()
   for (const match of Object.values(tournament.matches)) {
@@ -2200,7 +2257,11 @@ export function getTournamentStandings(tournament: Tournament, scores: Tournamen
     for (const [team, own, other] of [[match.teamA, score.scoreA, score.scoreB], [match.teamB, score.scoreB, score.scoreA]] as const) {
       for (const id of individual ? team.playerIds : [team.id]) {
         const row = byId.get(id)
-        if (row) { row.played += 1; row.pointsFor += own; row.pointsAgainst += other; if (own > other) row.wins += 1 }
+        if (row) {
+          row.played += 1; row.pointsFor += own; row.pointsAgainst += other
+          if (own > other) { row.wins += 1; row.tablePoints += 3 }
+          if (own === other) { row.draws += 1; row.tablePoints += 1 }
+        }
       }
     }
     if (tournament.format === 'knockout') {
@@ -2212,7 +2273,7 @@ export function getTournamentStandings(tournament: Tournament, scores: Tournamen
     }
   }
   const compare = (a: TournamentStanding, b: TournamentStanding) => (
-    (individual ? b.pointsFor - a.pointsFor : b.wins - a.wins)
+    (tournamentUsesTimedMatches(tournament) ? b.tablePoints - a.tablePoints : individual ? b.pointsFor - a.pointsFor : b.wins - a.wins)
     || (b.pointsFor - b.pointsAgainst) - (a.pointsFor - a.pointsAgainst)
     || (individual ? b.wins - a.wins : b.pointsFor - a.pointsFor)
   )
@@ -2230,6 +2291,7 @@ export function advanceTournament(tournament: Tournament, scores: TournamentScor
   requireTournamentManager(tournament, actorId)
   if (tournament.status !== 'running') throw new Error('Il torneo non è in corso.')
   if (now < tournament.startsAt) throw new Error('Aspetta l’orario d’inizio del torneo.')
+  if (tournamentUsesTimedMatches(tournament) && getTournamentRoundClock(tournament, now).state !== 'expired') throw new Error('Aspetta la fine del timer e del punto in corso prima di confermare il turno.')
   const currentMatches = Object.values(tournament.matches).filter((m) => m.round === tournament.currentRound)
   if (currentMatches.length === 0 || currentMatches.some((match) => {
     const score = scores.find((s) => s.matchId === match.id)
@@ -2254,5 +2316,5 @@ export function advanceTournament(tournament: Tournament, scores: TournamentScor
     generated = winners.flatMap((team, i) => i % 2 === 0 ? [tournamentMatch(tournament, nextRound, i / 2, team, winners[i + 1], winners.length === 2 ? 'final' : 'regular')] : [])
     if (winners.length === 2) generated.push(tournamentMatch(tournament, nextRound, 1, losers[0], losers[1], 'bronze'))
   }
-  return { ...tournament, currentRound: nextRound, matches: { ...tournament.matches, ...Object.fromEntries(generated.map((match) => [match.id, match])) }, updatedAt: now }
+  return { ...tournament, currentRound: nextRound, matches: { ...tournament.matches, ...Object.fromEntries(generated.map((match) => [match.id, match])) }, updatedAt: now, roundStartedAt: null }
 }

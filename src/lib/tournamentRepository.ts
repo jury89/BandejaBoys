@@ -1,10 +1,10 @@
 import { collection, doc, limit, onSnapshot, or, orderBy, query, runTransaction, where, type Firestore, type Unsubscribe } from 'firebase/firestore'
 import type { SessionUser } from '../types'
 import { isSlotAdmin } from './admin'
-import { advanceTournament, cancelTournament, canManageTournament, editTournament, leaveTournament, makeTournament, makeTournamentScore, publishTournament, registerForTournament, startTournament } from './domain'
+import { advanceTournament, cancelTournament, canManageTournament, editTournament, leaveTournament, makeTournament, makeTournamentScore, publishTournament, registerForTournament, removeTournamentGuest, saveTournamentGuest, startTournament, startTournamentRound } from './domain'
 import type { Tournament, TournamentInput, TournamentScore } from './tournamentTypes'
 
-type Action = 'publish' | 'cancel' | 'start' | 'advance'
+type Action = 'publish' | 'cancel' | 'start' | 'start-round' | 'advance'
 export interface TournamentRepository {
   subscribeTournaments(userId: string, listener: (items: Tournament[]) => void, onError: (error: Error) => void): Unsubscribe
   subscribeTournament(id: string, userId: string, listener: (item: Tournament | null) => void, onError: (error: Error) => void): Unsubscribe
@@ -14,6 +14,8 @@ export interface TournamentRepository {
   actOnTournament(id: string, action: Action, actor: SessionUser): Promise<void>
   registerForTournament(id: string, partnerId: string | null, actor: SessionUser): Promise<void>
   leaveTournament(id: string, actor: SessionUser): Promise<void>
+  saveTournamentGuest(id: string, guestId: string | null, displayName: string, partnerId: string | null, actor: SessionUser): Promise<void>
+  removeTournamentGuest(id: string, guestId: string, actor: SessionUser): Promise<void>
   saveTournamentScore(id: string, matchId: string, a: number, b: number, revision: number, actor: SessionUser): Promise<void>
 }
 
@@ -21,6 +23,7 @@ function applyAction(tournament: Tournament, action: Action, actorId: string, se
   if (action === 'publish') return publishTournament(tournament, actorId, now)
   if (action === 'cancel') return cancelTournament(tournament, actorId, now)
   if (action === 'start') return startTournament(tournament, actorId, seed, now)
+  if (action === 'start-round') return startTournamentRound(tournament, actorId, now)
   return advanceTournament(tournament, scores, actorId, now)
 }
 
@@ -58,6 +61,11 @@ export function remoteTournamentRepository(db: Firestore): TournamentRepository 
     editTournament: (id, input, actor) => mutate(id, t => editTournament(t, input, actor.id)),
     registerForTournament: (id, partnerId, actor) => mutate(id, t => registerForTournament(t, actor, partnerId)),
     leaveTournament: (id, actor) => mutate(id, t => leaveTournament(t, actor.id)),
+    saveTournamentGuest: (id, guestId, name, partnerId, actor) => {
+      const uid = guestId ?? `guest:${crypto.randomUUID()}`
+      return mutate(id, t => saveTournamentGuest(t, uid, name, partnerId, actor.id))
+    },
+    removeTournamentGuest: (id, guestId, actor) => mutate(id, t => removeTournamentGuest(t, guestId, actor.id)),
     async actOnTournament(id, action, actor) {
       const seed = crypto.getRandomValues(new Uint32Array(1))[0]
       await runTransaction(db, async tx => {
@@ -123,6 +131,8 @@ export function localTournamentRepository(): TournamentRepository {
     editTournament: (id, input, actor) => mutate(id, t => editTournament(t, input, actor.id)),
     registerForTournament: (id, partnerId, actor) => mutate(id, t => registerForTournament(t, actor, partnerId)),
     leaveTournament: (id, actor) => mutate(id, t => leaveTournament(t, actor.id)),
+    saveTournamentGuest: (id, guestId, name, partnerId, actor) => mutate(id, t => saveTournamentGuest(t, guestId ?? `guest:${crypto.randomUUID()}`, name, partnerId, actor.id)),
+    removeTournamentGuest: (id, guestId, actor) => mutate(id, t => removeTournamentGuest(t, guestId, actor.id)),
     actOnTournament: (id, action, actor) => mutate(id, (t, store) => applyAction(t, action, actor.id, crypto.getRandomValues(new Uint32Array(1))[0], store.scores[id] ?? [], Date.now())),
     async saveTournamentScore(id, matchId, a, b, revision, actor) {
       const store = localRead(), tournament = store.tournaments.find(t => t.id === id)
