@@ -32,11 +32,11 @@ export function TournamentRoundTimer({ tournament, now, manager, busy, onStart, 
   const time = `${Math.floor(clock.remainingSeconds / 60).toString().padStart(2, '0')}:${(clock.remainingSeconds % 60).toString().padStart(2, '0')}`
   return <section className={`tournament-panel tournament-clock ${clock.state === 'expired' ? 'is-expired' : ''}`} aria-label="Timer del turno">
     <div><h2>Turno {tournament.currentRound} di {tournament.totalRounds}</h2>
-      <p role="status">{clock.state === 'waiting' ? 'Tutti pronti? L’organizzatore avvia le partite insieme.' : clock.state === 'running' ? 'Turno in corso su tutti i campi.' : 'Tempo scaduto: terminate il punto in corso e registrate i game completati.'}</p>
+      <p role="status">{clock.state === 'waiting' ? 'Tutti pronti? L’organizzatore avvia le partite insieme, anche prima dell’orario previsto.' : clock.state === 'running' ? 'Turno in corso su tutti i campi.' : 'Tempo scaduto: terminate il punto in corso e registrate i game completati.'}</p>
     </div>
     <strong className="tournament-clock__time" role="timer" aria-label="Tempo rimanente">{time}</strong>
     <div className="tournament-actions">
-      {manager && clock.state === 'waiting' && <button className="button button--primary" disabled={busy || now < tournament.startsAt} onClick={onStart}>Avvia timer del turno</button>}
+      {manager && clock.state === 'waiting' && <button className="button button--primary" disabled={busy} onClick={onStart}>Avvia timer del turno</button>}
       <button className="button" onClick={() => void toggleSound()} aria-pressed={sound}>{sound ? 'Disattiva avviso sonoro' : 'Attiva avviso sonoro'}</button>
     </div>
     <p className="tournament-note">{simulation ? 'Questo timer è soltanto di prova e rimane su questo dispositivo, anche dopo un ricaricamento.' : 'Il timer è condiviso e continua dopo un ricaricamento.'} Per il suono tieni la pagina aperta e il dispositivo attivo; in background usa anche un timer del telefono. Il turno successivo parte solo dopo la conferma dei risultati e un nuovo avvio.</p>

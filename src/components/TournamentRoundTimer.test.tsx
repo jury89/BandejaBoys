@@ -9,6 +9,18 @@ const at = tournament.roundStartedAt, end = at + 900_000
 
 describe('TournamentRoundTimer', () => {
   afterEach(() => vi.unstubAllGlobals())
+  it('lets the manager start early, but not while busy or as an ordinary participant', async () => {
+    const onStart = vi.fn(), props = { tournament: { ...tournament, roundStartedAt: null }, now: at - 600_000, manager: true, busy: false, onStart }
+    const view = render(<TournamentRoundTimer {...props} />)
+    const button = screen.getByRole('button', { name: 'Avvia timer del turno' })
+    expect(button).toBeEnabled()
+    await userEvent.click(button)
+    expect(onStart).toHaveBeenCalledOnce()
+    view.rerender(<TournamentRoundTimer {...props} busy />)
+    expect(button).toBeDisabled()
+    view.rerender(<TournamentRoundTimer {...props} manager={false} />)
+    expect(screen.queryByRole('button', { name: 'Avvia timer del turno' })).not.toBeInTheDocument()
+  })
   it('requires an explicit sound opt-in and plays one signal per expired round', async () => {
     const start = vi.fn(), close = vi.fn().mockResolvedValue(undefined)
     class FakeAudio {

@@ -22,7 +22,7 @@ const timedRanking = '3 punti per vittoria, 1 per pareggio, 0 per sconfitta. Poi
 const statusLabel = { draft: 'Bozza privata', open: 'Iscrizioni aperte', running: 'Tabellone pronto', completed: 'Concluso', cancelled: 'Annullato' }
 function tournamentStatus(t: Tournament, now: number): string {
   if (t.status === 'open' && !tournamentRegistrationsOpen(t, now)) return 'Iscrizioni chiuse'
-  if (t.status === 'running' && now >= t.startsAt) return 'In corso'
+  if (t.status === 'running' && (!tournamentUsesTimedMatches(t) || t.roundStartedAt != null || t.currentRound > 1)) return 'In corso'
   return statusLabel[t.status]
 }
 function locationId(): string {
@@ -238,8 +238,8 @@ function TournamentDetail({ id, user, members, onBack, rehearsal }: { id: string
         {t.format === 'round-robin' && t.teams.filter(team => !matches.some(m => m.round === round && (m.teamA.id === team.id || m.teamB.id === team.id))).map(team => <p className="tournament-rest" key={team.id}>Riposa: {pairName(team.playerIds)}</p>)}
         <div className="tournament-matches">{matches.filter(m => m.round === round).map(match => {
           const score = scores.find(s => s.matchId === match.id)
-          const allowed = t.status === 'running' && round === t.currentRound && now >= t.startsAt && (!timed || (t.roundStartedAt != null && now >= t.roundStartedAt)) && (manager || (t.scoreAccess === 'players' && [...match.teamA.playerIds, ...match.teamB.playerIds].includes(user.id)))
-          return <article key={match.id} className="tournament-match"><header>{match.stage === 'final' ? 'Finale · ' : match.stage === 'bronze' ? 'Finale 3° posto · ' : ''}Campo {match.court}{!timed && ` · Ondata ${match.wave}`}</header><div><span>{pairName(match.teamA.playerIds)}</span><strong>{score?.scoreA ?? '–'}</strong></div><div><span>{pairName(match.teamB.playerIds)}</span><strong>{score?.scoreB ?? '–'}</strong></div>{allowed && <button className="button" disabled={busy} onClick={() => setMatchId(match.id)}>{score ? 'Modifica risultato' : 'Inserisci risultato'}<span className="sr-only">: {pairName(match.teamA.playerIds)} contro {pairName(match.teamB.playerIds)}</span></button>}{!score && !allowed && <small>{now < t.startsAt ? 'Risultati disponibili dall’inizio' : timed && clock.state === 'waiting' ? 'In attesa dell’avvio del turno' : 'In attesa del risultato'}</small>}</article>
+          const allowed = t.status === 'running' && round === t.currentRound && (!timed || (t.roundStartedAt != null && now >= t.roundStartedAt)) && (manager || (t.scoreAccess === 'players' && [...match.teamA.playerIds, ...match.teamB.playerIds].includes(user.id)))
+          return <article key={match.id} className="tournament-match"><header>{match.stage === 'final' ? 'Finale · ' : match.stage === 'bronze' ? 'Finale 3° posto · ' : ''}Campo {match.court}{!timed && ` · Ondata ${match.wave}`}</header><div><span>{pairName(match.teamA.playerIds)}</span><strong>{score?.scoreA ?? '–'}</strong></div><div><span>{pairName(match.teamB.playerIds)}</span><strong>{score?.scoreB ?? '–'}</strong></div>{allowed && <button className="button" disabled={busy} onClick={() => setMatchId(match.id)}>{score ? 'Modifica risultato' : 'Inserisci risultato'}<span className="sr-only">: {pairName(match.teamA.playerIds)} contro {pairName(match.teamB.playerIds)}</span></button>}{!score && !allowed && <small>{timed && clock.state === 'waiting' ? 'In attesa dell’avvio del turno' : 'In attesa del risultato'}</small>}</article>
         })}</div>
       </details>)}
     </section>}

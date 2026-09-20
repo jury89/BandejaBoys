@@ -33,11 +33,11 @@ describe('timed round robin', () => {
   it.each([{ courts: 1 }, { matchMinutes: 4 }, { matchMinutes: 31 }, { warmupMinutes: -1 }, { changeoverMinutes: 6 }, { matchMinutes: 12.5 }, { format: 'knockout', capacity: 8 }, { scoringMode: 'other' }])('rejects incompatible settings %j', override => {
     expect(() => validateTournamentInput({ ...input, ...override } as TournamentInput, now)).toThrow()
   })
-  it('only an organizer/admin starts the shared clock, once, at or after the scheduled start', () => {
+  it('only an organizer/admin starts the shared clock once, without waiting for the scheduled start', () => {
     const t = drawn()
     expect(getTournamentRoundClock(t, input.startsAt)).toMatchObject({ state: 'waiting', remainingSeconds: 900, endsAt: null })
     expect(() => startTournamentRound(t, 'p0', input.startsAt)).toThrow(/organizzatore/)
-    expect(() => startTournamentRound(t, owner, input.startsAt - 1)).toThrow()
+    expect(startTournamentRound(t, owner, input.startsAt - 600_000).roundStartedAt).toBe(input.startsAt - 600_000)
     const started = startTournamentRound(t, admin, input.startsAt)
     expect(getTournamentRoundClock(started, input.startsAt - 999).remainingSeconds).toBe(900)
     expect(() => startTournamentRound(started, owner, input.startsAt + 1000)).toThrow()
@@ -46,6 +46,27 @@ describe('timed round robin', () => {
     expect(getTournamentRoundClock(started, input.startsAt + 900_000)).toMatchObject({ state: 'expired', remainingSeconds: 0 })
     expect(getTournamentRoundClock(started, input.startsAt + 999_999).remainingSeconds).toBe(0)
     expect(() => makeTournamentScore(t, 'r1-m1', 0, 0, owner, undefined, 0, input.startsAt)).toThrow(/timer/)
+  })
+  it.each([owner, admin])('supports early scores and next rounds for %s without weakening timer/role guards', actor => {
+    const at = input.startsAt - 3_000_000, ready = drawn()
+    expect(() => startTournamentRound(ready, 'p0', at)).toThrow(/organizzatore/)
+    expect(() => startTournamentRound(registered(), actor, at)).toThrow(/in corso/)
+    expect(() => makeTournamentScore(ready, 'r1-m1', 4, 4, actor, undefined, 0, at)).toThrow(/timer/)
+    const t = startTournamentRound(ready, actor, at)
+    expect(t.startsAt).toBe(input.startsAt)
+    expect(t.registrations).toEqual(ready.registrations)
+    const scores = scoresFor(t, 4, 4, at)
+    const player = t.matches['r1-m1'].teamA.playerIds[0]
+    expect(makeTournamentScore(t, 'r1-m1', 4, 3, player, undefined, 0, at).updatedAt).toBe(at)
+    expect(() => makeTournamentScore(t, 'r1-m1', 4, 3, 'spectator', undefined, 0, at)).toThrow(/tue partite/)
+    expect(() => makeTournamentScore(t, 'r1-m1', 4, 3, actor, undefined, 0, at - 1)).toThrow(/timer/)
+    expect(() => startTournamentRound(t, actor, at + 1000)).toThrow(/già/)
+    expect(() => advanceTournament(t, scores, actor, at + 899_999)).toThrow(/timer/)
+    expect(() => advanceTournament(t, scores.slice(1), actor, at + 900_000)).toThrow(/Completa/)
+    const next = advanceTournament(t, scores, actor, at + 900_000)
+    expect(next).toMatchObject({ currentRound: 2, roundStartedAt: null, startsAt: input.startsAt })
+    expect(startTournamentRound(next, actor, at + 900_000).roundStartedAt).toBe(at + 900_000)
+    expect(() => makeTournamentScore(next, 'r1-m1', 5, 4, actor, scores[0], 1, at + 900_000)).toThrow(/corrente/)
   })
   it.each([[0, 0, true], [4, 4, true], [3, 2, true], [99, 99, true], [100, 0, false], [-1, 4, false], [1.5, 2, false]])('validates timed game score %s–%s', (a, b, valid) => {
     expect(tournamentScoreIsValid(input, a as number, b as number)).toBe(valid)

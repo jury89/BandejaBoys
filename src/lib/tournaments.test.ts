@@ -167,19 +167,19 @@ describe('tournament domain', () => {
   it.each([[6, 0, true], [6, 4, true], [7, 5, true], [6, 7, true], [6, 5, false], [6, 6, false], [8, 6, false], [-1, 6, false], [3.5, 6, false]])('validates completed set %i–%i: %s', (a, b, valid) => {
     expect(tournamentScoreIsValid({ format: 'knockout', pointsPerMatch: 24 }, a as number, b as number)).toBe(valid)
   })
-  it('only current-match participants or admin may score; rejects stale, premature and frozen edits', () => {
+  it('only current-match participants or admin may score; rejects stale and frozen edits even when playing early', () => {
     const t = running(), m = Object.values(t.matches)[0], player = m.teamA.playerIds[0]
     const score = makeTournamentScore(t, m.id, 14, 10, player, undefined, 0, input.startsAt)
     expect(score.revision).toBe(1)
     expect(() => makeTournamentScore(t, m.id, 14, 10, 'spectator', undefined, 0, input.startsAt)).toThrow(/tue partite/)
     const otherPlayer = Object.keys(t.registrations).find(id => ![...m.teamA.playerIds, ...m.teamB.playerIds].includes(id))!
     expect(() => makeTournamentScore(t, m.id, 14, 10, otherPlayer, undefined, 0, input.startsAt)).toThrow(/tue partite/)
-    expect(() => makeTournamentScore(t, m.id, 14, 10, admin, undefined, 0, input.startsAt - 1)).toThrow(/inizio/)
+    expect(makeTournamentScore(t, m.id, 14, 10, admin, undefined, 0, input.startsAt - 600_000).scoreA).toBe(14)
     expect(() => makeTournamentScore(t, m.id, 14, 9, player, undefined, 0, input.startsAt)).toThrow(/24/)
     expect(() => makeTournamentScore(t, m.id, 16, 8, player, score, 0, input.startsAt)).toThrow(/Qualcuno/)
     expect(makeTournamentScore(t, m.id, 16, 8, player, score, 1, input.startsAt).revision).toBe(2)
     expect(() => makeTournamentScore({ ...t, scoreAccess: 'admin' }, m.id, 14, 10, player, undefined, 0, input.startsAt)).toThrow(/tue partite/)
-    const next = advanceTournament(t, roundScores(t), admin, input.startsAt)
+    const next = advanceTournament(t, roundScores(t), admin, input.startsAt - 600_000)
     expect(() => makeTournamentScore(next, m.id, 14, 10, admin, score, 1, input.startsAt)).toThrow(/corrente/)
     expect(() => advanceTournament(t, roundScores(t), player, input.startsAt)).toThrow(/amministratore/)
   })
