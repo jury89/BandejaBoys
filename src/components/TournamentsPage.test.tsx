@@ -1,7 +1,7 @@
 import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { SLOT_ADMIN_USER_ID } from '../lib/admin'
-import { advanceTournament, makeTournament, makeTournamentScore, publishTournament, registerForTournament, startTournament } from '../lib/domain'
+import { advanceTournament, makeTournament, makeTournamentScore, publishTournament, registerForTournament, startTournament, startTournamentRound } from '../lib/domain'
 import type { Tournament, TournamentInput, TournamentScore } from '../lib/tournamentTypes'
 import { TournamentsPage } from './TournamentsPage'
 
@@ -31,6 +31,57 @@ describe('TournamentsPage', () => {
     vi.spyOn(Date, 'now').mockReturnValue(now)
   })
   afterEach(() => vi.restoreAllMocks())
+  it('offers the ten-player timed preset with a clear 88-minute estimate', async () => {
+    const u = userEvent.setup(); show()
+    await u.click(screen.getByRole('button', { name: /Crea torneo/ }))
+    const modal = screen.getByRole('dialog')
+    await u.click(within(modal).getByRole('button', { name: /Imposta 10 giocatori/ }))
+    expect(within(modal).getByLabelText('Massimo giocatori')).toHaveValue('10')
+    expect(within(modal).getByLabelText('Campi disponibili')).toHaveValue(2)
+    expect(within(modal).getByLabelText('Durata delle partite')).toHaveValue('timed')
+    expect(within(modal).getByLabelText('Minuti per partita')).toHaveValue(15)
+    expect(within(modal).getByText('88 minuti')).toBeInTheDocument()
+  })
+  it('lets the organizer add, rename and remove external entrants', async () => {
+    seed(fixture()); const u = userEvent.setup(); show()
+    await u.click(screen.getByRole('button', { name: /Aggiungi ospite/ }))
+    await u.type(screen.getByLabelText('Nome dell’ospite'), 'Ciccio')
+    await u.click(screen.getByRole('button', { name: 'Salva ospite' }))
+    await u.click(await screen.findByRole('button', { name: 'Gestisci ospite Ciccio' }))
+    await u.clear(screen.getByLabelText('Nome dell’ospite'))
+    await u.type(screen.getByLabelText('Nome dell’ospite'), 'Ciccio Rossi')
+    await u.click(screen.getByRole('button', { name: 'Salva ospite' }))
+    await u.click(await screen.findByRole('button', { name: 'Gestisci ospite Ciccio Rossi' }))
+    await u.click(screen.getByRole('button', { name: 'Rimuovi ospite' }))
+    await u.click(screen.getByRole('button', { name: 'Conferma rimozione ospite' }))
+    expect(screen.queryByText(/Ciccio Rossi · Ospite/)).not.toBeInTheDocument()
+  })
+  it('keeps guest management hidden from other members', () => {
+    seed(fixture()); show(members[7])
+    expect(screen.queryByRole('button', { name: /Aggiungi ospite/ })).not.toBeInTheDocument()
+  })
+  it('starts the shared timer before enabling game scores and accepts a draw', async () => {
+    const t = startTournament(fixture({ startsAt: now, format: 'round-robin', pairing: 'random-fixed', scoringMode: 'timed', capacity: 8 }, 8), admin.id, 42, now)
+    seed(t); const u = userEvent.setup(); show()
+    expect(screen.getByRole('timer')).toHaveTextContent('15:00')
+    expect(screen.queryByRole('button', { name: /Inserisci risultato/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Conferma turno e prosegui' })).toBeDisabled()
+    await u.click(screen.getByRole('button', { name: 'Avvia timer del turno' }))
+    await u.click((await screen.findAllByRole('button', { name: /Inserisci risultato/ }))[0])
+    const modal = screen.getByRole('dialog'), fields = within(modal).getAllByRole('spinbutton')
+    await u.type(fields[0], '4'); await u.type(fields[1], '4')
+    await u.click(within(modal).getByRole('button', { name: 'Salva risultato' }))
+    expect(await screen.findByRole('button', { name: /Modifica risultato/ })).toBeInTheDocument()
+    expect(screen.getByText('Classifica coppie · V–N–P: vinte, pareggiate, perse')).toBeInTheDocument()
+  })
+  it('reconstructs an expired timer and never advances the round automatically', () => {
+    const t = startTournamentRound(startTournament(fixture({ startsAt: now - 900_000, format: 'round-robin', pairing: 'random-fixed', scoringMode: 'timed' }, 8), admin.id, 42, now - 900_000), admin.id, now - 900_000)
+    seed(t); show()
+    expect(screen.getByRole('timer')).toHaveTextContent('00:00')
+    expect(screen.getByText(/Tempo scaduto:/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Conferma turno e prosegui' })).toBeEnabled()
+    expect(screen.getByRole('heading', { name: 'Turno 1 di 3' })).toBeInTheDocument()
+  })
   it.each([admin, members[0]])('$displayName chooses a formula and privately saves then publishes their tournament', async creator => {
     const u = userEvent.setup(); show(creator)
     await u.click(screen.getByRole('button', { name: /Crea torneo/ }))

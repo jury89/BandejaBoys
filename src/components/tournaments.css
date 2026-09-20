@@ -60,6 +60,19 @@
 .tournament-table th, .tournament-table td { text-align: right; padding: 12px 6px; border-bottom: 1px solid #dbe7eb; }
 .tournament-table th:first-child { text-align: left; min-width: 110px; overflow-wrap: anywhere; }
 .tournament-table thead th { font-size: 11px; color: #526a76; }
+.tournament-plan { padding: 14px 16px; border-left: 4px solid #0e7490; background: #eef5f7; }
+.tournament-plan p { margin: 6px 0; font-size: 14px; line-height: 1.6; }
+.tournament-schedule { padding-left: 22px; font-size: 14px; line-height: 1.8; }
+.tournament-schedule li > strong { margin-left: 16px; font-variant-numeric: tabular-nums; }
+.tournament-rest { margin: 0 0 14px; color: #526a76; font-size: 14px; }
+.tournament-add-guest { margin-top: 16px; }
+.tournament-guest-edit { display: block; margin-top: 6px; min-height: 44px; padding: 8px 12px; background: #eef5f7; border: 1px solid #b7d0da; border-radius: 8px; color: #075985; font: inherit; font-size: 13px; cursor: pointer; }
+.tournament-clock { border-left: 5px solid #d9ff43; background: #102a3a; color: white; }
+.tournament-clock h2 { color: white; }
+.tournament-clock__time { font-family: 'Barlow Condensed', sans-serif; font-size: clamp(64px, 12vw, 100px); font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.1; color: #d9ff43; }
+.tournament-clock .tournament-note { color: #d3e4ea; margin-top: 12px; }
+.tournament-clock.is-expired { border-left-color: #facc15; }
+.tournament-clock .button { background: white; color: #075985; }
 .tournament-page :is(button, a, summary, input, select):focus-visible, .tournament-form :is(button, input, select):focus-visible { outline: 3px solid #0e7490; outline-offset: 3px; }
 @media (max-width: 600px) {
   .tournament-hero { padding: 20px; gap: 12px; }

@@ -8,6 +8,12 @@ Alla chiusura delle iscrizioni l’organizzatore (o Jury) prepara il tabellone. 
 
 Regole, limiti e fonti: [docs/tournaments.md](docs/tournaments.md). Rilascio: Hosting, Firestore Rules e indici `tournaments(published, startsAt)` e `tournaments(createdBy, startsAt)`; nessuna migrazione e nessun nuovo servizio. Collaudo permessi senza dati reali: `npm run test:rules:tournaments` (ADC autorizzato al progetto).
 
+### Girone a tempo e ospiti
+
+Il preset **10 giocatori · 2 campi · 90 minuti** prepara un girone di 5 coppie fisse (sorteggiate o scelte), 5 turni da 15 minuti, 5 minuti di riscaldamento e 2 di cambio tra i turni: 88 minuti indicativi. Ogni coppia gioca 4 partite e riposa una volta. Si possono personalizzare le durate; il turno richiede abbastanza campi per giocare contemporaneamente. Il timer condiviso viene avviato dall’organizzatore, continua dopo un ricaricamento e non avvia da solo il turno successivo. Sono ammessi pareggi: 3 punti per vittoria, 1 per pareggio, 0 per sconfitta; poi differenza game e game fatti. Si contano i game completati, con punto secco sul 40–40, finendo il punto in corso alla scadenza. L’avviso sonoro opzionale richiede la pagina aperta e il dispositivo attivo.
+
+Creatore e Jury possono **aggiungere partecipanti esterni** per nome, gestirne il compagno e rimuoverli fino alla chiusura delle iscrizioni. Gli ospiti occupano posti reali, partecipano al sorteggio e alla classifica senza creare account. I risultati vengono inseriti dall’organizzatore/admin o dai membri coinvolti, secondo l’impostazione del torneo. I tornei a set già esistenti non cambiano.
+
 ## Campi, preferiti e posto fisso
 
 Ogni nuovo slot permette di scegliere **Oasi Boschetto**, **Tennis Club Mantova** oppure **Sport City Mantova**. Il circolo è visibile anche prima della prenotazione e viene usato per promemoria e calendario; la conferma della prenotazione resta un’azione separata. Gli slot precedenti senza identificativo del circolo restano all’Oasi, senza migrazioni o modifiche allo storico.

@@ -13,12 +13,18 @@ export interface TournamentInput {
   rounds: number
   pointsPerMatch: number
   scoreAccess: 'players' | 'admin'
+  // Missing fields on existing tournaments preserve the original scoring rules.
+  scoringMode?: 'standard' | 'timed'
+  matchMinutes?: number
+  warmupMinutes?: number
+  changeoverMinutes?: number
 }
 export interface TournamentRegistration {
   userId: string
   displayName: string
   joinedAt: number
   partnerId: string | null
+  isGuest?: true
 }
 export interface TournamentTeam { id: string; playerIds: [string, string] }
 export interface TournamentMatch {
@@ -43,6 +49,7 @@ export interface Tournament extends TournamentInput {
   currentRound: number
   totalRounds: number
   seed: number
+  roundStartedAt?: number | null
 }
 export interface TournamentScore {
   matchId: string
@@ -57,6 +64,8 @@ export interface TournamentStanding {
   playerIds: string[]
   played: number
   wins: number
+  draws: number
+  tablePoints: number
   pointsFor: number
   pointsAgainst: number
   rank: number

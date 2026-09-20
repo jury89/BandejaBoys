@@ -9,6 +9,8 @@ Run `npm run check` before every commit or push. It must complete lint, all test
 - Tournaments are independent from ordinary slots/Fanta. Every member can create; only the immutable creator and configured admin manage/publish/draw/advance/cancel. Drafts are private to creator/admin, published pages are member-readable. Registration and partner changes close exactly one hour before start (server time in Rules).
 - Fixed chosen tournament pairs require reciprocal consent. Draws are seeded and persisted once. Only current-round scores can change, by the match's players (when enabled), creator or admin, with optimistic revisions. Advancing reads scores transactionally and freezes the previous round; knockout needs a bronze final.
 - Tournament Rules changes require `npm run test:rules:tournaments` in addition to the standard check; this tests synthetic resources, never writes production data.
+- Timed round robin uses one persisted start timestamp per round, concurrent courts, integer completed-game scores (draws allowed), and 3/1/0 standings. Never write a ticking timer to Firestore. Advance only after expiry and all results; the next round needs a new manual start. Missing timing fields mean legacy standard scoring.
+- External tournament entrants use `guest:<UUID>` and `isGuest: true`, count towards capacity and never create accounts. Only creator/admin manage them before the same one-hour cutoff. Chosen member/guest pairs still require reciprocal choices.
 
 - Fantasy court points are versioned by the match season (`locksAt`), never settlement/current time. Summer keeps 2/3 attendance points; winter uses individual fantasy-score rank 5/3/1/0 with shared ties and skipped occupied places. Do not change manager scoring or the best-mean captain bonus.
 
