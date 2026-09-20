@@ -15,6 +15,8 @@ import type { NotificationDelivery } from '../lib/notificationHistory'
 import { repository } from '../lib/repository'
 import { slotElementId } from '../lib/slotNavigation'
 import { Dashboard } from './Dashboard'
+import { SLOT_ADMIN_USER_ID } from '../lib/admin'
+import type { Tournament } from '../lib/tournamentTypes'
 
 vi.mock('../InterfaceContext', () => ({ useInterfaceMode: () => 'nuova', clearInterfaceOverride: vi.fn() }))
 
@@ -30,6 +32,7 @@ const dashboardTestState = vi.hoisted(() => {
     sentAt: Date.UTC(2026, 6, 27, 8, 30),
   } satisfies NotificationDelivery
   return {
+    userId: 'jury',
     polls: [] as PadelPoll[],
     preferredVenueIds: [] as VenueId[],
     members: [] as MemberProfile[],
@@ -48,7 +51,7 @@ const dashboardTestState = vi.hoisted(() => {
 vi.mock('../AuthContext', () => ({
   useAuth: () => ({
     user: {
-      id: 'jury',
+      id: dashboardTestState.userId,
       displayName: 'Jury',
       email: 'jury@example.test',
       createdAt: 1,
@@ -133,12 +136,17 @@ vi.mock('../lib/repository', () => ({
     markNotificationDeliveriesRead: vi.fn().mockResolvedValue(undefined),
     saveMatchReport: vi.fn(),
     saveFantasyEntry: vi.fn(),
+    subscribeTournaments: (_userId: string, listener: (items: Tournament[]) => void) => {
+      listener([])
+      return vi.fn()
+    },
   },
 }))
 
 describe('menu account', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    dashboardTestState.userId = 'jury'
     vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
     dashboardTestState.polls = []
     dashboardTestState.preferredVenueIds = []
@@ -156,6 +164,29 @@ describe('menu account', () => {
 
   afterEach(() => {
     vi.useRealTimers()
+  })
+
+  it('mostra Tornei solo nel menu admin e apre la pagina di creazione senza uscire dall’app', async () => {
+    dashboardTestState.userId = SLOT_ADMIN_USER_ID
+    const user = userEvent.setup()
+    render(<Dashboard />)
+    await user.click(screen.getByRole('button', { name: 'Apri menu account di Jury' }))
+    await user.click(screen.getByRole('link', { name: /Tornei.*Crea e organizza/ }))
+    expect(await screen.findByRole('heading', { name: 'I tornei del gruppo' })).toBeInTheDocument()
+    expect(window.location.hash).toBe('#tornei')
+    expect(screen.getByRole('button', { name: 'Crea torneo' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Torna alla bacheca' }))
+    expect(screen.getByRole('heading', { name: /Ci vediamo in campo/ })).toBeInTheDocument()
+  })
+
+  it('nasconde l’ingresso di gestione ai membri ma consente la pagina condivisa senza creazione', async () => {
+    const user = userEvent.setup()
+    render(<Dashboard />)
+    await user.click(screen.getByRole('button', { name: 'Apri menu account di Jury' }))
+    expect(screen.queryByRole('link', { name: /Tornei.*Crea e organizza/ })).not.toBeInTheDocument()
+    act(() => { window.history.replaceState({}, '', '/#tornei'); window.dispatchEvent(new HashChangeEvent('hashchange')) })
+    expect(screen.getByRole('heading', { name: 'I tornei del gruppo' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Crea torneo' })).not.toBeInTheDocument()
   })
 
   it('parte dai campi preferiti, permette più circoli o tutti e ripristina il filtro senza salvare il profilo', async () => {

@@ -65,9 +65,11 @@ import { matchesVenueFilter, normalizePreferredVenueIds } from '../lib/venues'
 import type { VenueId } from '../types'
 import { VenueChoices } from './VenuePicker'
 import { VenuesPage } from './VenuesPage'
+import { TournamentsPage } from './TournamentsPage'
+import { isSlotAdmin } from '../lib/admin'
 
 type FeedFilter = PollSlotFilter
-type DashboardView = 'feed' | 'matches' | 'group-matches' | 'statistics' | 'fantasy' | 'notifications' | 'venues'
+type DashboardView = 'feed' | 'matches' | 'group-matches' | 'statistics' | 'fantasy' | 'notifications' | 'venues' | 'tournaments'
 
 const PERSONAL_MATCHES_HASH = '#i-miei-match'
 const GROUP_MATCHES_HASH = '#gli-altri-match'
@@ -78,6 +80,7 @@ const INITIAL_DATA_TIMEOUT_MS = 6_000
 const INITIAL_DATA_AUTO_RETRIES = 2
 
 function dashboardViewFromLocation(): DashboardView {
+  if (window.location.hash === '#tornei' || window.location.hash.startsWith('#tornei/')) return 'tournaments'
   if (window.location.hash === '#campi' || window.location.hash.startsWith('#campi/')) return 'venues'
   if (window.location.hash === PERSONAL_MATCHES_HASH) return 'matches'
   if (window.location.hash === GROUP_MATCHES_HASH) return 'group-matches'
@@ -910,6 +913,7 @@ export function Dashboard() {
                   <Trophy size={16} />
                   <span>FantaBandeja <small>Schiera la coppia e scala la classifica</small></span>
                 </button>
+                {isSlotAdmin(user.id) && <a href="#tornei" onClick={() => setAccountOpen(false)}><Trophy size={16} /><span>Tornei <small>Crea e organizza un torneo del gruppo</small></span></a>}
                 {hasRemoteBackend && (
                   <button type="button" onClick={() => {
                     setAccountOpen(false)
@@ -961,7 +965,7 @@ export function Dashboard() {
         </nav>
       )}
 
-      {dashboardView === 'venues' ? <VenuesPage selectedId={venuePageId} onBack={openBoard} /> : dashboardView === 'matches' ? (
+      {dashboardView === 'tournaments' ? <TournamentsPage user={user} members={matchNameMembers} onBack={openBoard} /> : dashboardView === 'venues' ? <VenuesPage selectedId={venuePageId} onBack={openBoard} /> : dashboardView === 'matches' ? (
         <MyMatchesPage
           matches={playerMatches}
           loading={loading || !feedbackSummariesLoaded || !matchReportsLoaded}

@@ -1,4 +1,11 @@
 {
-  "indexes": [],
+  "indexes": [{
+    "collectionGroup": "tournaments",
+    "queryScope": "COLLECTION",
+    "fields": [
+      { "fieldPath": "published", "order": "ASCENDING" },
+      { "fieldPath": "startsAt", "order": "DESCENDING" }
+    ]
+  }],
   "fieldOverrides": []
 }

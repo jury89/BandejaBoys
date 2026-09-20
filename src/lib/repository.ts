@@ -78,8 +78,9 @@ import {
 } from './fixedSeat'
 import { mondayOfWeek, pollWeekTitle, slotWeekTitle, weekStartForDateTime } from './format'
 import type { NotificationDelivery } from './notificationHistory'
+import { localTournamentRepository, remoteTournamentRepository, type TournamentRepository } from './tournamentRepository'
 
-export interface PadelRepository {
+export interface PadelRepository extends TournamentRepository {
   subscribePolls(listener: (polls: PadelPoll[]) => void, onError: (error: Error) => void): Unsubscribe
   subscribeMembers(listener: (members: MemberProfile[]) => void, onError: (error: Error) => void): Unsubscribe
   subscribeMatchFeedbackResponses(
@@ -471,6 +472,7 @@ function remoteRepository(): PadelRepository {
   }
 
   return {
+    ...remoteTournamentRepository(db),
     subscribePolls(listener, onError) {
       return onSnapshot(
         query(collection(db, 'polls'), orderBy('createdAt', 'desc')),
@@ -1251,6 +1253,7 @@ function localRepository(): PadelRepository {
   }
 
   return {
+    ...localTournamentRepository(),
     subscribePolls(listener) {
       const notify = () => listener(readLocalPolls())
       window.addEventListener(POLLS_EVENT, notify)
