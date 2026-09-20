@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { ArrowLeft, CalendarDays, Check, Copy, Plus, Trophy, UsersRound } from 'lucide-react'
 import type { MemberProfile, SessionUser } from '../types'
-import { canManageTournament, getTimedTournamentPlan, getTournamentRoundClock, getTournamentStandings, padelDateTimeToTimestamp, toDateTimeInput, tournamentRegistrationsOpen, tournamentUsesRotatingPairs, tournamentUsesTimedMatches, validateTournamentInput } from '../lib/domain'
+import { canEditTournament, canManageTournament, getTimedTournamentPlan, getTournamentRoundClock, getTournamentStandings, padelDateTimeToTimestamp, toDateTimeInput, tournamentRegistrationsOpen, tournamentSettingsEditable, tournamentUsesRotatingPairs, tournamentUsesTimedMatches, validateTournamentInput } from '../lib/domain'
 import { repository } from '../lib/repository'
 import { TOURNAMENT_FORMATS, type Tournament, type TournamentInput, type TournamentMatch, type TournamentScore } from '../lib/tournamentTypes'
 import { VENUES } from '../lib/venues'
@@ -47,67 +47,54 @@ function TournamentTimingFields({ input, update }: { input: TournamentInput; upd
   </div><TournamentPlan input={input} /><p>Stima a capienza piena. Al sorteggio durata e calendario si adattano agli iscritti effettivi; le coppie restano fisse e incontrano tutte le altre. Minimo 6 giocatori, in numero pari. Gli ospiti contano come tutti gli altri.</p></>
 }
 
-function TournamentOrganizationEditor({ tournament, user, onClose }: { tournament: Tournament; user: SessionUser; onClose: () => void }) {
-  const [input, setInput] = useState<TournamentInput>({ ...tournament, totalMinutes: tournament.totalMinutes ?? getTimedTournamentPlan(tournament).totalMinutes })
-  const [busy, setBusy] = useState(false), [error, setError] = useState('')
-  const update = <K extends keyof TournamentInput>(key: K, value: TournamentInput[K]) => setInput(current => ({ ...current, [key]: value }))
-  async function save(event: FormEvent) {
-    event.preventDefault(); setBusy(true); setError('')
-    try {
-      await repository.editTournamentOrganization(tournament.id, { capacity: input.capacity, courts: input.courts, totalMinutes: input.totalMinutes!, warmupMinutes: input.warmupMinutes, changeoverMinutes: input.changeoverMinutes }, user)
-      onClose()
-    } catch (reason) { setError(reason instanceof Error ? reason.message : 'Organizzazione non salvata. Riprova.') }
-    finally { setBusy(false) }
-  }
-  return <Modal title="Modifica organizzazione" onClose={onClose} size="wide"><form className="tournament-form" onSubmit={save}>
-    <p>Puoi adattare il torneo fino alla chiusura delle iscrizioni. Nessun iscritto verrà rimosso. Data, formula e scelta delle coppie restano invariate.</p>
-    <div className="tournament-form__grid"><label>Massimo giocatori<select value={input.capacity} onChange={e => update('capacity', Number(e.target.value))}>{Array.from({ length: 14 }, (_, i) => 6 + i * 2).map(n => <option key={n} disabled={n < Object.keys(tournament.registrations).length}>{n}</option>)}</select></label>
-      <label>Campi disponibili<input type="number" min={1} max={8} required value={input.courts} onChange={e => update('courts', Number(e.target.value))} /></label></div>
-    <TournamentTimingFields input={input} update={update} />
-    {error && <p className="form-error" role="alert">{error}</p>}
-    <button className="button button--primary" disabled={busy}>{busy ? 'Salvataggio…' : 'Salva organizzazione'}</button>
-  </form></Modal>
-}
-
 function TournamentEditor({ tournament, user, onClose, onSaved }: { tournament?: Tournament; user: SessionUser; onClose: () => void; onSaved: (id: string) => void }) {
   const [input, setInput] = useState<TournamentInput>(() => tournament ?? { title: '', startsAt: Math.ceil(Date.now() / 1_800_000) * 1_800_000 + 7 * 86_400_000, venueId: 'oasi-boschetto', format: 'americano', pairing: 'rotating', capacity: 8, courts: 1, rounds: 7, pointsPerMatch: 24, scoreAccess: 'players' })
   const [date, setDate] = useState(toDateTimeInput(new Date(input.startsAt)))
   const [error, setError] = useState(''), [busy, setBusy] = useState(false)
   const rotating = tournamentUsesRotatingPairs(input)
   const timed = tournamentUsesTimedMatches(input)
+  const metadataOnly = Boolean(tournament && !tournamentSettingsEditable(tournament, user.id))
+  const enrolled = tournament ? Object.keys(tournament.registrations).length : 0
+  const rulesLocked = enrolled > 0
   const update = <K extends keyof TournamentInput>(key: K, value: TournamentInput[K]) => setInput(current => ({ ...current, [key]: value }))
   async function submit(event: FormEvent) {
     event.preventDefault(); setError(''); setBusy(true)
     try {
-      const value = validateTournamentInput({ ...input, startsAt: padelDateTimeToTimestamp(date) }, Date.now())
+      const value = { ...input, startsAt: metadataOnly || date === toDateTimeInput(new Date(input.startsAt)) ? input.startsAt : padelDateTimeToTimestamp(date) }
       if (tournament) { await repository.editTournament(tournament.id, value, user); onSaved(tournament.id) }
-      else onSaved(await repository.createTournament(value, user))
+      else onSaved(await repository.createTournament(validateTournamentInput(value, Date.now()), user))
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'Salvataggio non riuscito. Riprova.') }
     finally { setBusy(false) }
   }
-  return <Modal title={tournament ? 'Modifica bozza' : 'Nuovo torneo'} eyebrow="Organizza il tuo torneo" onClose={onClose} size="wide">
+  return <Modal title={tournament ? 'Modifica torneo' : 'Nuovo torneo'} eyebrow="Organizza il tuo torneo" onClose={onClose} size="wide">
     <form className="tournament-form" onSubmit={submit}>
+      {tournament && user.id !== tournament.createdBy && <p className="tournament-note">Stai modificando il torneo di un altro membro come amministratore. Il creatore e gli iscritti rimarranno invariati.</p>}
+      {metadataOnly && <p className="tournament-note">Per proteggere lo storico puoi correggere soltanto nome e circolo. Calendario, coppie e risultati restano invariati.</p>}
       <label>Nome del torneo<input required minLength={3} maxLength={80} value={input.title} onChange={e => update('title', e.target.value)} placeholder="Il torneo dei fagiani" /></label>
-      <SlotDateTimeField value={date} onChange={setDate} />
-      <p>Orario italiano. Le iscrizioni chiudono automaticamente un’ora prima.</p>
       <label>Circolo<select value={input.venueId} onChange={e => update('venueId', e.target.value as TournamentInput['venueId'])}>{VENUES.map(v => <option value={v.id} key={v.id}>{v.name}</option>)}</select></label>
-      <fieldset className="tournament-formats"><legend>Formula</legend>{TOURNAMENT_FORMATS.map(format => <label key={format.id} className={input.format === format.id ? 'is-selected' : ''}>
-        <input type="radio" name="format" value={format.id} checked={input.format === format.id} onChange={() => setInput(current => ({ ...current, format: format.id, pairing: format.id === 'americano' || format.id === 'mexicano' ? 'rotating' : 'random-fixed', capacity: 8, scoringMode: 'standard', totalMinutes: null }))} />
+      {!metadataOnly && <><SlotDateTimeField value={date} onChange={setDate} />
+      <p>Orario italiano. Le iscrizioni chiudono automaticamente un’ora prima. Cambiando la data cambia anche la scadenza: se sposti l’inizio a più di un’ora da ora, le iscrizioni si riaprono.</p>
+      {rulesLocked && <p className="tournament-note">Ci sono già {enrolled} iscritti: formula, tipo di coppie e sistema di punteggio non si possono cambiare.</p>}
+      <fieldset className="tournament-formats" disabled={rulesLocked}><legend>Formula</legend>{TOURNAMENT_FORMATS.map(format => <label key={format.id} className={input.format === format.id ? 'is-selected' : ''}>
+        <input type="radio" name="format" value={format.id} checked={input.format === format.id} onChange={() => setInput(current => ({ ...current, format: format.id, pairing: format.id === 'americano' || format.id === 'mexicano' ? 'rotating' : 'random-fixed', capacity: 8, scoringMode: 'standard', totalMinutes: null, matchMinutes: 15 }))} />
         <span><strong>{format.name}</strong><small>{format.description}</small></span>
       </label>)}</fieldset>
-      {!rotating && <label>Coppie fisse<select value={input.pairing} onChange={e => update('pairing', e.target.value as TournamentInput['pairing'])}><option value="random-fixed">Sorteggiate dal computer</option><option value="chosen-fixed">Scelte dai giocatori, con conferma reciproca</option></select></label>}
-      {input.format === 'round-robin' && <label>Durata delle partite<select value={input.scoringMode ?? 'standard'} onChange={e => setInput(current => ({ ...current, scoringMode: e.target.value as TournamentInput['scoringMode'], totalMinutes: e.target.value === 'timed' ? 90 : null }))}><option value="standard">Un set a 6 game</option><option value="timed">Partite a tempo · durata totale disponibile</option></select></label>}
+      {!rotating && <label>Coppie fisse<select disabled={rulesLocked} value={input.pairing} onChange={e => update('pairing', e.target.value as TournamentInput['pairing'])}><option value="random-fixed">Sorteggiate dal computer</option><option value="chosen-fixed">Scelte dai giocatori, con conferma reciproca</option></select></label>}
+      {input.format === 'round-robin' && <label>Durata delle partite<select disabled={rulesLocked} value={input.scoringMode ?? 'standard'} onChange={e => setInput(current => ({ ...current, scoringMode: e.target.value as TournamentInput['scoringMode'], totalMinutes: e.target.value === 'timed' ? 90 : null, matchMinutes: 15 }))}><option value="standard">Un set a 6 game</option><option value="timed">Partite a tempo · durata totale disponibile</option></select></label>}
       <div className="tournament-form__grid">
-        <label>Massimo giocatori<select value={input.capacity} onChange={e => update('capacity', Number(e.target.value))}>{(input.format === 'knockout' ? [8, 16, 32] : rotating ? [4, 8, 12, 16, 20, 24, 28, 32] : Array.from({ length: 14 }, (_, i) => 6 + i * 2)).map(n => <option key={n}>{n}</option>)}</select></label>
+        <label>Massimo partecipanti<select value={input.capacity} onChange={e => update('capacity', Number(e.target.value))}>{(input.format === 'knockout' ? [8, 16, 32] : rotating ? [4, 8, 12, 16, 20, 24, 28, 32] : Array.from({ length: 14 }, (_, i) => 6 + i * 2)).map(n => <option key={n} disabled={n < enrolled}>{n}</option>)}</select></label>
         <label>Campi disponibili<input type="number" required min={1} max={8} value={input.courts} onChange={e => update('courts', Number(e.target.value))} /></label>
-        {rotating && <><label>Turni<input required type="number" min={1} max={31} value={input.rounds} onChange={e => update('rounds', Number(e.target.value))} /></label><label>Punti totali per incontro<select value={input.pointsPerMatch} onChange={e => update('pointsPerMatch', Number(e.target.value))}>{[16, 24, 32].map(n => <option key={n}>{n}</option>)}</select></label></>}
+        {rotating && <><label>Turni<input required type="number" min={1} max={31} value={input.rounds} onChange={e => update('rounds', Number(e.target.value))} /></label><label>Punti totali per incontro<select disabled={rulesLocked} value={input.pointsPerMatch} onChange={e => update('pointsPerMatch', Number(e.target.value))}>{[16, 24, 32].map(n => <option key={n}>{n}</option>)}</select></label></>}
       </div>
+      <p>Il massimo partecipanti comprende anche gli ospiti. Raggiunto il limite, le iscrizioni si fermano. Si può partire con meno persone se il numero è compatibile con la formula; nessun iscritto viene rimosso abbassando il limite.</p>
+      {timed && input.totalMinutes == null && <button type="button" className="button" onClick={() => update('totalMinutes', getTimedTournamentPlan(input).totalMinutes)}>Adatta alla durata totale disponibile</button>}
       {timed && <TournamentTimingFields input={input} update={update} />}
       <p>{timed ? `${timedRules} ${timedRanking}` : rotating ? `Ogni coppia guadagna i punti segnati: per esempio ${input.pointsPerMatch / 2 + 2}–${input.pointsPerMatch / 2 - 2}. Tutti giocano in ogni turno, anche in ondate su meno campi.` : 'Ogni partita è un set a 6 game, tie-break sul 6–6 (si registra 7–6). Il calendario viene calcolato dagli iscritti effettivi.'}</p>
       <label>Chi può inserire i risultati<select value={input.scoreAccess} onChange={e => update('scoreAccess', e.target.value as TournamentInput['scoreAccess'])}><option value="players">Organizzatore e giocatori della partita</option><option value="admin">Solo organizzatore</option></select></label>
-      <p className="tournament-note">Salvi una bozza visibile solo a te e all’amministratore. La pubblicherai dopo averla controllata. L’amministratore può sempre aiutarti nella gestione e nei risultati. Il torneo non prenota i campi e non assegna punti Fanta.</p>
+      </>}
+      <p className="tournament-note">{!tournament || tournament.status === 'draft' ? 'Salvi una bozza privata, da pubblicare dopo averla controllata.' : 'Le modifiche saranno subito visibili nella pagina del torneo. Iscrizioni e compagni scelti vengono conservati.'} Il torneo non prenota i campi e non assegna punti Fanta.</p>
       {error && <p role="alert" className="form-error">{error}</p>}
-      <button className="button button--primary" disabled={busy}>{busy ? 'Salvataggio…' : 'Salva bozza privata'}</button>
+      <button className="button button--primary" disabled={busy || Boolean(tournament && !canEditTournament(tournament, user.id))}>{busy ? 'Salvataggio…' : tournament ? 'Salva modifiche' : 'Salva bozza privata'}</button>
     </form>
   </Modal>
 }
@@ -171,7 +158,6 @@ function TournamentDetail({ id, user, members, onBack }: { id: string; user: Ses
   const [scores, setScores] = useState<TournamentScore[]>([])
   const [error, setError] = useState(''), [busy, setBusy] = useState(false), [attempt, setAttempt] = useState(0)
   const [editor, setEditor] = useState(false), [matchId, setMatchId] = useState('')
-  const [organizationEditor, setOrganizationEditor] = useState(false)
   const [guestEditor, setGuestEditor] = useState<{ id: string | null } | null>(null)
   const [confirmation, setConfirmation] = useState<'publish' | 'start' | 'advance' | 'cancel' | null>(null)
   const [message, setMessage] = useState(''), [now, setNow] = useState(Date.now)
@@ -216,8 +202,8 @@ function TournamentDetail({ id, user, members, onBack }: { id: string; user: Ses
     {error && <p className="form-error tournament-panel" role="alert">{error} <button onClick={() => setAttempt(a => a + 1)}>Ricarica dati</button></p>}
     {message && <p className="tournament-message" role="status">{message}</p>}
     {manager && <section className="tournament-panel tournament-actions" aria-label="Gestione torneo">
-      {t.status === 'draft' && <><button className="button" disabled={busy} onClick={() => setEditor(true)}>Modifica bozza</button><button className="button button--primary" disabled={busy} onClick={() => setConfirmation('publish')}>Pubblica al gruppo</button></>}
-      {timed && open && <button className="button" disabled={busy} onClick={() => setOrganizationEditor(true)}>Modifica organizzazione</button>}
+      {canEditTournament(t, user.id, now) && <button className="button" disabled={busy} onClick={() => setEditor(true)}>Modifica torneo</button>}
+      {t.status === 'draft' && <button className="button button--primary" disabled={busy} onClick={() => setConfirmation('publish')}>Pubblica al gruppo</button>}
       {t.published && <button className="button" onClick={() => { void navigator.clipboard.writeText(`${window.location.origin}${window.location.pathname}#tornei/${encodeURIComponent(t.id)}`).then(() => setMessage('Link copiato. Puoi mandarlo nel gruppo.')).catch(() => setMessage(`Link: ${window.location.origin}/#tornei/${encodeURIComponent(t.id)}`)) }}><Copy size={17} /> Copia link torneo</button>}
       {t.status === 'open' && <button className="button button--primary" disabled={busy || open || (timed && (!validCount || !plan?.feasible))} onClick={() => setConfirmation('start')}>Sorteggia e prepara tabellone</button>}
       {t.status === 'running' && <button className="button button--primary" disabled={busy || (timed && clock.state !== 'expired')} onClick={() => setConfirmation('advance')}>{nextLabel}</button>}
@@ -225,6 +211,7 @@ function TournamentDetail({ id, user, members, onBack }: { id: string; user: Ses
     </section>}
     {timed && t.status === 'running' && <TournamentRoundTimer tournament={t} now={now} manager={manager} busy={busy} onStart={() => void perform(() => repository.actOnTournament(t.id, 'start-round', user), 'Timer avviato per tutti.')} />}
     {t.status !== 'draft' && <section className="tournament-panel"><div className="tournament-section-heading"><h2>Iscritti</h2><strong>{registrations.length}/{t.capacity}</strong></div>
+      <p>Massimo {t.capacity} partecipanti, ospiti inclusi.{open ? registrations.length >= t.capacity ? ' Il torneo è completo.' : ` ${t.capacity - registrations.length} posti ancora disponibili.` : ''}</p>
       <p>{t.status === 'cancelled' ? 'Iscrizioni chiuse: torneo annullato.' : `${open ? 'Iscrizioni e scelta del compagno fino a' : 'Iscrizioni chiuse dal'} ${dateLabel(t.startsAt - 3_600_000)}.`}</p>
       {open && <div className="tournament-actions">{own ? <><span className="tournament-message"><Check size={18} /> Sei iscritto</span><button className="button" disabled={busy} onClick={() => void perform(() => repository.leaveTournament(t.id, user), 'Iscrizione ritirata.')}>Ritira iscrizione</button></> : <button className="button button--primary" disabled={busy || registrations.length >= t.capacity} onClick={() => void perform(() => repository.registerForTournament(t.id, null, user), 'Sei iscritto al torneo.')}>{registrations.length >= t.capacity ? 'Torneo completo' : 'Iscriviti al torneo'}</button>}</div>}
       {manager && open && <button className="button tournament-add-guest" disabled={busy || registrations.length >= t.capacity} onClick={() => setGuestEditor({ id: null })}><Plus size={18} /> Aggiungi ospite esterno</button>}
@@ -247,11 +234,10 @@ function TournamentDetail({ id, user, members, onBack }: { id: string; user: Ses
       <div className="tournament-table-wrap"><table className="tournament-table"><caption>{timed ? 'Classifica coppie · V–N–P: vinte, pareggiate, perse' : tournamentUsesRotatingPairs(t) ? 'Classifica individuale · punti' : 'Classifica coppie · game'}</caption><thead><tr><th scope="col">{t.format === 'knockout' && t.status !== 'completed' ? 'Coppia' : 'Posizione'}</th>{timed ? <><th scope="col">Punti</th><th scope="col">V–N–P</th><th scope="col">Game fatti/subiti</th></> : <><th scope="col">Giocate</th><th scope="col">Vinte</th><th scope="col">Fatti</th><th scope="col">Subiti</th></>}</tr></thead><tbody>{standings.map(row => <tr key={row.id}><th scope="row">{(t.format !== 'knockout' || t.status === 'completed') && <strong>{row.rank}°{row.tied ? ' =' : ''} </strong>}{pairName(row.playerIds)}</th>{timed ? <><td><strong>{row.tablePoints}</strong></td><td>{row.wins}–{row.draws}–{row.played - row.wins - row.draws}</td><td>{row.pointsFor}/{row.pointsAgainst}</td></> : <><td>{row.played}</td><td>{row.wins}</td><td>{row.pointsFor}</td><td>{row.pointsAgainst}</td></>}</tr>)}</tbody></table></div>
     </section>}
     <p className="tournament-note">Torneo del gruppo, separato dal Fanta e dalle partite ordinarie. Nessuna prenotazione automatica dei campi.</p>
-    {editor && <TournamentEditor tournament={t} user={user} onClose={() => setEditor(false)} onSaved={() => setEditor(false)} />}
-    {organizationEditor && <TournamentOrganizationEditor tournament={t} user={user} onClose={() => setOrganizationEditor(false)} />}
+    {editor && <TournamentEditor tournament={t} user={user} onClose={() => setEditor(false)} onSaved={() => { setEditor(false); setMessage('Torneo modificato. Iscrizioni e risultati conservati.') }} />}
     {guestEditor && <TournamentGuestEditor tournament={t} guestId={guestEditor.id} user={user} members={members} onClose={() => setGuestEditor(null)} />}
     {matchId && t.matches[matchId] && <TournamentScoreEditor tournament={t} match={t.matches[matchId]} score={scores.find(s => s.matchId === matchId)} members={members} user={user} onClose={() => setMatchId('')} />}
-    {confirmation && <Modal title={confirmation === 'publish' ? 'Pubblica il torneo?' : confirmation === 'cancel' ? 'Annulla il torneo?' : confirmation === 'start' ? 'Conferma il sorteggio?' : nextLabel} onClose={() => !busy && setConfirmation(null)}><div className="tournament-form"><p>{confirmation === 'publish' ? `Gli altri membri potranno aprire il link e iscriversi. ${timed ? 'Potrai adattare capienza, campi e durata totale finché le iscrizioni sono aperte; data e formula restano bloccate.' : 'Le impostazioni non saranno più modificabili.'}` : confirmation === 'cancel' ? 'Le iscrizioni e i risultati resteranno consultabili, ma non si potrà più giocare. Non vengono cancellati dati.' : confirmation === 'start' ? 'Coppie e calendario verranno salvati definitivamente usando gli iscritti attuali. Nessuna iscrizione verrà aggiunta dopo il sorteggio.' : 'Conferma solo dopo aver controllato tutti i risultati. I punteggi di questo turno non saranno più modificabili perché determinano classifica e abbinamenti successivi.'}</p>{confirmation === 'start' && timed && validCount && <TournamentPlan input={t} count={registrations.length} />}<button className="button button--primary" disabled={busy} onClick={() => void perform(() => repository.actOnTournament(t.id, confirmation, user), confirmation === 'publish' ? 'Torneo pubblicato. Copia il link e condividilo con il gruppo.' : 'Torneo aggiornato.')}>{busy ? 'Attendi…' : 'Conferma'}</button>{error && <p role="alert" className="form-error">{error}</p>}</div></Modal>}
+    {confirmation && <Modal title={confirmation === 'publish' ? 'Pubblica il torneo?' : confirmation === 'cancel' ? 'Annulla il torneo?' : confirmation === 'start' ? 'Conferma il sorteggio?' : nextLabel} onClose={() => !busy && setConfirmation(null)}><div className="tournament-form"><p>{confirmation === 'publish' ? 'Gli altri membri potranno aprire il link e iscriversi. Potrai modificare il torneo finché le iscrizioni sono aperte; dal primo iscritto formula, coppie e sistema di punteggio restano protetti. L’amministratore può intervenire anche sui tornei degli altri.' : confirmation === 'cancel' ? 'Le iscrizioni e i risultati resteranno consultabili, ma non si potrà più giocare. Non vengono cancellati dati.' : confirmation === 'start' ? 'Coppie e calendario verranno salvati definitivamente usando gli iscritti attuali. Nessuna iscrizione verrà aggiunta dopo il sorteggio.' : 'Conferma solo dopo aver controllato tutti i risultati. I punteggi di questo turno non saranno più modificabili perché determinano classifica e abbinamenti successivi.'}</p>{confirmation === 'start' && timed && validCount && <TournamentPlan input={t} count={registrations.length} />}<button className="button button--primary" disabled={busy} onClick={() => void perform(() => repository.actOnTournament(t.id, confirmation, user), confirmation === 'publish' ? 'Torneo pubblicato. Copia il link e condividilo con il gruppo.' : 'Torneo aggiornato.')}>{busy ? 'Attendi…' : 'Conferma'}</button>{error && <p role="alert" className="form-error">{error}</p>}</div></Modal>}
   </main>
 }
 

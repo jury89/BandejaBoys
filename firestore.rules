@@ -556,22 +556,26 @@ service cloud.firestore {
         && (data.get('totalMinutes', null) == null || validAdaptiveTournamentPlan(data));
     }
 
-    function validTournamentOrganizationUpdate(before, after) {
+    function validTournamentSettingsUpdate(before, after) {
       let changed = after.diff(before).affectedKeys();
-      // Ordinary registrations/scores must not pay for budget-edit/draw validation.
+      let settings = ['title', 'startsAt', 'venueId', 'format', 'pairing', 'capacity', 'courts',
+        'rounds', 'pointsPerMatch', 'scoreAccess', 'scoringMode', 'matchMinutes',
+        'warmupMinutes', 'changeoverMinutes', 'totalMinutes'];
+      // Keep all registrations and the saved draw intact when editing settings.
       return before.status == 'draft'
-        || !changed.hasAny(['capacity', 'courts', 'totalMinutes', 'matchMinutes', 'warmupMinutes', 'changeoverMinutes', 'scoringMode'])
-        || (
-        before.get('scoringMode', 'standard') == after.get('scoringMode', 'standard')
-        && ((before.status == 'open' && after.status == 'open'
-          && before.get('scoringMode', 'standard') == 'timed' && after.get('totalMinutes', null) != null
-          && request.time.toMillis() < before.startsAt - 3600000
-          && changed.hasOnly(['capacity', 'courts', 'totalMinutes', 'matchMinutes', 'warmupMinutes', 'changeoverMinutes', 'updatedAt'])) || (
-          before.status == 'open' && after.status == 'running' && before.get('totalMinutes', null) != null
+        || !changed.hasAny(settings)
+        || (isSlotAdmin() && changed.hasOnly(['title', 'venueId', 'updatedAt']))
+        || (before.status == 'open' && after.status == 'open'
+          && (isSlotAdmin() || request.time.toMillis() < before.startsAt - 3600000)
+          && changed.hasOnly(settings.concat(['updatedAt']))
+          && (after.startsAt == before.startsAt || after.startsAt > request.time.toMillis() + 3600000)
+          && (before.registrations.size() == 0 || (after.format == before.format
+            && after.pairing == before.pairing && after.pointsPerMatch == before.pointsPerMatch
+            && after.get('scoringMode', 'standard') == before.get('scoringMode', 'standard'))))
+        || (before.status == 'open' && after.status == 'running' && before.get('totalMinutes', null) != null
           && request.time.toMillis() >= before.startsAt - 3600000
-          && !changed.hasAny(['capacity', 'courts', 'totalMinutes', 'warmupMinutes', 'changeoverMinutes'])
-        ))
-      );
+          && !changed.hasAny(['title', 'startsAt', 'venueId', 'format', 'pairing', 'capacity', 'courts',
+            'rounds', 'pointsPerMatch', 'scoreAccess', 'scoringMode', 'warmupMinutes', 'changeoverMinutes', 'totalMinutes']));
     }
 
     // Legacy tournaments retain their clock. A new budget is opt-in before cutoff.
@@ -579,8 +583,9 @@ service cloud.firestore {
       let start = before.get('roundStartedAt', null);
       let nextStart = after.get('roundStartedAt', null);
       let expired = start != null && request.time.toMillis() >= start + before.get('matchMinutes', 15) * 60000;
-      return validTournamentOrganizationUpdate(before, after)
-        && (before.status != 'open' || after.status != 'running' || request.time.toMillis() >= before.startsAt - 3600000)
+      // Metadata corrections must also work on completed timed tournaments.
+      return !after.diff(before).affectedKeys().hasAny(['status', 'currentRound', 'roundStartedAt'])
+        || ((before.status != 'open' || after.status != 'running' || request.time.toMillis() >= before.startsAt - 3600000)
         && (after.get('scoringMode', 'standard') != 'timed' || (
           before.status != 'running' ? nextStart == null : (
             after.status == 'cancelled' ? nextStart == start : (
@@ -596,7 +601,7 @@ service cloud.firestore {
               )
             )
           )
-        ));
+        )));
     }
 
     function validOwnTournamentRegistration(data, before) {
@@ -645,6 +650,7 @@ service cloud.firestore {
         && request.resource.data.id == resource.data.id
         && request.resource.data.createdBy == resource.data.createdBy
         && request.resource.data.createdAt == resource.data.createdAt
+        && validTournamentSettingsUpdate(resource.data, request.resource.data)
         && validTournamentTimingUpdate(resource.data, request.resource.data)
         && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['registrations'])
           || (resource.data.published == true && resource.data.status == 'open'

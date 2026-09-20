@@ -1,4 +1,4 @@
-import { act, render, screen, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { SLOT_ADMIN_USER_ID } from '../lib/admin'
 import { advanceTournament, makeTournament, makeTournamentScore, publishTournament, registerForTournament, startTournament, startTournamentRound } from '../lib/domain'
@@ -37,15 +37,15 @@ describe('TournamentsPage', () => {
     const modal = screen.getByRole('dialog')
     await u.click(within(modal).getByRole('radio', { name: /Girone all’italiana/ }))
     await u.selectOptions(within(modal).getByLabelText('Durata delle partite'), 'timed')
-    await u.selectOptions(within(modal).getByLabelText('Massimo giocatori'), '10')
+    await u.selectOptions(within(modal).getByLabelText('Massimo partecipanti'), '10')
     await u.clear(within(modal).getByLabelText('Campi disponibili'))
     await u.type(within(modal).getByLabelText('Campi disponibili'), '2')
-    expect(within(modal).getByLabelText('Massimo giocatori')).toHaveValue('10')
+    expect(within(modal).getByLabelText('Massimo partecipanti')).toHaveValue('10')
     expect(within(modal).getByLabelText('Campi disponibili')).toHaveValue(2)
     expect(within(modal).getByLabelText('Durata delle partite')).toHaveValue('timed')
     expect(within(modal).getByLabelText('Durata totale disponibile (minuti)')).toHaveValue(90)
     expect(within(modal).getByText('88 minuti')).toBeInTheDocument()
-    await u.selectOptions(within(modal).getByLabelText('Massimo giocatori'), '12')
+    await u.selectOptions(within(modal).getByLabelText('Massimo partecipanti'), '12')
     expect(within(modal).getByText('8 minuti')).toBeInTheDocument()
     expect(within(modal).getByText('83 minuti')).toBeInTheDocument()
     await u.clear(within(modal).getByLabelText('Campi disponibili'))
@@ -55,19 +55,19 @@ describe('TournamentsPage', () => {
   it('updates published logistics before cutoff, without losing registrations', async () => {
     seed(fixture({ format: 'round-robin', pairing: 'random-fixed', scoringMode: 'timed', totalMinutes: 90 }, 8))
     const u = userEvent.setup(); show()
-    await u.click(screen.getByRole('button', { name: 'Modifica organizzazione' }))
+    await u.click(screen.getByRole('button', { name: 'Modifica torneo' }))
     const modal = screen.getByRole('dialog')
-    await u.selectOptions(within(modal).getByLabelText('Massimo giocatori'), '12')
+    await u.selectOptions(within(modal).getByLabelText('Massimo partecipanti'), '12')
     expect(within(modal).getByText('8 minuti')).toBeInTheDocument()
-    await u.click(within(modal).getByRole('button', { name: 'Salva organizzazione' }))
+    await u.click(within(modal).getByRole('button', { name: 'Salva modifiche' }))
     expect(await screen.findByText('8/12')).toBeInTheDocument()
     expect(screen.getByText('27 minuti')).toBeInTheDocument()
     expect(screen.getByText(/Stima aggiornata sugli iscritti attuali/)).toBeInTheDocument()
   })
-  it('blocks an odd attendance draw and hides logistics edits after cutoff', () => {
+  it('blocks an odd attendance draw but allows admin corrections after cutoff', () => {
     seed(fixture({ startsAt: now, format: 'round-robin', pairing: 'random-fixed', scoringMode: 'timed', totalMinutes: 90 }, 7))
     show()
-    expect(screen.queryByRole('button', { name: 'Modifica organizzazione' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Modifica torneo' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Sorteggia e prepara tabellone' })).toBeDisabled()
     expect(screen.getByText(/Il numero è dispari/)).toBeInTheDocument()
   })
@@ -88,6 +88,71 @@ describe('TournamentsPage', () => {
   it('keeps guest management hidden from other members', () => {
     seed(fixture()); show(members[7])
     expect(screen.queryByRole('button', { name: /Aggiungi ospite/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Modifica torneo' })).not.toBeInTheDocument()
+  })
+  it('lets a creator edit published details while protecting existing entries and rules', async () => {
+    const t = { ...fixture({}, 5), createdBy: members[0].id }
+    seed(t); const u = userEvent.setup(); show(members[0])
+    await u.click(screen.getByRole('button', { name: 'Modifica torneo' }))
+    const modal = screen.getByRole('dialog')
+    expect(within(modal).getByRole('option', { name: /^4$/ })).toBeDisabled()
+    expect(within(modal).getAllByRole('radio').every(r => r.closest('fieldset')?.disabled)).toBe(true)
+    await u.clear(within(modal).getByLabelText('Nome del torneo'))
+    await u.type(within(modal).getByLabelText('Nome del torneo'), 'Coppa aggiornata')
+    fireEvent.change(within(modal).getByLabelText('Data'), { target: { value: '2026-10-02' } })
+    await u.selectOptions(within(modal).getByLabelText('Circolo'), 'tennis-club-mantova')
+    await u.selectOptions(within(modal).getByLabelText('Massimo partecipanti'), '12')
+    await u.click(within(modal).getByRole('button', { name: 'Salva modifiche' }))
+    expect(await screen.findByRole('heading', { name: 'Coppa aggiornata' })).toBeInTheDocument()
+    expect(screen.getByText('5/12')).toBeInTheDocument()
+    const saved = JSON.parse(localStorage.getItem('bandeja-tournaments-v1')!).tournaments[0]
+    expect(saved.registrations).toEqual(t.registrations)
+    expect(saved.createdBy).toBe(members[0].id)
+    expect(saved.startsAt).toBe(t.startsAt + 86_400_000)
+  })
+  it('lets admin edit another creator’s closed undrawn tournament without moving its date', async () => {
+    const t = { ...fixture({ startsAt: now }, 4), createdBy: members[0].id }
+    seed(t); const u = userEvent.setup(); show()
+    await u.click(screen.getByRole('button', { name: 'Modifica torneo' }))
+    const modal = screen.getByRole('dialog')
+    expect(within(modal).getByText(/altro membro come amministratore/)).toBeInTheDocument()
+    await u.selectOptions(within(modal).getByLabelText('Massimo partecipanti'), '12')
+    await u.click(within(modal).getByRole('button', { name: 'Salva modifiche' }))
+    expect(await screen.findByText('4/12')).toBeInTheDocument()
+    const saved = JSON.parse(localStorage.getItem('bandeja-tournaments-v1')!).tournaments[0]
+    expect(saved.startsAt).toBe(t.startsAt)
+    expect(saved.registrations).toEqual(t.registrations)
+  })
+  it('only offers metadata to admin after drawing and preserves saved results', async () => {
+    const t = { ...startTournament(fixture({ startsAt: now }, 4), admin.id, 42, now), createdBy: members[0].id }
+    const scores = [makeTournamentScore(t, 'r1-m1', 14, 10, admin.id, undefined, 0, now)]
+    seed(t, scores); const u = userEvent.setup(); show()
+    await u.click(screen.getByRole('button', { name: 'Modifica torneo' }))
+    const modal = screen.getByRole('dialog')
+    expect(within(modal).queryByLabelText('Massimo partecipanti')).not.toBeInTheDocument()
+    expect(within(modal).getByText(/Calendario, coppie e risultati restano invariati/)).toBeInTheDocument()
+    await u.clear(within(modal).getByLabelText('Nome del torneo'))
+    await u.type(within(modal).getByLabelText('Nome del torneo'), 'Torneo corretto')
+    await u.click(within(modal).getByRole('button', { name: 'Salva modifiche' }))
+    expect(await screen.findByRole('heading', { name: 'Torneo corretto' })).toBeInTheDocument()
+    const saved = JSON.parse(localStorage.getItem('bandeja-tournaments-v1')!)
+    expect(saved.tournaments[0].matches).toEqual(t.matches)
+    expect(saved.scores.qa).toEqual(scores)
+  })
+  it('does not offer edits to a creator after drawing', () => {
+    seed({ ...startTournament(fixture({ startsAt: now }, 4), admin.id, 42, now), createdBy: members[0].id })
+    show(members[0])
+    expect(screen.queryByRole('button', { name: 'Modifica torneo' })).not.toBeInTheDocument()
+  })
+  it('can switch a long timed tournament back to standard before anyone joins', async () => {
+    seed(fixture({ format: 'round-robin', pairing: 'random-fixed', capacity: 6, scoringMode: 'timed', totalMinutes: 180 }, 0))
+    const u = userEvent.setup(); show()
+    await u.click(screen.getByRole('button', { name: 'Modifica torneo' }))
+    const modal = screen.getByRole('dialog')
+    await u.selectOptions(within(modal).getByLabelText('Durata delle partite'), 'standard')
+    await u.click(within(modal).getByRole('button', { name: 'Salva modifiche' }))
+    expect(await screen.findByText('Torneo modificato. Iscrizioni e risultati conservati.')).toBeInTheDocument()
+    expect(JSON.parse(localStorage.getItem('bandeja-tournaments-v1')!).tournaments[0].scoringMode).toBe('standard')
   })
   it('starts the shared timer before enabling game scores and accepts a draw', async () => {
     const t = startTournament(fixture({ startsAt: now, format: 'round-robin', pairing: 'random-fixed', scoringMode: 'timed', capacity: 8 }, 8), admin.id, 42, now)
@@ -128,7 +193,7 @@ describe('TournamentsPage', () => {
     await u.click(screen.getByRole('button', { name: 'Pubblica al gruppo' }))
     await u.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Conferma' }))
     expect(await screen.findByRole('button', { name: 'Iscriviti al torneo' })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Modifica bozza' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Modifica torneo' })).toBeInTheDocument()
   })
   it('members see the creation button but never see other members’ private drafts', () => {
     localStorage.setItem('bandeja-tournaments-v1', JSON.stringify({ tournaments: [makeTournament('secret', input, admin.id, now)], scores: {} }))

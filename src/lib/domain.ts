@@ -2102,8 +2102,35 @@ export function makeTournament(id: string, input: TournamentInput, actorId: stri
 
 export function editTournament(tournament: Tournament, input: TournamentInput, actorId: string, now = Date.now()): Tournament {
   requireTournamentManager(tournament, actorId)
-  if (tournament.status !== 'draft') throw new Error('Le impostazioni sono bloccate dopo la pubblicazione.')
-  return { ...tournament, ...validateTournamentInput(input, now), updatedAt: now }
+  if (!canEditTournament(tournament, actorId, now)) throw new Error('Le iscrizioni sono chiuse: chiedi all’amministratore di modificare il torneo.')
+  if (!tournamentSettingsEditable(tournament, actorId, now)) {
+    // Historical metadata may be corrected by the admin, never the saved draw.
+    const defaults = { scoringMode: 'standard', matchMinutes: 15, warmupMinutes: 5, changeoverMinutes: 2, totalMinutes: null }
+    const fields = ['startsAt', 'format', 'pairing', 'capacity', 'courts', 'rounds', 'pointsPerMatch', 'scoreAccess', 'scoringMode', 'matchMinutes', 'warmupMinutes', 'changeoverMinutes', 'totalMinutes'] as const
+    if (fields.some(key => (input[key] ?? defaults[key as keyof typeof defaults]) !== (tournament[key] ?? defaults[key as keyof typeof defaults]))) throw new Error('Il tabellone è protetto: puoi modificare soltanto nome e circolo.')
+    const title = input.title.trim()
+    if (title.length < 3 || title.length > 80) throw new Error('Il nome del torneo deve avere da 3 a 80 caratteri.')
+    return { ...tournament, title, venueId: validateVenueId(input.venueId), updatedAt: now }
+  }
+  if (input.capacity < Object.keys(tournament.registrations).length) throw new Error('Il massimo partecipanti non può essere inferiore agli iscritti: nessuno verrà rimosso.')
+  if (Object.keys(tournament.registrations).length > 0 && (
+    input.format !== tournament.format || input.pairing !== tournament.pairing
+    || (input.scoringMode ?? 'standard') !== (tournament.scoringMode ?? 'standard') || input.pointsPerMatch !== tournament.pointsPerMatch
+  )) throw new Error('Ci sono già iscritti: formula, coppie e sistema di punteggio restano invariati.')
+  // Admin can repair a closed, undrawn tournament without moving its old date.
+  // An explicitly changed date must leave at least one hour for registrations.
+  const validationTime = tournament.status === 'open' && input.startsAt === tournament.startsAt
+    ? Math.min(now, input.startsAt - TOURNAMENT_SIGNUP_LEAD_MS - 1) : now
+  return { ...tournament, ...validateTournamentInput(input, validationTime), updatedAt: now }
+}
+
+export function canEditTournament(tournament: Tournament, actorId: string, now = Date.now()): boolean {
+  return isSlotAdmin(actorId) || (tournament.createdBy === actorId && (tournament.status === 'draft' || tournamentRegistrationsOpen(tournament, now)))
+}
+
+export function tournamentSettingsEditable(tournament: Tournament, actorId: string, now = Date.now()): boolean {
+  return canManageTournament(tournament, actorId) && (tournament.status === 'draft'
+    || (tournament.status === 'open' && (isSlotAdmin(actorId) || tournamentRegistrationsOpen(tournament, now))))
 }
 
 export function editTournamentOrganization(tournament: Tournament, organization: TournamentOrganization, actorId: string, now = Date.now()): Tournament {
