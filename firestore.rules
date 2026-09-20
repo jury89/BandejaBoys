@@ -570,8 +570,7 @@ service cloud.firestore {
           && changed.hasOnly(settings.concat(['updatedAt']))
           && (after.startsAt == before.startsAt || after.startsAt > request.time.toMillis() + 3600000)
           && (before.registrations.size() == 0 || (after.format == before.format
-            && after.pairing == before.pairing && after.pointsPerMatch == before.pointsPerMatch
-            && after.get('scoringMode', 'standard') == before.get('scoringMode', 'standard'))))
+            && after.pairing == before.pairing && after.pointsPerMatch == before.pointsPerMatch)))
         || (before.status == 'open' && after.status == 'running' && before.get('totalMinutes', null) != null
           && request.time.toMillis() >= before.startsAt - 3600000
           && !changed.hasAny(['title', 'startsAt', 'venueId', 'format', 'pairing', 'capacity', 'courts',

@@ -28,10 +28,28 @@ describe('safe tournament editing', () => {
     expect(edited.registrations).toEqual(t.registrations)
     expect(Object.keys(edited.registrations)).toHaveLength(5)
   })
-  it.each([{ format: 'mexicano' }, { pairing: 'chosen-fixed' }, { scoringMode: 'timed' }, { pointsPerMatch: 16 }] as Partial<TournamentInput>[])('locks enrolled players’ rules: %j', change => {
+  it.each([{ format: 'mexicano' }, { pairing: 'chosen-fixed' }, { pointsPerMatch: 16 }] as Partial<TournamentInput>[])('locks enrolled players’ rules: %j', change => {
     const t = fixture({}, 1)
     expect(() => editTournament(t, { ...t, ...change }, owner, now)).toThrow(/già iscritti/)
     expect(() => editTournament(t, { ...t, ...change }, admin, now)).toThrow(/già iscritti/)
+  })
+  it.each([owner, admin])('%s can change duration before draw without losing members, guests or chosen pairs', actor => {
+    let t = saveTournamentGuest(fixture({ format: 'round-robin', pairing: 'chosen-fixed', capacity: 10 }, 7), 'guest:ciccio', 'Ciccio', 'p0', owner, now)
+    t = registerForTournament(t, { id: 'p0', displayName: 'Player 0' }, 'guest:ciccio', now)
+    const timed = editTournament(t, { ...t, scoringMode: 'timed', totalMinutes: 90 }, actor, now)
+    expect(timed).toMatchObject({ scoringMode: 'timed', totalMinutes: 90, matchMinutes: 15, createdBy: owner })
+    expect(timed.registrations).toEqual(t.registrations)
+    const standard = editTournament(timed, { ...timed, scoringMode: 'standard', totalMinutes: null, matchMinutes: 15 }, actor, now)
+    expect(standard.scoringMode).toBe('standard')
+    expect(standard.registrations).toEqual(t.registrations)
+    expect(standard.matches).toEqual(t.matches)
+  })
+  it('keeps timing changes behind the creator cutoff and admin override', () => {
+    const t = fixture({ format: 'round-robin', pairing: 'random-fixed' }, 8)
+    const cutoff = t.startsAt - 3_600_000, change = { ...t, scoringMode: 'timed' as const, totalMinutes: 90 }
+    expect(() => editTournament(t, change, owner, cutoff)).toThrow(/chiuse/)
+    expect(editTournament(t, change, admin, cutoff).scoringMode).toBe('timed')
+    expect(() => editTournament(t, change, 'other', now)).toThrow(/organizzatore/)
   })
   it('allows a new formula only before the first registration', () => {
     const t = fixture()
@@ -66,7 +84,7 @@ describe('safe tournament editing', () => {
     const edited = editTournament(t, { ...t, title: 'Storico corretto', venueId: 'oasi-boschetto' }, admin, input.startsAt)
     expect(edited).toEqual({ ...t, title: 'Storico corretto', venueId: 'oasi-boschetto', updatedAt: input.startsAt })
     expect(() => editTournament(t, t, owner, input.startsAt)).toThrow(/chiuse/)
-    for (const change of [{ startsAt: t.startsAt + 1000 }, { capacity: 12 }, { courts: 3 }, { scoreAccess: 'admin' }, { matchMinutes: 9 }]) {
+    for (const change of [{ startsAt: t.startsAt + 1000 }, { capacity: 12 }, { courts: 3 }, { scoreAccess: 'admin' }, { matchMinutes: 9 }, { scoringMode: 'timed', totalMinutes: 90 }]) {
       expect(() => editTournament(t, { ...t, ...change } as TournamentInput, admin, input.startsAt)).toThrow(/tabellone è protetto/)
     }
   })

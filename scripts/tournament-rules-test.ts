@@ -239,9 +239,19 @@ for (const actor of [owner, admin]) {
   for (const change of [{ format: 'mexicano' }, { pairing: 'chosen-fixed' }, { pointsPerMatch: 16 }]) {
     test(`${actor} cannot change enrolled players rules ${JSON.stringify(change)}`, 'DENY', 'update', actor, enrolled, { ...enrolled, ...change })
   }
-  test(`${actor} cannot change enrolled timed scoring`, 'DENY', 'update', actor, timedRegistered, { ...timedRegistered, scoringMode: 'standard' })
+  const standard = editTournament(timedRegistered, { ...timedRegistered, scoringMode: 'standard', totalMinutes: null, matchMinutes: 15 }, actor, now)
+  test(`${actor} changes enrolled timed matches to sets`, 'ALLOW', 'update', actor, timedRegistered, standard)
+  const timed = editTournament(standard, { ...standard, scoringMode: 'timed', totalMinutes: 90 }, actor, now)
+  test(`${actor} changes enrolled sets to timed matches`, 'ALLOW', 'update', actor, standard, timed)
+  test(`${actor} cannot remove entrants while changing duration`, 'DENY', 'update', actor, standard, { ...timed, registrations: {} })
+  test(`${actor} changes adaptive matches to sets`, 'ALLOW', 'update', actor, adaptiveRegistered, editTournament(adaptiveRegistered, { ...adaptiveRegistered, scoringMode: 'standard', totalMinutes: null, matchMinutes: 15 }, actor, now))
   test(`${actor} cannot remove entrants while changing settings`, 'DENY', 'update', actor, enrolled, { ...enrolled, title: 'Nuovo nome', registrations: {} })
 }
+const standardEnrolled = editTournament(timedRegistered, { ...timedRegistered, scoringMode: 'standard', totalMinutes: null, matchMinutes: 15 }, owner, now)
+const convertedEnrolled = editTournament(standardEnrolled, { ...standardEnrolled, scoringMode: 'timed', totalMinutes: 90 }, admin, cutoff)
+test('creator cannot change duration at cutoff', 'DENY', 'update', owner, standardEnrolled, convertedEnrolled, { time: cutoff })
+test('admin changes duration at cutoff', 'ALLOW', 'update', admin, standardEnrolled, convertedEnrolled, { time: cutoff })
+test('other member cannot change duration', 'DENY', 'update', 'p0', standardEnrolled, convertedEnrolled, { time: cutoff })
 test('other member cannot edit published title', 'DENY', 'update', 'p0', ownOpen, { ...ownOpen, title: 'Nome forzato' })
 test('owner cannot edit at cutoff', 'DENY', 'update', owner, ownOpen, { ...ownOpen, title: 'Nome tardivo' }, { time: cutoff })
 test('admin edits another owner draft', 'ALLOW', 'update', admin, ownDraft, { ...ownDraft, title: 'Bozza corretta' })
@@ -252,7 +262,7 @@ for (const status of ['running', 'completed', 'cancelled'] as const) {
   const historical = { ...timedStarted, status }
   test(`admin corrects ${status} metadata preserving clock`, 'ALLOW', 'update', admin, historical, editTournament(historical, { ...historical, title: 'Storico corretto', venueId: 'tennis-club-mantova' }, admin, endsAt), { time: endsAt })
   test(`creator cannot correct ${status} metadata`, 'DENY', 'update', owner, historical, { ...historical, title: 'Correzione vietata' }, { time: endsAt })
-  for (const change of [{ capacity: 12 }, { startsAt: now + 86_400_000 }, { courts: 3 }, { scoreAccess: 'admin' }]) {
+  for (const change of [{ capacity: 12 }, { startsAt: now + 86_400_000 }, { courts: 3 }, { scoreAccess: 'admin' }, { scoringMode: 'standard' }, { matchMinutes: 20 }]) {
     test(`admin cannot change ${status} draw settings ${JSON.stringify(change)}`, 'DENY', 'update', admin, historical, { ...historical, ...change }, { time: endsAt })
   }
   test(`metadata edits cannot replace ${status} draw`, 'DENY', 'update', admin, historical, { ...historical, title: 'Altro nome', matches: {} }, { time: endsAt })
