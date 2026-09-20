@@ -1,5 +1,7 @@
 import { DEFAULT_VENUE_ID, slotVenueId, slotVenueName, validateVenueId } from './venues'
 import { getFantasySeasonForRound } from './fantasySeasons'
+import { isSlotAdmin } from './admin'
+import type { Tournament, TournamentInput, TournamentMatch, TournamentRegistration, TournamentScore, TournamentStanding, TournamentTeam } from './tournamentTypes'
 import type {
   AdminSlotRosterAction,
   CreatePollInput,
@@ -2009,4 +2011,244 @@ export function addDaysToDateTimeInput(value: string, days: number): string {
 export function defaultSlotForWeek(weekStart: string, dayOffset = 1): string {
   const normalizedWeekStart = mondayOfWeek(weekStart) ?? weekStart
   return addDaysToDateTimeInput(`${normalizedWeekStart}T19:30`, dayOffset)
+}
+
+// Tournaments are independent of ordinary slots and fantasy seasons.
+export const TOURNAMENT_SIGNUP_LEAD_MS = 60 * 60_000
+
+export function tournamentUsesRotatingPairs(tournament: Pick<TournamentInput, 'format'>): boolean {
+  return tournament.format === 'americano' || tournament.format === 'mexicano'
+}
+
+export function validateTournamentInput(input: TournamentInput, now: number): TournamentInput {
+  const title = input.title.trim()
+  if (title.length < 3 || title.length > 80) throw new Error('Il nome del torneo deve avere da 3 a 80 caratteri.')
+  if (!Number.isFinite(input.startsAt) || input.startsAt <= now + TOURNAMENT_SIGNUP_LEAD_MS) throw new Error('Scegli un inizio distante più di un’ora.')
+  if (!['americano', 'mexicano', 'round-robin', 'knockout'].includes(input.format)) throw new Error('Scegli una formula valida.')
+  const rotating = tournamentUsesRotatingPairs(input)
+  if (rotating ? input.pairing !== 'rotating' : !['random-fixed', 'chosen-fixed'].includes(input.pairing)) throw new Error('La scelta delle coppie non è compatibile con la formula.')
+  tournamentPlayerCountError(input.capacity, input.format)
+  if (!Number.isInteger(input.courts) || input.courts < 1 || input.courts > 8) throw new Error('Scegli da 1 a 8 campi.')
+  if (!Number.isInteger(input.rounds) || input.rounds < 1 || input.rounds > 31) throw new Error('Scegli da 1 a 31 turni.')
+  if (![16, 24, 32].includes(input.pointsPerMatch)) throw new Error('Scegli 16, 24 o 32 punti per incontro.')
+  if (!['players', 'admin'].includes(input.scoreAccess)) throw new Error('Scegli chi può inserire i risultati.')
+  return { title, startsAt: input.startsAt, venueId: validateVenueId(input.venueId), format: input.format,
+    pairing: input.pairing, capacity: input.capacity, courts: input.courts, rounds: input.rounds,
+    pointsPerMatch: input.pointsPerMatch, scoreAccess: input.scoreAccess }
+}
+
+function tournamentPlayerCountError(count: number, format: TournamentInput['format']): void {
+  if (!Number.isInteger(count) || count > 32 || count < 4) throw new Error('Servono da 4 a 32 iscritti.')
+  if (format === 'knockout' && ![8, 16, 32].includes(count)) throw new Error('L’eliminazione diretta richiede 8, 16 o 32 iscritti, per includere la finale del terzo posto.')
+  if (format === 'round-robin' && (count < 6 || count % 2)) throw new Error('Il girone richiede un numero pari di iscritti, almeno 6 per assegnare il podio.')
+  if ((format === 'americano' || format === 'mexicano') && count % 4) throw new Error('La formula richiede un numero di iscritti multiplo di 4, così tutti giocano a ogni turno.')
+}
+
+function requireTournamentAdmin(actorId: string): void {
+  if (!isSlotAdmin(actorId)) throw new Error('Solo l’amministratore può gestire i tornei.')
+}
+
+export function makeTournament(id: string, input: TournamentInput, actorId: string, now = Date.now()): Tournament {
+  requireTournamentAdmin(actorId)
+  return { ...validateTournamentInput(input, now), id, published: false, status: 'draft', createdBy: actorId,
+    createdAt: now, updatedAt: now, registrations: {}, teams: [], matches: {}, currentRound: 0, totalRounds: 0, seed: 0 }
+}
+
+export function editTournament(tournament: Tournament, input: TournamentInput, actorId: string, now = Date.now()): Tournament {
+  requireTournamentAdmin(actorId)
+  if (tournament.status !== 'draft') throw new Error('Le impostazioni sono bloccate dopo la pubblicazione.')
+  return { ...tournament, ...validateTournamentInput(input, now), updatedAt: now }
+}
+
+export function publishTournament(tournament: Tournament, actorId: string, now = Date.now()): Tournament {
+  requireTournamentAdmin(actorId)
+  if (tournament.status !== 'draft') throw new Error('Il torneo non è una bozza.')
+  validateTournamentInput(tournament, now)
+  return { ...tournament, status: 'open', published: true, updatedAt: now }
+}
+
+export function cancelTournament(tournament: Tournament, actorId: string, now = Date.now()): Tournament {
+  requireTournamentAdmin(actorId)
+  if (tournament.status === 'completed' || tournament.status === 'cancelled') throw new Error('Il torneo è già concluso.')
+  return { ...tournament, status: 'cancelled', updatedAt: now }
+}
+
+export function tournamentRegistrationsOpen(tournament: Tournament, now: number): boolean {
+  return tournament.published && tournament.status === 'open' && now < tournament.startsAt - TOURNAMENT_SIGNUP_LEAD_MS
+}
+
+export function registerForTournament(tournament: Tournament, user: Pick<SessionUser, 'id' | 'displayName'>, partnerId: string | null, now = Date.now()): Tournament {
+  if (!tournamentRegistrationsOpen(tournament, now)) throw new Error('Le iscrizioni chiudono un’ora prima dell’inizio.')
+  const existing = tournament.registrations[user.id]
+  if (!existing && Object.keys(tournament.registrations).length >= tournament.capacity) throw new Error('Il torneo è completo.')
+  if (partnerId && (tournament.pairing !== 'chosen-fixed' || partnerId === user.id || !tournament.registrations[partnerId])) throw new Error('Scegli un altro giocatore già iscritto.')
+  const registration: TournamentRegistration = { userId: user.id, displayName: user.displayName, joinedAt: existing?.joinedAt ?? now, partnerId }
+  return { ...tournament, updatedAt: now, registrations: { ...tournament.registrations, [user.id]: registration } }
+}
+
+export function leaveTournament(tournament: Tournament, userId: string, now = Date.now()): Tournament {
+  if (!tournamentRegistrationsOpen(tournament, now)) throw new Error('Le iscrizioni sono chiuse: contatta l’organizzatore.')
+  const registrations = { ...tournament.registrations }
+  delete registrations[userId]
+  // Other players' choices are not modified on their behalf. A non-reciprocal choice is visibly unconfirmed.
+  return { ...tournament, registrations, updatedAt: now }
+}
+
+function tournamentShuffle<T>(items: T[], seed: number): T[] {
+  const shuffled = [...items]
+  let state = seed >>> 0
+  for (let i = shuffled.length - 1; i > 0; i -= 1) {
+    state = (Math.imul(state, 1664525) + 1013904223) >>> 0
+    const j = Math.floor((state / 4294967296) * (i + 1))
+    ;[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+  }
+  return shuffled
+}
+
+function tournamentTeam(a: string, b: string): TournamentTeam {
+  return { id: JSON.stringify([a, b].sort()), playerIds: [a, b] }
+}
+
+function tournamentMatch(tournament: Tournament, round: number, index: number, teamA: TournamentTeam, teamB: TournamentTeam, stage: TournamentMatch['stage'] = 'regular'): TournamentMatch {
+  return { id: `r${round}-m${index + 1}`, round, court: index % tournament.courts + 1,
+    wave: Math.floor(index / tournament.courts) + 1, teamA, teamB, stage }
+}
+
+function circlePairs<T>(items: T[], roundIndex: number): Array<[T | null, T | null]> {
+  const circle: Array<T | null> = [...items]
+  if (circle.length % 2) circle.push(null)
+  for (let i = 0; i < roundIndex % (circle.length - 1); i += 1) circle.splice(1, 0, circle.pop()!)
+  return Array.from({ length: circle.length / 2 }, (_, i) => [circle[i], circle[circle.length - 1 - i]])
+}
+
+function rotatingTournamentRound(tournament: Tournament, orderedIds: string[], round: number): TournamentMatch[] {
+  const teams = tournament.format === 'americano'
+    ? circlePairs(orderedIds, round - 1).map(([a, b]) => tournamentTeam(a!, b!))
+    : orderedIds.flatMap((_, i) => i % 4 === 0 ? [tournamentTeam(orderedIds[i], orderedIds[i + 3]), tournamentTeam(orderedIds[i + 1], orderedIds[i + 2])] : [])
+  return teams.flatMap((team, i) => i % 2 === 0 ? [tournamentMatch(tournament, round, i / 2, team, teams[i + 1])] : [])
+}
+
+export function startTournament(tournament: Tournament, actorId: string, seed: number, now = Date.now()): Tournament {
+  requireTournamentAdmin(actorId)
+  if (tournament.status !== 'open' || !tournament.published) throw new Error('Pubblica il torneo prima di preparare il tabellone.')
+  if (now < tournament.startsAt - TOURNAMENT_SIGNUP_LEAD_MS) throw new Error('Aspetta la chiusura delle iscrizioni per il sorteggio.')
+  const ids = Object.keys(tournament.registrations).sort()
+  tournamentPlayerCountError(ids.length, tournament.format)
+  if (ids.length > tournament.capacity) throw new Error('Gli iscritti superano la capienza del torneo.')
+  if (!Number.isInteger(seed) || seed < 0 || seed > 4294967295) throw new Error('Sorteggio non valido.')
+  const shuffled = tournamentShuffle(ids, seed)
+  let teams: TournamentTeam[] = []
+  let matches: TournamentMatch[] = []
+  let totalRounds = tournament.rounds
+  if (tournamentUsesRotatingPairs(tournament)) {
+    for (let r = 1; r <= (tournament.format === 'americano' ? totalRounds : 1); r += 1) matches.push(...rotatingTournamentRound(tournament, shuffled, r))
+  } else {
+    if (tournament.pairing === 'chosen-fixed') {
+      const paired = new Set<string>()
+      ids.forEach((id) => {
+        if (paired.has(id)) return
+        const partner = tournament.registrations[id].partnerId
+        if (!partner || partner === id || tournament.registrations[partner]?.partnerId !== id || paired.has(partner)) throw new Error('Tutti devono avere un compagno confermato reciprocamente prima del sorteggio.')
+        teams.push(tournamentTeam(id, partner)); paired.add(id); paired.add(partner)
+      })
+      teams = tournamentShuffle(teams, seed)
+    } else teams = shuffled.flatMap((id, i) => i % 2 === 0 ? [tournamentTeam(id, shuffled[i + 1])] : [])
+    if (tournament.format === 'round-robin') {
+      totalRounds = teams.length % 2 ? teams.length : teams.length - 1
+      for (let r = 1; r <= totalRounds; r += 1) {
+        circlePairs(teams, r - 1).filter((pair) => pair[0] && pair[1]).forEach(([a, b], i) => matches.push(tournamentMatch(tournament, r, i, a!, b!)))
+      }
+    } else {
+      totalRounds = Math.log2(teams.length)
+      matches = teams.flatMap((team, i) => i % 2 === 0 ? [tournamentMatch(tournament, 1, i / 2, team, teams[i + 1])] : [])
+    }
+  }
+  return { ...tournament, status: 'running', seed, teams, totalRounds, currentRound: 1,
+    matches: Object.fromEntries(matches.map((match) => [match.id, match])), updatedAt: now }
+}
+
+export function tournamentScoreIsValid(tournament: Pick<Tournament, 'format' | 'pointsPerMatch'>, a: number, b: number): boolean {
+  if (!Number.isInteger(a) || !Number.isInteger(b) || a < 0 || b < 0) return false
+  if (tournamentUsesRotatingPairs(tournament)) return a + b === tournament.pointsPerMatch
+  const high = Math.max(a, b), low = Math.min(a, b)
+  return (high === 6 && low <= 4) || (high === 7 && (low === 5 || low === 6))
+}
+
+export function makeTournamentScore(tournament: Tournament, matchId: string, a: number, b: number, actorId: string, previous: TournamentScore | undefined, expectedRevision: number, now = Date.now()): TournamentScore {
+  const match = tournament.matches[matchId]
+  if (!match || tournament.status !== 'running' || match.round !== tournament.currentRound) throw new Error('Puoi correggere soltanto i risultati del turno corrente, prima di avanzare.')
+  if (now < tournament.startsAt) throw new Error('I risultati si inseriscono dall’orario d’inizio del torneo.')
+  if (!isSlotAdmin(actorId) && (tournament.scoreAccess !== 'players' || ![...match.teamA.playerIds, ...match.teamB.playerIds].includes(actorId))) throw new Error('Puoi inserire solo i risultati delle tue partite.')
+  if ((previous?.revision ?? 0) !== expectedRevision) throw new Error('Qualcuno ha aggiornato questo risultato. Riapri la partita per vedere l’ultima versione.')
+  if (!tournamentScoreIsValid(tournament, a, b)) throw new Error(tournamentUsesRotatingPairs(tournament) ? `I punti delle due coppie devono sommare ${tournament.pointsPerMatch}.` : 'Risultato valido: 6–0 fino a 6–4, 7–5 oppure 7–6 (anche a squadre invertite).')
+  return { matchId, scoreA: a, scoreB: b, updatedBy: actorId, updatedAt: now, revision: expectedRevision + 1 }
+}
+
+export function getTournamentStandings(tournament: Tournament, scores: TournamentScore[]): TournamentStanding[] {
+  const individual = tournamentUsesRotatingPairs(tournament)
+  const rows: TournamentStanding[] = (individual ? Object.keys(tournament.registrations).map((id) => ({ id, playerIds: [id] })) : tournament.teams)
+    .map((team) => ({ ...team, played: 0, wins: 0, pointsFor: 0, pointsAgainst: 0, rank: 0, tied: false }))
+  const byId = new Map(rows.map((row) => [row.id, row]))
+  const placements = new Map<string, number>()
+  for (const match of Object.values(tournament.matches)) {
+    const score = scores.find((s) => s.matchId === match.id)
+    if (!score || !tournamentScoreIsValid(tournament, score.scoreA, score.scoreB)) continue
+    for (const [team, own, other] of [[match.teamA, score.scoreA, score.scoreB], [match.teamB, score.scoreB, score.scoreA]] as const) {
+      for (const id of individual ? team.playerIds : [team.id]) {
+        const row = byId.get(id)
+        if (row) { row.played += 1; row.pointsFor += own; row.pointsAgainst += other; if (own > other) row.wins += 1 }
+      }
+    }
+    if (tournament.format === 'knockout') {
+      const winner = score.scoreA > score.scoreB ? match.teamA.id : match.teamB.id
+      const loser = score.scoreA > score.scoreB ? match.teamB.id : match.teamA.id
+      if (match.stage === 'final') { placements.set(winner, 1); placements.set(loser, 2) }
+      else if (match.stage === 'bronze') { placements.set(winner, 3); placements.set(loser, 4) }
+      else placements.set(loser, 2 ** (tournament.totalRounds - match.round) + 1)
+    }
+  }
+  const compare = (a: TournamentStanding, b: TournamentStanding) => (
+    (individual ? b.pointsFor - a.pointsFor : b.wins - a.wins)
+    || (b.pointsFor - b.pointsAgainst) - (a.pointsFor - a.pointsAgainst)
+    || (individual ? b.wins - a.wins : b.pointsFor - a.pointsFor)
+  )
+  if (tournament.format === 'knockout' && tournament.status === 'completed') {
+    return rows.map((row) => ({ ...row, rank: placements.get(row.id) ?? 0,
+      tied: [...placements.values()].filter((rank) => rank === placements.get(row.id)).length > 1 }))
+      .sort((a, b) => a.rank - b.rank || a.id.localeCompare(b.id))
+  }
+  rows.sort((a, b) => compare(a, b) || a.id.localeCompare(b.id))
+  return rows.map((row) => ({ ...row, rank: 1 + rows.filter((other) => compare(other, row) < 0).length,
+    tied: rows.filter((other) => compare(other, row) === 0).length > 1 }))
+}
+
+export function advanceTournament(tournament: Tournament, scores: TournamentScore[], actorId: string, now = Date.now()): Tournament {
+  requireTournamentAdmin(actorId)
+  if (tournament.status !== 'running') throw new Error('Il torneo non è in corso.')
+  if (now < tournament.startsAt) throw new Error('Aspetta l’orario d’inizio del torneo.')
+  const currentMatches = Object.values(tournament.matches).filter((m) => m.round === tournament.currentRound)
+  if (currentMatches.length === 0 || currentMatches.some((match) => {
+    const score = scores.find((s) => s.matchId === match.id)
+    return !score || !tournamentScoreIsValid(tournament, score.scoreA, score.scoreB)
+  })) throw new Error('Completa tutti i risultati del turno prima di continuare.')
+  if (tournament.currentRound === tournament.totalRounds) return { ...tournament, status: 'completed', updatedAt: now }
+  const nextRound = tournament.currentRound + 1
+  let generated: TournamentMatch[] = []
+  if (tournament.format === 'mexicano') {
+    // Stable seeded tie order only affects matchups, never podium/rank.
+    const shuffled = tournamentShuffle(Object.keys(tournament.registrations).sort(), tournament.seed)
+    const standings = getTournamentStandings(tournament, scores)
+    const ordered = [...standings].sort((a, b) => a.rank - b.rank || shuffled.indexOf(a.id) - shuffled.indexOf(b.id)).map((row) => row.id)
+    generated = rotatingTournamentRound(tournament, ordered, nextRound)
+  } else if (tournament.format === 'knockout') {
+    const winners: TournamentTeam[] = [], losers: TournamentTeam[] = []
+    currentMatches.forEach((match) => {
+      const score = scores.find((s) => s.matchId === match.id)!
+      winners.push(score.scoreA > score.scoreB ? match.teamA : match.teamB)
+      losers.push(score.scoreA > score.scoreB ? match.teamB : match.teamA)
+    })
+    generated = winners.flatMap((team, i) => i % 2 === 0 ? [tournamentMatch(tournament, nextRound, i / 2, team, winners[i + 1], winners.length === 2 ? 'final' : 'regular')] : [])
+    if (winners.length === 2) generated.push(tournamentMatch(tournament, nextRound, 1, losers[0], losers[1], 'bronze'))
+  }
+  return { ...tournament, currentRound: nextRound, matches: { ...tournament.matches, ...Object.fromEntries(generated.map((match) => [match.id, match])) }, updatedAt: now }
 }

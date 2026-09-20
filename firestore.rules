@@ -504,6 +504,97 @@ service cloud.firestore {
         && resource.data.members[request.auth.uid] == true;
     }
 
+    function validTournament(data) {
+      return data.keys().hasOnly(['id', 'title', 'startsAt', 'venueId', 'format', 'pairing', 'capacity',
+          'courts', 'rounds', 'pointsPerMatch', 'scoreAccess', 'published', 'status', 'createdBy',
+          'createdAt', 'updatedAt', 'registrations', 'teams', 'matches', 'currentRound', 'totalRounds', 'seed'])
+        && data.title is string && data.title.size() >= 3 && data.title.size() <= 80
+        && data.startsAt is number
+        && data.venueId in ['oasi-boschetto', 'tennis-club-mantova', 'sport-city-mantova']
+        && data.format in ['americano', 'mexicano', 'round-robin', 'knockout']
+        && data.pairing in ['rotating', 'random-fixed', 'chosen-fixed']
+        && data.capacity is int && data.capacity >= 4 && data.capacity <= 32
+        && data.courts is int && data.courts >= 1 && data.courts <= 8
+        && data.rounds is int && data.rounds >= 1 && data.rounds <= 31
+        && data.pointsPerMatch in [16, 24, 32]
+        && data.scoreAccess in ['players', 'admin']
+        && data.published is bool
+        && data.status in ['draft', 'open', 'running', 'completed', 'cancelled']
+        && data.createdBy == '4VSiYJso4YSWf35Rg8Cp0Q8hVmu2'
+        && data.createdAt is number && data.updatedAt is number
+        && data.registrations is map && data.registrations.size() <= data.capacity
+        && data.teams is list && data.teams.size() <= 16
+        && data.matches is map && data.matches.size() <= 256
+        && data.currentRound is int && data.currentRound >= 0 && data.currentRound <= 31
+        && data.totalRounds is int && data.totalRounds >= 0 && data.totalRounds <= 31
+        && data.seed is int && data.seed >= 0 && data.seed <= 4294967295;
+    }
+
+    function validOwnTournamentRegistration(data, before) {
+      let uid = request.auth.uid;
+      let registration = data.registrations.get(uid, {});
+      return !(uid in data.registrations) || (
+        registration.keys().hasOnly(['userId', 'displayName', 'joinedAt', 'partnerId'])
+        && registration.userId == uid
+        && registration.displayName is string && registration.displayName.size() >= 1 && registration.displayName.size() <= 80
+        && registration.joinedAt is number
+        && (uid in before.registrations
+          ? registration.joinedAt == before.registrations[uid].joinedAt
+          : registration.joinedAt >= request.time.toMillis() - 120000 && registration.joinedAt <= request.time.toMillis() + 120000)
+        && (registration.partnerId == null || (
+          data.pairing == 'chosen-fixed' && registration.partnerId is string
+          && registration.partnerId != uid && registration.partnerId in data.registrations))
+      );
+    }
+
+    match /tournaments/{tournamentId} {
+      allow read: if isSlotAdmin() || (isMember() && resource.data.published == true);
+      allow create: if isSlotAdmin() && validTournament(request.resource.data)
+        && request.resource.data.id == tournamentId && request.resource.data.status == 'draft'
+        && request.resource.data.published == false && request.resource.data.registrations.size() == 0
+        && request.resource.data.matches.size() == 0;
+      allow update: if isMember() && validTournament(request.resource.data)
+        && request.resource.data.id == resource.data.id
+        && request.resource.data.createdBy == resource.data.createdBy
+        && request.resource.data.createdAt == resource.data.createdAt
+        && (isSlotAdmin() || (
+          resource.data.published == true && resource.data.status == 'open'
+          && request.time.toMillis() < resource.data.startsAt - 3600000
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['registrations', 'updatedAt'])
+          && request.resource.data.registrations.diff(resource.data.registrations).affectedKeys().hasOnly([request.auth.uid])
+          && validOwnTournamentRegistration(request.resource.data, resource.data)
+        ));
+      allow delete: if false;
+
+      match /scores/{matchId} {
+        function tournament() {
+          return get(/databases/$(database)/documents/tournaments/$(tournamentId)).data;
+        }
+        function validScore() {
+          let parent = tournament();
+          let fixture = parent.matches[matchId];
+          let data = request.resource.data;
+          let high = data.scoreA > data.scoreB ? data.scoreA : data.scoreB;
+          let low = data.scoreA < data.scoreB ? data.scoreA : data.scoreB;
+          return parent.published == true && parent.status == 'running'
+            && fixture.round == parent.currentRound && request.time.toMillis() >= parent.startsAt
+            && (isSlotAdmin() || (parent.scoreAccess == 'players'
+              && (request.auth.uid in fixture.teamA.playerIds || request.auth.uid in fixture.teamB.playerIds)))
+            && data.keys().hasOnly(['matchId', 'scoreA', 'scoreB', 'updatedBy', 'updatedAt', 'revision'])
+            && data.matchId == matchId && data.updatedBy == request.auth.uid
+            && data.updatedAt is number && data.revision is int
+            && data.scoreA is int && data.scoreB is int && data.scoreA >= 0 && data.scoreB >= 0
+            && (parent.format in ['americano', 'mexicano']
+              ? data.scoreA + data.scoreB == parent.pointsPerMatch
+              : ((high == 6 && low <= 4) || (high == 7 && low in [5, 6])));
+        }
+        allow read: if isSlotAdmin() || (isMember() && tournament().published == true);
+        allow create: if isMember() && validScore() && request.resource.data.revision == 1;
+        allow update: if isMember() && validScore() && request.resource.data.revision == resource.data.revision + 1;
+        allow delete: if false;
+      }
+    }
+
     match /polls/{pollId} {
       allow read: if isMember() || isNotifier();
       allow create: if isMember()

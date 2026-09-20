@@ -11,6 +11,7 @@
     "test": "vitest run --maxWorkers=1 --testTimeout=30000",
     "test:watch": "vitest",
     "test:rules:match-report": "tsx scripts/match-report-rules-test.ts",
+    "test:rules:tournaments": "tsx scripts/tournament-rules-test.ts",
     "smoke:match-report": "tsx scripts/match-report-production-smoke.ts",
     "db:get": "tsx scripts/firestore-read.ts get",
     "db:query": "tsx scripts/firestore-read.ts query",
