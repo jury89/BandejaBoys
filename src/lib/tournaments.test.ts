@@ -19,14 +19,14 @@ function roundScores(t: Tournament, a = 14, b = 10): TournamentScore[] {
 }
 
 describe('tournament domain', () => {
-  it('lets every signed-in member create a private draft and locks configuration on publish', () => {
+  it('lets every signed-in member create and edit a tournament before cutoff', () => {
     expect(() => makeTournament('qa', input, '', now)).toThrow(/Accedi/)
     const draft = makeTournament('qa', input, 'organizer', now)
     expect(draft).toMatchObject({ published: false, status: 'draft', createdBy: 'organizer', registrations: {}, matches: {} })
     expect(editTournament(draft, { ...input, title: 'Nuovo nome' }, 'organizer', now).title).toBe('Nuovo nome')
     const published = publishTournament(draft, 'organizer', now)
     expect(published.published).toBe(true)
-    expect(() => editTournament(published, input, admin, now)).toThrow(/bloccate/)
+    expect(editTournament(published, input, admin, now).createdBy).toBe('organizer')
     expect(() => publishTournament(published, admin, now)).toThrow(/bozza/)
   })
   it.each(['organizer', admin])('allows creator and admin management throughout the lifecycle: %s', actor => {

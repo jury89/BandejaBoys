@@ -1,7 +1,7 @@
 /** Semantic Rules tests with synthetic resources and mocked get(): no Firestore writes or production document reads. */
 import { readFileSync } from 'node:fs'
 import { GoogleAuth } from 'google-auth-library'
-import { editTournamentOrganization, makeTournament, publishTournament, registerForTournament, saveTournamentGuest, removeTournamentGuest, startTournament, startTournamentRound } from '../src/lib/domain'
+import { editTournament, editTournamentOrganization, makeTournament, publishTournament, registerForTournament, saveTournamentGuest, removeTournamentGuest, startTournament, startTournamentRound } from '../src/lib/domain'
 import { SLOT_ADMIN_USER_ID as admin } from '../src/lib/admin'
 import type { Tournament } from '../src/lib/tournamentTypes'
 
@@ -176,8 +176,8 @@ test('cannot skip a timed round', 'DENY', 'update', owner, timedStarted, { ...ti
 test('cannot finish before timer ends', 'DENY', 'update', owner, timedStarted, { ...timedStarted, status: 'completed' }, { time: endsAt - 1 })
 test('cannot finish before the final round', 'DENY', 'update', owner, timedStarted, { ...timedStarted, status: 'completed' }, { time: endsAt })
 test('can complete expired final round', 'ALLOW', 'update', owner, { ...timedStarted, currentRound: 5 }, { ...timedStarted, currentRound: 5, status: 'completed' }, { time: endsAt })
-test('cannot change duration after publication', 'DENY', 'update', owner, timedOpen, { ...timedOpen, matchMinutes: 5 })
-test('cannot change scoring after publication', 'DENY', 'update', owner, timedOpen, { ...timedOpen, scoringMode: 'standard' })
+test('owner can change duration before cutoff', 'ALLOW', 'update', owner, timedOpen, { ...timedOpen, matchMinutes: 5 })
+test('owner can change scoring before first signup', 'ALLOW', 'update', owner, timedOpen, { ...timedOpen, scoringMode: 'standard' })
 const legacyDraft = Object.fromEntries(Object.entries(draft).filter(([key]) => !['scoringMode', 'matchMinutes', 'warmupMinutes', 'changeoverMinutes', 'roundStartedAt'].includes(key)))
 test('legacy draft remains editable', 'ALLOW', 'update', admin, legacyDraft, { ...legacyDraft, title: 'Legacy title' })
 test('legacy tournament remains publishable', 'ALLOW', 'update', admin, legacyDraft, { ...legacyDraft, status: 'open', published: true })
@@ -209,7 +209,7 @@ test('organizer edits organization before cutoff', 'ALLOW', 'update', owner, ada
 test('admin edits organization before cutoff', 'ALLOW', 'update', admin, adaptiveRegistered, adaptiveEdited)
 test('other members cannot edit organization', 'DENY', 'update', 'p0', adaptiveRegistered, adaptiveEdited)
 test('organization cannot change at cutoff', 'DENY', 'update', owner, adaptiveRegistered, adaptiveEdited, { time: cutoff })
-test('organization edit cannot also move start', 'DENY', 'update', owner, adaptiveRegistered, { ...adaptiveEdited, startsAt: now + 86_400_000 })
+test('organization edit can also reschedule before draw', 'ALLOW', 'update', owner, adaptiveRegistered, { ...adaptiveEdited, startsAt: now + 86_400_000 })
 test('organization cannot remove existing registrants', 'DENY', 'update', owner, adaptiveRegistered, { ...adaptiveRegistered, capacity: 10, matchMinutes: 15 })
 test('legacy open tournament can explicitly adopt a budget', 'ALLOW', 'update', owner, timedRegistered, editTournamentOrganization(timedRegistered, { capacity: 12, courts: 2, totalMinutes: 90 }, owner, now))
 test('adaptive draw saves eight court slots for twelve players', 'ALLOW', 'update', owner, adaptiveRegistered, adaptiveDrawn, { time: cutoff })
@@ -230,6 +230,33 @@ let longRegistered = publishTournament(longDraft, owner, now)
 for (let i = 0; i < 24; i++) longRegistered = registerForTournament(longRegistered, { id: `p${i}`, displayName: `Player ${i}` }, null, now)
 test('larger schedules may exceed thirty-one rounds', 'ALLOW', 'update', owner, longRegistered, startTournament(longRegistered, owner, 42, cutoff), { time: cutoff })
 test('longer available time supports matches over thirty minutes', 'ALLOW', 'create', owner, undefined, makeTournament('qa', { ...adaptiveDraft, capacity: 6, courts: 2, totalMinutes: 180 }, owner, now))
+
+// General editing: creator before cutoff, only Jury across owners/after cutoff.
+for (const actor of [owner, admin]) {
+  test(`${actor} edits a published tournament`, 'ALLOW', 'update', actor, ownOpen, editTournament(ownOpen, { ...ownOpen, title: 'Nuova coppa', venueId: 'sport-city-mantova', capacity: 12, startsAt: now + 86_400_000 }, actor, now))
+  test(`${actor} cannot backdate a new start`, 'DENY', 'update', actor, ownOpen, { ...ownOpen, startsAt: now + 3_600_000 })
+  const enrolled = { ...registered, createdBy: owner }
+  for (const change of [{ format: 'mexicano' }, { pairing: 'chosen-fixed' }, { pointsPerMatch: 16 }]) {
+    test(`${actor} cannot change enrolled players rules ${JSON.stringify(change)}`, 'DENY', 'update', actor, enrolled, { ...enrolled, ...change })
+  }
+  test(`${actor} cannot change enrolled timed scoring`, 'DENY', 'update', actor, timedRegistered, { ...timedRegistered, scoringMode: 'standard' })
+  test(`${actor} cannot remove entrants while changing settings`, 'DENY', 'update', actor, enrolled, { ...enrolled, title: 'Nuovo nome', registrations: {} })
+}
+test('other member cannot edit published title', 'DENY', 'update', 'p0', ownOpen, { ...ownOpen, title: 'Nome forzato' })
+test('owner cannot edit at cutoff', 'DENY', 'update', owner, ownOpen, { ...ownOpen, title: 'Nome tardivo' }, { time: cutoff })
+test('admin edits another owner draft', 'ALLOW', 'update', admin, ownDraft, { ...ownDraft, title: 'Bozza corretta' })
+test('admin edits closed undrawn logistics without rescheduling', 'ALLOW', 'update', admin, adaptiveRegistered, editTournament(adaptiveRegistered, { ...adaptiveRegistered, ...adaptiveSettings }, admin, cutoff), { time: cutoff })
+test('admin can reopen undrawn tournament with future date', 'ALLOW', 'update', admin, adaptiveRegistered, editTournament(adaptiveRegistered, { ...adaptiveRegistered, startsAt: now + 86_400_000 }, admin, cutoff), { time: cutoff })
+test('admin cannot transfer tournament ownership', 'DENY', 'update', admin, ownOpen, { ...ownOpen, createdBy: admin })
+for (const status of ['running', 'completed', 'cancelled'] as const) {
+  const historical = { ...timedStarted, status }
+  test(`admin corrects ${status} metadata preserving clock`, 'ALLOW', 'update', admin, historical, editTournament(historical, { ...historical, title: 'Storico corretto', venueId: 'tennis-club-mantova' }, admin, endsAt), { time: endsAt })
+  test(`creator cannot correct ${status} metadata`, 'DENY', 'update', owner, historical, { ...historical, title: 'Correzione vietata' }, { time: endsAt })
+  for (const change of [{ capacity: 12 }, { startsAt: now + 86_400_000 }, { courts: 3 }, { scoreAccess: 'admin' }]) {
+    test(`admin cannot change ${status} draw settings ${JSON.stringify(change)}`, 'DENY', 'update', admin, historical, { ...historical, ...change }, { time: endsAt })
+  }
+  test(`metadata edits cannot replace ${status} draw`, 'DENY', 'update', admin, historical, { ...historical, title: 'Altro nome', matches: {} }, { time: endsAt })
+}
 
 const projectId = JSON.parse(readFileSync('.firebaserc', 'utf8')).projects.default as string
 const endpoint = `https://firebaserules.googleapis.com/v1/projects/${projectId}:test`
