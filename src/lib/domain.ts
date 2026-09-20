@@ -1,6 +1,6 @@
 import { DEFAULT_VENUE_ID, slotVenueId, slotVenueName, validateVenueId } from './venues'
 import { getFantasySeasonForRound } from './fantasySeasons'
-import { isSlotAdmin } from './admin'
+import { isSlotAdmin, SLOT_ADMIN_USER_ID } from './admin'
 import type { Tournament, TournamentInput, TournamentMatch, TournamentOrganization, TournamentRegistration, TournamentScore, TournamentStanding, TournamentTeam } from './tournamentTypes'
 import type {
   AdminSlotRosterAction,
@@ -2088,6 +2088,30 @@ function tournamentPlayerCountError(count: number, format: TournamentInput['form
 
 export function canManageTournament(tournament: Pick<Tournament, 'createdBy'>, actorId: string): boolean {
   return Boolean(actorId) && (tournament.createdBy === actorId || isSlotAdmin(actorId))
+}
+
+/** A fresh rehearsal, never a clone of registrations, scores, ids or history. */
+export function makeTournamentSimulation(actorId: string, source: TournamentInput | undefined, now: number): Tournament {
+  if (actorId !== SLOT_ADMIN_USER_ID) throw new Error('La simulazione è riservata a Jury.')
+  const input: TournamentInput = source ?? { title: 'Girone di prova', startsAt: 0, venueId: 'sport-city-mantova', format: 'round-robin', pairing: 'random-fixed', capacity: 10, courts: 2, rounds: 3, pointsPerMatch: 24, scoreAccess: 'players', scoringMode: 'timed', totalMinutes: 90 }
+  // makeTournament projects only validated input fields, discarding all real history.
+  let t = publishTournament(makeTournament('simulation-private', { ...input, title: `Prova · ${input.title.replace(/^(Prova · )+/, '')}`.slice(0, 80), startsAt: Math.ceil((now + 7_200_000) / 1_800_000) * 1_800_000 }, actorId, now), actorId, now)
+  for (let i = 0; i < t.capacity; i++) t = saveTournamentGuest(t, `guest:simulation-${i}`, `Fagiano ${String(i + 1).padStart(2, '0')}`, null, actorId, now + i)
+  if (t.pairing === 'chosen-fixed') {
+    for (let i = 0; i < t.capacity; i++) t = saveTournamentGuest(t, `guest:simulation-${i}`, t.registrations[`guest:simulation-${i}`].displayName, `guest:simulation-${i % 2 === 0 ? i + 1 : i - 1}`, actorId, now + t.capacity + i)
+  }
+  return t
+}
+
+/** Valid illustrative scores; actual score validation still runs when saving. */
+export function getTournamentSimulationScore(t: Tournament, match: TournamentMatch): [number, number] {
+  const variation = (match.round + match.court + match.wave) % 4
+  if (tournamentUsesRotatingPairs(t)) {
+    const a = t.pointsPerMatch / 2 + variation - 1
+    return [a, t.pointsPerMatch - a]
+  }
+  if (tournamentUsesTimedMatches(t)) return variation === 0 ? [3, 3] : [2 + variation, 3]
+  return variation % 2 ? [6, variation] : [variation, 6]
 }
 
 function requireTournamentManager(tournament: Tournament, actorId: string): void {

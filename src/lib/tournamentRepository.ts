@@ -93,23 +93,24 @@ export function remoteTournamentRepository(db: Firestore): TournamentRepository 
   }
 }
 
-const STORE = 'bandeja-tournaments-v1'
-const EVENT = 'bandeja-tournaments-updated'
-interface LocalStore { tournaments: Tournament[]; scores: Record<string, TournamentScore[]> }
-function localRead(): LocalStore {
-  try { return JSON.parse(localStorage.getItem(STORE) ?? '{"tournaments":[],"scores":{}}') as LocalStore }
-  catch { return { tournaments: [], scores: {} } }
-}
-function localWrite(store: LocalStore) {
-  localStorage.setItem(STORE, JSON.stringify(store))
-  window.dispatchEvent(new Event(EVENT))
-}
-function localSubscribe(notify: () => void): Unsubscribe {
-  window.addEventListener(EVENT, notify); window.addEventListener('storage', notify); notify()
-  return () => { window.removeEventListener(EVENT, notify); window.removeEventListener('storage', notify) }
-}
-export function localTournamentRepository(): TournamentRepository {
-  const mutate = async (id: string, fn: (t: Tournament, store: LocalStore) => Tournament) => {
+export interface LocalTournamentStore { tournaments: Tournament[]; scores: Record<string, TournamentScore[]> }
+export function localTournamentRepository(options: { storageKey?: string; now?: () => number } = {}): TournamentRepository {
+  const STORE = options.storageKey ?? 'bandeja-tournaments-v1'
+  const EVENT = options.storageKey ? `${STORE}:updated` : 'bandeja-tournaments-updated'
+  const now = options.now ?? (() => Date.now())
+  function localRead(): LocalTournamentStore {
+    try { return JSON.parse(localStorage.getItem(STORE) ?? '{"tournaments":[],"scores":{}}') as LocalTournamentStore }
+    catch { return { tournaments: [], scores: {} } }
+  }
+  function localWrite(store: LocalTournamentStore) {
+    localStorage.setItem(STORE, JSON.stringify(store))
+    window.dispatchEvent(new Event(EVENT))
+  }
+  function localSubscribe(notify: () => void): Unsubscribe {
+    window.addEventListener(EVENT, notify); window.addEventListener('storage', notify); notify()
+    return () => { window.removeEventListener(EVENT, notify); window.removeEventListener('storage', notify) }
+  }
+  const mutate = async (id: string, fn: (t: Tournament, store: LocalTournamentStore) => Tournament) => {
     const store = localRead(), index = store.tournaments.findIndex(t => t.id === id)
     if (index < 0) throw new Error('Torneo non trovato.')
     store.tournaments[index] = fn(store.tournaments[index], store); localWrite(store)
@@ -127,21 +128,21 @@ export function localTournamentRepository(): TournamentRepository {
     },
     subscribeTournamentScores(id, listener) { return localSubscribe(() => listener(localRead().scores[id] ?? [])) },
     async createTournament(input, actor) {
-      const tournament = makeTournament(crypto.randomUUID(), input, actor.id), store = localRead()
+      const tournament = makeTournament(crypto.randomUUID(), input, actor.id, now()), store = localRead()
       store.tournaments.push(tournament); localWrite(store); return tournament.id
     },
-    editTournament: (id, input, actor) => mutate(id, t => editTournament(t, input, actor.id)),
-    editTournamentOrganization: (id, input, actor) => mutate(id, t => editTournamentOrganization(t, input, actor.id)),
-    registerForTournament: (id, partnerId, actor) => mutate(id, t => registerForTournament(t, actor, partnerId)),
-    leaveTournament: (id, actor) => mutate(id, t => leaveTournament(t, actor.id)),
-    saveTournamentGuest: (id, guestId, name, partnerId, actor) => mutate(id, t => saveTournamentGuest(t, guestId ?? `guest:${crypto.randomUUID()}`, name, partnerId, actor.id)),
-    removeTournamentGuest: (id, guestId, actor) => mutate(id, t => removeTournamentGuest(t, guestId, actor.id)),
-    actOnTournament: (id, action, actor) => mutate(id, (t, store) => applyAction(t, action, actor.id, crypto.getRandomValues(new Uint32Array(1))[0], store.scores[id] ?? [], Date.now())),
+    editTournament: (id, input, actor) => mutate(id, t => editTournament(t, input, actor.id, now())),
+    editTournamentOrganization: (id, input, actor) => mutate(id, t => editTournamentOrganization(t, input, actor.id, now())),
+    registerForTournament: (id, partnerId, actor) => mutate(id, t => registerForTournament(t, actor, partnerId, now())),
+    leaveTournament: (id, actor) => mutate(id, t => leaveTournament(t, actor.id, now())),
+    saveTournamentGuest: (id, guestId, name, partnerId, actor) => mutate(id, t => saveTournamentGuest(t, guestId ?? `guest:${crypto.randomUUID()}`, name, partnerId, actor.id, now())),
+    removeTournamentGuest: (id, guestId, actor) => mutate(id, t => removeTournamentGuest(t, guestId, actor.id, now())),
+    actOnTournament: (id, action, actor) => mutate(id, (t, store) => applyAction(t, action, actor.id, crypto.getRandomValues(new Uint32Array(1))[0], store.scores[id] ?? [], now())),
     async saveTournamentScore(id, matchId, a, b, revision, actor) {
       const store = localRead(), tournament = store.tournaments.find(t => t.id === id)
       if (!tournament) throw new Error('Torneo non trovato.')
       const scores = store.scores[id] ?? [], existing = scores.find(s => s.matchId === matchId)
-      const score = makeTournamentScore(tournament, matchId, a, b, actor.id, existing, revision)
+      const score = makeTournamentScore(tournament, matchId, a, b, actor.id, existing, revision, now())
       store.scores[id] = [...scores.filter(s => s.matchId !== matchId), score]; localWrite(store)
     },
   }

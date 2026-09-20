@@ -94,6 +94,17 @@ describe('TournamentsPage', () => {
     seed(fixture()); show(members[7])
     expect(screen.queryByRole('button', { name: /Aggiungi ospite/ })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Modifica torneo' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Prova in privato' })).not.toBeInTheDocument()
+  })
+  it('copies a real tournament configuration to rehearsal without changing its local source', async () => {
+    const t = fixture({ format: 'mexicano', capacity: 12, courts: 3 }, 8)
+    seed(t); const original = localStorage.getItem('bandeja-tournaments-v1')
+    const u = userEvent.setup(); show()
+    await u.click(screen.getByRole('button', { name: 'Prova in privato' }))
+    await u.click(screen.getByRole('button', { name: 'Prepara simulazione privata' }))
+    expect(await screen.findByText('12/12')).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Strumenti della simulazione' })).toBeInTheDocument()
+    expect(localStorage.getItem('bandeja-tournaments-v1')).toBe(original)
   })
   it('lets a creator edit published details while protecting existing entries and rules', async () => {
     const t = { ...fixture({}, 5), createdBy: members[0].id }

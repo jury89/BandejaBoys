@@ -3,6 +3,10 @@ import { ArrowLeft, CalendarDays, Check, Copy, Plus, Trophy, UsersRound } from '
 import type { MemberProfile, SessionUser } from '../types'
 import { canEditTournament, canManageTournament, getTimedTournamentPlan, getTournamentRoundClock, getTournamentStandings, padelDateTimeToTimestamp, toDateTimeInput, tournamentRegistrationsOpen, tournamentSettingsEditable, tournamentUsesRotatingPairs, tournamentUsesTimedMatches, validateTournamentInput } from '../lib/domain'
 import { repository } from '../lib/repository'
+import { SLOT_ADMIN_USER_ID } from '../lib/admin'
+import { openTournamentSimulation, resetTournamentSimulation, type TournamentSimulationSession } from '../lib/tournamentSimulation'
+import { TournamentRuntimeContext, useTournamentNow, useTournamentRuntime } from './tournamentRuntime'
+import { TournamentSimulationTools } from './TournamentSimulationTools'
 import { TOURNAMENT_FORMATS, type Tournament, type TournamentInput, type TournamentMatch, type TournamentScore } from '../lib/tournamentTypes'
 import { VENUES } from '../lib/venues'
 import { Modal } from './Modal'
@@ -50,12 +54,13 @@ function TournamentTimingFields({ input, update }: { input: TournamentInput; upd
 }
 
 function TournamentEditor({ tournament, user, onClose, onSaved }: { tournament?: Tournament; user: SessionUser; onClose: () => void; onSaved: (id: string) => void }) {
-  const [input, setInput] = useState<TournamentInput>(() => tournament ?? { title: '', startsAt: Math.ceil(Date.now() / 1_800_000) * 1_800_000 + 7 * 86_400_000, venueId: 'oasi-boschetto', format: 'americano', pairing: 'rotating', capacity: 8, courts: 1, rounds: 7, pointsPerMatch: 24, scoreAccess: 'players' })
+  const { repository, now: getNow, simulation } = useTournamentRuntime()
+  const [input, setInput] = useState<TournamentInput>(() => tournament ?? { title: '', startsAt: Math.ceil(getNow() / 1_800_000) * 1_800_000 + 7 * 86_400_000, venueId: 'oasi-boschetto', format: 'americano', pairing: 'rotating', capacity: 8, courts: 1, rounds: 7, pointsPerMatch: 24, scoreAccess: 'players' })
   const [date, setDate] = useState(toDateTimeInput(new Date(input.startsAt)))
   const [error, setError] = useState(''), [busy, setBusy] = useState(false)
   const rotating = tournamentUsesRotatingPairs(input)
   const timed = tournamentUsesTimedMatches(input)
-  const metadataOnly = Boolean(tournament && !tournamentSettingsEditable(tournament, user.id))
+  const metadataOnly = Boolean(tournament && !tournamentSettingsEditable(tournament, user.id, getNow()))
   const enrolled = tournament ? Object.keys(tournament.registrations).length : 0
   const rulesLocked = enrolled > 0
   const update = <K extends keyof TournamentInput>(key: K, value: TournamentInput[K]) => setInput(current => ({ ...current, [key]: value }))
@@ -64,11 +69,11 @@ function TournamentEditor({ tournament, user, onClose, onSaved }: { tournament?:
     try {
       const value = { ...input, startsAt: metadataOnly || date === toDateTimeInput(new Date(input.startsAt)) ? input.startsAt : padelDateTimeToTimestamp(date) }
       if (tournament) { await repository.editTournament(tournament.id, value, user); onSaved(tournament.id) }
-      else onSaved(await repository.createTournament(validateTournamentInput(value, Date.now()), user))
+      else onSaved(await repository.createTournament(validateTournamentInput(value, getNow()), user))
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'Salvataggio non riuscito. Riprova.') }
     finally { setBusy(false) }
   }
-  return <Modal title={tournament ? 'Modifica torneo' : 'Nuovo torneo'} eyebrow="Organizza il tuo torneo" onClose={onClose} size="wide">
+  return <Modal title={tournament ? 'Modifica torneo' : 'Nuovo torneo'} eyebrow={simulation ? 'Simulazione privata · dati fittizi' : 'Organizza il tuo torneo'} onClose={onClose} size="wide">
     <form className="tournament-form" onSubmit={submit}>
       {tournament && user.id !== tournament.createdBy && <p className="tournament-note">Stai modificando il torneo di un altro membro come amministratore. Il creatore e gli iscritti rimarranno invariati.</p>}
       {metadataOnly && <p className="tournament-note">Per proteggere lo storico puoi correggere soltanto nome e circolo. Calendario, coppie e risultati restano invariati.</p>}
@@ -95,14 +100,15 @@ function TournamentEditor({ tournament, user, onClose, onSaved }: { tournament?:
       <p>{timed ? `${timedRules} ${timedRanking}` : rotating ? `Ogni coppia guadagna i punti segnati: per esempio ${input.pointsPerMatch / 2 + 2}–${input.pointsPerMatch / 2 - 2}. Tutti giocano in ogni turno, anche in ondate su meno campi.` : 'Ogni partita è un set a 6 game, tie-break sul 6–6 (si registra 7–6). Il calendario viene calcolato dagli iscritti effettivi.'}</p>
       <label>Chi può inserire i risultati<select value={input.scoreAccess} onChange={e => update('scoreAccess', e.target.value as TournamentInput['scoreAccess'])}><option value="players">Organizzatore e giocatori della partita</option><option value="admin">Solo organizzatore</option></select></label>
       </>}
-      <p className="tournament-note">{!tournament || tournament.status === 'draft' ? 'Salvi una bozza privata, da pubblicare dopo averla controllata.' : 'Le modifiche saranno subito visibili nella pagina del torneo. Iscrizioni e compagni scelti vengono conservati.'} Il torneo non prenota i campi e non assegna punti Fanta.</p>
+      <p className="tournament-note">{simulation ? 'Salvi soltanto questa prova sul tuo dispositivo: nessun torneo reale viene modificato.' : !tournament || tournament.status === 'draft' ? 'Salvi una bozza privata, da pubblicare dopo averla controllata.' : 'Le modifiche saranno subito visibili nella pagina del torneo. Iscrizioni e compagni scelti vengono conservati.'} Il torneo non prenota i campi e non assegna punti Fanta.</p>
       {error && <p role="alert" className="form-error">{error}</p>}
-      <button className="button button--primary" disabled={busy || Boolean(tournament && !canEditTournament(tournament, user.id))}>{busy ? 'Salvataggio…' : tournament ? 'Salva modifiche' : 'Salva bozza privata'}</button>
+      <button className="button button--primary" disabled={busy || Boolean(tournament && !canEditTournament(tournament, user.id, getNow()))}>{busy ? 'Salvataggio…' : tournament ? 'Salva modifiche' : 'Salva bozza privata'}</button>
     </form>
   </Modal>
 }
 
 function TournamentScoreEditor({ tournament, match, score, members, user, onClose }: { tournament: Tournament; match: TournamentMatch; score?: TournamentScore; members: MemberProfile[]; user: SessionUser; onClose: () => void }) {
+  const { repository, simulation } = useTournamentRuntime()
   const [a, setA] = useState(score ? String(score.scoreA) : ''), [b, setB] = useState(score ? String(score.scoreB) : '')
   const [busy, setBusy] = useState(false), [error, setError] = useState('')
   const [revision] = useState(score?.revision ?? 0)
@@ -116,7 +122,7 @@ function TournamentScoreEditor({ tournament, match, score, members, user, onClos
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'Risultato non salvato. Riprova.') }
     finally { setBusy(false) }
   }
-  return <Modal title="Risultato della partita" onClose={onClose}><form className="tournament-form" onSubmit={save}>
+  return <Modal title="Risultato della partita" eyebrow={simulation ? 'Simulazione privata · dati fittizi' : undefined} onClose={onClose}><form className="tournament-form" onSubmit={save}>
     <p>Turno {match.round} · Campo {match.court}{!timed && ` · Ondata ${match.wave}`}</p>
     <label>{pairName(match.teamA.playerIds)}<input type="number" inputMode="numeric" min={0} max={timed ? 99 : 32} required value={a} onChange={e => setA(e.target.value)} /></label>
     <label>{pairName(match.teamB.playerIds)}<input type="number" inputMode="numeric" min={0} max={timed ? 99 : 32} required value={b} onChange={e => setB(e.target.value)} /></label>
@@ -129,6 +135,7 @@ function TournamentScoreEditor({ tournament, match, score, members, user, onClos
 function TournamentGuestEditor({ tournament, guestId, user, members, onClose }: {
   tournament: Tournament; guestId: string | null; user: SessionUser; members: MemberProfile[]; onClose: () => void
 }) {
+  const { repository, simulation } = useTournamentRuntime()
   const guest = guestId ? tournament.registrations[guestId] : null
   const [name, setName] = useState(guest?.displayName ?? ''), [partner, setPartner] = useState(guest?.partnerId ?? '')
   const [error, setError] = useState(''), [busy, setBusy] = useState(false), [removing, setRemoving] = useState(false)
@@ -145,7 +152,7 @@ function TournamentGuestEditor({ tournament, guestId, user, members, onClose }: 
     catch (reason) { setError(reason instanceof Error ? reason.message : 'Ospite non rimosso. Riprova.') }
     finally { setBusy(false) }
   }
-  return <Modal title={guest ? 'Gestisci ospite' : 'Aggiungi partecipante esterno'} onClose={onClose}><form className="tournament-form" onSubmit={save}>
+  return <Modal title={guest ? 'Gestisci ospite' : 'Aggiungi partecipante esterno'} eyebrow={simulation ? 'Simulazione privata · dati fittizi' : undefined} onClose={onClose}><form className="tournament-form" onSubmit={save}>
     <label>Nome dell’ospite<input required maxLength={80} value={name} onChange={e => setName(e.target.value)} /></label>
     {tournament.pairing === 'chosen-fixed' && <label>Compagno dell’ospite<select value={tournament.registrations[partner] ? partner : ''} onChange={e => setPartner(e.target.value)}><option value="">Da scegliere</option>{Object.values(tournament.registrations).filter(r => r.userId !== guestId).map(r => <option key={r.userId} value={r.userId}>{tournamentName(tournament, members, r.userId)}{r.isGuest ? ' (ospite)' : ''}</option>)}</select></label>}
     <p>L’ospite occupa un posto nel torneo, senza creare un account. Nelle coppie scelte indichi tu il suo compagno: il membro deve ricambiare la scelta; per due ospiti gestisci entrambe le scelte.</p>
@@ -156,22 +163,23 @@ function TournamentGuestEditor({ tournament, guestId, user, members, onClose }: 
   </form></Modal>
 }
 
-function TournamentDetail({ id, user, members, onBack }: { id: string; user: SessionUser; members: MemberProfile[]; onBack: () => void }) {
+function TournamentDetail({ id, user, members, onBack, rehearsal }: { id: string; user: SessionUser; members: MemberProfile[]; onBack: () => void; rehearsal?: TournamentSimulationSession }) {
+  const { repository, simulation } = useTournamentRuntime()
+  const now = useTournamentNow()
   const [record, setRecord] = useState<{ value: Tournament | null } | null>(null)
   const [scores, setScores] = useState<TournamentScore[]>([])
   const [error, setError] = useState(''), [busy, setBusy] = useState(false), [attempt, setAttempt] = useState(0)
   const [editor, setEditor] = useState(false), [matchId, setMatchId] = useState('')
   const [guestEditor, setGuestEditor] = useState<{ id: string | null } | null>(null)
   const [confirmation, setConfirmation] = useState<'publish' | 'start' | 'advance' | 'cancel' | null>(null)
-  const [message, setMessage] = useState(''), [now, setNow] = useState(Date.now)
+  const [message, setMessage] = useState(''), [preview, setPreview] = useState(false)
   const manager = Boolean(record?.value && canManageTournament(record.value, user.id))
-  useEffect(() => repository.subscribeTournament(id, user.id, value => { setRecord({ value }); setError('') }, err => setError(err.message)), [id, user.id, attempt])
+  useEffect(() => repository.subscribeTournament(id, user.id, value => { setRecord({ value }); setError('') }, err => setError(err.message)), [repository, id, user.id, attempt])
   const canReadScores = record?.value && (record.value.published || manager)
   useEffect(() => {
     if (!canReadScores) return
     return repository.subscribeTournamentScores(id, setScores, err => setError(err.message))
-  }, [id, canReadScores, attempt])
-  useEffect(() => { const timer = window.setInterval(() => setNow(Date.now()), 1000); return () => window.clearInterval(timer) }, [])
+  }, [repository, id, canReadScores, attempt])
   async function perform(action: () => Promise<void>, success: string) {
     setBusy(true); setError(''); setMessage('')
     try { await action(); setMessage(success); setConfirmation(null) } catch (reason) { setError(reason instanceof Error ? reason.message : 'Operazione non riuscita. Riprova.') }
@@ -194,6 +202,7 @@ function TournamentDetail({ id, user, members, onBack }: { id: string; user: Ses
   const plan = timed ? getTimedTournamentPlan(t, plannedCount) : null
   return <main className="dashboard tournament-page">
     <button className="button button--ghost" onClick={onBack}><ArrowLeft size={18} /> Tutti i tornei</button>
+    {rehearsal && <TournamentSimulationTools session={rehearsal} tournament={t} now={now} busy={busy} onAction={action => perform(action, 'Prova aggiornata. Il torneo reale non è stato modificato.')} />}
     <section className="tournament-hero"><div><span className="tournament-status">{tournamentStatus(t, now)}</span><h1>{t.title}</h1><p><CalendarDays size={18} /> {dateLabel(t.startsAt)}</p><p>{VENUES.find(v => v.id === t.venueId)?.name} · {t.courts} {t.courts === 1 ? 'campo' : 'campi'}</p></div><Trophy size={44} aria-hidden="true" /></section>
     <section className="tournament-panel"><h2>{format.name}{timed ? ' a tempo' : ''}</h2><p>{format.description}</p><p>{timed ? timedRanking : format.scoring}</p><p>{timed ? timedRules : tournamentUsesRotatingPairs(t) ? `${t.rounds} turni · ${t.pointsPerMatch} punti totali a partita.` : `Coppie ${t.pairing === 'random-fixed' ? 'sorteggiate' : 'scelte dai giocatori'}. Un set a 6, tie-break sul 6–6.`}</p><p>Risultati: {t.scoreAccess === 'admin' ? 'solo organizzatore' : 'organizzatore e giocatori di ciascuna partita'}, con assistenza dell’amministratore. I risultati si possono correggere prima di confermare il turno.</p></section>
     {plan && <section className="tournament-panel"><h2>{t.currentRound > 0 ? 'Il programma del torneo' : 'Il programma previsto'}</h2>
@@ -206,13 +215,14 @@ function TournamentDetail({ id, user, members, onBack }: { id: string; user: Ses
     {message && <p className="tournament-message" role="status">{message}</p>}
     {manager && <section className="tournament-panel tournament-actions" aria-label="Gestione torneo">
       {canEditTournament(t, user.id, now) && <button className="button" disabled={busy} onClick={() => setEditor(true)}>Modifica torneo</button>}
-      {t.status === 'draft' && <button className="button button--primary" disabled={busy} onClick={() => setConfirmation('publish')}>Pubblica al gruppo</button>}
-      {t.published && <button className="button" onClick={() => { void navigator.clipboard.writeText(`${window.location.origin}${window.location.pathname}#tornei/${encodeURIComponent(t.id)}`).then(() => setMessage('Link copiato. Puoi mandarlo nel gruppo.')).catch(() => setMessage(`Link: ${window.location.origin}/#tornei/${encodeURIComponent(t.id)}`)) }}><Copy size={17} /> Copia link torneo</button>}
+      {t.status === 'draft' && !simulation && <button className="button button--primary" disabled={busy} onClick={() => setConfirmation('publish')}>Pubblica al gruppo</button>}
+      {t.published && !simulation && <button className="button" onClick={() => { void navigator.clipboard.writeText(`${window.location.origin}${window.location.pathname}#tornei/${encodeURIComponent(t.id)}`).then(() => setMessage('Link copiato. Puoi mandarlo nel gruppo.')).catch(() => setMessage(`Link: ${window.location.origin}/#tornei/${encodeURIComponent(t.id)}`)) }}><Copy size={17} /> Copia link torneo</button>}
+      {!simulation && user.id === SLOT_ADMIN_USER_ID && <button className="button" onClick={() => setPreview(true)}>Prova in privato</button>}
       {t.status === 'open' && <button className="button button--primary" disabled={busy || open || (timed && (!validCount || !plan?.feasible))} onClick={() => setConfirmation('start')}>Sorteggia e prepara tabellone</button>}
       {t.status === 'running' && <button className="button button--primary" disabled={busy || (timed && clock.state !== 'expired')} onClick={() => setConfirmation('advance')}>{nextLabel}</button>}
       {t.status !== 'completed' && t.status !== 'cancelled' && <button className="button button--ghost" disabled={busy} onClick={() => setConfirmation('cancel')}>Annulla torneo</button>}
     </section>}
-    {timed && t.status === 'running' && <TournamentRoundTimer tournament={t} now={now} manager={manager} busy={busy} onStart={() => void perform(() => repository.actOnTournament(t.id, 'start-round', user), 'Timer avviato per tutti.')} />}
+    {timed && t.status === 'running' && <TournamentRoundTimer tournament={t} now={now} manager={manager} busy={busy} simulation={simulation} onStart={() => void perform(() => repository.actOnTournament(t.id, 'start-round', user), simulation ? 'Timer di prova avviato.' : 'Timer avviato per tutti.')} />}
     {t.status !== 'draft' && <section className="tournament-panel"><div className="tournament-section-heading"><h2>Iscritti</h2><strong>{registrations.length}/{t.capacity}</strong></div>
       <p>Massimo {t.capacity} partecipanti, ospiti inclusi.{open ? registrations.length >= t.capacity ? ' Il torneo è completo.' : ` ${t.capacity - registrations.length} posti ancora disponibili.` : ''}</p>
       <p>{t.status === 'cancelled' ? 'Iscrizioni chiuse: torneo annullato.' : `${open ? 'Iscrizioni e scelta del compagno fino a' : 'Iscrizioni chiuse dal'} ${dateLabel(t.startsAt - 3_600_000)}.`}</p>
@@ -236,7 +246,8 @@ function TournamentDetail({ id, user, members, onBack }: { id: string; user: Ses
     {t.currentRound > 0 && <section className="tournament-panel"><h2>{t.status === 'completed' ? 'Il podio e la classifica finale' : t.format === 'knockout' ? 'Statistiche del tabellone' : 'Classifica provvisoria'}</h2>{t.status === 'completed' && <div className="tournament-podium">{standings.filter(row => row.rank <= 3).map(row => <div key={row.id}><Trophy size={25} /><strong>{row.rank}°{row.tied ? ' ex aequo' : ''}</strong><span>{pairName(row.playerIds)}</span></div>)}</div>}
       <div className="tournament-table-wrap"><table className="tournament-table"><caption>{timed ? 'Classifica coppie · V–N–P: vinte, pareggiate, perse' : tournamentUsesRotatingPairs(t) ? 'Classifica individuale · punti' : 'Classifica coppie · game'}</caption><thead><tr><th scope="col">{t.format === 'knockout' && t.status !== 'completed' ? 'Coppia' : 'Posizione'}</th>{timed ? <><th scope="col">Punti</th><th scope="col">V–N–P</th><th scope="col">Game fatti/subiti</th></> : <><th scope="col">Giocate</th><th scope="col">Vinte</th><th scope="col">Fatti</th><th scope="col">Subiti</th></>}</tr></thead><tbody>{standings.map(row => <tr key={row.id}><th scope="row">{(t.format !== 'knockout' || t.status === 'completed') && <strong>{row.rank}°{row.tied ? ' =' : ''} </strong>}{pairName(row.playerIds)}</th>{timed ? <><td><strong>{row.tablePoints}</strong></td><td>{row.wins}–{row.draws}–{row.played - row.wins - row.draws}</td><td>{row.pointsFor}/{row.pointsAgainst}</td></> : <><td>{row.played}</td><td>{row.wins}</td><td>{row.pointsFor}</td><td>{row.pointsAgainst}</td></>}</tr>)}</tbody></table></div>
     </section>}
-    <p className="tournament-note">Torneo del gruppo, separato dal Fanta e dalle partite ordinarie. Nessuna prenotazione automatica dei campi.</p>
+    <p className="tournament-note">{simulation ? 'Simulazione privata: risultati fittizi salvati solo su questo dispositivo. Nessuna pubblicazione, notifica o modifica al database condiviso.' : 'Torneo del gruppo, separato dal Fanta e dalle partite ordinarie. Nessuna prenotazione automatica dei campi.'}</p>
+    {preview && <Modal title="Prepara una prova privata" onClose={() => setPreview(false)}><div className="tournament-form"><p>Copio formula, numero massimo di partecipanti, campi e durata. Userai nomi fittizi al posto degli iscritti reali, fino alla capienza prevista. Date, iscrizioni e risultati del torneo originale non cambiano.</p><p>Questa operazione sostituisce soltanto l’eventuale prova salvata su questo dispositivo. La simulazione non sarà visibile agli altri e non si può pubblicare.</p><button className="button button--primary" onClick={() => { try { resetTournamentSimulation(user, t); window.location.assign('#tornei/simulazione') } catch (reason) { setPreview(false); setError(reason instanceof Error ? reason.message : 'Impossibile preparare la prova.') } }}>Prepara simulazione privata</button></div></Modal>}
     {editor && <TournamentEditor tournament={t} user={user} onClose={() => setEditor(false)} onSaved={() => { setEditor(false); setMessage('Torneo modificato. Iscrizioni e risultati conservati.') }} />}
     {guestEditor && <TournamentGuestEditor tournament={t} guestId={guestEditor.id} user={user} members={members} onClose={() => setGuestEditor(null)} />}
     {matchId && t.matches[matchId] && <TournamentScoreEditor tournament={t} match={t.matches[matchId]} score={scores.find(s => s.matchId === matchId)} members={members} user={user} onClose={() => setMatchId('')} />}
@@ -255,9 +266,13 @@ export function TournamentsPage({ user, members, onBack }: { user: SessionUser; 
     return repository.subscribeTournaments(user.id, data => { setItems(data); setError('') }, reason => setError(reason.message))
   }, [id, user.id, attempt])
   const open = (nextId: string) => { setId(nextId); window.location.assign(nextId ? `#tornei/${encodeURIComponent(nextId)}` : '#tornei') }
+  if (id === 'simulazione') return user.id === SLOT_ADMIN_USER_ID
+    ? <PrivateTournamentSimulation key={user.id} user={user} onBack={() => open('')} />
+    : <main className="dashboard tournament-page"><h1>Simulazione privata</h1><p>Questa modalità è riservata a Jury.</p><button className="button" onClick={() => open('')}>Torna ai tornei</button></main>
   if (id) return <TournamentDetail key={id} id={id} user={user} members={members} onBack={() => open('')} />
   return <main className="dashboard tournament-page"><button className="button button--ghost" onClick={onBack}><ArrowLeft size={18} /> Torna alla bacheca</button><section className="tournament-hero"><div><h1>I tornei del gruppo</h1><p>Compagni diversi, stessa voglia di giocare.</p></div><Trophy size={42} /></section>
     <div className="tournament-actions"><button className="button button--primary" onClick={() => setCreating(true)}><Plus size={18} /> Crea torneo</button><p>Chi crea il torneo lo gestisce. Le bozze sono visibili solo al creatore e all’amministratore.</p></div>
+    {user.id === SLOT_ADMIN_USER_ID && <section className="tournament-panel tournament-simulation-entry"><div><h2>Prova prima di giocare</h2><p>Solo per te: dieci giocatori fittizi, due campi e 90 minuti. Puoi provare tabellone, timer, risultati e podio senza toccare i tornei veri. La prova riprende da dove l’hai lasciata su questo dispositivo.</p></div><button className="button" onClick={() => open('simulazione')}>Simulazione privata</button></section>}
     {error && <p role="alert">{error} <button onClick={() => setAttempt(a => a + 1)}>Riprova</button></p>}
     {!items && !error && <p>Caricamento tornei…</p>}
     {items?.length === 0 && <section className="tournament-panel"><UsersRound /><h2>Il primo torneo aspetta voi</h2><p>Scegli una formula e prepara una bozza, oppure aspetta un torneo pubblicato dal gruppo.</p></section>}
@@ -265,4 +280,13 @@ export function TournamentsPage({ user, members, onBack }: { user: SessionUser; 
     {items?.length === 50 && <p>Mostrati i 50 tornei più recenti. I precedenti rimangono accessibili dal loro link.</p>}
     {creating && <TournamentEditor user={user} onClose={() => setCreating(false)} onSaved={nextId => { setCreating(false); open(nextId) }} />}
   </main>
+}
+
+function PrivateTournamentSimulation({ user, onBack }: { user: SessionUser; onBack: () => void }) {
+  const [state, setState] = useState(() => {
+    try { return { session: openTournamentSimulation(user), error: '' } }
+    catch (reason) { return { session: null, error: reason instanceof Error ? reason.message : 'Prova non disponibile.' } }
+  })
+  if (!state.session) return <main className="dashboard tournament-page"><h1>Simulazione privata</h1><p role="alert">{state.error}</p><p>Puoi sostituire soltanto la prova locale e ricominciare. I tornei reali non verranno toccati.</p><button className="button" onClick={() => { try { resetTournamentSimulation(user); setState({ session: openTournamentSimulation(user), error: '' }) } catch { setState({ session: null, error: 'Salvataggio locale non disponibile: abilita lo spazio dati del browser e riprova.' }) } }}>Prepara una nuova prova locale</button><button className="button" onClick={onBack}>Torna ai tornei</button></main>
+  return <TournamentRuntimeContext.Provider value={state.session}><TournamentDetail id="simulation-private" user={user} members={[]} onBack={onBack} rehearsal={state.session} /></TournamentRuntimeContext.Provider>
 }

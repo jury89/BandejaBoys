@@ -73,8 +73,13 @@
 .tournament-clock .tournament-note { color: #d3e4ea; margin-top: 12px; }
 .tournament-clock.is-expired { border-left-color: #facc15; }
 .tournament-clock .button { background: white; color: #075985; }
+.tournament-simulation { border-left: 5px solid #d9ff43; background: #f5ffce; }
+.tournament-simulation time { font-weight: 800; font-variant-numeric: tabular-nums; }
+.tournament-simulation-entry { display: flex; align-items: center; gap: 20px; }
+.tournament-simulation-entry .button { flex-shrink: 0; }
 .tournament-page :is(button, a, summary, input, select):focus-visible, .tournament-form :is(button, input, select):focus-visible { outline: 3px solid #0e7490; outline-offset: 3px; }
 @media (max-width: 600px) {
+  .tournament-simulation-entry { display: grid; }
   .tournament-hero { padding: 20px; gap: 12px; }
   .tournament-hero > svg { width: 30px; }
   .tournament-panel { padding: 16px; }

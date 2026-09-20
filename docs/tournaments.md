@@ -21,6 +21,25 @@ Capienza massima 32; al via si usa il numero effettivo di iscritti se compatibil
 
 Per Americano/Mexicano: punti fatti, differenza punti, vittorie. Per il girone: vittorie, differenza game, game fatti. Pari merito completi condividono il rango, saltando i posti occupati: nessuno vince per ordine alfabetico. Nell’eliminazione decidono finale e finalina. Il creatore o l’admin avanza al turno successivo soltanto dopo tutti i risultati; si possono correggere i risultati del turno corrente, non quelli che hanno già determinato turni successivi. Creatore e admin possono inserire tutti i risultati; i giocatori solo quelli delle proprie partite quando l’opzione lo permette. Prima dell’avanzamento la UI chiede conferma.
 
+## Simulazione privata di Jury
+
+In **Tornei → Simulazione privata**, soltanto Jury trova una prova pronta con 10 partecipanti fittizi, 2 campi e 90 minuti. Il link `#tornei/simulazione` è bloccato per ogni altro account, anche digitandolo direttamente. Il controllo usa l’UID amministratore configurato, non l’override admin delle anteprime locali.
+
+La prova usa gli stessi moduli, regole di sorteggio, punteggi e podio dei tornei reali, ma un repository locale e un orologio separati. Non crea documenti Firestore, non invia notifiche, non contribuisce al Fanta o alle statistiche e non può essere pubblicata o condivisa. Resta solo sul browser/dispositivo usato; cancellando i dati del sito si perde la prova, non i tornei reali. Non è una funzione di sincronizzazione tra dispositivi né un archivio cifrato: i dati sono fittizi e l’accesso nell’app è limitato a Jury.
+
+Percorso consigliato:
+
+1. Controllare le impostazioni con **Modifica torneo**.
+2. **Salta alla chiusura iscrizioni**, poi **Sorteggia e prepara tabellone**.
+3. **Salta all’inizio del torneo** e, se previsto, **Avvia timer del turno**.
+4. Inserire i punteggi a mano oppure usare **Compila risultati di prova**: compila soltanto quelli mancanti nel turno corrente, senza sovrascrivere risultati manuali.
+5. **Fai scadere il timer**, poi confermare il turno; ripetere fino al podio. Senza timer si può confermare dopo tutti i risultati.
+6. **Ricomincia la simulazione** sostituisce solo i dati di prova, mantenendo le impostazioni attuali; richiede conferma.
+
+Sulla pagina di qualsiasi torneo, Jury trova **Prova in privato**. Dopo conferma, copia solo le impostazioni e riempie la capienza con nomi fittizi; non copia iscritti, risultati, autore, date o identificativi reali. La prova riceve un inizio futuro simulabile. Per coppie scelte, gli ospiti fittizi partono già abbinati reciprocamente. La nuova prova sostituisce soltanto la precedente sullo stesso dispositivo. Funziona con tutte le formule, non solo con il girone a tempo.
+
+Il pannello lime “Simulazione privata” è l’unico accento aggiunto: palette ink/deep/court/ball/sfondo/bianco e caratteri Barlow Condensed/Manrope restano quelli dell’app. Controlli allineati a sinistra, a tutta larghezza su mobile; avvertenza anche nei moduli di modifica, ospiti e risultati per non confondere la prova con un torneo reale.
+
 ## Girone a tempo adattivo
 
 Scegli **Girone all’italiana → Partite a tempo**, coppie fisse sorteggiate o scelte, capienza pari da 6 a 32 giocatori, 1–8 campi e durata totale disponibile da 15 a 720 minuti. Riscaldamento (0–15) e cambi (0–5) sono inclusi. Non è un preset legato a dieci persone: il planner usa il minimo numero di turni compatibile con tutte le sfide e i campi, assegna riposi alle coppie non in campo e divide il tempo utile tra i turni. Ogni coppia incontra tutte le altre una volta, senza sovrapposizioni. Partite di almeno 5 minuti; se il budget non basta l’app indica il minimo richiesto, senza cambiare formula né escludere iscritti.
