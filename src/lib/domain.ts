@@ -2115,8 +2115,8 @@ export function editTournament(tournament: Tournament, input: TournamentInput, a
   if (input.capacity < Object.keys(tournament.registrations).length) throw new Error('Il massimo partecipanti non può essere inferiore agli iscritti: nessuno verrà rimosso.')
   if (Object.keys(tournament.registrations).length > 0 && (
     input.format !== tournament.format || input.pairing !== tournament.pairing
-    || (input.scoringMode ?? 'standard') !== (tournament.scoringMode ?? 'standard') || input.pointsPerMatch !== tournament.pointsPerMatch
-  )) throw new Error('Ci sono già iscritti: formula, coppie e sistema di punteggio restano invariati.')
+    || input.pointsPerMatch !== tournament.pointsPerMatch
+  )) throw new Error('Ci sono già iscritti: formula, coppie e punti totali per incontro restano invariati.')
   // Admin can repair a closed, undrawn tournament without moving its old date.
   // An explicitly changed date must leave at least one hour for registrations.
   const validationTime = tournament.status === 'open' && input.startsAt === tournament.startsAt
