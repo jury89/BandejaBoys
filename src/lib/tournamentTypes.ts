@@ -53,6 +53,8 @@ export interface Tournament extends TournamentInput {
   totalRounds: number
   seed: number
   roundStartedAt?: number | null
+  // Explicit organizer stop; absent on legacy/naturally expired rounds.
+  roundEndedAt?: number | null
 }
 export interface TournamentScore {
   matchId: string

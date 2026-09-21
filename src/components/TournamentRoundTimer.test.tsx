@@ -48,4 +48,22 @@ describe('TournamentRoundTimer', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Attiva avviso sonoro' }))
     expect(screen.getByRole('alert')).toHaveTextContent('timer del telefono')
   })
+  it('freezes the remainder after manual stop and never sounds at the original deadline', async () => {
+    const oscillator = vi.fn()
+    vi.stubGlobal('AudioContext', class {
+      state = 'running'
+      resume = vi.fn().mockResolvedValue(undefined)
+      close = vi.fn().mockResolvedValue(undefined)
+      createOscillator = oscillator
+    })
+    const stopped = { ...tournament, roundEndedAt: at + 60_000 }
+    const props = { tournament: stopped, manager: true, busy: false, onStart: vi.fn(), onEnd: vi.fn() }
+    const view = render(<TournamentRoundTimer {...props} now={at + 60_000} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Attiva avviso sonoro' }))
+    view.rerender(<TournamentRoundTimer {...props} now={end + 1000} />)
+    expect(screen.getByRole('timer')).toHaveTextContent('14:00')
+    expect(oscillator).not.toHaveBeenCalled()
+    expect(screen.queryByRole('button', { name: 'Concludi turno' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Avvia timer del turno' })).not.toBeInTheDocument()
+  })
 })

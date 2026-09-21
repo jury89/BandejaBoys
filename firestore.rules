@@ -523,7 +523,7 @@ service cloud.firestore {
       return data.keys().hasOnly(['id', 'title', 'startsAt', 'venueId', 'format', 'pairing', 'capacity',
           'courts', 'rounds', 'pointsPerMatch', 'scoreAccess', 'published', 'status', 'createdBy',
           'createdAt', 'updatedAt', 'registrations', 'teams', 'matches', 'currentRound', 'totalRounds', 'seed',
-          'scoringMode', 'matchMinutes', 'warmupMinutes', 'changeoverMinutes', 'roundStartedAt', 'totalMinutes'])
+          'scoringMode', 'matchMinutes', 'warmupMinutes', 'changeoverMinutes', 'roundStartedAt', 'roundEndedAt', 'totalMinutes'])
         && data.title is string && data.title.size() >= 3 && data.title.size() <= 80
         && data.startsAt is number
         && data.venueId in ['oasi-boschetto', 'tennis-club-mantova', 'sport-city-mantova']
@@ -553,6 +553,9 @@ service cloud.firestore {
         && data.get('warmupMinutes', 5) is int && data.get('warmupMinutes', 5) >= 0 && data.get('warmupMinutes', 5) <= 15
         && data.get('changeoverMinutes', 2) is int && data.get('changeoverMinutes', 2) >= 0 && data.get('changeoverMinutes', 2) <= 5
         && (data.get('roundStartedAt', null) == null || data.roundStartedAt is number)
+        && (data.get('roundEndedAt', null) == null || (data.roundEndedAt is number
+          && data.get('scoringMode', 'standard') == 'timed' && data.get('roundStartedAt', null) != null
+          && data.roundEndedAt >= data.roundStartedAt))
         && (data.get('totalMinutes', null) == null || validAdaptiveTournamentPlan(data));
     }
 
@@ -577,29 +580,39 @@ service cloud.firestore {
             'rounds', 'pointsPerMatch', 'scoreAccess', 'scoringMode', 'warmupMinutes', 'changeoverMinutes', 'totalMinutes']));
     }
 
-    // Legacy tournaments retain their clock. A new budget is opt-in before cutoff.
-    function validTournamentTimingUpdate(before, after) {
+    // Only evaluate running-clock timestamps on running timed tournaments. Adaptive
+    // draws already spend most of the Rules expression budget validating the plan.
+    function validRunningTournamentClock(before, after) {
       let start = before.get('roundStartedAt', null);
       let nextStart = after.get('roundStartedAt', null);
+      let end = before.get('roundEndedAt', null);
+      let nextEnd = after.get('roundEndedAt', null);
       let expired = start != null && request.time.toMillis() >= start + before.get('matchMinutes', 15) * 60000;
-      // Metadata corrections must also work on completed timed tournaments.
-      return !after.diff(before).affectedKeys().hasAny(['status', 'currentRound', 'roundStartedAt'])
-        || ((before.status != 'open' || after.status != 'running' || request.time.toMillis() >= before.startsAt - 3600000)
-        && (after.get('scoringMode', 'standard') != 'timed' || (
-          before.status != 'running' ? nextStart == null : (
-            after.status == 'cancelled' ? nextStart == start : (
-              after.status == 'completed' ? expired && nextStart == start
+      let finished = expired || (start != null && end != null);
+      return after.status == 'cancelled' ? nextStart == start && nextEnd == end : (
+              after.status == 'completed' ? finished && nextStart == start && nextEnd == end
                 && before.currentRound == before.totalRounds && after.currentRound == before.currentRound : (
                 after.currentRound == before.currentRound + 1
-                  ? expired && nextStart == null && after.status == 'running'
+                  ? finished && nextStart == null && nextEnd == null && after.status == 'running'
                   : after.currentRound == before.currentRound && after.status == 'running'
                     && (nextStart == start || (start == null && nextStart != null
                       && nextStart >= request.time.toMillis() - 120000
                       && nextStart <= request.time.toMillis() + 120000))
+                    && (nextEnd == end || (start != null && nextStart == start && end == null && nextEnd != null
+                      && !expired && nextEnd >= start && nextEnd >= request.time.toMillis() - 120000
+                      && nextEnd <= request.time.toMillis() + 120000
+                      && after.diff(before).affectedKeys().hasOnly(['roundEndedAt', 'updatedAt'])))
               )
-            )
-          )
-        )));
+            );
+    }
+
+    function validTournamentTimingUpdate(before, after) {
+      // Metadata corrections must also work on completed timed tournaments.
+      return !after.diff(before).affectedKeys().hasAny(['status', 'currentRound', 'roundStartedAt', 'roundEndedAt'])
+        || ((before.status != 'open' || after.status != 'running' || request.time.toMillis() >= before.startsAt - 3600000)
+        && (after.get('scoringMode', 'standard') != 'timed'
+          || (before.status == 'running' ? validRunningTournamentClock(before, after)
+            : after.get('roundStartedAt', null) == null && after.get('roundEndedAt', null) == null)));
     }
 
     function validOwnTournamentRegistration(data, before) {
@@ -641,7 +654,8 @@ service cloud.firestore {
         && request.resource.data.id == tournamentId && request.resource.data.status == 'draft'
         && request.resource.data.published == false && request.resource.data.registrations.size() == 0
         && request.resource.data.matches.size() == 0
-        && request.resource.data.get('roundStartedAt', null) == null;
+        && request.resource.data.get('roundStartedAt', null) == null
+        && request.resource.data.get('roundEndedAt', null) == null;
       allow update: if isMember() && (validOwnTournamentUpdate(resource.data, request.resource.data) || (
         (isSlotAdmin() || resource.data.createdBy == request.auth.uid)
         && validTournament(request.resource.data)

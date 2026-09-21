@@ -47,17 +47,26 @@ describe('simulation UI isolation', () => {
     await u.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Conferma' }))
     expect(screen.queryByRole('button', { name: 'Salta all’inizio del torneo' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Avvia timer del turno' })).toBeEnabled()
+    await u.click(screen.getByText('Strumenti di prova', { selector: 'summary' }))
     for (let i = 1; i <= 5; i++) {
       await u.click(screen.getByRole('button', { name: 'Avvia timer del turno' }))
       expect(screen.getByText('In corso', { selector: '.tournament-status' })).toBeInTheDocument()
       expect(screen.getByRole('timer')).toHaveTextContent('15:00')
       await u.click(screen.getByRole('button', { name: 'Compila risultati di prova' }))
-      await u.click(screen.getByRole('button', { name: 'Fai scadere il timer' }))
-      expect(screen.getByRole('timer')).toHaveTextContent('00:00')
+      if (i === 1 || i === 5) {
+        await u.click(screen.getByRole('button', { name: 'Concludi turno' }))
+        expect(within(screen.getByRole('dialog')).getByText(/timer si fermerà per tutti/)).toBeInTheDocument()
+        await u.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Conferma' }))
+        expect(screen.getByRole('timer')).toHaveAccessibleName('Tempo rimasto alla chiusura')
+      } else {
+        await u.click(screen.getByRole('button', { name: 'Fai scadere il timer' }))
+        expect(screen.getByRole('timer')).toHaveTextContent('00:00')
+      }
       await u.click(screen.getByRole('button', { name: i === 5 ? 'Concludi torneo e assegna il podio' : 'Conferma turno e prosegui' }))
       await u.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Conferma' }))
     }
     expect(await screen.findByRole('heading', { name: 'Il podio e la classifica finale' })).toBeInTheDocument()
+    await u.click(screen.getByRole('button', { name: 'Partite' }))
     await u.click(screen.getByRole('button', { name: 'Ricomincia la simulazione' }))
     await u.click(screen.getByRole('button', { name: 'Conferma nuova simulazione' }))
     expect(screen.getByRole('button', { name: 'Salta alla chiusura iscrizioni' })).toBeInTheDocument()
