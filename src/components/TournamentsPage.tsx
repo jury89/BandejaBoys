@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { ArrowLeft, CalendarDays, Check, Copy, Plus, Trophy, UsersRound } from 'lucide-react'
 import type { MemberProfile, SessionUser } from '../types'
 import { canEditTournament, canManageTournament, getTimedTournamentPlan, getTournamentRoundClock, getTournamentStandings, padelDateTimeToTimestamp, toDateTimeInput, tournamentRegistrationsOpen, tournamentSettingsEditable, tournamentUsesRotatingPairs, tournamentUsesTimedMatches, validateTournamentInput } from '../lib/domain'
@@ -171,7 +171,9 @@ function TournamentDetail({ id, user, members, onBack, rehearsal }: { id: string
   const [error, setError] = useState(''), [busy, setBusy] = useState(false), [attempt, setAttempt] = useState(0)
   const [editor, setEditor] = useState(false), [matchId, setMatchId] = useState('')
   const [guestEditor, setGuestEditor] = useState<{ id: string | null } | null>(null)
-  const [confirmation, setConfirmation] = useState<'publish' | 'start' | 'advance' | 'cancel' | null>(null)
+  const [confirmation, setConfirmation] = useState<'publish' | 'start' | 'advance' | 'end-round' | 'cancel' | null>(null)
+  const [selectedView, setSelectedView] = useState<'play' | 'standings' | 'details' | null>(null)
+  const playArea = useRef<HTMLDivElement>(null)
   const [message, setMessage] = useState(''), [preview, setPreview] = useState(false)
   const manager = Boolean(record?.value && canManageTournament(record.value, user.id))
   useEffect(() => repository.subscribeTournament(id, user.id, value => { setRecord({ value }); setError('') }, err => setError(err.message)), [repository, id, user.id, attempt])
@@ -182,7 +184,13 @@ function TournamentDetail({ id, user, members, onBack, rehearsal }: { id: string
   }, [repository, id, canReadScores, attempt])
   async function perform(action: () => Promise<void>, success: string) {
     setBusy(true); setError(''); setMessage('')
-    try { await action(); setMessage(success); setConfirmation(null) } catch (reason) { setError(reason instanceof Error ? reason.message : 'Operazione non riuscita. Riprova.') }
+    try {
+      await action(); setMessage(success); setConfirmation(null)
+      if (confirmation === 'advance' || confirmation === 'start') {
+        setSelectedView(null)
+        window.requestAnimationFrame(() => { playArea.current?.focus({ preventScroll: true }); playArea.current?.scrollIntoView?.({ block: 'start' }) })
+      }
+    } catch (reason) { setError(reason instanceof Error ? reason.message : 'Operazione non riuscita. Riprova.') }
     finally { setBusy(false) }
   }
   const t = record?.value
@@ -200,10 +208,46 @@ function TournamentDetail({ id, user, members, onBack, rehearsal }: { id: string
   const validCount = registrations.length >= 6 && registrations.length % 2 === 0
   const plannedCount = validCount ? registrations.length : t.capacity
   const plan = timed ? getTimedTournamentPlan(t, plannedCount) : null
+  const hasDraw = t.currentRound > 0
+  const view = selectedView ?? (t.status === 'completed' ? 'standings' : 'play')
+  const currentMatches = matches.filter(m => m.round === t.currentRound)
+  const received = currentMatches.filter(m => scores.some(s => s.matchId === m.id)).length
+  const missing = currentMatches.length - received
+  const canStopAfterScores = timed && clock.state === 'running' && missing === 0
+  const canAdvance = currentMatches.length > 0 && received === currentMatches.length && (!timed || clock.state === 'expired' || clock.state === 'ended')
+  const renderMatches = (round: number) => <>
+    {t.format === 'round-robin' && t.teams.filter(team => !matches.some(m => m.round === round && (m.teamA.id === team.id || m.teamB.id === team.id))).map(team => <p className="tournament-rest" key={team.id}>Riposa: {pairName(team.playerIds)}</p>)}
+    <div className="tournament-matches">{matches.filter(m => m.round === round).map(match => {
+      const score = scores.find(s => s.matchId === match.id)
+      const allowed = t.status === 'running' && round === t.currentRound && (!timed || (t.roundStartedAt != null && now >= t.roundStartedAt)) && (manager || (t.scoreAccess === 'players' && [...match.teamA.playerIds, ...match.teamB.playerIds].includes(user.id)))
+      return <article key={match.id} className="tournament-match"><header>{match.stage === 'final' ? 'Finale · ' : match.stage === 'bronze' ? 'Finale 3° posto · ' : ''}Campo {match.court}{!timed && ` · Ondata ${match.wave}`}<span>{score ? 'Risultato inserito' : 'Da compilare'}</span></header><div><span>{pairName(match.teamA.playerIds)}</span><strong>{score?.scoreA ?? '–'}</strong></div><div><span>{pairName(match.teamB.playerIds)}</span><strong>{score?.scoreB ?? '–'}</strong></div>{allowed && <button className="button" disabled={busy} onClick={() => setMatchId(match.id)}>{score ? 'Modifica risultato' : 'Inserisci risultato'}<span className="sr-only">: {pairName(match.teamA.playerIds)} contro {pairName(match.teamB.playerIds)}</span></button>}{!score && !allowed && <small>{timed && round === t.currentRound && clock.state === 'waiting' ? 'In attesa dell’avvio del turno' : 'In attesa del risultato'}</small>}</article>
+    })}</div>
+  </>
   return <main className="dashboard tournament-page">
     <button className="button button--ghost" onClick={onBack}><ArrowLeft size={18} /> Tutti i tornei</button>
-    {rehearsal && <TournamentSimulationTools session={rehearsal} tournament={t} now={now} busy={busy} onAction={action => perform(action, 'Prova aggiornata. Il torneo reale non è stato modificato.')} />}
-    <section className="tournament-hero"><div><span className="tournament-status">{tournamentStatus(t, now)}</span><h1>{t.title}</h1><p><CalendarDays size={18} /> {dateLabel(t.startsAt)}</p><p>{VENUES.find(v => v.id === t.venueId)?.name} · {t.courts} {t.courts === 1 ? 'campo' : 'campi'}</p></div><Trophy size={44} aria-hidden="true" /></section>
+    {simulation && <p className="tournament-simulation-banner">Simulazione privata · Solo dati fittizi su questo dispositivo.</p>}
+    <section className={`tournament-hero${hasDraw ? ' tournament-hero--compact' : ''}`}><div><span className="tournament-status">{tournamentStatus(t, now)}</span><h1>{t.title}</h1><p><CalendarDays size={18} /> {dateLabel(t.startsAt)}</p><p>{VENUES.find(v => v.id === t.venueId)?.name} · {t.courts} {t.courts === 1 ? 'campo' : 'campi'}</p></div><Trophy size={44} aria-hidden="true" /></section>
+    {hasDraw && <nav className="tournament-view-nav" aria-label="Sezioni del torneo">{([['play', t.status === 'running' ? 'Turno in corso' : 'Partite'], ['standings', 'Classifica'], ['details', 'Dettagli']] as const).map(([value, label]) => <button key={value} className="button" aria-pressed={view === value} onClick={() => setSelectedView(value)}>{label}</button>)}</nav>}
+    {error && <p className="form-error tournament-panel" role="alert">{error} <button onClick={() => setAttempt(a => a + 1)}>Ricarica dati</button></p>}
+    {message && <p className="tournament-message" role="status">{message}</p>}
+    <div ref={playArea} tabIndex={-1} className="tournament-play-area" hidden={!hasDraw || view !== 'play'}>
+      {t.status === 'running' && <section className="tournament-live" aria-label="Turno corrente">
+        {timed ? <TournamentRoundTimer tournament={t} now={now} manager={manager} busy={busy} simulation={simulation} onStart={() => void perform(() => repository.actOnTournament(t.id, 'start-round', user), simulation ? 'Timer di prova avviato.' : 'Timer avviato per tutti.')} onEnd={() => setConfirmation('end-round')} /> : <h2>Turno {t.currentRound} di {t.totalRounds}</h2>}
+        <div className="tournament-live__scores"><div className="tournament-section-heading"><h3>Risultati del turno</h3><span>{received}/{currentMatches.length} inseriti</span></div>
+          {!timed && <p className="tournament-note">Le ondate si giocano in sequenza; i campi della stessa ondata possono giocare insieme.</p>}
+          {renderMatches(t.currentRound)}
+        </div>
+        <div className="tournament-live__next"><p>{timed && clock.state === 'waiting' ? 'Avvia il timer quando tutti sono pronti.' : missing > 0 ? missing === 1 ? 'Manca 1 risultato per confermare il turno.' : `Mancano ${missing} risultati per confermare il turno.` : timed && clock.state === 'running' ? 'Risultati inseriti. Attendi il timer o concludi il turno in anticipo.' : 'Tutti i risultati sono inseriti: controllali prima di proseguire.'}</p>
+          {manager ? <button className="button button--primary" disabled={busy || (!canAdvance && !canStopAfterScores)} onClick={() => setConfirmation(canStopAfterScores ? 'end-round' : 'advance')}>{canStopAfterScores ? 'Concludi turno in anticipo' : nextLabel}</button> : <p className="tournament-note">L’organizzatore conferma i risultati e avvia il prossimo turno.</p>}
+        </div>
+      </section>}
+      {rehearsal && <details className="tournament-panel tournament-secondary"><summary>Strumenti di prova</summary><TournamentSimulationTools session={rehearsal} tournament={t} now={now} busy={busy} onAction={action => perform(action, 'Prova aggiornata. Il torneo reale non è stato modificato.')} /></details>}
+      {matches.length > 0 && <details className="tournament-panel tournament-secondary" open={t.status !== 'running'}><summary>{t.status === 'running' ? 'Altri turni e risultati' : 'Risultati del torneo'}</summary>
+        {Array.from(new Set(matches.filter(m => t.status !== 'running' || m.round !== t.currentRound).map(m => m.round))).map(round => <details className="tournament-round" key={round}><summary>Turno {round}{t.status === 'completed' || round < t.currentRound ? ' · confermato' : ' · in programma'}</summary>{renderMatches(round)}</details>)}
+      </details>}
+    </div>
+    <div className="tournament-detail-sections" hidden={hasDraw && view !== 'details'}>
+    {!hasDraw && rehearsal && <TournamentSimulationTools session={rehearsal} tournament={t} now={now} busy={busy} onAction={action => perform(action, 'Prova aggiornata. Il torneo reale non è stato modificato.')} />}
     <section className="tournament-panel"><h2>{format.name}{timed ? ' a tempo' : ''}</h2><p>{format.description}</p><p>{timed ? timedRanking : format.scoring}</p><p>{timed ? timedRules : tournamentUsesRotatingPairs(t) ? `${t.rounds} turni · ${t.pointsPerMatch} punti totali a partita.` : `Coppie ${t.pairing === 'random-fixed' ? 'sorteggiate' : 'scelte dai giocatori'}. Un set a 6, tie-break sul 6–6.`}</p><p>Risultati: {t.scoreAccess === 'admin' ? 'solo organizzatore' : 'organizzatore e giocatori di ciascuna partita'}, con assistenza dell’amministratore. I risultati si possono correggere prima di confermare il turno.</p></section>
     {plan && <section className="tournament-panel"><h2>{t.currentRound > 0 ? 'Il programma del torneo' : 'Il programma previsto'}</h2>
       <TournamentPlan input={t} count={plannedCount} />
@@ -211,18 +255,14 @@ function TournamentDetail({ id, user, members, onBack, rehearsal }: { id: string
       {t.status === 'open' && !validCount && <p className="tournament-note">Iscritti attuali: {registrations.length}. {registrations.length % 2 ? 'Il numero è dispari: manca un compagno per completare le coppie.' : 'Non è ancora raggiunto il minimo di 6.'} Nessuno verrà escluso automaticamente.</p>}
       {plan.feasible && <details><summary>Orari indicativi dei turni</summary><ol className="tournament-schedule">{plan.schedule.map(r => <li key={r.round}><span>Turno {r.round}</span><strong>{timeLabel(r.startsAt)}–{timeLabel(r.endsAt)}</strong></li>)}</ol><p>Gli orari sono indicativi: l’organizzatore avvia ogni timer quando tutti sono pronti, dopo il riscaldamento o il cambio campo. Eventuali ritardi consumano il margine disponibile: nessun turno parte automaticamente.</p></details>}
     </section>}
-    {error && <p className="form-error tournament-panel" role="alert">{error} <button onClick={() => setAttempt(a => a + 1)}>Ricarica dati</button></p>}
-    {message && <p className="tournament-message" role="status">{message}</p>}
     {manager && <section className="tournament-panel tournament-actions" aria-label="Gestione torneo">
       {canEditTournament(t, user.id, now) && <button className="button" disabled={busy} onClick={() => setEditor(true)}>Modifica torneo</button>}
       {t.status === 'draft' && !simulation && <button className="button button--primary" disabled={busy} onClick={() => setConfirmation('publish')}>Pubblica al gruppo</button>}
       {t.published && !simulation && <button className="button" onClick={() => { void navigator.clipboard.writeText(`${window.location.origin}${window.location.pathname}#tornei/${encodeURIComponent(t.id)}`).then(() => setMessage('Link copiato. Puoi mandarlo nel gruppo.')).catch(() => setMessage(`Link: ${window.location.origin}/#tornei/${encodeURIComponent(t.id)}`)) }}><Copy size={17} /> Copia link torneo</button>}
       {!simulation && user.id === SLOT_ADMIN_USER_ID && <button className="button" onClick={() => setPreview(true)}>Prova in privato</button>}
       {t.status === 'open' && <button className="button button--primary" disabled={busy || open || (timed && (!validCount || !plan?.feasible))} onClick={() => setConfirmation('start')}>Sorteggia e prepara tabellone</button>}
-      {t.status === 'running' && <button className="button button--primary" disabled={busy || (timed && clock.state !== 'expired')} onClick={() => setConfirmation('advance')}>{nextLabel}</button>}
       {t.status !== 'completed' && t.status !== 'cancelled' && <button className="button button--ghost" disabled={busy} onClick={() => setConfirmation('cancel')}>Annulla torneo</button>}
     </section>}
-    {timed && t.status === 'running' && <TournamentRoundTimer tournament={t} now={now} manager={manager} busy={busy} simulation={simulation} onStart={() => void perform(() => repository.actOnTournament(t.id, 'start-round', user), simulation ? 'Timer di prova avviato.' : 'Timer avviato per tutti.')} />}
     {t.status !== 'draft' && <section className="tournament-panel"><div className="tournament-section-heading"><h2>Iscritti</h2><strong>{registrations.length}/{t.capacity}</strong></div>
       <p>Massimo {t.capacity} partecipanti, ospiti inclusi.{open ? registrations.length >= t.capacity ? ' Il torneo è completo.' : ` ${t.capacity - registrations.length} posti ancora disponibili.` : ''}</p>
       <p>{t.status === 'cancelled' ? 'Iscrizioni chiuse: torneo annullato.' : `${open ? 'Iscrizioni e scelta del compagno fino a' : 'Iscrizioni chiuse dal'} ${dateLabel(t.startsAt - 3_600_000)}.`}</p>
@@ -233,17 +273,8 @@ function TournamentDetail({ id, user, members, onBack, rehearsal }: { id: string
       {registrations.length === 0 && <p>Ancora nessun iscritto.</p>}
       {t.status === 'open' && !open && <p>L’organizzatore prepara il tabellone con gli iscritti effettivi. Se il numero non è compatibile con la formula, il torneo non parte.</p>}
     </section>}
-    {matches.length > 0 && <section className="tournament-panel"><h2>{t.status === 'completed' ? 'Risultati del torneo' : `Partite · turno ${t.currentRound} di ${t.totalRounds}`}</h2><p>{timed ? 'Tutte le partite del turno iniziano insieme. Segnate i game completati; i risultati sono provvisori finché l’organizzatore conferma il turno.' : 'Le ondate si giocano in sequenza; i campi della stessa ondata possono giocare contemporaneamente.'}</p>
-      {Array.from(new Set(matches.map(m => m.round))).map(round => <details className="tournament-round" key={round} open={round === t.currentRound}><summary>Turno {round}{t.status === 'completed' || round < t.currentRound ? ' · confermato' : round > t.currentRound ? ' · in programma' : ' · corrente'}</summary>
-        {t.format === 'round-robin' && t.teams.filter(team => !matches.some(m => m.round === round && (m.teamA.id === team.id || m.teamB.id === team.id))).map(team => <p className="tournament-rest" key={team.id}>Riposa: {pairName(team.playerIds)}</p>)}
-        <div className="tournament-matches">{matches.filter(m => m.round === round).map(match => {
-          const score = scores.find(s => s.matchId === match.id)
-          const allowed = t.status === 'running' && round === t.currentRound && (!timed || (t.roundStartedAt != null && now >= t.roundStartedAt)) && (manager || (t.scoreAccess === 'players' && [...match.teamA.playerIds, ...match.teamB.playerIds].includes(user.id)))
-          return <article key={match.id} className="tournament-match"><header>{match.stage === 'final' ? 'Finale · ' : match.stage === 'bronze' ? 'Finale 3° posto · ' : ''}Campo {match.court}{!timed && ` · Ondata ${match.wave}`}</header><div><span>{pairName(match.teamA.playerIds)}</span><strong>{score?.scoreA ?? '–'}</strong></div><div><span>{pairName(match.teamB.playerIds)}</span><strong>{score?.scoreB ?? '–'}</strong></div>{allowed && <button className="button" disabled={busy} onClick={() => setMatchId(match.id)}>{score ? 'Modifica risultato' : 'Inserisci risultato'}<span className="sr-only">: {pairName(match.teamA.playerIds)} contro {pairName(match.teamB.playerIds)}</span></button>}{!score && !allowed && <small>{timed && clock.state === 'waiting' ? 'In attesa dell’avvio del turno' : 'In attesa del risultato'}</small>}</article>
-        })}</div>
-      </details>)}
-    </section>}
-    {t.currentRound > 0 && <section className="tournament-panel"><h2>{t.status === 'completed' ? 'Il podio e la classifica finale' : t.format === 'knockout' ? 'Statistiche del tabellone' : 'Classifica provvisoria'}</h2>{t.status === 'completed' && <div className="tournament-podium">{standings.filter(row => row.rank <= 3).map(row => <div key={row.id}><Trophy size={25} /><strong>{row.rank}°{row.tied ? ' ex aequo' : ''}</strong><span>{pairName(row.playerIds)}</span></div>)}</div>}
+    </div>
+    {t.currentRound > 0 && <section className="tournament-panel" hidden={view !== 'standings'} aria-label="Classifica del torneo"><h2>{t.status === 'completed' ? 'Il podio e la classifica finale' : t.format === 'knockout' ? 'Statistiche del tabellone' : 'Classifica provvisoria'}</h2>{t.status === 'completed' && <div className="tournament-podium">{standings.filter(row => row.rank <= 3).map(row => <div key={row.id}><Trophy size={25} /><strong>{row.rank}°{row.tied ? ' ex aequo' : ''}</strong><span>{pairName(row.playerIds)}</span></div>)}</div>}
       <div className="tournament-table-wrap"><table className="tournament-table"><caption>{timed ? 'Classifica coppie · V–N–P: vinte, pareggiate, perse' : tournamentUsesRotatingPairs(t) ? 'Classifica individuale · punti' : 'Classifica coppie · game'}</caption><thead><tr><th scope="col">{t.format === 'knockout' && t.status !== 'completed' ? 'Coppia' : 'Posizione'}</th>{timed ? <><th scope="col">Punti</th><th scope="col">V–N–P</th><th scope="col">Game fatti/subiti</th></> : <><th scope="col">Giocate</th><th scope="col">Vinte</th><th scope="col">Fatti</th><th scope="col">Subiti</th></>}</tr></thead><tbody>{standings.map(row => <tr key={row.id}><th scope="row">{(t.format !== 'knockout' || t.status === 'completed') && <strong>{row.rank}°{row.tied ? ' =' : ''} </strong>}{pairName(row.playerIds)}</th>{timed ? <><td><strong>{row.tablePoints}</strong></td><td>{row.wins}–{row.draws}–{row.played - row.wins - row.draws}</td><td>{row.pointsFor}/{row.pointsAgainst}</td></> : <><td>{row.played}</td><td>{row.wins}</td><td>{row.pointsFor}</td><td>{row.pointsAgainst}</td></>}</tr>)}</tbody></table></div>
     </section>}
     <p className="tournament-note">{simulation ? 'Simulazione privata: risultati fittizi salvati solo su questo dispositivo. Nessuna pubblicazione, notifica o modifica al database condiviso.' : 'Torneo del gruppo, separato dal Fanta e dalle partite ordinarie. Nessuna prenotazione automatica dei campi.'}</p>
@@ -251,7 +282,7 @@ function TournamentDetail({ id, user, members, onBack, rehearsal }: { id: string
     {editor && <TournamentEditor tournament={t} user={user} onClose={() => setEditor(false)} onSaved={() => { setEditor(false); setMessage('Torneo modificato. Iscrizioni e risultati conservati.') }} />}
     {guestEditor && <TournamentGuestEditor tournament={t} guestId={guestEditor.id} user={user} members={members} onClose={() => setGuestEditor(null)} />}
     {matchId && t.matches[matchId] && <TournamentScoreEditor tournament={t} match={t.matches[matchId]} score={scores.find(s => s.matchId === matchId)} members={members} user={user} onClose={() => setMatchId('')} />}
-    {confirmation && <Modal title={confirmation === 'publish' ? 'Pubblica il torneo?' : confirmation === 'cancel' ? 'Annulla il torneo?' : confirmation === 'start' ? 'Conferma il sorteggio?' : nextLabel} onClose={() => !busy && setConfirmation(null)}><div className="tournament-form"><p>{confirmation === 'publish' ? 'Gli altri membri potranno aprire il link e iscriversi. Potrai modificare il torneo finché le iscrizioni sono aperte; dal primo iscritto formula e coppie restano protette. Nel girone puoi ancora cambiare la durata delle partite prima del sorteggio. L’amministratore può intervenire anche sui tornei degli altri.' : confirmation === 'cancel' ? 'Le iscrizioni e i risultati resteranno consultabili, ma non si potrà più giocare. Non vengono cancellati dati.' : confirmation === 'start' ? 'Coppie e calendario verranno salvati definitivamente usando gli iscritti attuali. Nessuna iscrizione verrà aggiunta dopo il sorteggio.' : 'Conferma solo dopo aver controllato tutti i risultati. I punteggi di questo turno non saranno più modificabili perché determinano classifica e abbinamenti successivi.'}</p>{confirmation === 'start' && timed && validCount && <TournamentPlan input={t} count={registrations.length} />}<button className="button button--primary" disabled={busy} onClick={() => void perform(() => repository.actOnTournament(t.id, confirmation, user), confirmation === 'publish' ? 'Torneo pubblicato. Copia il link e condividilo con il gruppo.' : 'Torneo aggiornato.')}>{busy ? 'Attendi…' : 'Conferma'}</button>{error && <p role="alert" className="form-error">{error}</p>}</div></Modal>}
+    {confirmation && <Modal title={confirmation === 'publish' ? 'Pubblica il torneo?' : confirmation === 'cancel' ? 'Annulla il torneo?' : confirmation === 'start' ? 'Conferma il sorteggio?' : confirmation === 'end-round' ? 'Concludere il turno in anticipo?' : nextLabel} onClose={() => !busy && setConfirmation(null)}><div className="tournament-form"><p>{confirmation === 'publish' ? 'Gli altri membri potranno aprire il link e iscriversi. Potrai modificare il torneo finché le iscrizioni sono aperte; dal primo iscritto formula e coppie restano protette. Nel girone puoi ancora cambiare la durata delle partite prima del sorteggio. L’amministratore può intervenire anche sui tornei degli altri.' : confirmation === 'cancel' ? 'Le iscrizioni e i risultati resteranno consultabili, ma non si potrà più giocare. Non vengono cancellati dati.' : confirmation === 'start' ? 'Coppie e calendario verranno salvati definitivamente usando gli iscritti attuali. Nessuna iscrizione verrà aggiunta dopo il sorteggio.' : confirmation === 'end-round' ? 'Il timer si fermerà per tutti i campi e non potrà ripartire in questo turno. Assicurati che tutti abbiano finito di giocare. Potrai ancora inserire e correggere i punteggi; il turno successivo non partirà automaticamente.' : 'Conferma solo dopo aver controllato tutti i risultati. I punteggi di questo turno non saranno più modificabili perché determinano classifica e abbinamenti successivi.'}</p>{confirmation === 'start' && timed && validCount && <TournamentPlan input={t} count={registrations.length} />}<button className="button button--primary" disabled={busy} onClick={() => void perform(() => repository.actOnTournament(t.id, confirmation, user), confirmation === 'publish' ? 'Torneo pubblicato. Copia il link e condividilo con il gruppo.' : confirmation === 'end-round' ? 'Turno concluso. Completa e conferma i risultati.' : 'Torneo aggiornato.')}>{busy ? 'Attendi…' : 'Conferma'}</button>{error && <p role="alert" className="form-error">{error}</p>}</div></Modal>}
   </main>
 }
 

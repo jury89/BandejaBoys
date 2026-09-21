@@ -2047,8 +2047,8 @@ export function getTournamentRoundClock(tournament: Tournament, now: number) {
   const endsAt = typeof tournament.roundStartedAt === 'number'
     ? tournament.roundStartedAt + durationSeconds * 1000 : null
   // The UI tick may be a fraction of a second older than the newly saved start.
-  return { endsAt, remainingSeconds: endsAt === null ? durationSeconds : Math.min(durationSeconds, Math.max(0, Math.ceil((endsAt - now) / 1000))),
-    state: endsAt === null ? 'waiting' as const : now < endsAt ? 'running' as const : 'expired' as const }
+  return { endsAt, remainingSeconds: endsAt === null ? durationSeconds : Math.min(durationSeconds, Math.max(0, Math.ceil((endsAt - (tournament.roundEndedAt ?? now)) / 1000))),
+    state: endsAt === null ? 'waiting' as const : tournament.roundEndedAt != null ? 'ended' as const : now < endsAt ? 'running' as const : 'expired' as const }
 }
 
 export function validateTournamentInput(input: TournamentInput, now: number): TournamentInput {
@@ -2349,7 +2349,7 @@ export function startTournament(tournament: Tournament, actorId: string, seed: n
     }
   }
   return { ...tournament, status: 'running', seed, teams, totalRounds, currentRound: 1,
-    matches: Object.fromEntries(matches.map((match) => [match.id, match])), updatedAt: now, roundStartedAt: null,
+    matches: Object.fromEntries(matches.map((match) => [match.id, match])), updatedAt: now, roundStartedAt: null, roundEndedAt: null,
     ...(plan ? { matchMinutes: plan.matchMinutes } : {}) }
 }
 
@@ -2358,6 +2358,15 @@ export function startTournamentRound(tournament: Tournament, actorId: string, no
   if (!tournamentUsesTimedMatches(tournament) || tournament.status !== 'running') throw new Error('Il timer è disponibile solo per un girone a tempo in corso.')
   if (tournament.roundStartedAt != null) throw new Error('Il timer di questo turno è già stato avviato.')
   return { ...tournament, roundStartedAt: now, updatedAt: now }
+}
+
+export function endTournamentRound(tournament: Tournament, actorId: string, now = Date.now()): Tournament {
+  requireTournamentManager(tournament, actorId)
+  if (!tournamentUsesTimedMatches(tournament) || tournament.status !== 'running'
+    || tournament.roundStartedAt == null || now < tournament.roundStartedAt
+    || getTournamentRoundClock(tournament, now).state !== 'running') throw new Error('Puoi concludere solo un turno con il timer in corso.')
+  // Stop play without freezing scores: confirmation/advancement is a separate transaction.
+  return { ...tournament, roundEndedAt: now, updatedAt: now }
 }
 
 export function tournamentScoreIsValid(tournament: Pick<Tournament, 'format' | 'pointsPerMatch' | 'scoringMode'>, a: number, b: number): boolean {
@@ -2423,7 +2432,7 @@ export function getTournamentStandings(tournament: Tournament, scores: Tournamen
 export function advanceTournament(tournament: Tournament, scores: TournamentScore[], actorId: string, now = Date.now()): Tournament {
   requireTournamentManager(tournament, actorId)
   if (tournament.status !== 'running') throw new Error('Il torneo non è in corso.')
-  if (tournamentUsesTimedMatches(tournament) && getTournamentRoundClock(tournament, now).state !== 'expired') throw new Error('Aspetta la fine del timer e del punto in corso prima di confermare il turno.')
+  if (tournamentUsesTimedMatches(tournament) && !['expired', 'ended'].includes(getTournamentRoundClock(tournament, now).state)) throw new Error('Aspetta la fine del timer oppure concludi il turno prima di confermare i risultati.')
   const currentMatches = Object.values(tournament.matches).filter((m) => m.round === tournament.currentRound)
   if (currentMatches.length === 0 || currentMatches.some((match) => {
     const score = scores.find((s) => s.matchId === match.id)
@@ -2448,5 +2457,5 @@ export function advanceTournament(tournament: Tournament, scores: TournamentScor
     generated = winners.flatMap((team, i) => i % 2 === 0 ? [tournamentMatch(tournament, nextRound, i / 2, team, winners[i + 1], winners.length === 2 ? 'final' : 'regular')] : [])
     if (winners.length === 2) generated.push(tournamentMatch(tournament, nextRound, 1, losers[0], losers[1], 'bronze'))
   }
-  return { ...tournament, currentRound: nextRound, matches: { ...tournament.matches, ...Object.fromEntries(generated.map((match) => [match.id, match])) }, updatedAt: now, roundStartedAt: null }
+  return { ...tournament, currentRound: nextRound, matches: { ...tournament.matches, ...Object.fromEntries(generated.map((match) => [match.id, match])) }, updatedAt: now, roundStartedAt: null, roundEndedAt: null }
 }

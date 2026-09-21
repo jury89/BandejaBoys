@@ -1,7 +1,7 @@
 /** Semantic Rules tests with synthetic resources and mocked get(): no Firestore writes or production document reads. */
 import { readFileSync } from 'node:fs'
 import { GoogleAuth } from 'google-auth-library'
-import { editTournament, editTournamentOrganization, makeTournament, publishTournament, registerForTournament, saveTournamentGuest, removeTournamentGuest, startTournament, startTournamentRound } from '../src/lib/domain'
+import { editTournament, editTournamentOrganization, endTournamentRound, makeTournament, publishTournament, registerForTournament, saveTournamentGuest, removeTournamentGuest, startTournament, startTournamentRound } from '../src/lib/domain'
 import { SLOT_ADMIN_USER_ID as admin } from '../src/lib/admin'
 import type { Tournament } from '../src/lib/tournamentTypes'
 
@@ -187,6 +187,28 @@ test('timed decimal rejected', 'DENY', 'create', owner, undefined, { ...timedSco
 test('timed negative rejected', 'DENY', 'create', owner, undefined, { ...timedScore, scoreA: -1 }, timedOptions)
 test('timed spectator cannot score', 'DENY', 'create', 'spectator', undefined, { ...timedScore, updatedBy: 'spectator' }, timedOptions)
 const timedNext = { ...timedStarted, currentRound: 2, roundStartedAt: null }
+const stoppedAt = timedOpen.startsAt + 60_000
+const timedStopped = endTournamentRound(timedStarted, owner, stoppedAt)
+for (const actor of [owner, admin]) {
+  test(`${actor} explicitly stops running timer early`, 'ALLOW', 'update', actor, timedStarted, timedStopped, { time: stoppedAt })
+  test(`${actor} advances after explicit stop`, 'ALLOW', 'update', actor, timedStopped, { ...timedNext, roundEndedAt: null }, { time: stoppedAt })
+  test(`${actor} completes explicitly stopped final`, 'ALLOW', 'update', actor, { ...timedStopped, currentRound: 5 }, { ...timedStopped, currentRound: 5, status: 'completed' }, { time: stoppedAt })
+}
+test('player cannot stop shared clock', 'DENY', 'update', player, timedStarted, timedStopped, { time: stoppedAt })
+test('spectator cannot stop shared clock', 'DENY', 'update', 'spectator', timedStarted, timedStopped, { time: stoppedAt })
+test('cannot stop an unstarted clock', 'DENY', 'update', owner, timedDrawn, { ...timedDrawn, roundEndedAt: stoppedAt }, { time: stoppedAt })
+test('cannot start and stop in the same write', 'DENY', 'update', owner, timedDrawn, timedStopped, { time: stoppedAt })
+test('cannot backdate explicit stop', 'DENY', 'update', owner, timedStarted, { ...timedStopped, roundEndedAt: stoppedAt - 120001 }, { time: stoppedAt })
+test('cannot postdate explicit stop', 'DENY', 'update', owner, timedStarted, { ...timedStopped, roundEndedAt: stoppedAt + 120001 }, { time: stoppedAt })
+test('cannot alter saved stop', 'DENY', 'update', owner, timedStopped, { ...timedStopped, roundEndedAt: stoppedAt + 1 }, { time: stoppedAt })
+test('cannot reopen stopped clock', 'DENY', 'update', owner, timedStopped, { ...timedStopped, roundEndedAt: null }, { time: stoppedAt })
+test('cannot restart stopped clock', 'DENY', 'update', owner, timedStopped, { ...timedStopped, roundStartedAt: stoppedAt }, { time: stoppedAt })
+test('cannot combine stop with next round', 'DENY', 'update', owner, timedStarted, { ...timedStopped, currentRound: 2 }, { time: stoppedAt })
+test('cannot modify draw while stopping', 'DENY', 'update', owner, timedStarted, { ...timedStopped, matches: {} }, { time: stoppedAt })
+test('cannot retain old stop into next round', 'DENY', 'update', owner, timedStopped, { ...timedStopped, currentRound: 2, roundStartedAt: null }, { time: stoppedAt })
+test('stopped scores remain editable by participants', 'ALLOW', 'create', timedMatch.teamA.playerIds[0], undefined, { matchId: timedMatch.id, scoreA: 3, scoreB: 2, updatedBy: timedMatch.teamA.playerIds[0], updatedAt: stoppedAt, revision: 1 }, { parent: timedStopped, scoreId: timedMatch.id, time: stoppedAt })
+test('cannot change stop after completion', 'DENY', 'update', admin, { ...timedStopped, status: 'completed' }, { ...timedStopped, status: 'completed', roundEndedAt: stoppedAt + 1 }, { time: stoppedAt })
+test('cannot create a prestopped timer', 'DENY', 'create', owner, undefined, { ...timedDraft, roundStartedAt: now, roundEndedAt: now })
 test('cannot advance before timer ends', 'DENY', 'update', owner, timedStarted, timedNext, { time: endsAt - 1 })
 test('can advance after timer ends', 'ALLOW', 'update', owner, timedStarted, timedNext, { time: endsAt })
 test('cannot skip a timed round', 'DENY', 'update', owner, timedStarted, { ...timedNext, currentRound: 3 }, { time: endsAt })

@@ -1,4 +1,4 @@
-import { advanceTournament, getTimedTournamentPlan, getTournamentRoundClock, getTournamentStandings, makeTournament, makeTournamentScore, publishTournament, registerForTournament, removeTournamentGuest, saveTournamentGuest, startTournament, startTournamentRound, tournamentScoreIsValid, validateTournamentInput } from './domain'
+import { advanceTournament, endTournamentRound, getTimedTournamentPlan, getTournamentRoundClock, getTournamentStandings, makeTournament, makeTournamentScore, publishTournament, registerForTournament, removeTournamentGuest, saveTournamentGuest, startTournament, startTournamentRound, tournamentScoreIsValid, validateTournamentInput } from './domain'
 import { SLOT_ADMIN_USER_ID as admin } from './admin'
 import { localTournamentRepository } from './tournamentRepository'
 import type { Tournament, TournamentInput, TournamentScore } from './tournamentTypes'
@@ -17,6 +17,30 @@ function scoresFor(t: Tournament, a: number, b: number, at: number) {
 }
 
 describe('timed round robin', () => {
+  it.each([owner, admin])('%s stops early without skipping scores or restarting the same timer', actor => {
+    const at = input.startsAt - 600_000, ready = drawn()
+    expect(() => endTournamentRound(ready, actor, at)).toThrow(/timer/)
+    const started = startTournamentRound(ready, owner, at)
+    expect(() => endTournamentRound(started, 'p0', at + 60_000)).toThrow(/organizzatore/)
+    expect(() => endTournamentRound(started, actor, at - 1)).toThrow(/timer/)
+    expect(() => endTournamentRound(started, actor, at + 900_000)).toThrow(/timer/)
+    expect(() => endTournamentRound({ ...started, status: 'cancelled' }, actor, at)).toThrow(/timer/)
+    expect(() => endTournamentRound({ ...started, scoringMode: 'standard' }, actor, at)).toThrow(/timer/)
+    const stopped = endTournamentRound(started, actor, at + 60_000)
+    expect(stopped).toMatchObject({ roundStartedAt: at, roundEndedAt: at + 60_000, currentRound: 1, status: 'running' })
+    expect(getTournamentRoundClock(JSON.parse(JSON.stringify(stopped)), at + 999_999)).toMatchObject({ state: 'ended', remainingSeconds: 840 })
+    expect(() => endTournamentRound(stopped, actor, at + 61_000)).toThrow(/timer/)
+    expect(() => startTournamentRound(stopped, actor, at + 61_000)).toThrow(/già/)
+    expect(() => advanceTournament(stopped, [], actor, at + 61_000)).toThrow(/Completa/)
+    const scores = scoresFor(stopped, 3, 2, at + 61_000)
+    const next = advanceTournament(stopped, scores, actor, at + 61_000)
+    expect(next).toMatchObject({ currentRound: 2, roundStartedAt: null, roundEndedAt: null })
+    expect(getTournamentRoundClock(next, at + 61_000).state).toBe('waiting')
+    expect(() => makeTournamentScore(next, 'r1-m1', 4, 2, actor, scores[0], 1, at + 61_000)).toThrow(/corrente/)
+    const final = { ...started, currentRound: started.totalRounds }
+    const endedFinal = endTournamentRound(final, actor, at + 60_000)
+    expect(advanceTournament(endedFinal, scoresFor(endedFinal, 2, 2, at + 60_000), actor, at + 60_000).status).toBe('completed')
+  })
   it('fits ten people on two courts into 88 minutes with four matches and one rest each', () => {
     const plan = getTimedTournamentPlan(input), t = drawn(), matches = Object.values(t.matches)
     expect(plan).toMatchObject({ teams: 5, rounds: 5, requiredCourts: 2, matchesPerPair: 4, playingMinutes: 60, totalMinutes: 88 })
@@ -159,6 +183,10 @@ describe('external tournament participants', () => {
     await repo.actOnTournament(t.id, 'start', user(owner))
     await repo.actOnTournament(t.id, 'start-round', user(owner))
     expect(latest.roundStartedAt).toBe(input.startsAt)
+    clock.mockReturnValue(input.startsAt + 60_000)
+    await repo.actOnTournament(t.id, 'end-round', user(owner))
+    expect(latest.roundEndedAt).toBe(input.startsAt + 60_000)
+    expect(JSON.parse(localStorage.getItem('bandeja-tournaments-v1')!).tournaments[0].roundEndedAt).toBe(latest.roundEndedAt)
     stop(); clock.mockRestore()
   })
 })

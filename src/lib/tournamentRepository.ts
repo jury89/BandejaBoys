@@ -1,10 +1,10 @@
 import { collection, doc, limit, onSnapshot, or, orderBy, query, runTransaction, where, type Firestore, type Unsubscribe } from 'firebase/firestore'
 import type { SessionUser } from '../types'
 import { isSlotAdmin } from './admin'
-import { advanceTournament, cancelTournament, canManageTournament, editTournament, editTournamentOrganization, leaveTournament, makeTournament, makeTournamentScore, publishTournament, registerForTournament, removeTournamentGuest, saveTournamentGuest, startTournament, startTournamentRound } from './domain'
+import { advanceTournament, cancelTournament, canManageTournament, editTournament, editTournamentOrganization, endTournamentRound, leaveTournament, makeTournament, makeTournamentScore, publishTournament, registerForTournament, removeTournamentGuest, saveTournamentGuest, startTournament, startTournamentRound } from './domain'
 import type { Tournament, TournamentInput, TournamentOrganization, TournamentScore } from './tournamentTypes'
 
-type Action = 'publish' | 'cancel' | 'start' | 'start-round' | 'advance'
+type Action = 'publish' | 'cancel' | 'start' | 'start-round' | 'end-round' | 'advance'
 export interface TournamentRepository {
   subscribeTournaments(userId: string, listener: (items: Tournament[]) => void, onError: (error: Error) => void): Unsubscribe
   subscribeTournament(id: string, userId: string, listener: (item: Tournament | null) => void, onError: (error: Error) => void): Unsubscribe
@@ -25,6 +25,7 @@ function applyAction(tournament: Tournament, action: Action, actorId: string, se
   if (action === 'cancel') return cancelTournament(tournament, actorId, now)
   if (action === 'start') return startTournament(tournament, actorId, seed, now)
   if (action === 'start-round') return startTournamentRound(tournament, actorId, now)
+  if (action === 'end-round') return endTournamentRound(tournament, actorId, now)
   return advanceTournament(tournament, scores, actorId, now)
 }
 
