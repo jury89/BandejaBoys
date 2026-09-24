@@ -221,6 +221,7 @@ describe('menu account', () => {
     const user = userEvent.setup()
     render(<Dashboard />)
     const navigation = screen.getByRole('navigation', { name: 'Navigazione principale' })
+    expect(navigation.parentElement).toHaveClass('club-navigation-frame')
     expect(navigation.querySelectorAll('button')).toHaveLength(4)
     await user.click(screen.getByRole('button', { name: /Posti liberi/ }))
     await user.click(screen.getByRole('button', { name: 'Partite' }))

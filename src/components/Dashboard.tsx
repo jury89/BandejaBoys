@@ -939,7 +939,7 @@ export function Dashboard() {
         </div>
       </header>
 
-      {isNewInterface && <nav className="club-navigation" aria-label="Navigazione principale">
+      {isNewInterface && <div className="club-navigation-frame"><nav className="club-navigation" aria-label="Navigazione principale">
         {mainSections.map(({ label, icon: Icon, active, open }) => (
           <button key={label} type="button" aria-current={active ? 'page' : undefined} onClick={() => {
             setAccountOpen(false)
@@ -947,7 +947,7 @@ export function Dashboard() {
             open()
           }}><Icon size={21} aria-hidden="true" /><span>{label}</span></button>
         ))}
-      </nav>}
+      </nav></div>}
 
       {!isNewInterface && dashboardView === 'feed' && <ClassicBoardFilters value={feedFilter} counts={{ all: totalSlotCount, booking: bookingCandidateSlotCount, booked: bookedSlotCount }} onChange={setFeedFilter} />}
 
