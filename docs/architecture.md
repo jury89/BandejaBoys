@@ -130,6 +130,14 @@ Trenta minuti dopo la fine di una partita prenotata con quattro titolari, ciascu
 
 Lo stato `ready` non viene salvato: è derivato dal numero di titolari. Lo stato `booked` dipende dalla presenza di `bookedAt`. In questo modo non possono esistere stati incoerenti. Le adesioni precedenti all’introduzione del campo `role` restano compatibili e vengono interpretate secondo il vecchio ordine cronologico.
 
+### Ancoraggio della navigazione Clubhouse
+
+`Dashboard` monta `.club-navigation` in `.club-navigation-frame`: il contenitore è fisso con `top: 0`, altezza `100dvh` (fallback `100vh`) e allineamento flex al fondo. Il menu non è più direttamente `position: fixed; bottom: 0`, combinazione soggetta a spostamenti durante lo scroll inerziale in alcune versioni di Safari/iOS. Non si memorizzano altezze del viewport e non si aggiungono listener allo scroll. Il contenitore lascia passare i tocchi (`pointer-events: none`), riabilitati solo sulla navigazione; la safe area resta nel padding del menu. Da 1050 px il contenitore è alto 76 px e centra il menu nella testata. Le modali continuano a nascondere la navigazione e il posizionamento di “Altre azioni” continua a misurare il rettangolo del menu effettivo, non il contenitore.
+
+Il collaudo richiede scroll lunghi in entrambe le direzioni, cambi di altezza/orientamento, navigazione tra sezioni e apertura/chiusura di modali su mobile, più la testata desktop. L’emulazione desktop non riproduce il compositor di un iPhone fisico: il difetto intermittente iOS richiede anche una conferma sul dispositivo interessato.
+
+Verifica del 24 settembre 2026: `npm run check` superato (552 test, 63 file). Browser integrato con Firebase disabilitato e 12 round fittizi: 320×568, 390×844, 390×664, 844×390 e 1280×900; barra al fondo dopo scroll/cambio dimensioni, dettagli Fanta cliccabili, profilo aperto/chiuso correttamente, UX classica senza barra, nessun overflow orizzontale o errore console.
+
 ## Notifiche
 
 ### Budget di lettura del notifier

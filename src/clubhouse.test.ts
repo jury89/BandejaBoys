@@ -9,6 +9,22 @@ function declarations(selector: string) {
 }
 
 describe('geometria Clubhouse', () => {
+  it('ancora la navigazione al viewport dinamico senza il bottom-fixed difettoso su iOS', () => {
+    const frame = declarations('.club-navigation-frame')
+    expect(frame).toContain('position: fixed;')
+    expect(frame).toContain('inset: 0 0 auto;')
+    expect(frame.indexOf('height: 100dvh;')).toBeGreaterThan(frame.indexOf('height: 100vh;'))
+    expect(frame).toContain('align-items: flex-end;')
+    expect(frame).toContain('pointer-events: none;')
+    const nav = declarations('.club-navigation')
+    expect(nav).toContain('pointer-events: auto;')
+    expect(nav).toContain('env(safe-area-inset-bottom)')
+    expect(nav).not.toMatch(/(?:position|inset|bottom|transform)\s*:/)
+    const desktop = styles.slice(styles.indexOf('@media (min-width: 1050px)'))
+    expect(desktop).toContain('.club-navigation-frame { height: 76px; align-items: center; justify-content: center; }')
+    expect(declarations('body.modal-open .club-navigation')).toContain('visibility: hidden;')
+  })
+
   it('mantiene il campo a due colonne e due metà anche su desktop', () => {
     const court = declarations('.club-roster')
     expect(court).toContain('grid-template-columns: repeat(2, minmax(0, 1fr))')

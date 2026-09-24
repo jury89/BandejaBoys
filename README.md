@@ -44,6 +44,8 @@ Anche nella nuova interfaccia la bacheca mostra il campo con quattro posti: tito
 
 Il menu **Altre azioni** della nuova interfaccia si apre sopra o sotto in base allo spazio visibile, senza spostare lo slot. Sugli schermi bassi scorre internamente e resta fuori dall’area coperta dalle barre fisse.
 
+La navigazione mobile della nuova interfaccia è allineata al fondo di un contenitore ancorato in alto e alto quanto il viewport dinamico (`100dvh`, fallback `100vh`), per evitare lo spostamento delle barre `bottom: 0` durante lo scroll su iOS. Conserva la safe area inferiore, non intercetta i tocchi fuori dai pulsanti e torna nella testata da 1050 px.
+
 Mini sito privato per organizzare le partite di padel del gruppo: sondaggi settimanali, quattro titolari in ordine di adesione, riserve, sostituzioni, conferma del campo e campionato FantaBandeja.
 
 ## Online
