@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { ArrowLeft, CalendarDays, Check, Copy, Plus, Trophy, UsersRound } from 'lucide-react'
 import type { MemberProfile, SessionUser } from '../types'
-import { canEditTournament, canManageTournament, getTimedTournamentPlan, getTournamentRoundClock, getTournamentStandings, padelDateTimeToTimestamp, toDateTimeInput, tournamentRegistrationsOpen, tournamentSettingsEditable, tournamentUsesRotatingPairs, tournamentUsesTimedMatches, validateTournamentInput } from '../lib/domain'
+import { canEditTournament, canEditTournamentRound, canEditTournamentTeams, canManageTournament, getTimedTournamentPlan, getTournamentRoundClock, getTournamentStandings, padelDateTimeToTimestamp, toDateTimeInput, tournamentRegistrationsOpen, tournamentSettingsEditable, tournamentUsesRotatingPairs, tournamentUsesTimedMatches, validateTournamentInput } from '../lib/domain'
 import { repository } from '../lib/repository'
 import { SLOT_ADMIN_USER_ID } from '../lib/admin'
 import { openTournamentSimulation, resetTournamentSimulation, type TournamentSimulationSession } from '../lib/tournamentSimulation'
@@ -13,6 +13,7 @@ import { Modal } from './Modal'
 import { ProfileAvatar } from './ProfileAvatar'
 import { SlotDateTimeField } from './SlotDateTimeField'
 import { TournamentRoundTimer } from './TournamentRoundTimer'
+import { TournamentRoundsEditor, TournamentTeamsEditor } from './TournamentDrawEditors'
 import './tournaments.css'
 
 const dateLabel = (time: number) => new Intl.DateTimeFormat('it-IT', { timeZone: 'Europe/Rome', weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' }).format(time)
@@ -173,6 +174,7 @@ function TournamentDetail({ id, user, members, onBack, rehearsal }: { id: string
   const [scores, setScores] = useState<TournamentScore[]>([])
   const [error, setError] = useState(''), [busy, setBusy] = useState(false), [attempt, setAttempt] = useState(0)
   const [editor, setEditor] = useState(false), [matchId, setMatchId] = useState('')
+  const [drawEditor, setDrawEditor] = useState<'teams' | 'rounds' | null>(null)
   const [guestEditor, setGuestEditor] = useState<{ id: string | null } | null>(null)
   const [confirmation, setConfirmation] = useState<'publish' | 'start' | 'advance' | 'end-round' | 'cancel' | null>(null)
   const [selectedView, setSelectedView] = useState<'play' | 'standings' | 'details' | null>(null)
@@ -260,6 +262,8 @@ function TournamentDetail({ id, user, members, onBack, rehearsal }: { id: string
     </section>}
     {manager && <section className="tournament-panel tournament-actions" aria-label="Gestione torneo">
       {canEditTournament(t, user.id, now) && <button className="button" disabled={busy} onClick={() => setEditor(true)}>Modifica torneo</button>}
+      {canEditTournamentTeams(t, scores, user.id) && <button className="button" disabled={busy} onClick={() => setDrawEditor('teams')}>Modifica coppie sorteggiate</button>}
+      {Object.values(t.matches).some(match => canEditTournamentRound(t, match.round, scores, user.id)) && <button className="button" disabled={busy} onClick={() => setDrawEditor('rounds')}>Modifica turni e avversari</button>}
       {t.status === 'draft' && !simulation && <button className="button button--primary" disabled={busy} onClick={() => setConfirmation('publish')}>Pubblica al gruppo</button>}
       {t.published && !simulation && <button className="button" onClick={() => { void navigator.clipboard.writeText(`${window.location.origin}${window.location.pathname}#tornei/${encodeURIComponent(t.id)}`).then(() => setMessage('Link copiato. Puoi mandarlo nel gruppo.')).catch(() => setMessage(`Link: ${window.location.origin}/#tornei/${encodeURIComponent(t.id)}`)) }}><Copy size={17} /> Copia link torneo</button>}
       {!simulation && user.id === SLOT_ADMIN_USER_ID && <button className="button" onClick={() => setPreview(true)}>Prova in privato</button>}
@@ -283,6 +287,8 @@ function TournamentDetail({ id, user, members, onBack, rehearsal }: { id: string
     <p className="tournament-note">{simulation ? 'Simulazione privata: risultati fittizi salvati solo su questo dispositivo. Nessuna pubblicazione, notifica o modifica al database condiviso.' : 'Torneo del gruppo, separato dal Fanta e dalle partite ordinarie. Nessuna prenotazione automatica dei campi.'}</p>
     {preview && <Modal title="Prepara una prova privata" onClose={() => setPreview(false)}><div className="tournament-form"><p>Copio formula, numero massimo di partecipanti, campi e durata. Userai nomi fittizi al posto degli iscritti reali, fino alla capienza prevista. Date, iscrizioni e risultati del torneo originale non cambiano.</p><p>Questa operazione sostituisce soltanto l’eventuale prova salvata su questo dispositivo. La simulazione non sarà visibile agli altri e non si può pubblicare.</p><button className="button button--primary" onClick={() => { try { resetTournamentSimulation(user, t); window.location.assign('#tornei/simulazione') } catch (reason) { setPreview(false); setError(reason instanceof Error ? reason.message : 'Impossibile preparare la prova.') } }}>Prepara simulazione privata</button></div></Modal>}
     {editor && <TournamentEditor tournament={t} user={user} onClose={() => setEditor(false)} onSaved={() => { setEditor(false); setMessage('Torneo modificato. Iscrizioni e risultati conservati.') }} />}
+    {drawEditor === 'teams' && <TournamentTeamsEditor tournament={t} members={members} user={user} onClose={() => setDrawEditor(null)} onSaved={() => { setDrawEditor(null); setMessage('Coppie aggiornate nel tabellone.') }} />}
+    {drawEditor === 'rounds' && <TournamentRoundsEditor tournament={t} scores={scores} members={members} user={user} onClose={() => setDrawEditor(null)} onSaved={() => { setDrawEditor(null); setMessage('Avversari e turni aggiornati.') }} />}
     {guestEditor && <TournamentGuestEditor tournament={t} guestId={guestEditor.id} user={user} members={members} registrationsOpen={open} onClose={() => setGuestEditor(null)} />}
     {matchId && t.matches[matchId] && <TournamentScoreEditor tournament={t} match={t.matches[matchId]} score={scores.find(s => s.matchId === matchId)} members={members} user={user} onClose={() => setMatchId('')} />}
     {confirmation && <Modal title={confirmation === 'publish' ? 'Pubblica il torneo?' : confirmation === 'cancel' ? 'Annulla il torneo?' : confirmation === 'start' ? 'Conferma il sorteggio?' : confirmation === 'end-round' ? 'Concludere il turno in anticipo?' : nextLabel} onClose={() => !busy && setConfirmation(null)}><div className="tournament-form"><p>{confirmation === 'publish' ? 'Gli altri membri potranno aprire il link e iscriversi. Potrai modificare il torneo finché le iscrizioni sono aperte; dal primo iscritto formula e coppie restano protette. Nel girone puoi ancora cambiare la durata delle partite prima del sorteggio. L’amministratore può intervenire anche sui tornei degli altri.' : confirmation === 'cancel' ? 'Le iscrizioni e i risultati resteranno consultabili, ma non si potrà più giocare. Non vengono cancellati dati.' : confirmation === 'start' ? 'Coppie e calendario verranno salvati definitivamente usando gli iscritti attuali. Nessuna iscrizione verrà aggiunta dopo il sorteggio.' : confirmation === 'end-round' ? 'Il timer si fermerà per tutti i campi e non potrà ripartire in questo turno. Assicurati che tutti abbiano finito di giocare. Potrai ancora inserire e correggere i punteggi; il turno successivo non partirà automaticamente.' : 'Conferma solo dopo aver controllato tutti i risultati. I punteggi di questo turno non saranno più modificabili perché determinano classifica e abbinamenti successivi.'}</p>{confirmation === 'start' && timed && validCount && <TournamentPlan input={t} count={registrations.length} />}<button className="button button--primary" disabled={busy} onClick={() => void perform(() => repository.actOnTournament(t.id, confirmation, user), confirmation === 'publish' ? 'Torneo pubblicato. Copia il link e condividilo con il gruppo.' : confirmation === 'end-round' ? 'Turno concluso. Completa e conferma i risultati.' : 'Torneo aggiornato.')}>{busy ? 'Attendi…' : 'Conferma'}</button>{error && <p role="alert" className="form-error">{error}</p>}</div></Modal>}

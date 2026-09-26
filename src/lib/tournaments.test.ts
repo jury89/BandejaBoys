@@ -1,4 +1,4 @@
-import { advanceTournament, cancelTournament, editTournament, getTournamentStandings, leaveTournament, makeTournament, makeTournamentScore, publishTournament, registerForTournament, startTournament, tournamentRegistrationsOpen, tournamentScoreIsValid, validateTournamentInput } from './domain'
+import { advanceTournament, cancelTournament, editTournament, editTournamentMatches, editTournamentTeams, getTournamentStandings, leaveTournament, makeTournament, makeTournamentScore, publishTournament, registerForTournament, startTournament, startTournamentRound, tournamentRegistrationsOpen, tournamentScoreIsValid, validateTournamentInput } from './domain'
 import { SLOT_ADMIN_USER_ID as admin } from './admin'
 import { localTournamentRepository } from './tournamentRepository'
 import type { Tournament, TournamentInput, TournamentScore } from './tournamentTypes'
@@ -19,6 +19,72 @@ function roundScores(t: Tournament, a = 14, b = 10): TournamentScore[] {
 }
 
 describe('tournament domain', () => {
+  it('replaces computer-drawn fixed teams throughout the saved schedule before play', () => {
+    const t = running({ format: 'round-robin', pairing: 'random-fixed' })
+    const pairs = t.teams.map(team => [...team.playerIds] as [string, string])
+    ;[pairs[0][0], pairs[1][0]] = [pairs[1][0], pairs[0][0]]
+    const edited = editTournamentTeams(t, pairs, [], admin, 0, input.startsAt)
+    expect(edited.drawRevision).toBe(1)
+    expect(edited.teams.map(team => team.id)).not.toEqual(t.teams.map(team => team.id))
+    expect(Object.values(edited.matches).every(match => edited.teams.some(team => team.id === match.teamA.id)
+      && edited.teams.some(team => team.id === match.teamB.id))).toBe(true)
+    expect(Object.keys(edited.matches)).toEqual(Object.keys(t.matches))
+    expect(() => editTournamentTeams(t, pairs.map(() => pairs[0]), [], admin, 0)).toThrow(/una sola coppia/)
+    expect(() => editTournamentTeams(edited, pairs, [], admin, 0)).toThrow(/modificato/)
+    expect(() => editTournamentTeams(t, pairs, [], 'p0', 0)).toThrow(/prima del primo/)
+    const score = makeTournamentScore(t, 'r1-m1', 6, 2, admin, undefined, 0, input.startsAt)
+    expect(() => editTournamentTeams(t, pairs, [score], admin, 0)).toThrow(/prima del primo/)
+    expect(() => editTournamentTeams(startTournamentRound({ ...t, scoringMode: 'timed' }, admin, input.startsAt), pairs, [], admin, 0)).toThrow(/prima del primo/)
+  })
+
+  it('lets the organizer rearrange complete round-robin rounds while preserving every opponent once', () => {
+    const t = running({ format: 'round-robin', pairing: 'random-fixed' })
+    const first = Object.values(t.matches).filter(match => match.round === 1)
+    const second = Object.values(t.matches).filter(match => match.round === 2)
+    const changed = { ...t.matches }
+    first.forEach((match, index) => { changed[match.id] = { ...match, teamA: second[index].teamA, teamB: second[index].teamB } })
+    expect(() => editTournamentMatches(t, changed, [], admin, 0)).toThrow(/una sola volta/)
+    second.forEach((match, index) => { changed[match.id] = { ...match, teamA: first[index].teamA, teamB: first[index].teamB } })
+    const edited = editTournamentMatches(t, changed, [], admin, 0, input.startsAt)
+    expect(edited.matches['r1-m1'].teamA.id).toBe(second[0].teamA.id)
+    expect(edited.matches['r2-m1'].teamA.id).toBe(first[0].teamA.id)
+    expect(edited.drawRevision).toBe(1)
+    expect(() => editTournamentMatches(edited, t.matches, [], admin, 0)).toThrow(/modificato/)
+    const duplicate = { ...t.matches, [first[0].id]: { ...first[0], teamB: first[0].teamA } }
+    expect(() => editTournamentMatches(t, duplicate, [], admin, 0)).toThrow(/due partite|una sola volta/)
+    const score = makeTournamentScore(t, first[0].id, 6, 2, admin, undefined, 0, input.startsAt)
+    expect(() => editTournamentMatches(t, changed, [score], admin, 0)).toThrow(/senza risultati/)
+    expect(() => editTournamentMatches(t, changed, [], 'p0', 0)).toThrow(/organizzatore/)
+  })
+
+  it('keeps confirmed results untouched while rearranging later round-robin rounds', () => {
+    const t = running({ format: 'round-robin', pairing: 'random-fixed' })
+    const scores = roundScores(t, 6, 2)
+    const advanced = advanceTournament(t, scores, admin, input.startsAt)
+    const second = Object.values(advanced.matches).filter(match => match.round === 2)
+    const third = Object.values(advanced.matches).filter(match => match.round === 3)
+    const proposed = { ...advanced.matches }
+    second.forEach((match, index) => { proposed[match.id] = { ...match, teamA: third[index].teamA, teamB: third[index].teamB } })
+    third.forEach((match, index) => { proposed[match.id] = { ...match, teamA: second[index].teamA, teamB: second[index].teamB } })
+    const edited = editTournamentMatches(advanced, proposed, scores, admin, 0)
+    expect(edited.matches['r1-m1']).toEqual(t.matches['r1-m1'])
+    expect(edited.matches['r2-m1'].teamA.id).toBe(third[0].teamA.id)
+    const first = proposed['r1-m1']
+    expect(() => editTournamentMatches(advanced, { ...proposed, 'r1-m1': { ...first, teamA: first.teamB, teamB: first.teamA } }, scores, admin, 0)).toThrow(/senza risultati/)
+  })
+
+  it('allows knockout opponents and rotating players to be changed before their round starts', () => {
+    const knockout = running({ format: 'knockout', pairing: 'random-fixed' })
+    const [a, b] = Object.values(knockout.matches)
+    const bracket = { ...knockout.matches,
+      [a.id]: { ...a, teamB: b.teamB }, [b.id]: { ...b, teamB: a.teamB } }
+    expect(editTournamentMatches(knockout, bracket, [], admin, 0).matches[a.id].teamB.id).toBe(b.teamB.id)
+    const americano = running({ format: 'americano', capacity: 8, rounds: 2 })
+    const [one, two] = Object.values(americano.matches).filter(match => match.round === 1)
+    const rotated = { ...americano.matches,
+      [one.id]: { ...one, teamB: two.teamB }, [two.id]: { ...two, teamB: one.teamB } }
+    expect(editTournamentMatches(americano, rotated, [], admin, 0).matches[one.id].teamB.id).toBe(two.teamB.id)
+  })
   it('lets every signed-in member create and edit a tournament before cutoff', () => {
     expect(() => makeTournament('qa', input, '', now)).toThrow(/Accedi/)
     const draft = makeTournament('qa', input, 'organizer', now)

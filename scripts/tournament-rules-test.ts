@@ -1,7 +1,7 @@
 /** Semantic Rules tests with synthetic resources and mocked get(): no Firestore writes or production document reads. */
 import { readFileSync } from 'node:fs'
 import { GoogleAuth } from 'google-auth-library'
-import { editTournament, editTournamentOrganization, endTournamentRound, leaveTournament, makeTournament, publishTournament, registerForTournament, renameTournamentGuest, saveTournamentGuest, removeTournamentGuest, startTournament, startTournamentRound } from '../src/lib/domain'
+import { editTournament, editTournamentMatches, editTournamentOrganization, editTournamentTeams, endTournamentRound, leaveTournament, makeTournament, publishTournament, registerForTournament, renameTournamentGuest, saveTournamentGuest, removeTournamentGuest, startTournament, startTournamentRound } from '../src/lib/domain'
 import { SLOT_ADMIN_USER_ID as admin } from '../src/lib/admin'
 import type { Tournament } from '../src/lib/tournamentTypes'
 
@@ -83,6 +83,22 @@ const running = startTournament(registered, admin, 17, open.startsAt)
 test('admin saves draw', 'ALLOW', 'update', admin, registered, running, { time: open.startsAt })
 test('owner saves own draw', 'ALLOW', 'update', owner, { ...registered, createdBy: owner }, { ...running, createdBy: owner }, { time: open.startsAt })
 test('player cannot save draw', 'DENY', 'update', 'p0', registered, running, { time: open.startsAt })
+const fixedRegistered = { ...registered, format: 'round-robin' as const, pairing: 'random-fixed' as const }
+const fixedDraw = startTournament(fixedRegistered, admin, 17, open.startsAt)
+const fixedPairs = fixedDraw.teams.map(team => [...team.playerIds] as [string, string])
+;[fixedPairs[0][0], fixedPairs[1][0]] = [fixedPairs[1][0], fixedPairs[0][0]]
+const correctedPairs = editTournamentTeams(fixedDraw, fixedPairs, [], admin, 0, open.startsAt)
+test('organizer corrects computer-drawn pairs', 'ALLOW', 'update', admin, fixedDraw, correctedPairs, { time: open.startsAt })
+test('another member cannot correct drawn pairs', 'DENY', 'update', 'p0', fixedDraw, correctedPairs, { time: open.startsAt })
+test('draw edit cannot change tournament settings', 'DENY', 'update', admin, fixedDraw, { ...correctedPairs, capacity: 10 }, { time: open.startsAt })
+const firstMatches = Object.values(fixedDraw.matches).filter(item => item.round === 1)
+const secondMatches = Object.values(fixedDraw.matches).filter(item => item.round === 2)
+const reordered = { ...fixedDraw.matches }
+firstMatches.forEach((item, index) => { reordered[item.id] = { ...item, teamA: secondMatches[index].teamA, teamB: secondMatches[index].teamB } })
+secondMatches.forEach((item, index) => { reordered[item.id] = { ...item, teamA: firstMatches[index].teamA, teamB: firstMatches[index].teamB } })
+const correctedRounds = editTournamentMatches(fixedDraw, reordered, [], admin, 0, open.startsAt)
+test('organizer corrects round opponents', 'ALLOW', 'update', admin, fixedDraw, correctedRounds, { time: open.startsAt })
+test('another member cannot correct round opponents', 'DENY', 'update', 'p0', fixedDraw, correctedRounds, { time: open.startsAt })
 const match = running.matches['r1-m1'], player = match.teamA.playerIds[0]
 const other = Object.keys(running.registrations).find(id => ![...match.teamA.playerIds, ...match.teamB.playerIds].includes(id))!
 const options = { parent: running, scoreId: match.id, time: open.startsAt }

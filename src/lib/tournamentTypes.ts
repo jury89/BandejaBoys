@@ -54,6 +54,8 @@ export interface Tournament extends TournamentInput {
   currentRound: number
   totalRounds: number
   seed: number
+  // Optimistic revision for manual changes to the saved draw (0 for older tournaments).
+  drawRevision?: number
   roundStartedAt?: number | null
   // Explicit organizer stop; absent on legacy/naturally expired rounds.
   roundEndedAt?: number | null

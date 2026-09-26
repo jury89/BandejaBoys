@@ -523,7 +523,7 @@ service cloud.firestore {
       return data.keys().hasOnly(['id', 'title', 'startsAt', 'venueId', 'format', 'pairing', 'capacity',
           'courts', 'rounds', 'pointsPerMatch', 'scoreAccess', 'published', 'status', 'createdBy',
           'createdAt', 'updatedAt', 'registrations', 'teams', 'matches', 'currentRound', 'totalRounds', 'seed',
-          'scoringMode', 'matchMinutes', 'warmupMinutes', 'changeoverMinutes', 'roundStartedAt', 'roundEndedAt', 'totalMinutes', 'guestNameChange'])
+          'scoringMode', 'matchMinutes', 'warmupMinutes', 'changeoverMinutes', 'roundStartedAt', 'roundEndedAt', 'totalMinutes', 'guestNameChange', 'drawRevision'])
         && data.title is string && data.title.size() >= 3 && data.title.size() <= 80
         && data.startsAt is number
         && data.venueId in ['oasi-boschetto', 'tennis-club-mantova', 'sport-city-mantova']

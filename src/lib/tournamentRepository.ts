@@ -1,8 +1,8 @@
 import { collection, doc, limit, onSnapshot, or, orderBy, query, runTransaction, where, type Firestore, type Unsubscribe } from 'firebase/firestore'
 import type { SessionUser } from '../types'
 import { isSlotAdmin } from './admin'
-import { advanceTournament, cancelTournament, canManageTournament, editTournament, editTournamentOrganization, endTournamentRound, leaveTournament, makeTournament, makeTournamentScore, publishTournament, registerForTournament, removeTournamentGuest, renameTournamentGuest, saveTournamentGuest, startTournament, startTournamentRound } from './domain'
-import type { Tournament, TournamentInput, TournamentOrganization, TournamentScore } from './tournamentTypes'
+import { advanceTournament, cancelTournament, canManageTournament, editTournament, editTournamentMatches, editTournamentOrganization, editTournamentTeams, endTournamentRound, leaveTournament, makeTournament, makeTournamentScore, publishTournament, registerForTournament, removeTournamentGuest, renameTournamentGuest, saveTournamentGuest, startTournament, startTournamentRound } from './domain'
+import type { Tournament, TournamentInput, TournamentMatch, TournamentOrganization, TournamentScore } from './tournamentTypes'
 
 type Action = 'publish' | 'cancel' | 'start' | 'start-round' | 'end-round' | 'advance'
 export interface TournamentRepository {
@@ -12,6 +12,8 @@ export interface TournamentRepository {
   createTournament(input: TournamentInput, actor: SessionUser): Promise<string>
   editTournament(id: string, input: TournamentInput, actor: SessionUser): Promise<void>
   editTournamentOrganization(id: string, input: TournamentOrganization, actor: SessionUser): Promise<void>
+  editTournamentTeams(id: string, pairs: Array<[string, string]>, expectedRevision: number, actor: SessionUser): Promise<void>
+  editTournamentMatches(id: string, matches: Record<string, TournamentMatch>, expectedRevision: number, actor: SessionUser): Promise<void>
   actOnTournament(id: string, action: Action, actor: SessionUser): Promise<void>
   registerForTournament(id: string, partnerId: string | null, actor: SessionUser): Promise<void>
   leaveTournament(id: string, actor: SessionUser): Promise<void>
@@ -39,6 +41,20 @@ export function remoteTournamentRepository(db: Firestore): TournamentRepository 
       tx.set(ref, fn({ ...snapshot.data(), id } as Tournament))
     })
   }
+  const mutateDraw = async (
+    id: string, scoreMatchIds: (tournament: Tournament) => string[],
+    fn: (tournament: Tournament, scores: TournamentScore[]) => Tournament,
+  ) => {
+    await runTransaction(db, async tx => {
+      const ref = doc(tournaments, id), snapshot = await tx.get(ref)
+      if (!snapshot.exists()) throw new Error('Torneo non trovato.')
+      const tournament = { ...snapshot.data(), id } as Tournament
+      // Only affected rounds need score reads; a concurrent result still retries the transaction.
+      const scoreSnapshots = await Promise.all(scoreMatchIds(tournament).map(matchId => tx.get(doc(db, 'tournaments', id, 'scores', matchId))))
+      const scores = scoreSnapshots.filter(score => score.exists()).map(score => score.data() as TournamentScore)
+      tx.set(ref, fn(tournament, scores))
+    })
+  }
   return {
     subscribeTournaments(userId, listener, onError) {
       const source = isSlotAdmin(userId)
@@ -63,6 +79,17 @@ export function remoteTournamentRepository(db: Firestore): TournamentRepository 
     },
     editTournament: (id, input, actor) => mutate(id, t => editTournament(t, input, actor.id)),
     editTournamentOrganization: (id, input, actor) => mutate(id, t => editTournamentOrganization(t, input, actor.id)),
+    editTournamentTeams: (id, pairs, revision, actor) => mutateDraw(id,
+      t => Object.values(t.matches).filter(match => match.round === 1).map(match => match.id),
+      (t, scores) => editTournamentTeams(t, pairs, scores, actor.id, revision)),
+    editTournamentMatches: (id, matches, revision, actor) => mutateDraw(id,
+      t => {
+        const changedRounds = new Set(Object.values(t.matches).filter(match => (
+          matches[match.id]?.teamA?.id !== match.teamA.id || matches[match.id]?.teamB?.id !== match.teamB.id
+        )).map(match => match.round))
+        return Object.values(t.matches).filter(match => changedRounds.has(match.round)).map(match => match.id)
+      },
+      (t, scores) => editTournamentMatches(t, matches, scores, actor.id, revision)),
     registerForTournament: (id, partnerId, actor) => mutate(id, t => registerForTournament(t, actor, partnerId)),
     leaveTournament: (id, actor) => mutate(id, t => leaveTournament(t, actor.id)),
     saveTournamentGuest: (id, guestId, name, partnerId, actor) => {
@@ -136,6 +163,8 @@ export function localTournamentRepository(options: { storageKey?: string; now?: 
     },
     editTournament: (id, input, actor) => mutate(id, t => editTournament(t, input, actor.id, now())),
     editTournamentOrganization: (id, input, actor) => mutate(id, t => editTournamentOrganization(t, input, actor.id, now())),
+    editTournamentTeams: (id, pairs, revision, actor) => mutate(id, (t, store) => editTournamentTeams(t, pairs, store.scores[id] ?? [], actor.id, revision, now())),
+    editTournamentMatches: (id, matches, revision, actor) => mutate(id, (t, store) => editTournamentMatches(t, matches, store.scores[id] ?? [], actor.id, revision, now())),
     registerForTournament: (id, partnerId, actor) => mutate(id, t => registerForTournament(t, actor, partnerId, now())),
     leaveTournament: (id, actor) => mutate(id, t => leaveTournament(t, actor.id, now())),
     saveTournamentGuest: (id, guestId, name, partnerId, actor) => mutate(id, t => saveTournamentGuest(t, guestId ?? `guest:${crypto.randomUUID()}`, name, partnerId, actor.id, now())),

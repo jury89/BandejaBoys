@@ -2360,8 +2360,121 @@ export function startTournament(tournament: Tournament, actorId: string, seed: n
     }
   }
   return { ...tournament, status: 'running', seed, teams, totalRounds, currentRound: 1,
-    matches: Object.fromEntries(matches.map((match) => [match.id, match])), updatedAt: now, roundStartedAt: null, roundEndedAt: null,
+    matches: Object.fromEntries(matches.map((match) => [match.id, match])), drawRevision: 0, updatedAt: now, roundStartedAt: null, roundEndedAt: null,
     ...(plan ? { matchMinutes: plan.matchMinutes } : {}) }
+}
+
+function requireDrawRevision(tournament: Tournament, expectedRevision: number): void {
+  if ((tournament.drawRevision ?? 0) !== expectedRevision) {
+    throw new Error('Il tabellone è stato modificato da qualcun altro. Riapri la modifica e riprova.')
+  }
+}
+
+export function canEditTournamentTeams(tournament: Tournament, scores: TournamentScore[], actorId: string): boolean {
+  return canManageTournament(tournament, actorId)
+    && tournament.status === 'running' && tournament.pairing === 'random-fixed'
+    && !tournamentUsesRotatingPairs(tournament) && tournament.currentRound === 1
+    && tournament.roundStartedAt == null && scores.length === 0
+}
+
+/** Change computer-drawn fixed pairs before play. Match identities, courts and rounds stay stable. */
+export function editTournamentTeams(
+  tournament: Tournament, pairs: Array<[string, string]>, scores: TournamentScore[],
+  actorId: string, expectedRevision: number, now = Date.now(),
+): Tournament {
+  if (!canEditTournamentTeams(tournament, scores, actorId)) throw new Error('Le coppie sorteggiate si possono modificare solo prima del primo risultato o timer.')
+  requireDrawRevision(tournament, expectedRevision)
+  const registered = Object.keys(tournament.registrations).sort()
+  const selected = pairs.flat()
+  if (pairs.length !== tournament.teams.length || selected.length !== registered.length
+    || new Set(selected).size !== registered.length || selected.some(id => !tournament.registrations[id])) {
+    throw new Error('Ogni iscritto deve comparire in una sola coppia.')
+  }
+  const teams = pairs.map(([a, b]) => tournamentTeam(a, b))
+  if (teams.every((team, index) => team.id === tournament.teams[index].id)) throw new Error('Le coppie non sono cambiate.')
+  const replacement = new Map(tournament.teams.map((team, index) => [team.id, teams[index]]))
+  const matches = Object.fromEntries(Object.entries(tournament.matches).map(([id, match]) => [id, {
+    ...match, teamA: replacement.get(match.teamA.id)!, teamB: replacement.get(match.teamB.id)!,
+  }]))
+  return { ...tournament, teams, matches, drawRevision: expectedRevision + 1, updatedAt: now }
+}
+
+export function canEditTournamentRound(
+  tournament: Tournament, round: number, scores: TournamentScore[], actorId: string,
+): boolean {
+  if (!canManageTournament(tournament, actorId) || tournament.status !== 'running'
+    || round < tournament.currentRound || round > tournament.totalRounds
+    || scores.some(score => tournament.matches[score.matchId]?.round === round)) return false
+  if (round === tournament.currentRound && tournament.roundStartedAt != null) return false
+  if ((tournament.format === 'knockout' || tournament.format === 'mexicano') && round !== tournament.currentRound) return false
+  return Object.values(tournament.matches).some(match => match.round === round)
+}
+
+function sameTournamentMatchPosition(left: TournamentMatch, right: TournamentMatch): boolean {
+  return left.id === right.id && left.round === right.round && left.court === right.court
+    && left.wave === right.wave && left.stage === right.stage
+}
+
+/** Replace opponents in unplayed rounds without changing match IDs or their score history. */
+export function editTournamentMatches(
+  tournament: Tournament, matches: Record<string, TournamentMatch>, scores: TournamentScore[],
+  actorId: string, expectedRevision: number, now = Date.now(),
+): Tournament {
+  requireTournamentManager(tournament, actorId)
+  requireDrawRevision(tournament, expectedRevision)
+  const oldMatches = tournament.matches
+  const oldIds = Object.keys(oldMatches)
+  if (Object.keys(matches).length !== oldIds.length || oldIds.some(id => !matches[id])) throw new Error('Il numero delle partite non può cambiare.')
+  const registered = Object.keys(tournament.registrations)
+  const registeredSet = new Set(registered)
+  const fixed = !tournamentUsesRotatingPairs(tournament)
+  const teams = new Map(tournament.teams.map(team => [team.id, team]))
+  const changedRounds = new Set<number>()
+  for (const id of oldIds) {
+    const old = oldMatches[id], match = matches[id]
+    if (!sameTournamentMatchPosition(old, match)) throw new Error('Turno, campo e identità della partita non possono cambiare.')
+    for (const team of [match.teamA, match.teamB]) {
+      if (team.playerIds.length !== 2 || team.playerIds[0] === team.playerIds[1]
+        || team.id !== tournamentTeam(...team.playerIds).id
+        || team.playerIds.some(player => !registeredSet.has(player))
+        || (fixed && !teams.has(team.id))) throw new Error('Una coppia del calendario non è valida.')
+    }
+    if (old.teamA.id !== match.teamA.id || old.teamB.id !== match.teamB.id) changedRounds.add(match.round)
+  }
+  if (!changedRounds.size) throw new Error('Gli avversari non sono cambiati.')
+  if ([...changedRounds].some(round => !canEditTournamentRound(tournament, round, scores, actorId))) {
+    throw new Error('Puoi modificare solo turni senza risultati e non ancora avviati.')
+  }
+  for (let round = 1; round <= tournament.totalRounds; round += 1) {
+    const oldRound = oldIds.map(id => oldMatches[id]).filter(match => match.round === round)
+    const proposed = oldIds.map(id => matches[id]).filter(match => match.round === round)
+    if (!proposed.length) continue
+    const assigned = proposed.flatMap(match => fixed ? [match.teamA.id, match.teamB.id]
+      : [...match.teamA.playerIds, ...match.teamB.playerIds])
+    if (new Set(assigned).size !== assigned.length) throw new Error(`Nel turno ${round} una coppia o un giocatore compare in due partite.`)
+    if (fixed && tournament.format === 'knockout') {
+      const original = oldRound.flatMap(match => [match.teamA.id, match.teamB.id]).sort()
+      if (JSON.stringify([...assigned].sort()) !== JSON.stringify(original)) throw new Error('Nel turno a eliminazione devono restare le stesse coppie qualificate.')
+    }
+    if (!fixed && (assigned.length !== registered.length || assigned.some(id => !registeredSet.has(id)))) {
+      throw new Error(`Nel turno ${round} devono giocare tutti gli iscritti, una volta sola.`)
+    }
+  }
+  if (tournament.format === 'round-robin') {
+    const pairings = oldIds.map(id => [matches[id].teamA.id, matches[id].teamB.id].sort().join('|'))
+    if (new Set(pairings).size !== pairings.length) throw new Error('Nel girone ogni coppia deve affrontare ogni altra una sola volta. Controlla anche gli altri turni.')
+  }
+  if (tournament.format === 'americano') {
+    const pairCounts = (draw: Record<string, TournamentMatch>) => {
+      const count = new Map<string, number>()
+      Object.values(draw).forEach(match => [match.teamA.id, match.teamB.id].forEach(id => count.set(id, (count.get(id) ?? 0) + 1)))
+      return [...count].sort(([a], [b]) => a.localeCompare(b))
+    }
+    if (JSON.stringify(pairCounts(matches)) !== JSON.stringify(pairCounts(oldMatches))) {
+      throw new Error('Nell’Americano ogni coppia di compagni deve mantenere il numero di incontri previsto.')
+    }
+  }
+  return { ...tournament, matches, drawRevision: expectedRevision + 1, updatedAt: now }
 }
 
 export function startTournamentRound(tournament: Tournament, actorId: string, now = Date.now()): Tournament {
