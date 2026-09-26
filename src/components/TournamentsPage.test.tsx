@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { SLOT_ADMIN_USER_ID } from '../lib/admin'
-import { advanceTournament, makeTournament, makeTournamentScore, publishTournament, registerForTournament, startTournament, startTournamentRound } from '../lib/domain'
+import { advanceTournament, makeTournament, makeTournamentScore, publishTournament, registerForTournament, saveTournamentGuest, startTournament, startTournamentRound } from '../lib/domain'
 import type { Tournament, TournamentInput, TournamentScore } from '../lib/tournamentTypes'
 import { TournamentsPage } from './TournamentsPage'
 
@@ -89,6 +89,26 @@ describe('TournamentsPage', () => {
     await u.click(screen.getByRole('button', { name: 'Rimuovi ospite' }))
     await u.click(screen.getByRole('button', { name: 'Conferma rimozione ospite' }))
     expect(screen.queryByText(/Ciccio Rossi · Ospite/)).not.toBeInTheDocument()
+  })
+  it.each(['open', 'running', 'completed', 'cancelled'] as const)('keeps guest names editable on a %s tournament after cutoff', async status => {
+    const enrolled = saveTournamentGuest(fixture({ startsAt: now }, 3), 'guest:ciccio', 'Ciccio', null, admin.id, now - 86_400_000)
+    const drawn = status === 'running' || status === 'completed' ? startTournament(enrolled, admin.id, 42, now) : enrolled
+    const tournament = { ...drawn, status }
+    seed(tournament)
+    const u = userEvent.setup(); show()
+    if (tournament.currentRound > 0) await u.click(screen.getByRole('button', { name: 'Dettagli' }))
+    expect(screen.queryByRole('button', { name: /Aggiungi ospite/ })).not.toBeInTheDocument()
+    await u.click(screen.getByRole('button', { name: 'Modifica nome ospite Ciccio' }))
+    const modal = screen.getByRole('dialog')
+    expect(within(modal).queryByRole('button', { name: 'Rimuovi ospite' })).not.toBeInTheDocument()
+    await u.clear(within(modal).getByLabelText('Nome dell’ospite'))
+    await u.type(within(modal).getByLabelText('Nome dell’ospite'), 'Ciccio Rossi')
+    await u.click(within(modal).getByRole('button', { name: 'Salva nome' }))
+    expect(await screen.findByRole('button', { name: 'Modifica nome ospite Ciccio Rossi' })).toBeInTheDocument()
+    const saved = JSON.parse(localStorage.getItem('bandeja-tournaments-v1')!).tournaments[0] as Tournament
+    expect(saved.registrations['guest:ciccio'].displayName).toBe('Ciccio Rossi')
+    expect(saved.registrations['guest:ciccio'].joinedAt).toBe(tournament.registrations['guest:ciccio'].joinedAt)
+    expect(saved.matches).toEqual(tournament.matches)
   })
   it('keeps guest management hidden from other members', () => {
     seed(fixture()); show(members[7])

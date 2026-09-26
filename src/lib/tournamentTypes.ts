@@ -47,6 +47,8 @@ export interface Tournament extends TournamentInput {
   createdAt: number
   updatedAt: number
   registrations: Record<string, TournamentRegistration>
+  // A changing marker routes rename-only writes through narrow Security Rules.
+  guestNameChange?: { guestId: string; revision: number }
   teams: TournamentTeam[]
   matches: Record<string, TournamentMatch>
   currentRound: number

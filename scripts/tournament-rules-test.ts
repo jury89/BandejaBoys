@@ -1,7 +1,7 @@
 /** Semantic Rules tests with synthetic resources and mocked get(): no Firestore writes or production document reads. */
 import { readFileSync } from 'node:fs'
 import { GoogleAuth } from 'google-auth-library'
-import { editTournament, editTournamentOrganization, endTournamentRound, makeTournament, publishTournament, registerForTournament, saveTournamentGuest, removeTournamentGuest, startTournament, startTournamentRound } from '../src/lib/domain'
+import { editTournament, editTournamentOrganization, endTournamentRound, leaveTournament, makeTournament, publishTournament, registerForTournament, renameTournamentGuest, saveTournamentGuest, removeTournamentGuest, startTournament, startTournamentRound } from '../src/lib/domain'
 import { SLOT_ADMIN_USER_ID as admin } from '../src/lib/admin'
 import type { Tournament } from '../src/lib/tournamentTypes'
 
@@ -133,6 +133,30 @@ test('guest registration forbidden at cutoff even for organizer', 'DENY', 'updat
 test('guest removal forbidden at cutoff even for admin', 'DENY', 'update', admin, guestJoined, ownOpen, { time: cutoff })
 test('member cannot turn own registration into guest', 'DENY', 'update', 'p0', open, { ...joined, registrations: { p0: { ...joined.registrations.p0, isGuest: true } } })
 test('organizer cannot exceed capacity with guest', 'DENY', 'update', owner, { ...full, createdBy: owner }, { ...full, createdBy: owner, registrations: { ...full.registrations, ...guestJoined.registrations } })
+const guestRenamed = renameTournamentGuest(guestJoined, 'guest:ciccio', 'Ciccio Rossi', owner, cutoff)
+test('creator can rename guest at cutoff', 'ALLOW', 'update', owner, guestJoined, guestRenamed, { time: cutoff })
+test('creator can rename the same guest again after cutoff', 'ALLOW', 'update', owner, guestRenamed, renameTournamentGuest(guestRenamed, 'guest:ciccio', 'Ciccio Bianchi', owner, cutoff + 1), { time: cutoff + 1 })
+test('admin can rename guest after cutoff', 'ALLOW', 'update', admin, guestJoined, guestRenamed, { time: ownOpen.startsAt })
+test('other member cannot rename guest', 'DENY', 'update', 'p0', guestJoined, guestRenamed, { time: cutoff })
+test('rename marker must increment exactly once', 'DENY', 'update', owner, guestJoined, { ...guestRenamed, guestNameChange: { guestId: 'guest:ciccio', revision: 9 } }, { time: cutoff })
+test('renaming without marker is still closed at cutoff', 'DENY', 'update', owner, guestJoined, { ...guestJoined, registrations: guestRenamed.registrations }, { time: cutoff })
+test('rename cannot change guest partner', 'DENY', 'update', owner, guestJoined, { ...guestRenamed, registrations: { ...guestRenamed.registrations, 'guest:ciccio': { ...guestRenamed.registrations['guest:ciccio'], partnerId: 'p0' } } }, { time: cutoff })
+test('rename cannot add a participant', 'DENY', 'update', owner, guestJoined, { ...guestRenamed, registrations: { ...guestRenamed.registrations, p0: { userId: 'p0', displayName: 'Player 0', joinedAt: now, partnerId: null } } }, { time: cutoff })
+test('rename cannot change registration order', 'DENY', 'update', owner, guestJoined, { ...guestRenamed, registrations: { ...guestRenamed.registrations, 'guest:ciccio': { ...guestRenamed.registrations['guest:ciccio'], joinedAt: now - 1 } } }, { time: cutoff })
+test('rename cannot change tournament settings', 'DENY', 'update', owner, guestJoined, { ...guestRenamed, capacity: 12 }, { time: cutoff })
+test('rename cannot target a member', 'DENY', 'update', owner, joined, { ...joined, guestNameChange: { guestId: 'p0', revision: 1 }, registrations: { p0: { ...joined.registrations.p0, displayName: 'Falso' } } }, { time: cutoff })
+test('rename cannot use a blank or overlong name', 'DENY', 'update', owner, guestJoined, { ...guestRenamed, registrations: { 'guest:ciccio': { ...guestRenamed.registrations['guest:ciccio'], displayName: '' } } }, { time: cutoff })
+let guestDraw = ownOpen
+for (let i = 0; i < 3; i++) guestDraw = registerForTournament(guestDraw, { id: `p${i}`, displayName: `Player ${i}` }, null, now)
+guestDraw = saveTournamentGuest(guestDraw, 'guest:ciccio', 'Ciccio', null, owner, now)
+const guestRunning = startTournament(guestDraw, owner, 42, ownOpen.startsAt)
+for (const status of ['running', 'completed', 'cancelled'] as const) {
+  const before = { ...guestRunning, status }
+  const after = renameTournamentGuest(before, 'guest:ciccio', 'Ciccio Rossi', owner, ownOpen.startsAt + 1)
+  test(`creator renames guest on ${status} tournament`, 'ALLOW', 'update', owner, before, after, { time: ownOpen.startsAt + 1 })
+  test(`admin renames guest on ${status} tournament`, 'ALLOW', 'update', admin, before, after, { time: ownOpen.startsAt + 1 })
+  test(`rename cannot alter ${status} draw`, 'DENY', 'update', owner, before, { ...after, matches: {} }, { time: ownOpen.startsAt + 1 })
+}
 
 const timedDraft = makeTournament('qa', { ...draft, format: 'round-robin', pairing: 'random-fixed', capacity: 10, courts: 2, scoringMode: 'timed', matchMinutes: 15 }, owner, now)
 const timedOpen = publishTournament(timedDraft, owner, now)
@@ -227,6 +251,10 @@ let adaptiveRegistered = adaptiveOpen
 for (let i = 0; i < 12; i++) adaptiveRegistered = registerForTournament(adaptiveRegistered, { id: `p${i}`, displayName: `Player ${i}` }, null, now)
 const adaptiveDrawn = startTournament(adaptiveRegistered, owner, 42, cutoff)
 const adaptiveStarted = startTournamentRound(adaptiveDrawn, owner, adaptiveOpen.startsAt)
+const adaptiveGuestRegistered = saveTournamentGuest(leaveTournament(adaptiveRegistered, 'p11', now), 'guest:ciccio', 'Ciccio', null, owner, now)
+const adaptiveGuestDrawn = startTournament(adaptiveGuestRegistered, owner, 42, cutoff)
+test('rename survives adaptive drawn tournament expression budget', 'ALLOW', 'update', owner, adaptiveGuestDrawn, renameTournamentGuest(adaptiveGuestDrawn, 'guest:ciccio', 'Ciccio Rossi', owner, cutoff), { time: cutoff })
+test('rename survives adaptive completed tournament expression budget', 'ALLOW', 'update', admin, { ...adaptiveGuestDrawn, status: 'completed' }, renameTournamentGuest({ ...adaptiveGuestDrawn, status: 'completed' }, 'guest:ciccio', 'Ciccio Rossi', admin, cutoff), { time: cutoff })
 const adaptiveSettings = { capacity: 14, courts: 3, totalMinutes: 120, warmupMinutes: 5, changeoverMinutes: 2 }
 const adaptiveEdited = editTournamentOrganization(adaptiveRegistered, adaptiveSettings, owner, now)
 test('adaptive draft on fewer courts accepted', 'ALLOW', 'create', owner, undefined, adaptiveDraft)

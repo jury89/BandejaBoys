@@ -71,7 +71,7 @@ L’avviso sonoro va attivato esplicitamente su ogni dispositivo. Usa Web Audio 
 
 ## Partecipanti esterni
 
-Nell’elenco iscritti, creatore e Jury vedono **Aggiungi ospite** finché le iscrizioni sono aperte. Nome obbligatorio, massimo 80 caratteri; ogni ospite ha un ID `guest:<UUID>` e occupa un posto nella stessa capienza dei membri. Non vengono creati account o registrazioni nelle partite ordinarie. Nome, compagno e rimozione si gestiscono dalla voce dell’ospite; tutto si blocca a −1 ora, anche per l’organizzatore, senza alterare tabelloni o storico dopo il via.
+Nell’elenco iscritti, creatore e Jury vedono **Aggiungi ospite** finché le iscrizioni sono aperte. Nome obbligatorio, massimo 80 caratteri; ogni ospite ha un ID `guest:<UUID>` e occupa un posto nella stessa capienza dei membri. Non vengono creati account o registrazioni nelle partite ordinarie. Compagno e rimozione si gestiscono dalla voce dell’ospite fino a −1 ora. **Modifica nome** resta disponibile anche a iscrizioni chiuse, durante il torneo e dopo conclusione o annullamento; corregge soltanto il nome, mantenendo ID, ordine d’iscrizione, coppie, tabellone e risultati. Dopo il sorteggio la voce si trova in **Dettagli → Iscritti**.
 
 Per le coppie scelte, l’organizzatore sceglie per l’ospite; il membro deve ricambiare dal suo account. Per due ospiti si impostano entrambe le scelte. Se uno viene rimosso, il compagno resta da confermare e il sorteggio non può partire con una coppia incoerente. Ospiti e membri compaiono allo stesso modo nelle partite e nel podio, ma gli esterni non possono accedere o salvare risultati: lo fa l’organizzatore/Jury oppure un membro coinvolto, se abilitato.
 

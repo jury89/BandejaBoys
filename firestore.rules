@@ -523,7 +523,7 @@ service cloud.firestore {
       return data.keys().hasOnly(['id', 'title', 'startsAt', 'venueId', 'format', 'pairing', 'capacity',
           'courts', 'rounds', 'pointsPerMatch', 'scoreAccess', 'published', 'status', 'createdBy',
           'createdAt', 'updatedAt', 'registrations', 'teams', 'matches', 'currentRound', 'totalRounds', 'seed',
-          'scoringMode', 'matchMinutes', 'warmupMinutes', 'changeoverMinutes', 'roundStartedAt', 'roundEndedAt', 'totalMinutes'])
+          'scoringMode', 'matchMinutes', 'warmupMinutes', 'changeoverMinutes', 'roundStartedAt', 'roundEndedAt', 'totalMinutes', 'guestNameChange'])
         && data.title is string && data.title.size() >= 3 && data.title.size() <= 80
         && data.startsAt is number
         && data.venueId in ['oasi-boschetto', 'tennis-club-mantova', 'sport-city-mantova']
@@ -644,6 +644,30 @@ service cloud.firestore {
         && validOwnTournamentRegistration(after, before);
     }
 
+    // A name correction can outlive signups, the draw and the tournament itself.
+    // The explicit guest id lets Rules verify one nested map entry without
+    // trusting the client to rewrite any other registration or match fact.
+    function validTournamentGuestRename(before, after) {
+      let change = after.get('guestNameChange', {});
+      let guestId = change.get('guestId', '');
+      return (isSlotAdmin() || before.createdBy == request.auth.uid)
+        && change is map && change.keys().hasOnly(['guestId', 'revision'])
+        && guestId is string && guestId.matches('^guest:[^/]+$')
+        && change.revision is int && change.revision == before.get('guestNameChange', {}).get('revision', 0) + 1
+        && after.diff(before).affectedKeys().hasOnly(['registrations', 'updatedAt', 'guestNameChange'])
+        && after.updatedAt is number
+        && before.registrations is map && after.registrations is map
+        && guestId in before.registrations && guestId in after.registrations
+        && before.registrations[guestId].isGuest == true
+        && after.registrations.diff(before.registrations).affectedKeys().size() == 1
+        && after.registrations.diff(before.registrations).affectedKeys().hasOnly([guestId])
+        && after.registrations[guestId].diff(before.registrations[guestId]).affectedKeys().hasOnly(['displayName'])
+        && after.registrations[guestId].displayName is string
+        && after.registrations[guestId].displayName.size() >= 1
+        && after.registrations[guestId].displayName.size() <= 80
+        && after.registrations[guestId].displayName != before.registrations[guestId].displayName;
+    }
+
     match /tournaments/{tournamentId} {
       // Creation transactions first check that the generated document id is unused.
       allow get: if isMember() && !exists(/databases/$(database)/documents/tournaments/$(tournamentId));
@@ -654,9 +678,12 @@ service cloud.firestore {
         && request.resource.data.id == tournamentId && request.resource.data.status == 'draft'
         && request.resource.data.published == false && request.resource.data.registrations.size() == 0
         && request.resource.data.matches.size() == 0
+        && !('guestNameChange' in request.resource.data)
         && request.resource.data.get('roundStartedAt', null) == null
         && request.resource.data.get('roundEndedAt', null) == null;
-      allow update: if isMember() && (validOwnTournamentUpdate(resource.data, request.resource.data) || (
+      allow update: if isMember() && (request.resource.data.get('guestNameChange', null) != resource.data.get('guestNameChange', null)
+        ? validTournamentGuestRename(resource.data, request.resource.data)
+        : (validOwnTournamentUpdate(resource.data, request.resource.data) || (
         (isSlotAdmin() || resource.data.createdBy == request.auth.uid)
         && validTournament(request.resource.data)
         && request.resource.data.id == resource.data.id
@@ -667,7 +694,7 @@ service cloud.firestore {
         && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['registrations'])
           || (resource.data.published == true && resource.data.status == 'open'
             && request.time.toMillis() < resource.data.startsAt - 3600000))
-      ));
+      )));
       allow delete: if false;
 
       match /scores/{matchId} {

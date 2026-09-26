@@ -20,7 +20,7 @@ Solo Jury vede **Tornei → Simulazione privata**: esempio 10 giocatori/2 campi/
 
 Il timer condiviso viene avviato dall’organizzatore, continua dopo un ricaricamento e non avvia da solo il turno successivo. Sono ammessi pareggi: 3 punti per vittoria, 1 per pareggio, 0 per sconfitta; poi differenza game e game fatti. Si contano i game completati, con punto secco sul 40–40, finendo il punto in corso alla scadenza. Ritardi e punti aggiuntivi consumano il margine: la fine entro il budget richiede di rispettare cambi e programma. L’avviso sonoro opzionale richiede la pagina aperta e il dispositivo attivo.
 
-Creatore e Jury possono **aggiungere partecipanti esterni** per nome, gestirne il compagno e rimuoverli fino alla chiusura delle iscrizioni. Gli ospiti occupano posti reali, partecipano al sorteggio e alla classifica senza creare account. I risultati vengono inseriti dall’organizzatore/admin o dai membri coinvolti, secondo l’impostazione del torneo. I tornei a set già esistenti non cambiano.
+Creatore e Jury possono **aggiungere partecipanti esterni** per nome, gestirne il compagno e rimuoverli fino alla chiusura delle iscrizioni. Il nome di un ospite già iscritto resta correggibile da **Dettagli → Iscritti → Modifica nome** anche dopo il sorteggio, durante il torneo e dopo la conclusione o l’annullamento; identità, compagno, tabellone e risultati non cambiano. Gli ospiti occupano posti reali, partecipano al sorteggio e alla classifica senza creare account. I risultati vengono inseriti dall’organizzatore/admin o dai membri coinvolti, secondo l’impostazione del torneo. I tornei a set già esistenti non cambiano.
 
 ## Campi, preferiti e posto fisso
 

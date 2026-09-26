@@ -2210,6 +2210,17 @@ export function saveTournamentGuest(tournament: Tournament, guestId: string, dis
   return { ...next, registrations: { ...next.registrations, [guestId]: { ...next.registrations[guestId], isGuest: true } } }
 }
 
+export function renameTournamentGuest(tournament: Tournament, guestId: string, displayName: string, actorId: string, now = Date.now()): Tournament {
+  requireTournamentManager(tournament, actorId)
+  const guest = tournament.registrations[guestId]
+  if (!guestId.startsWith('guest:') || !guest?.isGuest) throw new Error('Puoi rinominare solo un ospite esterno già iscritto.')
+  const name = displayName.trim()
+  if (!name || name.length > 80) throw new Error('Il nome dell’ospite deve avere da 1 a 80 caratteri.')
+  if (name === guest.displayName) return tournament
+  return { ...tournament, updatedAt: now, guestNameChange: { guestId, revision: (tournament.guestNameChange?.revision ?? 0) + 1 },
+    registrations: { ...tournament.registrations, [guestId]: { ...guest, displayName: name } } }
+}
+
 export function removeTournamentGuest(tournament: Tournament, guestId: string, actorId: string, now = Date.now()): Tournament {
   requireTournamentManager(tournament, actorId)
   if (!tournament.registrations[guestId]?.isGuest) throw new Error('Puoi rimuovere solo un ospite esterno.')

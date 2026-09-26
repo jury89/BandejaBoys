@@ -1,4 +1,4 @@
-import { canEditTournament, editTournament, makeTournament, publishTournament, registerForTournament, saveTournamentGuest, startTournament, tournamentRegistrationsOpen, tournamentSettingsEditable } from './domain'
+import { canEditTournament, editTournament, makeTournament, publishTournament, registerForTournament, renameTournamentGuest, saveTournamentGuest, startTournament, tournamentRegistrationsOpen, tournamentSettingsEditable } from './domain'
 import { SLOT_ADMIN_USER_ID as admin } from './admin'
 import type { Tournament, TournamentInput } from './tournamentTypes'
 
@@ -27,6 +27,30 @@ describe('safe tournament editing', () => {
     const edited = editTournament(t, { ...t, capacity: 12 }, admin, now)
     expect(edited.registrations).toEqual(t.registrations)
     expect(Object.keys(edited.registrations)).toHaveLength(5)
+  })
+  it.each(['open', 'running', 'completed', 'cancelled'] as const)('renames an existing guest on a %s tournament after cutoff without changing play facts', status => {
+    const enrolled = saveTournamentGuest(fixture({ startsAt: now + 7_200_000 }, 3), 'guest:ciccio', 'Ciccio', null, owner, now)
+    const drawn = status === 'running' || status === 'completed' ? startTournament(enrolled, owner, 42, enrolled.startsAt) : enrolled
+    const tournament = { ...drawn, status }
+    const changedAt = enrolled.startsAt + 1
+    const renamed = renameTournamentGuest(tournament, 'guest:ciccio', '  Ciccio Rossi  ', owner, changedAt)
+    expect(renamed.registrations['guest:ciccio']).toEqual({ ...tournament.registrations['guest:ciccio'], displayName: 'Ciccio Rossi' })
+    expect(renamed).toMatchObject({ guestNameChange: { guestId: 'guest:ciccio', revision: 1 }, updatedAt: changedAt, status })
+    expect(renameTournamentGuest(renamed, 'guest:ciccio', 'Ciccio Bianchi', owner, changedAt).guestNameChange?.revision).toBe(2)
+    expect(renamed.teams).toEqual(tournament.teams)
+    expect(renamed.matches).toEqual(tournament.matches)
+    expect(renamed.currentRound).toBe(tournament.currentRound)
+    expect(Object.keys(renamed.registrations)).toEqual(Object.keys(tournament.registrations))
+    expect(renameTournamentGuest(tournament, 'guest:ciccio', 'Nuovo nome', admin, changedAt).registrations['guest:ciccio'].displayName).toBe('Nuovo nome')
+    expect(() => renameTournamentGuest(tournament, 'guest:ciccio', 'Falso', 'other', changedAt)).toThrow(/organizzatore/)
+    expect(() => saveTournamentGuest(tournament, 'guest:ciccio', 'Falso', null, owner, changedAt)).toThrow(/chiudono/)
+  })
+  it('rejects missing guests, member identities and invalid names during rename', () => {
+    const t = saveTournamentGuest(fixture({}, 1), 'guest:ciccio', 'Ciccio', null, owner, now)
+    expect(() => renameTournamentGuest(t, 'guest:missing', 'Nuovo', owner, now)).toThrow(/già iscritto/)
+    expect(() => renameTournamentGuest(t, 'p0', 'Nuovo', owner, now)).toThrow(/ospite/)
+    expect(() => renameTournamentGuest(t, 'guest:ciccio', '  ', owner, now)).toThrow(/1 a 80/)
+    expect(() => renameTournamentGuest(t, 'guest:ciccio', 'A'.repeat(81), owner, now)).toThrow(/1 a 80/)
   })
   it.each([{ format: 'mexicano' }, { pairing: 'chosen-fixed' }, { pointsPerMatch: 16 }] as Partial<TournamentInput>[])('locks enrolled players’ rules: %j', change => {
     const t = fixture({}, 1)
