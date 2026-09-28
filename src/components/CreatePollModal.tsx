@@ -1,7 +1,7 @@
-import { useMemo, useRef, useState, type FormEvent } from 'react'
+import { useRef, useState, type FormEvent } from 'react'
 import { AlertTriangle, CalendarPlus, CopyPlus, Plus, Trash2 } from 'lucide-react'
 import type { CreatePollInput, PadelSlot, SessionUser, SlotInput } from '../types'
-import { defaultSlotForWeek, hasExistingSlotAtDateTime, nextMondayDate } from '../lib/domain'
+import { defaultNewSlot, hasExistingSlotAtDateTime } from '../lib/domain'
 import { Modal } from './Modal'
 import { SlotDateTimeField } from './SlotDateTimeField'
 import { DEFAULT_VENUE_ID } from '../lib/venues'
@@ -29,11 +29,9 @@ function nextDayAtSameTime(value: string) {
 }
 
 export function CreatePollModal({ user, onClose, onCreate, onDone, existingSlots }: CreatePollModalProps) {
-  const initialWeekStart = useMemo(() => nextMondayDate(), [])
-  const nextEditorId = useRef(3)
-  const [slots, setSlots] = useState<EditableSlot[]>([
-    { editorId: 'slot-1', startsAt: defaultSlotForWeek(initialWeekStart, 1), durationMinutes: 90, venueId: user.preferredVenueIds?.[0] ?? DEFAULT_VENUE_ID },
-    { editorId: 'slot-2', startsAt: defaultSlotForWeek(initialWeekStart, 3), durationMinutes: 90, venueId: user.preferredVenueIds?.[0] ?? DEFAULT_VENUE_ID },
+  const nextEditorId = useRef(2)
+  const [slots, setSlots] = useState<EditableSlot[]>(() => [
+    { editorId: 'slot-1', ...defaultNewSlot() },
   ])
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -86,15 +84,16 @@ export function CreatePollModal({ user, onClose, onCreate, onDone, existingSlots
               type="button"
               onClick={() => setSlots((current) => {
                 const previous = current.at(-1)
+                const source = previous ?? defaultNewSlot()
                 return [
                   ...current,
                   {
                     editorId: `slot-${nextEditorId.current++}`,
                     startsAt: previous
                       ? nextDayAtSameTime(previous.startsAt)
-                      : defaultSlotForWeek(initialWeekStart, 1),
-                    durationMinutes: previous?.durationMinutes ?? 90,
-                    venueId: previous?.venueId ?? DEFAULT_VENUE_ID,
+                      : source.startsAt,
+                    durationMinutes: source.durationMinutes,
+                    venueId: source.venueId,
                   },
                 ]
               })}
