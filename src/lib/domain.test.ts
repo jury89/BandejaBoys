@@ -5,6 +5,7 @@ import {
   addSignup,
   applyAdminSlotRosterAction,
   aggregateMatchFeedbackSummaries,
+  defaultNewSlot,
   defaultSlotForWeek,
   groupMatchReportSetsByTeams,
   getMatchPairings,
@@ -1130,6 +1131,20 @@ describe('stato slot e creazione sondaggio', () => {
     expect(nextMondayDate(new Date('2026-07-20T12:00:00.000Z'))).toBe('2026-07-27')
     expect(nextMondayDate(new Date('2026-07-22T12:00:00.000Z'))).toBe('2026-07-27')
     expect(nextMondayDate(new Date('2026-07-19T22:30:00.000Z'))).toBe('2026-07-27')
+  })
+
+  it.each([
+    ['2026-09-28T10:00:00Z', '2026-09-29'],
+    ['2026-09-28T22:30:00Z', '2026-09-30'],
+    ['2026-09-30T10:00:00Z', '2026-10-01'],
+    ['2026-12-31T20:00:00Z', '2027-01-01'],
+    ['2028-02-28T10:00:00Z', '2028-02-29'],
+    ['2026-03-28T22:30:00Z', '2026-03-29'],
+    ['2026-10-24T21:30:00Z', '2026-10-25'],
+  ])('precompila un nuovo slot per domani a Roma da %s', (now, tomorrow) => {
+    expect(defaultNewSlot(new Date(now))).toEqual({
+      startsAt: `${tomorrow}T18:30`, durationMinutes: 90, venueId: 'tennis-club-mantova',
+    })
   })
 
   it('prepara i campi data e ora nel fuso di Roma', () => {

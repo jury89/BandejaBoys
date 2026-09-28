@@ -2013,6 +2013,15 @@ export function defaultSlotForWeek(weekStart: string, dayOffset = 1): string {
   return addDaysToDateTimeInput(`${normalizedWeekStart}T19:30`, dayOffset)
 }
 
+/** New proposals start tomorrow in Rome; profile filters do not change this default. */
+export function defaultNewSlot(from = new Date()): SlotInput {
+  return {
+    startsAt: addDaysToDateTimeInput(`${toDateInput(from)}T18:30`, 1),
+    durationMinutes: 90,
+    venueId: 'tennis-club-mantova',
+  }
+}
+
 // Tournaments are independent of ordinary slots and fantasy seasons.
 export const TOURNAMENT_SIGNUP_LEAD_MS = 60 * 60_000
 
