@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { useInterfaceMode } from '../InterfaceContext'
-import { slotVenueName } from '../lib/venues'
+import { slotVenueName, wansportBookingUrl } from '../lib/venues'
 import { VenueLabel } from './VenueLabel'
 import {
   ArrowRight,
@@ -9,6 +9,7 @@ import {
   CalendarPlus,
   Check,
   Clock3,
+  ExternalLink,
   History,
   LogOut,
   MapPin,
@@ -76,6 +77,7 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
   const starters = getStarters(slot)
   const reserves = getReserves(slot)
   const phase = getSlotPhase(slot)
+  const wansportUrl = phase === 'booked' ? undefined : wansportBookingUrl(slot)
   const timeIsConfirmed = phase === 'booked'
   const PhaseIcon = phaseCopy[phase].icon
   const joined = slot.signups.some((signup) => signup.userId === user.id)
@@ -452,6 +454,19 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
         {isNewInterface && <button className="button button--ghost club-calendar" type="button" onClick={addToCalendar} aria-label={`Aggiungi lo slot di ${date.full} alle ${date.time} al calendario`}>
           <CalendarPlus size={17} /><span>Calendario</span>
         </button>}
+
+        {!disabled && wansportUrl && (
+          <a
+            className="button button--secondary wansport-booking-link"
+            href={wansportUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label={`Apri Wansport per ${date.full} alle ${date.time}: scegli campo e orario`}
+          >
+            <ExternalLink size={18} aria-hidden="true" />
+            <span><strong>Scegli campo su Wansport</strong><small>{date.full} · ore {date.time}</small></span>
+          </a>
+        )}
 
         {!disabled && phase !== 'booked' && (
           <button

@@ -1,4 +1,5 @@
 import type { PadelSlot, VenueId } from '../types'
+import { PADEL_TIME_ZONE } from './format'
 
 export const DEFAULT_VENUE_ID: VenueId = 'oasi-boschetto'
 export const VENUES: ReadonlyArray<{ id: VenueId; name: string; address: string; phone?: string; website?: string }> = [
@@ -52,4 +53,14 @@ export function matchesVenueFilter(slot: SlotVenue, venueIds: readonly VenueId[]
 export function venueInfoHref(slot: SlotVenue): string | undefined {
   const id = slotVenueId(slot)
   return id === DEFAULT_VENUE_ID ? undefined : `#campi/${id}`
+}
+
+const bookingDateFormatter = new Intl.DateTimeFormat('en-CA', {
+  year: 'numeric', month: '2-digit', day: '2-digit', timeZone: PADEL_TIME_ZONE,
+})
+
+export function wansportBookingUrl(slot: SlotVenue & Pick<PadelSlot, 'startsAt'>): string | undefined {
+  if (slotVenueId(slot) !== 'tennis-club-mantova') return undefined
+  const date = bookingDateFormatter.format(new Date(slot.startsAt))
+  return `https://tennisclubmantova.wansport.com/en-gb/start#bookings/15/${date}`
 }

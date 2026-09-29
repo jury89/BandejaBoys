@@ -2,7 +2,7 @@ import type { MemberProfile, PadelSlot, VenueId } from '../types'
 import { addSlotToPoll, hasExistingSlotAtDateTime, makePoll, rescheduleSlot, setSlotBooking } from './domain'
 import { fixedSeatMatchingMembers } from './fixedSeat'
 import { buildSlotCalendar } from './calendar'
-import { matchesVenueFilter, normalizePreferredVenueIds, slotVenueId, slotVenueName, validatePreferredVenueIds } from './venues'
+import { matchesVenueFilter, normalizePreferredVenueIds, slotVenueId, slotVenueName, validatePreferredVenueIds, wansportBookingUrl } from './venues'
 
 const player: MemberProfile = { id: 'jury', displayName: 'Jury', email: 'jury@example.test', createdAt: 1,
   fixedSeatPreference: { weekday: 2, startMinutes: 18 * 60, endMinutes: 20 * 60 } }
@@ -10,6 +10,13 @@ const input = { startsAt: '2026-09-15T18:00', durationMinutes: 90 }
 const legacy: PadelSlot = { id: 'old', ...input, venue: '', signups: [] }
 
 describe('circoli e preferenze', () => {
+  it('apre Wansport sul giorno di Roma soltanto per gli slot del Tennis Club', () => {
+    const tennis = { ...legacy, venueId: 'tennis-club-mantova' as const, startsAt: '2026-10-02T22:30:00.000Z' }
+    expect(wansportBookingUrl(tennis)).toBe('https://tennisclubmantova.wansport.com/en-gb/start#bookings/15/2026-10-03')
+    expect(wansportBookingUrl({ ...tennis, venueId: 'sport-city-mantova' })).toBeUndefined()
+    expect(wansportBookingUrl(legacy)).toBeUndefined()
+  })
+
   it('legge gli slot storici come Oasi senza mutarli e conserva etichette sconosciute', () => {
     expect(slotVenueId(legacy)).toBe('oasi-boschetto')
     expect(slotVenueName(legacy)).toBe('Oasi Boschetto')

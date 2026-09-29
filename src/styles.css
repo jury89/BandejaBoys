@@ -2277,6 +2277,32 @@ p {
   transform: translateX(2px);
 }
 
+.slot-card__actions .wansport-booking-link {
+  min-height: 52px;
+  flex: 1 1 100%;
+  justify-content: flex-start;
+  text-align: left;
+  text-decoration: none;
+}
+
+.wansport-booking-link > svg {
+  flex: 0 0 auto;
+}
+
+.wansport-booking-link span {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.wansport-booking-link small {
+  color: #4d6672;
+  font-size: 0.64rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
 .substitution-action {
   position: relative;
   display: flex;
