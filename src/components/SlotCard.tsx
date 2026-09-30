@@ -461,10 +461,10 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
             href={wansportUrl}
             target="_blank"
             rel="noopener noreferrer"
-            aria-label={`Apri Wansport per ${date.full} alle ${date.time}: scegli campo e orario`}
+            aria-label={`Scegli campo su Tennis Club per ${date.full} alle ${date.time}: seleziona campo e orario`}
           >
             <ExternalLink size={18} aria-hidden="true" />
-            <span><strong>Scegli campo su Wansport</strong><small>{date.full} · ore {date.time}</small></span>
+            <span><strong>Scegli campo su Tennis Club</strong><small>{date.full} · ore {date.time}</small></span>
           </a>
         )}
 

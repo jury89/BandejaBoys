@@ -28,7 +28,7 @@ Creatore e Jury possono **aggiungere partecipanti esterni** per nome, gestirne i
 
 Ogni nuovo slot permette di scegliere **Oasi Boschetto**, **Tennis Club Mantova** oppure **Sport City Mantova**. Il circolo è visibile anche prima della prenotazione e viene usato per promemoria e calendario; la conferma della prenotazione resta un’azione separata. Gli slot precedenti senza identificativo del circolo restano all’Oasi, senza migrazioni o modifiche allo storico.
 
-Negli slot del **Tennis Club Mantova** ancora da prenotare, **Scegli campo su Wansport** apre in una nuova scheda il calendario Padel sul giorno dello slot, calcolato nel fuso di Roma. Wansport usa l’account personale di chi apre il link: lì si controllano disponibilità, orario e campo e si conclude la prenotazione. Il link non prenota automaticamente e non aggiorna Bandeca; dopo aver prenotato, occorre usare **Segna come prenotato** nello slot.
+Negli slot del **Tennis Club Mantova** ancora da prenotare, **Scegli campo su Tennis Club** apre in una nuova scheda il calendario Padel sul giorno dello slot, calcolato nel fuso di Roma. Wansport usa l’account personale di chi apre il link: lì si controllano disponibilità, orario e campo e si conclude la prenotazione. Il link non prenota automaticamente e non aggiorna Bandeca; dopo aver prenotato, occorre usare **Segna come prenotato** nello slot.
 
 **Nuovo slot** apre il modulo con una sola proposta: **domani alle 18:30 al Tennis Club Mantova**, durata 90 minuti. “Domani” segue il calendario di Roma e viene ricalcolato a ogni apertura, indipendentemente dai campi preferiti. Tutti i valori restano modificabili; **Aggiungi slot** e **Duplica** permettono di inserire altre proposte.
 

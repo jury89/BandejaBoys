@@ -226,16 +226,16 @@ describe('azioni dello slot', () => {
     const props = { poll, slot: tennisSlot, user, members: [user], onPollChange: vi.fn(), onNotify: vi.fn(), onError: vi.fn() }
     const { rerender } = render(<SlotCard {...props} />)
 
-    const link = screen.getByRole('link', { name: /Apri Wansport per sabato 3 ottobre alle 18:30/ })
+    const link = screen.getByRole('link', { name: /Scegli campo su Tennis Club per sabato 3 ottobre alle 18:30/ })
     expect(link).toHaveAttribute('href', 'https://tennisclubmantova.wansport.com/en-gb/start#bookings/15/2026-10-03')
     expect(link).toHaveAttribute('target', '_blank')
     expect(link).toHaveAttribute('rel', 'noopener noreferrer')
-    expect(screen.getByText('Scegli campo su Wansport')).toBeInTheDocument()
+    expect(screen.getByText('Scegli campo su Tennis Club')).toBeInTheDocument()
 
     rerender(<SlotCard {...props} slot={setSlotBooking(tennisSlot, user, 20)} />)
-    expect(screen.queryByText('Scegli campo su Wansport')).not.toBeInTheDocument()
+    expect(screen.queryByText('Scegli campo su Tennis Club')).not.toBeInTheDocument()
     rerender(<SlotCard {...props} slot={{ ...tennisSlot, venueId: 'sport-city-mantova' }} />)
-    expect(screen.queryByText('Scegli campo su Wansport')).not.toBeInTheDocument()
+    expect(screen.queryByText('Scegli campo su Tennis Club')).not.toBeInTheDocument()
   })
 
   it('mostra la conferma del campo al posto della fascia in attesa', () => {
