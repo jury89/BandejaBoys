@@ -66,6 +66,26 @@ describe('archivio notifiche', () => {
     expect(screen.getByText(/prossime notifiche push consegnate/)).toBeInTheDocument()
   })
 
+  it('mostra la categoria e il testo dell’ultimo richiamo Fanta', () => {
+    render(
+      <NotificationHistoryPage
+        notifications={[{
+          ...notifications[0],
+          kind: 'fantasy-reminder-1h',
+          title: 'Ultima chiamata Fanta!',
+          body: 'Sveglia fagianotto! Schiera la coppia e il capitano prima dell’inizio.',
+        }]}
+        loading={false}
+        error={null}
+        onBack={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByText('Ultimo promemoria Fanta')).toBeInTheDocument()
+    expect(screen.getByText('Ultima chiamata Fanta!')).toBeInTheDocument()
+    expect(screen.getByText(/Schiera la coppia e il capitano/)).toBeInTheDocument()
+  })
+
   it('mostra notifiche legacy o sconosciute senza bloccare la pagina', () => {
     render(
       <NotificationHistoryPage

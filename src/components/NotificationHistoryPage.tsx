@@ -67,6 +67,8 @@ function notificationPresentation(kind: string): NotificationPresentation {
       return { label: 'Sveglia del lunedì', icon: BellRing, tone: 'monday' }
     case 'fantasy-open':
       return { label: 'FantaBandeja', icon: Trophy, tone: 'fantasy' }
+    case 'fantasy-reminder-1h':
+      return { label: 'Ultimo promemoria Fanta', icon: AlarmClock, tone: 'fantasy' }
     case 'fantasy-roster-changed':
       return { label: 'Formazione fantasy', icon: Trophy, tone: 'fantasy' }
     case 'fantasy-result':

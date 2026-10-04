@@ -37,6 +37,7 @@ export const BOOKING_REMINDER_LEAD_MS = 7 * DAY_MS
 export const BOOKING_REMINDER_WINDOW_MS = DAY_MS
 export const MATCH_FEEDBACK_NOTIFICATION_WINDOW_MS = 30 * 60 * 1000
 export const MONDAY_MOTIVATION_WINDOW_MS = HOUR_MS
+export const FANTASY_LINEUP_REMINDER_LEAD_MS = HOUR_MS
 export const FANTASY_RESULT_NOTIFICATION_WINDOW_MS = 7 * DAY_MS
 
 export function isFantasyResultNotificationWindow(round: FantasyRound, now: number): boolean {
@@ -92,7 +93,7 @@ export function planNotificationMatchReads(
   }
 }
 
-export type NotificationKind = 'new-slots' | 'fixed-seat-auto-join' | 'slot-ready' | 'starter-substitution' | 'booking-reminder-7d' | 'reminder-24h' | 'reminder-2h' | 'match-rating' | 'match-mvp' | 'match-feedback' | 'monday-motivation' | 'fantasy-open' | 'fantasy-roster-changed' | 'fantasy-result' | 'test'
+export type NotificationKind = 'new-slots' | 'fixed-seat-auto-join' | 'slot-ready' | 'starter-substitution' | 'booking-reminder-7d' | 'reminder-24h' | 'reminder-2h' | 'match-rating' | 'match-mvp' | 'match-feedback' | 'monday-motivation' | 'fantasy-open' | 'fantasy-reminder-1h' | 'fantasy-roster-changed' | 'fantasy-result' | 'test'
 export type TestNotificationMode = 'standard' | 'feedback' | 'match-mvp'
 
 const NOTIFICATION_PREFERENCE_BY_KIND = {
@@ -107,6 +108,7 @@ const NOTIFICATION_PREFERENCE_BY_KIND = {
   'match-feedback': 'matchFeedback',
   'monday-motivation': 'mondayMotivation',
   'fantasy-open': 'fantasy',
+  'fantasy-reminder-1h': 'fantasy',
   'fantasy-roster-changed': 'fantasy',
   'fantasy-result': 'fantasy',
 } as const satisfies Record<Exclude<NotificationKind, 'test' | 'fixed-seat-auto-join'>, keyof NotificationPreferences>
@@ -413,6 +415,24 @@ export function collectFantasyNotifications(
         recipientUserIds: null,
         excludedUserIds: round.participantIds,
       })
+
+      if (now >= round.locksAt - FANTASY_LINEUP_REMINDER_LEAD_MS) {
+        const currentManagerIds = roundEntries
+          .filter((entry) => fantasyEntryIsCurrent(round, entry))
+          .map((entry) => entry.managerId)
+        notifications.push({
+          // One last call per deadline, even if the roster changes during this hour.
+          id: `fantasy-reminder-1h:${round.id}:${round.locksAt}`,
+          kind: 'fantasy-reminder-1h',
+          title: 'Ultima chiamata Fanta!',
+          body: `Sveglia fagianotto! Il Fanta per ${formatSession(round.slotStartsAt)} sta per chiudere. Schiera la coppia e il capitano prima dell’inizio.`,
+          url: '/#fantabandeja',
+          tag: `fantasy-reminder-1h-${round.id}`,
+          ttlSeconds: Math.max(1, Math.floor((round.locksAt - now) / 1000)),
+          recipientUserIds: null,
+          excludedUserIds: Array.from(new Set([...round.participantIds, ...currentManagerIds])),
+        })
+      }
 
       const staleManagerIds = Array.from(new Set(
         roundEntries

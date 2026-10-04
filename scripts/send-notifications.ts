@@ -213,6 +213,7 @@ for (const notification of notifications) {
         TTL: notification.ttlSeconds,
         urgency: notification.kind === 'slot-ready'
           || notification.kind === 'reminder-2h'
+          || notification.kind === 'fantasy-reminder-1h'
           || notification.kind === 'match-mvp'
           ? 'high'
           : 'normal',
