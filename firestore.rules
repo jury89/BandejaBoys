@@ -423,7 +423,7 @@ service cloud.firestore {
           'new-slots', 'slot-ready', 'starter-substitution', 'booking-reminder-7d',
           'fixed-seat-auto-join',
           'reminder-24h', 'reminder-2h', 'match-rating', 'match-mvp', 'match-feedback',
-          'monday-motivation', 'fantasy-open', 'fantasy-roster-changed',
+          'monday-motivation', 'fantasy-open', 'fantasy-reminder-1h', 'fantasy-roster-changed',
           'fantasy-result', 'test'
         ]
         && request.resource.data.title is string

@@ -2,6 +2,7 @@ import type { FantasyEntry, FantasyRound, PadelPoll, PadelSlot, Signup } from '.
 import {
   BOOKING_REMINDER_LEAD_MS,
   BOOKING_REMINDER_WINDOW_MS,
+  FANTASY_LINEUP_REMINDER_LEAD_MS,
   MATCH_FEEDBACK_NOTIFICATION_WINDOW_MS,
   NEW_SLOT_NOTIFICATION_WINDOW_MS,
   NEW_SLOT_QUIET_PERIOD_MS,
@@ -31,6 +32,7 @@ describe('preferenze notifiche', () => {
     expect(isNotificationKindEnabled('match-mvp')).toBe(true)
     expect(isNotificationKindEnabled('match-feedback')).toBe(true)
     expect(isNotificationKindEnabled('fantasy-open')).toBe(true)
+    expect(isNotificationKindEnabled('fantasy-reminder-1h')).toBe(true)
   })
 
   it('disattiva soltanto le categorie scelte e lascia passare i test manuali', () => {
@@ -56,6 +58,7 @@ describe('preferenze notifiche', () => {
     expect(isNotificationKindEnabled('match-mvp', preferences)).toBe(false)
     expect(isNotificationKindEnabled('match-feedback', preferences)).toBe(false)
     expect(isNotificationKindEnabled('fantasy-result', preferences)).toBe(false)
+    expect(isNotificationKindEnabled('fantasy-reminder-1h', preferences)).toBe(false)
     expect(isNotificationKindEnabled('fixed-seat-auto-join', preferences)).toBe(true)
     expect(isNotificationKindEnabled('test', preferences)).toBe(true)
   })
@@ -817,6 +820,78 @@ describe('notifiche FantaBandeja', () => {
       excludedUserIds: ['a', 'b', 'c', 'd'],
       url: '/#fantabandeja',
     })
+  })
+
+  it.each([
+    [FANTASY_LINEUP_REMINDER_LEAD_MS + 1, false],
+    [FANTASY_LINEUP_REMINDER_LEAD_MS, true],
+    [40 * 60 * 1000, true],
+    [1, true],
+    [0, false],
+    [-1, false],
+  ])('ultimo richiamo con %i ms alla scadenza: %s', (remaining, expected) => {
+    const reminder = collectFantasyNotifications(
+      [fantasyRound], [], fantasyRound.locksAt - remaining,
+    ).find((notification) => notification.kind === 'fantasy-reminder-1h')
+
+    expect(Boolean(reminder)).toBe(expected)
+    if (reminder) {
+      expect(reminder).toMatchObject({
+        recipientUserIds: null,
+        excludedUserIds: fantasyRound.participantIds,
+        url: '/#fantabandeja',
+        title: 'Ultima chiamata Fanta!',
+        ttlSeconds: Math.max(1, Math.floor(remaining / 1000)),
+      })
+      expect(reminder.body).toContain('Sveglia fagianotto!')
+    }
+  })
+
+  it('esclude chi ha già una formazione valida ma richiama le giocate obsolete o incomplete', () => {
+    const entries = [
+      fantasyEntry,
+      { ...fantasyEntry, managerId: 'stale', rosterKey: 'old-roster' },
+      { ...fantasyEntry, managerId: 'incomplete', captainId: 'c' },
+      { ...fantasyEntry, managerId: 'other-round', roundId: 'another-round' },
+    ]
+    const reminder = collectFantasyNotifications(
+      [fantasyRound], entries, fantasyRound.locksAt - FANTASY_LINEUP_REMINDER_LEAD_MS,
+    ).find((notification) => notification.kind === 'fantasy-reminder-1h')
+
+    expect(reminder?.excludedUserIds).toEqual(['a', 'b', 'c', 'd', 'manager'])
+  })
+
+  it('rivaluta le formazioni salvate dopo la soglia ed evita duplicati nei retry', () => {
+    const dueAt = fantasyRound.locksAt - FANTASY_LINEUP_REMINDER_LEAD_MS
+    const before = collectFantasyNotifications([fantasyRound], [], dueAt)
+      .find((notification) => notification.kind === 'fantasy-reminder-1h')!
+    const after = collectFantasyNotifications([fantasyRound], [fantasyEntry], dueAt + 10 * 60 * 1000)
+      .find((notification) => notification.kind === 'fantasy-reminder-1h')!
+
+    expect(before.excludedUserIds).not.toContain('manager')
+    expect(after.excludedUserIds).toContain('manager')
+    expect(after.id).toBe(before.id)
+    expect(before.id).toBe(`fantasy-reminder-1h:${fantasyRound.id}:${fantasyRound.locksAt}`)
+    expect(before.id).not.toBe(collectFantasyNotifications([fantasyRound], [], dueAt)[0].id)
+  })
+
+  it('segue lo spostamento della scadenza e conserva valide le giocate quando cambia solo l’orario', () => {
+    const moved = { ...fantasyRound, locksAt: fantasyRound.locksAt + 2 * 60 * 60 * 1000 }
+    const original = collectFantasyNotifications([fantasyRound], [], fantasyRound.locksAt - 60_000)
+      .find((notification) => notification.kind === 'fantasy-reminder-1h')!
+
+    expect(collectFantasyNotifications([moved], [], fantasyRound.locksAt - 60_000)
+      .some((notification) => notification.kind === 'fantasy-reminder-1h')).toBe(false)
+    const reminder = collectFantasyNotifications([moved], [fantasyEntry], moved.locksAt - 60_000)
+      .find((notification) => notification.kind === 'fantasy-reminder-1h')!
+    expect(reminder.id).not.toBe(original.id)
+    expect(reminder.excludedUserIds).toContain('manager')
+  })
+
+  it.each(['pending', 'scored', 'void'] as const)('non richiama un round %s', (status) => {
+    expect(collectFantasyNotifications(
+      [{ ...fantasyRound, status }], [], fantasyRound.locksAt - 60_000,
+    ).some((notification) => notification.kind === 'fantasy-reminder-1h')).toBe(false)
   })
 
   it('avvisa il manager quando la formazione salvata non è più valida', () => {

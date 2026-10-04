@@ -74,6 +74,9 @@ describe('letture mirate del notifier', () => {
     const loaded = await loadNotificationMatchData(fake.reader, [poll], [round], round.locksAt - 1)
     expect(fake.calls).toEqual([{ path: `fantasyRounds/${round.id}/entries`, filter: undefined }])
     expect(loaded.fantasyEntries).toEqual([entry])
+    const reminder = collectFantasyNotifications([round], loaded.fantasyEntries, round.locksAt - 1)
+      .find((notification) => notification.kind === 'fantasy-reminder-1h')
+    expect(reminder?.excludedUserIds).toContain(entry.managerId)
   })
 
   it('filtra le schede chiuse del solo match in notifica e mantiene la precedenza dei giudizi correnti', async () => {

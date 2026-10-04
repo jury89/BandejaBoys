@@ -95,7 +95,7 @@ const NOTIFICATION_OPTIONS: {
   {
     key: 'fantasy',
     title: 'FantaBandeja',
-    description: 'Apertura round, cambi formazione e risultati fantasy.',
+    description: 'Apertura round, ultimo promemoria, cambi formazione e risultati fantasy.',
     icon: Trophy,
   },
 ]
