@@ -2,7 +2,7 @@ import type { MemberProfile, PadelSlot, VenueId } from '../types'
 import { addSlotToPoll, hasExistingSlotAtDateTime, makePoll, rescheduleSlot, setSlotBooking } from './domain'
 import { fixedSeatMatchingMembers } from './fixedSeat'
 import { buildSlotCalendar } from './calendar'
-import { matchesVenueFilter, normalizePreferredVenueIds, slotVenueId, slotVenueName, validatePreferredVenueIds, wansportBookingUrl } from './venues'
+import { matchesVenueFilter, normalizePreferredVenueIds, slotVenueId, slotVenueName, validatePreferredVenueIds, venueInfoHref, wansportBookingUrl } from './venues'
 
 const player: MemberProfile = { id: 'jury', displayName: 'Jury', email: 'jury@example.test', createdAt: 1,
   fixedSeatPreference: { weekday: 2, startMinutes: 18 * 60, endMinutes: 20 * 60 } }
@@ -10,6 +10,21 @@ const input = { startsAt: '2026-09-15T18:00', durationMinutes: 90 }
 const legacy: PadelSlot = { id: 'old', ...input, venue: '', signups: [] }
 
 describe('circoli e preferenze', () => {
+  it('usa Time to Padel per slot, prenotazione, calendario, filtri e posto fisso', () => {
+    const poll = { id: 'time', ...makePoll({ slots: [{ ...input, venueId: 'time-to-padel' }] }, player) }
+    const slot = poll.slots[0]
+    expect(slotVenueName(slot)).toBe('Time to Padel')
+    expect(venueInfoHref(slot)).toBe('#campi/time-to-padel')
+    expect(buildSlotCalendar(poll, slot)).toContain('LOCATION:Time to Padel')
+    const booked = setSlotBooking(slot, player, 10)
+    expect(booked.venue).toBe('Time to Padel')
+    const unbooked = setSlotBooking(booked, null)
+    expect(unbooked).toMatchObject({ venueId: 'time-to-padel', venue: '' })
+    expect(matchesVenueFilter(slot, ['time-to-padel'])).toBe(true)
+    expect(matchesVenueFilter(slot, ['tennis-club-mantova'])).toBe(false)
+    expect(validatePreferredVenueIds(['oasi-boschetto', 'tennis-club-mantova', 'sport-city-mantova', 'time-to-padel'])).toHaveLength(4)
+    expect(fixedSeatMatchingMembers(slot, [player, { ...player, id: 'time', preferredVenueIds: ['time-to-padel'] }, { ...player, id: 'tennis', preferredVenueIds: ['tennis-club-mantova'] }]).map(member => member.id)).toEqual(['jury', 'time'])
+  })
   it('apre Wansport sul giorno di Roma soltanto per gli slot del Tennis Club', () => {
     const tennis = { ...legacy, venueId: 'tennis-club-mantova' as const, startsAt: '2026-10-02T22:30:00.000Z' }
     expect(wansportBookingUrl(tennis)).toBe('https://tennisclubmantova.wansport.com/en-gb/start#bookings/15/2026-10-03')

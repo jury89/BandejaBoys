@@ -203,7 +203,7 @@ export interface PlayerStatistics {
   performances: PlayerMatchPerformance[]
 }
 
-export type VenueId = 'oasi-boschetto' | 'tennis-club-mantova' | 'sport-city-mantova'
+export type VenueId = 'oasi-boschetto' | 'tennis-club-mantova' | 'sport-city-mantova' | 'time-to-padel'
 
 export interface SlotInput {
   venueId?: VenueId
