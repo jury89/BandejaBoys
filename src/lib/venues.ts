@@ -6,6 +6,7 @@ export const VENUES: ReadonlyArray<{ id: VenueId; name: string; address: string;
   { id: 'oasi-boschetto', name: 'Oasi Boschetto', address: 'Mantova', phone: '+390376290058' },
   { id: 'tennis-club-mantova', name: 'Tennis Club Mantova', address: 'Via Learco Guerra, 2 · Mantova', phone: '+390376327915', website: 'https://www.tennisclubmantova.com/' },
   { id: 'sport-city-mantova', name: 'Sport City Mantova', address: 'Via Palmiro Azzi, 5 · Mantova', website: 'https://www.mantovasportcity.it/' },
+  { id: 'time-to-padel', name: 'Time to Padel', address: 'Via Premana, 26 · Gazoldo degli Ippoliti', website: 'https://www.anytimes.it/club/time-to-padel/' },
 ]
 
 export type SlotVenue = Pick<PadelSlot, 'venueId'> & Partial<Pick<PadelSlot, 'venue'>>

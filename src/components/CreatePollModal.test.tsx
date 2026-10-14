@@ -58,10 +58,10 @@ describe('editor degli slot', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Aggiungi slot' }))
     expect(screen.getAllByLabelText('Data')[1]).toHaveValue('2026-08-26')
     expect(screen.getByLabelText('Campo dello slot 2')).toHaveValue('oasi-boschetto')
-    fireEvent.change(screen.getByLabelText('Campo dello slot 2'), { target: { value: 'tennis-club-mantova' } })
+    fireEvent.change(screen.getByLabelText('Campo dello slot 2'), { target: { value: 'time-to-padel' } })
     fireEvent.click(screen.getByRole('button', { name: 'Pubblica slot' }))
     await waitFor(() => expect(onCreate).toHaveBeenCalled())
-    expect(onCreate.mock.calls[0][0].slots.map((slot: { venueId: string }) => slot.venueId)).toEqual(['oasi-boschetto', 'tennis-club-mantova'])
+    expect(onCreate.mock.calls[0][0].slots.map((slot: { venueId: string }) => slot.venueId)).toEqual(['oasi-boschetto', 'time-to-padel'])
   })
   it('crea gli slot dalle singole date senza richiedere nome o settimana', async () => {
     const onCreate = vi.fn().mockResolvedValue(undefined)

@@ -75,9 +75,9 @@ service cloud.firestore {
         && validNotificationPreferences()
         && (!request.resource.data.keys().hasAny(['preferredVenueIds'])
           || (request.resource.data.preferredVenueIds is list
-            && request.resource.data.preferredVenueIds.size() <= 3
+            && request.resource.data.preferredVenueIds.size() <= 4
             && request.resource.data.preferredVenueIds.toSet().size() == request.resource.data.preferredVenueIds.size()
-            && request.resource.data.preferredVenueIds.hasOnly(['oasi-boschetto', 'tennis-club-mantova', 'sport-city-mantova'])))
+            && request.resource.data.preferredVenueIds.hasOnly(['oasi-boschetto', 'tennis-club-mantova', 'sport-city-mantova', 'time-to-padel'])))
         && (!request.resource.data.keys().hasAny(['interfaceMode'])
           || request.resource.data.interfaceMode in ['classica', 'nuova'])
         && (!request.resource.data.keys().hasAny(['fixedSeatPreference'])
@@ -526,7 +526,7 @@ service cloud.firestore {
           'scoringMode', 'matchMinutes', 'warmupMinutes', 'changeoverMinutes', 'roundStartedAt', 'roundEndedAt', 'totalMinutes', 'guestNameChange', 'drawRevision'])
         && data.title is string && data.title.size() >= 3 && data.title.size() <= 80
         && data.startsAt is number
-        && data.venueId in ['oasi-boschetto', 'tennis-club-mantova', 'sport-city-mantova']
+        && data.venueId in ['oasi-boschetto', 'tennis-club-mantova', 'sport-city-mantova', 'time-to-padel']
         && data.format in ['americano', 'mexicano', 'round-robin', 'knockout']
         && data.pairing in ['rotating', 'random-fixed', 'chosen-fixed']
         && data.capacity is int && data.capacity >= 4 && data.capacity <= 32

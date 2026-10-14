@@ -25,6 +25,8 @@ function test(label: string, expectation: 'ALLOW' | 'DENY', method: string, acto
   } })
 }
 test('admin creates draft', 'ALLOW', 'create', admin, undefined, draft)
+test('member creates a Time to Padel tournament', 'ALLOW', 'create', 'p0', undefined, makeTournament('qa', { ...draft, venueId: 'time-to-padel' }, 'p0', now))
+test('unknown tournament venue rejected', 'DENY', 'create', admin, undefined, { ...draft, venueId: 'unknown-venue' })
 test('member cannot forge creator identity', 'DENY', 'create', 'p0', undefined, draft)
 test('anonymous cannot create', 'DENY', 'create', null, undefined, draft)
 test('admin reads draft', 'ALLOW', 'get', admin, draft)

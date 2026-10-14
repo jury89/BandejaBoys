@@ -18,9 +18,10 @@ describe('profilo giocatore', () => {
     render(<ProfileModal user={player} onClose={vi.fn()} onSave={onSave} onDone={vi.fn()} />)
     await user.click(screen.getByRole('checkbox', { name: 'Sport City Mantova' }))
     await user.click(screen.getByRole('checkbox', { name: 'Tennis Club Mantova' }))
+    await user.click(screen.getByRole('checkbox', { name: 'Time to Padel' }))
     expect(screen.getByText(/sarai iscritto automaticamente solo ai nuovi slot/)).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Salva profilo' }))
-    expect(onSave.mock.calls[0][5]).toEqual(['sport-city-mantova', 'tennis-club-mantova'])
+    expect(onSave.mock.calls[0][5]).toEqual(['sport-city-mantova', 'tennis-club-mantova', 'time-to-padel'])
   })
   afterEach(() => window.history.replaceState(null, '', '/'))
 

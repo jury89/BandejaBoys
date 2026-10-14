@@ -4,6 +4,7 @@ import { VENUES } from '../lib/venues'
 
 const TCM_URL = 'https://www.tennisclubmantova.com/'
 const SPORT_URL = 'https://www.mantovasportcity.it/servizi/'
+const TIME_URL = 'https://www.anytimes.it/club/time-to-padel/'
 
 export function VenuesPage({ selectedId, onBack }: { selectedId: string; onBack: () => void }) {
   const venue = VENUES.find((item) => item.id === selectedId && item.id !== 'oasi-boschetto')
@@ -40,6 +41,19 @@ export function VenuesPage({ selectedId, onBack }: { selectedId: string; onBack:
           <p>Per assistenza: <a href="mailto:segreteria@tennisclubmantova.com">segreteria@tennisclubmantova.com</a>.</p>
         </section>
         <aside className="venue-notice"><h3>Da confermare con il circolo</h3><p>Quota associativa e tesseramento (nuovi iscritti e rinnovi), documenti/certificato richiesti e listino invernale 2026/27. Non abbiamo un prezzo aggiornato verificabile: non usiamo le tariffe degli anni passati.</p></aside>
+      </> : venue.id === 'time-to-padel' ? <>
+        <section><h3>Il centro</h3>
+          <p>Tre campi da padel indoor panoramici a Gazoldo degli Ippoliti, con lounge bar e corner shop.</p>
+          <p>Indirizzo e servizi sono riportati nella <a href={TIME_URL} target="_blank" rel="noreferrer">scheda del circolo su AnyTimes</a>.</p>
+        </section>
+        <section><h3>Quanto costa giocare</h3>
+          <p>Il listino aggiornato non è pubblicato nella scheda del circolo. Verifica la tariffa per la durata e l’orario scelti prima di prenotare.</p>
+        </section>
+        <section><h3>Come iscriversi e prenotare</h3>
+          <p>Usa <a href="https://timetopadel.anytimes.it/" target="_blank" rel="noreferrer">AnyTimes Time to Padel</a> per controllare le disponibilità e prenotare con il tuo account.</p>
+          <p>Dopo aver prenotato con il circolo, usa <strong>Segna come prenotato</strong> nello slot di Bandeca per confermare il campo al gruppo.</p>
+        </section>
+        <aside className="venue-notice"><h3>Da confermare con il circolo</h3><p>Tariffe, quota e durata del tesseramento, procedura d’iscrizione e documenti/certificato richiesti.</p></aside>
       </> : <>
         <section><h3>Quanto costa giocare</h3>
           <p className="venue-price-lead">Da 40 € / ora <span>indicazione del sito, non un preventivo</span></p>
@@ -51,8 +65,8 @@ export function VenuesPage({ selectedId, onBack }: { selectedId: string; onBack:
       </>}
       <footer className="venue-info-card__footer">
         {venue.phone && <a className="button button--secondary" href={`tel:${venue.phone}`}><Phone size={18} /> Chiama il circolo</a>}
-        <a className="button button--secondary" href={venue.website} target="_blank" rel="noreferrer"><ExternalLink size={18} /> Sito ufficiale</a>
-        <small>Fonti consultate il 15 settembre 2026. Prezzi e condizioni possono cambiare: la conferma spetta al circolo.</small>
+        <a className="button button--secondary" href={venue.website} target="_blank" rel="noreferrer"><ExternalLink size={18} /> {venue.id === 'time-to-padel' ? 'Scheda del circolo' : 'Sito ufficiale'}</a>
+        <small>Fonti consultate il {venue.id === 'time-to-padel' ? '14 ottobre 2026' : '15 settembre 2026'}. Prezzi e condizioni possono cambiare: la conferma spetta al circolo.</small>
       </footer>
     </article>}
   </main>

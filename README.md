@@ -26,7 +26,7 @@ Creatore e Jury possono **aggiungere partecipanti esterni** per nome, gestirne i
 
 ## Campi, preferiti e posto fisso
 
-Ogni nuovo slot permette di scegliere **Oasi Boschetto**, **Tennis Club Mantova** oppure **Sport City Mantova**. Il circolo è visibile anche prima della prenotazione e viene usato per promemoria e calendario; la conferma della prenotazione resta un’azione separata. Gli slot precedenti senza identificativo del circolo restano all’Oasi, senza migrazioni o modifiche allo storico.
+Ogni nuovo slot permette di scegliere **Oasi Boschetto**, **Tennis Club Mantova**, **Sport City Mantova** oppure **Time to Padel** a Gazoldo degli Ippoliti. Il circolo è visibile anche prima della prenotazione e viene usato per promemoria e calendario; la conferma della prenotazione resta un’azione separata. Gli slot precedenti senza identificativo del circolo restano all’Oasi, senza migrazioni o modifiche allo storico.
 
 Negli slot del **Tennis Club Mantova** ancora da prenotare, **Scegli campo su Tennis Club** apre in una nuova scheda il calendario Padel sul giorno dello slot, calcolato nel fuso di Roma. Wansport usa l’account personale di chi apre il link: lì si controllano disponibilità, orario e campo e si conclude la prenotazione. Il link non prenota automaticamente e non aggiorna Bandeca; dopo aver prenotato, occorre usare **Segna come prenotato** nello slot.
 
@@ -34,9 +34,11 @@ Negli slot del **Tennis Club Mantova** ancora da prenotare, **Scegli campo su Te
 
 In **Profilo → Campi preferiti** puoi selezionare più circoli. La bacheca si apre filtrata sui preferiti; **Tutti i campi** e le caselle del filtro cambiano soltanto la vista corrente. **Ripristina i preferiti** recupera la scelta salvata. Nessun preferito significa tutti i campi. Il posto fisso si applica **soltanto ai nuovi slot nei circoli preferiti**, mantenendo il limite globale di tre utenti per fascia sovrapposta. Cambiare preferenze o riprogrammare uno slot non altera iscrizioni già presenti.
 
-**Campi e costi** è raggiungibile dalla bacheca e dal menu account; il nome di Tennis Club e Sport City sullo slot apre la relativa scheda. Link diretti: `#campi/tennis-club-mantova` e `#campi/sport-city-mantova`. Fonti ufficiali consultate il 15 settembre 2026: il listino estivo TCM scade il 31 ottobre; per Sport City il prezzo “da 40 €/ora” non è presentato come costo a persona o prezzo di 90 minuti. Quote associative, requisiti e listini non verificati sono marcati **da confermare**. I contenuti editoriali e le fonti sono in `src/components/VenuesPage.tsx`; il catalogo in `src/lib/venues.ts`.
+**Campi e costi** è raggiungibile dalla bacheca e dal menu account; il nome di Tennis Club, Sport City e Time to Padel sullo slot apre la relativa scheda. Link diretti: `#campi/tennis-club-mantova`, `#campi/sport-city-mantova` e `#campi/time-to-padel`. Fonti ufficiali consultate il 15 settembre 2026 per Tennis Club e Sport City: il listino estivo TCM scade il 31 ottobre; per Sport City il prezzo “da 40 €/ora” non è presentato come costo a persona o prezzo di 90 minuti. Quote associative, requisiti e listini non verificati sono marcati **da confermare**. I contenuti editoriali e le fonti sono in `src/components/VenuesPage.tsx`; il catalogo in `src/lib/venues.ts`.
 
 Rilascio: pubblicare Hosting e Firestore Rules (campo profilo `preferredVenueIds`). Non occorrono migrazioni, nuove letture periodiche o deploy dello scheduler.
+
+**Time to Padel** è disponibile anche nei preferiti, nei filtri della bacheca e nei tornei. La scheda `#campi/time-to-padel` riporta Via Premana 26, tre campi indoor e il collegamento alle prenotazioni [AnyTimes](https://timetopadel.anytimes.it/), dalla [scheda del circolo](https://www.anytimes.it/club/time-to-padel/) consultata il 14 ottobre 2026. Tariffe e tesseramento sono da confermare con la struttura. Le Rules ammettono `time-to-padel` e fino a quattro circoli preferiti distinti.
 
 ## Interfaccia classica e anteprima
 
