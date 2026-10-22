@@ -91,6 +91,26 @@ describe('cronologia dello slot', () => {
     expect(screen.getByText(/precedenti all’introduzione della cronologia/)).toBeInTheDocument()
   })
 
+  it('mostra il cambio di circolo nella cronologia', async () => {
+    vi.spyOn(repository, 'getSlotActivity').mockResolvedValue([{
+      id: 'venue-changed',
+      type: 'slot_venue_changed',
+      actorId: 'jury',
+      actorName: 'Jury',
+      pollId: poll.id,
+      pollTitle: poll.title,
+      slotId: slot.id,
+      slotStartsAt: slot.startsAt,
+      occurredAt: Date.UTC(2026, 6, 25, 14, 30),
+      details: { previousVenue: 'Oasi Boschetto', venue: 'Tennis Club Mantova' },
+    }])
+
+    render(<SlotActivityModal poll={poll} slot={slot} onClose={vi.fn()} />)
+
+    expect(await screen.findByText('Campo aggiornato')).toBeInTheDocument()
+    expect(screen.getByText('Oasi Boschetto → Tennis Club Mantova')).toBeInTheDocument()
+  })
+
   it('mostra nome e ruolo dell’ospite aggiunto dal membro', async () => {
     vi.spyOn(repository, 'getSlotActivity').mockResolvedValue([{
       id: 'guest-added',

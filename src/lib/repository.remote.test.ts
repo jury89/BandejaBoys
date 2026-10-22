@@ -325,6 +325,11 @@ describe('repository remoto della scelta MVP', () => {
     }))
     expect(update).not.toHaveProperty('targetWeekStart')
     expect(update).not.toHaveProperty('title')
+
+    await repository.rescheduleSlot(poll.id, poll.slots[0].id, '2026-09-01T18:30', voter, 'tennis-club-mantova')
+    expect(firestoreMocks.transaction.update.mock.calls[1][1]).toEqual(expect.objectContaining({
+      slots: [expect.objectContaining({ venueId: 'tennis-club-mantova' })],
+    }))
   })
 
   it('applica la gestione amministrativa della formazione nella transazione del sondaggio', async () => {

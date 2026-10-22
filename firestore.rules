@@ -393,7 +393,7 @@ service cloud.firestore {
         ])
         && request.resource.data.type in [
           'poll_created', 'poll_archived', 'poll_reopened', 'poll_deleted',
-          'slot_created', 'slot_rescheduled', 'slot_deleted',
+          'slot_created', 'slot_rescheduled', 'slot_venue_changed', 'slot_deleted',
           'signup_joined', 'fixed_seat_auto_joined', 'signup_left', 'starter_substituted',
           'slot_roster_admin_updated',
           'guest_added', 'guest_removed',

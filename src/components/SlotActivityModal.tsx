@@ -8,6 +8,7 @@ import {
   Clock3,
   History,
   LogOut,
+  MapPin,
   RefreshCw,
   ScrollText,
   ShieldCheck,
@@ -93,13 +94,23 @@ function activityPresentation(event: LocalActivityEvent): ActivityPresentation {
     case 'slot_rescheduled': {
       const previous = slotSessionLabel(detailString(event, 'previousStartsAt'))
       const next = slotSessionLabel(event.slotStartsAt)
+      const previousVenue = detailString(event, 'previousVenue')
+      const venue = detailString(event, 'venue')
+      const scheduleDescription = previous && next ? `Da ${previous} a ${next}.` : next ? `Nuovo orario: ${next}.` : ''
       return {
         title: 'Data e ora aggiornate',
-        description: previous && next ? `Da ${previous} a ${next}.` : next ? `Nuovo orario: ${next}.` : undefined,
+        description: `${scheduleDescription}${previousVenue && venue ? ` Campo da ${previousVenue} a ${venue}.` : ''}` || undefined,
         icon: CalendarClock,
         tone: 'schedule',
       }
     }
+    case 'slot_venue_changed':
+      return {
+        title: 'Campo aggiornato',
+        description: `${detailString(event, 'previousVenue')} → ${detailString(event, 'venue')}`,
+        icon: MapPin,
+        tone: 'schedule',
+      }
     case 'signup_joined':
       return {
         title: detailString(event, 'previousRole') === 'reserve' ? 'Da riserva a titolare' : 'Adesione aggiunta',

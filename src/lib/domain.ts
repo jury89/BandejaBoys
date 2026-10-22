@@ -39,6 +39,7 @@ import type {
   SlotInput,
   SlotPhase,
   SlotWeekGroup,
+  VenueId,
 } from '../types'
 import { mondayOfWeek, PADEL_TIME_ZONE, pollWeekTitle, slotWeekTitle, weekStartForDateTime } from './format'
 
@@ -1857,17 +1858,26 @@ export function rescheduleSlot(
   slotId: string,
   startsAt: string,
   updatedAt = Date.now(),
+  venueId?: VenueId,
 ): PadelPoll {
   const normalizedStartsAt = normalizeStartsAt(startsAt)
   const currentSlot = poll.slots.find((slot) => slot.id === slotId)
-  if (poll.slots.some((slot) => slot.id !== slotId && slot.startsAt === normalizedStartsAt && currentSlot && slotVenueId(slot) === slotVenueId(currentSlot))) {
+  const selectedVenueId = venueId === undefined && currentSlot ? slotVenueId(currentSlot) : validateVenueId(venueId)
+  if (poll.slots.some((slot) => slot.id !== slotId && slot.startsAt === normalizedStartsAt && slotVenueId(slot) === selectedVenueId)) {
     throw new Error('Esiste già uno slot con questa data e questo orario.')
   }
 
   const updated = updateSlot(
     poll,
     slotId,
-    (slot) => ({ ...slot, startsAt: normalizedStartsAt }),
+    (slot) => venueId === undefined || selectedVenueId === slotVenueId(slot)
+      ? { ...slot, startsAt: normalizedStartsAt }
+      : {
+        ...slot,
+        startsAt: normalizedStartsAt,
+        venueId: selectedVenueId,
+        venue: slot.bookedAt ? slotVenueName({ venueId: selectedVenueId }) : '',
+      },
     updatedAt,
   )
   return {

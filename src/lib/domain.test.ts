@@ -1188,6 +1188,24 @@ describe('stato slot e creazione sondaggio', () => {
       signups: booked.signups,
     })
     expect(() => rescheduleSlot(current, booked.id, later.startsAt)).toThrow('Esiste già uno slot')
+
+    const legacyUnchangedVenue = rescheduleSlot(current, booked.id, '2026-07-31T20:00', 100, 'oasi-boschetto')
+    expect(legacyUnchangedVenue.slots.find((item) => item.id === booked.id)?.venue).toBe('Bandeja Club')
+
+    const movedVenue = rescheduleSlot(current, booked.id, booked.startsAt, 100, 'tennis-club-mantova')
+    expect(movedVenue.slots[0]).toMatchObject({
+      venueId: 'tennis-club-mantova',
+      venue: 'Tennis Club Mantova',
+      bookedAt: 10,
+      bookedBy: 'jury',
+      signups: booked.signups,
+    })
+    expect(() => rescheduleSlot(current, booked.id, booked.startsAt, 100, 'non-existent' as never))
+      .toThrow('Scegli un campo valido.')
+
+    const differentVenueAtSameTime = rescheduleSlot(current, booked.id, later.startsAt, 100, 'tennis-club-mantova')
+    expect(differentVenueAtSameTime.slots.find((item) => item.id === booked.id)?.venueId)
+      .toBe('tennis-club-mantova')
   })
 
   it('lascia la settimana fuori dalla modifica e la deriva dalla nuova data dello slot', () => {

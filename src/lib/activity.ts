@@ -8,6 +8,7 @@ export const ACTIVITY_EVENT_TYPES = [
   'poll_deleted',
   'slot_created',
   'slot_rescheduled',
+  'slot_venue_changed',
   'slot_deleted',
   'signup_joined',
   'fixed_seat_auto_joined',

@@ -290,7 +290,8 @@ describe('azioni dello slot', () => {
     expect(screen.getByText('Orario confermato')).toBeInTheDocument()
   })
 
-  it('modifica data e ora di uno slot esistente', async () => {
+  it.each([390, 1280])('modifica data, ora e circolo di uno slot esistente a %d px', async (width) => {
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: width })
     const reschedule = vi.spyOn(repository, 'rescheduleSlot').mockResolvedValue(poll)
     const onNotify = vi.fn()
     render(
@@ -305,25 +306,27 @@ describe('azioni dello slot', () => {
       />,
     )
 
-    fireEvent.click(screen.getByRole('button', { name: 'Modifica data e ora dello slot' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Modifica lo slot' }))
     expect(screen.getByLabelText('Data')).not.toHaveFocus()
     fireEvent.change(screen.getByLabelText('Data'), { target: { value: '2026-07-29' } })
     fireEvent.change(screen.getByLabelText('Ora'), { target: { value: '20' } })
     fireEvent.change(screen.getByLabelText('Minuti'), { target: { value: '30' } })
+    fireEvent.change(screen.getByLabelText('Campo'), { target: { value: 'tennis-club-mantova' } })
     expect(Array.from(
       screen.getByLabelText('Minuti').querySelectorAll<HTMLOptionElement>('option'),
       (option) => option.value,
     )).toEqual(['00', '30'])
     expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Salva data e ora' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Salva modifiche' }))
 
     await waitFor(() => expect(reschedule).toHaveBeenCalledWith(
       poll.id,
       slot.id,
       '2026-07-29T20:30',
       user,
+      'tennis-club-mantova',
     ))
-    expect(onNotify).toHaveBeenCalledWith('Data e ora dello slot aggiornate.')
+    expect(onNotify).toHaveBeenCalledWith('Slot aggiornato.')
   })
 
   it('apre direttamente lo slot come evento calendario dal pulsante a icona', () => {
@@ -347,12 +350,12 @@ describe('azioni dello slot', () => {
 
     const actions = screen.getByRole('group', { name: 'Azioni dello slot' })
     const calendar = screen.getByRole('button', { name: /Aggiungi lo slot.+al calendario/ })
-    const edit = screen.getByRole('button', { name: 'Modifica data e ora dello slot' })
+    const edit = screen.getByRole('button', { name: 'Modifica lo slot' })
     const remove = screen.getByRole('button', { name: /Elimina lo slot/ })
 
     expect(actions).not.toContainElement(calendar)
     expect(calendar).toHaveTextContent('Calendario')
-    expect(edit).toHaveTextContent('Modifica data e ora')
+    expect(edit).toHaveTextContent('Modifica slot')
     expect(remove).toHaveTextContent('Elimina slot')
     fireEvent.click(calendar)
 

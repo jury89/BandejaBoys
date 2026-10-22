@@ -69,6 +69,7 @@ describe('repository activity log in demo mode', () => {
     await repository.joinSlot(poll.id, slot.id, user, 'starter')
     await repository.leaveSlot(poll.id, slot.id, user)
     await repository.rescheduleSlot(poll.id, slot.id, '2027-01-05T20:00', user)
+    await repository.rescheduleSlot(poll.id, slot.id, '2027-01-05T20:00', user, 'tennis-club-mantova')
 
     expect(activity().events.map((event) => event.type)).toEqual([
       'poll_created',
@@ -76,12 +77,13 @@ describe('repository activity log in demo mode', () => {
       'signup_joined',
       'signup_left',
       'slot_rescheduled',
+      'slot_venue_changed',
     ])
     expect(activity().events.at(-1)).toMatchObject({
       actorId: 'jury',
       pollId: poll.id,
       slotId: slot.id,
-      details: { previousStartsAt: '2027-01-05T18:30:00.000Z' },
+      details: { previousVenue: 'Oasi Boschetto', venue: 'Tennis Club Mantova' },
     })
     expect(activity().events.every((event) => Number.isFinite(event.occurredAt))).toBe(true)
   })

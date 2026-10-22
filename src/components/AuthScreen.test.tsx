@@ -48,15 +48,15 @@ describe('accesso locale', () => {
     await user.type(screen.getByLabelText('Password'), 'segreto123')
     await user.click(screen.getByRole('button', { name: /Crea il mio account/ }))
 
-    const editButtons = await screen.findAllByRole('button', { name: 'Modifica data e ora dello slot' })
+    const editButtons = await screen.findAllByRole('button', { name: 'Modifica lo slot' })
     fireEvent.click(editButtons[0])
     fireEvent.change(screen.getByLabelText('Data'), { target: { value: '2099-08-15' } })
     fireEvent.change(screen.getByLabelText('Ora'), { target: { value: '18' } })
     fireEvent.change(screen.getByLabelText('Minuti'), { target: { value: '30' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Salva data e ora' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Salva modifiche' }))
 
     expect(await screen.findByText('18:30')).toBeInTheDocument()
-    expect(screen.getByText('Data e ora dello slot aggiornate.')).toBeInTheDocument()
+    expect(screen.getByText('Slot aggiornato.')).toBeInTheDocument()
   }, 15_000)
 
   it('filtra la bacheca tra tutti gli slot, quelli da prenotare e quelli prenotati', async () => {

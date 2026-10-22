@@ -266,11 +266,11 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
                   type="button"
                   onClick={() => setScheduleOpen(true)}
                   disabled={busy}
-                  title="Modifica data e ora"
-                  aria-label="Modifica data e ora dello slot"
+                  title="Modifica slot"
+                  aria-label="Modifica lo slot"
                 >
                   <PencilLine size={15} />
-                  {isNewInterface && <span>Modifica data e ora</span>}
+                  {isNewInterface && <span>Modifica slot</span>}
                 </button>
                 <button
                   className="slot-card__icon-action slot-card__icon-action--delete"
@@ -496,7 +496,7 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
         <EditSlotModal
           slot={slot}
           onClose={() => setScheduleOpen(false)}
-          onSave={(startsAt) => syncPoll(() => repository.rescheduleSlot(poll.id, slot.id, startsAt, user))}
+          onSave={(startsAt, venueId) => syncPoll(() => repository.rescheduleSlot(poll.id, slot.id, startsAt, user, venueId))}
           onDone={onNotify}
         />
       )}

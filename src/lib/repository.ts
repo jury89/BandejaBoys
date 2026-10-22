@@ -33,7 +33,9 @@ import type {
   SessionUser,
   SignupRole,
   SlotInput,
+  VenueId,
 } from '../types'
+import { slotVenueId, slotVenueName } from './venues'
 import {
   makeActivityEvent,
   slotViewDocumentId,
@@ -153,6 +155,7 @@ export interface PadelRepository extends TournamentRepository {
     slotId: string,
     startsAt: string,
     actor: SessionUser,
+    venueId?: VenueId,
   ): Promise<PadelPoll>
   substitute(
     pollId: string,
@@ -848,18 +851,21 @@ function remoteRepository(): PadelRepository {
         },
       )
     },
-    async rescheduleSlot(pollId, slotId, startsAt, actor) {
+    async rescheduleSlot(pollId, slotId, startsAt, actor, venueId) {
       return mutatePoll(
         pollId,
-        (poll) => rescheduleSlot(poll, slotId, startsAt),
+        (poll) => rescheduleSlot(poll, slotId, startsAt, Date.now(), venueId),
         (before, after) => {
           const previous = slotById(before, slotId)
           const updated = slotById(after, slotId)
-          return previous && updated && previous.startsAt !== updated.startsAt
-            ? makeActivityEvent('slot_rescheduled', actor, after, updated, {
-              previousStartsAt: previous.startsAt,
-            })
-            : null
+          if (!previous || !updated) return null
+          const timeChanged = previous.startsAt !== updated.startsAt
+          const venueChanged = slotVenueId(previous) !== slotVenueId(updated)
+          if (!timeChanged && !venueChanged) return null
+          return makeActivityEvent(timeChanged ? 'slot_rescheduled' : 'slot_venue_changed', actor, after, updated, {
+            ...(timeChanged ? { previousStartsAt: previous.startsAt } : {}),
+            ...(venueChanged ? { previousVenue: slotVenueName(previous), venue: slotVenueName(updated) } : {}),
+          })
         },
       )
     },
@@ -1507,18 +1513,21 @@ function localRepository(): PadelRepository {
         },
       )
     },
-    async rescheduleSlot(pollId, slotId, startsAt, actor) {
+    async rescheduleSlot(pollId, slotId, startsAt, actor, venueId) {
       return mutate(
         pollId,
-        (poll) => rescheduleSlot(poll, slotId, startsAt),
+        (poll) => rescheduleSlot(poll, slotId, startsAt, Date.now(), venueId),
         (before, after) => {
           const previous = slotById(before, slotId)
           const updated = slotById(after, slotId)
-          return previous && updated && previous.startsAt !== updated.startsAt
-            ? makeActivityEvent('slot_rescheduled', actor, after, updated, {
-              previousStartsAt: previous.startsAt,
-            })
-            : null
+          if (!previous || !updated) return null
+          const timeChanged = previous.startsAt !== updated.startsAt
+          const venueChanged = slotVenueId(previous) !== slotVenueId(updated)
+          if (!timeChanged && !venueChanged) return null
+          return makeActivityEvent(timeChanged ? 'slot_rescheduled' : 'slot_venue_changed', actor, after, updated, {
+            ...(timeChanged ? { previousStartsAt: previous.startsAt } : {}),
+            ...(venueChanged ? { previousVenue: slotVenueName(previous), venue: slotVenueName(updated) } : {}),
+          })
         },
       )
     },
