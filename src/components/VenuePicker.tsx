@@ -1,5 +1,5 @@
 import type { VenueId } from '../types'
-import { VENUES } from '../lib/venues'
+import { CLUB_VENUES, VENUES } from '../lib/venues'
 
 export function VenuePicker({ value, onChange, label = 'Campo', disabled = false }: {
   value: VenueId
@@ -20,7 +20,7 @@ export function VenueChoices({ value, onChange, disabled = false }: {
   disabled?: boolean
 }) {
   return <div className="venue-choices">
-    {VENUES.map((venue) => <label key={venue.id} className={value.includes(venue.id) ? 'is-selected' : ''}>
+    {CLUB_VENUES.map((venue) => <label key={venue.id} className={value.includes(venue.id) ? 'is-selected' : ''}>
       <input type="checkbox" checked={value.includes(venue.id)} disabled={disabled} onChange={(event) => {
         onChange(event.target.checked ? [...value, venue.id] : value.filter((id) => id !== venue.id))
       }} />

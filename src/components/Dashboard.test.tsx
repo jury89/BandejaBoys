@@ -223,6 +223,15 @@ describe('menu account', () => {
     expect(screen.getByRole('link', { name: 'AnyTimes Time to Padel' })).toHaveAttribute('href', 'https://timetopadel.anytimes.it/')
     expect(screen.getByText(/listino aggiornato non è pubblicato/)).toBeInTheDocument()
     expect(screen.queryByText(/Da 40 €/)).not.toBeInTheDocument()
+    act(() => { window.history.replaceState({}, '', '/#campi/beach-stadium'); window.dispatchEvent(new HashChangeEvent('hashchange')) })
+    expect(screen.getByRole('heading', { name: 'Beach Stadium' })).toBeInTheDocument()
+    expect(screen.getByText(/Via Marco Biagi, 14/)).toBeInTheDocument()
+    expect(screen.getByText(/Due campi da padel/)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Wansport' })).toHaveAttribute('href', 'https://wansport.com/scarica-la-nuova-app/')
+    expect(screen.queryByRole('link', { name: 'Insla' })).not.toBeInTheDocument()
+    act(() => { window.history.replaceState({}, '', '/#campi/insla'); window.dispatchEvent(new HashChangeEvent('hashchange')) })
+    expect(screen.getByRole('heading', { name: 'I nostri circoli' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Insla' })).not.toBeInTheDocument()
   })
 
   it('rende le quattro sezioni raggiungibili direttamente e conserva il filtro tornando in bacheca', async () => {

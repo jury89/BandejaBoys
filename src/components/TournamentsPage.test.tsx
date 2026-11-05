@@ -40,6 +40,8 @@ describe('TournamentsPage', () => {
     const u = userEvent.setup(); show()
     await u.click(screen.getByRole('button', { name: /Crea torneo/ }))
     const modal = screen.getByRole('dialog')
+    expect(within(modal).getByRole('option', { name: 'Beach Stadium' })).toBeInTheDocument()
+    expect(within(modal).queryByRole('option', { name: 'Insla' })).not.toBeInTheDocument()
     await u.click(within(modal).getByRole('radio', { name: /Girone all’italiana/ }))
     await u.selectOptions(within(modal).getByLabelText('Durata delle partite'), 'timed')
     await typeCapacity(u, modal, 10)

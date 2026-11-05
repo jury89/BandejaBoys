@@ -12,6 +12,17 @@ const user: SessionUser = {
 describe('editor degli slot', () => {
   afterEach(() => vi.useRealTimers())
 
+  it('pubblica slot distinti a Beach Stadium e Insla', async () => {
+    const onCreate = vi.fn().mockResolvedValue(undefined)
+    render(<CreatePollModal user={user} existingSlots={[]} onClose={vi.fn()} onCreate={onCreate} onDone={vi.fn()} />)
+    fireEvent.change(screen.getByLabelText('Campo dello slot 1'), { target: { value: 'beach-stadium' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Aggiungi slot' }))
+    fireEvent.change(screen.getByLabelText('Campo dello slot 2'), { target: { value: 'insla' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Pubblica slot' }))
+    await waitFor(() => expect(onCreate).toHaveBeenCalled())
+    expect(onCreate.mock.calls[0][0].slots.map((slot: { venueId: string }) => slot.venueId)).toEqual(['beach-stadium', 'insla'])
+  })
+
   it('apre e pubblica un solo slot domani alle 18:30 al Tennis Club, indipendentemente dai preferiti', async () => {
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(new Date('2026-09-28T10:00:00Z'))

@@ -1,13 +1,14 @@
 import { ArrowLeft, ExternalLink, MapPin, Phone } from 'lucide-react'
 import { useState } from 'react'
-import { VENUES } from '../lib/venues'
+import { CLUB_VENUES } from '../lib/venues'
 
 const TCM_URL = 'https://www.tennisclubmantova.com/'
 const SPORT_URL = 'https://www.mantovasportcity.it/servizi/'
 const TIME_URL = 'https://www.anytimes.it/club/time-to-padel/'
+const BEACH_URL = 'https://beachstadium.it/sport/padel'
 
 export function VenuesPage({ selectedId, onBack }: { selectedId: string; onBack: () => void }) {
-  const venue = VENUES.find((item) => item.id === selectedId && item.id !== 'oasi-boschetto')
+  const venue = CLUB_VENUES.find((item) => item.id === selectedId && item.id !== 'oasi-boschetto')
   const [openedAt] = useState(() => Date.now())
   const summerExpired = openedAt >= Date.parse('2026-11-01T00:00:00+01:00')
   return <main className="venues-page">
@@ -16,7 +17,7 @@ export function VenuesPage({ selectedId, onBack }: { selectedId: string; onBack:
       <p>Scegli il circolo, organizza la partita. La prenotazione del campo si fa direttamente con la struttura.</p>
     </header>
     <nav className="venue-page-nav" aria-label="Informazioni sui circoli">
-      {VENUES.filter((item) => item.id !== 'oasi-boschetto').map((item) => <a key={item.id} href={`#campi/${item.id}`} aria-current={venue?.id === item.id ? 'page' : undefined}>{item.name}</a>)}
+      {CLUB_VENUES.filter((item) => item.id !== 'oasi-boschetto').map((item) => <a key={item.id} href={`#campi/${item.id}`} aria-current={venue?.id === item.id ? 'page' : undefined}>{item.name}</a>)}
     </nav>
     {!venue ? <section className="venue-info-card"><h2>I nostri circoli</h2>
       <p>Apri una scheda qui sopra per tariffe e iscrizione. Puoi scegliere i tuoi campi preferiti nel profilo.</p>
@@ -54,6 +55,19 @@ export function VenuesPage({ selectedId, onBack }: { selectedId: string; onBack:
           <p>Dopo aver prenotato con il circolo, usa <strong>Segna come prenotato</strong> nello slot di Bandeca per confermare il campo al gruppo.</p>
         </section>
         <aside className="venue-notice"><h3>Da confermare con il circolo</h3><p>Tariffe, quota e durata del tesseramento, procedura d’iscrizione e documenti/certificato richiesti.</p></aside>
+      </> : venue.id === 'beach-stadium' ? <>
+        <section><h3>Il centro</h3>
+          <p>Due campi da padel a Bagnolo San Vito, aperti sui lati in estate e coperti e riscaldati in inverno, all’interno del parco GoParc vicino all’uscita Mantova Sud.</p>
+          <p>Informazioni dalla <a href={BEACH_URL} target="_blank" rel="noreferrer">pagina padel ufficiale</a>.</p>
+        </section>
+        <section><h3>Quanto costa giocare</h3>
+          <p>Il listino non è pubblicato nella pagina padel del circolo. Chiedi la tariffa aggiornata per la durata e l’orario scelti prima di prenotare.</p>
+        </section>
+        <section><h3>Come iscriversi e prenotare</h3>
+          <p>Il sito ufficiale rimanda all’app <a href="https://wansport.com/scarica-la-nuova-app/" target="_blank" rel="noreferrer">Wansport</a> per le prenotazioni. Cerca Beach Stadium nell’app oppure contatta la segreteria al <a href="tel:+393318044637">331 8044637</a> o scrivi a <a href="mailto:info@beachstadium.it">info@beachstadium.it</a>.</p>
+          <p>Dopo aver prenotato con il circolo, usa <strong>Segna come prenotato</strong> nello slot di Bandeca per confermare il campo al gruppo.</p>
+        </section>
+        <aside className="venue-notice"><h3>Da confermare con il circolo</h3><p>Tariffe, tesseramento, procedura d’iscrizione e documenti/certificato richiesti.</p></aside>
       </> : <>
         <section><h3>Quanto costa giocare</h3>
           <p className="venue-price-lead">Da 40 € / ora <span>indicazione del sito, non un preventivo</span></p>
@@ -66,7 +80,7 @@ export function VenuesPage({ selectedId, onBack }: { selectedId: string; onBack:
       <footer className="venue-info-card__footer">
         {venue.phone && <a className="button button--secondary" href={`tel:${venue.phone}`}><Phone size={18} /> Chiama il circolo</a>}
         <a className="button button--secondary" href={venue.website} target="_blank" rel="noreferrer"><ExternalLink size={18} /> {venue.id === 'time-to-padel' ? 'Scheda del circolo' : 'Sito ufficiale'}</a>
-        <small>Fonti consultate il {venue.id === 'time-to-padel' ? '14 ottobre 2026' : '15 settembre 2026'}. Prezzi e condizioni possono cambiare: la conferma spetta al circolo.</small>
+        <small>Fonti consultate il {venue.id === 'beach-stadium' ? '5 novembre 2026' : venue.id === 'time-to-padel' ? '14 ottobre 2026' : '15 settembre 2026'}. Prezzi e condizioni possono cambiare: la conferma spetta al circolo.</small>
       </footer>
     </article>}
   </main>

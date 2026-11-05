@@ -8,7 +8,7 @@ import { openTournamentSimulation, resetTournamentSimulation, type TournamentSim
 import { TournamentRuntimeContext, useTournamentNow, useTournamentRuntime } from './tournamentRuntime'
 import { TournamentSimulationTools } from './TournamentSimulationTools'
 import { TOURNAMENT_FORMATS, type Tournament, type TournamentInput, type TournamentMatch, type TournamentScore } from '../lib/tournamentTypes'
-import { VENUES } from '../lib/venues'
+import { CLUB_VENUES, VENUES } from '../lib/venues'
 import { Modal } from './Modal'
 import { ProfileAvatar } from './ProfileAvatar'
 import { SlotDateTimeField } from './SlotDateTimeField'
@@ -79,7 +79,7 @@ function TournamentEditor({ tournament, user, onClose, onSaved }: { tournament?:
       {tournament && user.id !== tournament.createdBy && <p className="tournament-note">Stai modificando il torneo di un altro membro come amministratore. Il creatore e gli iscritti rimarranno invariati.</p>}
       {metadataOnly && <p className="tournament-note">Per proteggere lo storico puoi correggere soltanto nome e circolo. Calendario, coppie e risultati restano invariati.</p>}
       <label>Nome del torneo<input required minLength={3} maxLength={80} value={input.title} onChange={e => update('title', e.target.value)} placeholder="Il torneo dei fagiani" /></label>
-      <label>Circolo<select value={input.venueId} onChange={e => update('venueId', e.target.value as TournamentInput['venueId'])}>{VENUES.map(v => <option value={v.id} key={v.id}>{v.name}</option>)}</select></label>
+      <label>Circolo<select value={input.venueId} onChange={e => update('venueId', e.target.value as TournamentInput['venueId'])}>{CLUB_VENUES.map(v => <option value={v.id} key={v.id}>{v.name}</option>)}</select></label>
       {!metadataOnly && <><SlotDateTimeField value={date} onChange={setDate} />
       <p>Orario italiano. Le iscrizioni chiudono automaticamente un’ora prima. Cambiando la data cambia anche la scadenza: se sposti l’inizio a più di un’ora da ora, le iscrizioni si riaprono.</p>
       {rulesLocked && <p className="tournament-note">Ci sono già {enrolled} iscritti: formula e tipo di coppie restano invariati.{rotating ? ' Anche i punti totali per incontro restano invariati.' : ''}{input.format === 'round-robin' ? ' Puoi ancora cambiare la durata delle partite prima del sorteggio, senza perdere iscritti o compagni scelti.' : ''}</p>}

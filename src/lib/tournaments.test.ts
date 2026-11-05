@@ -19,6 +19,15 @@ function roundScores(t: Tournament, a = 14, b = 10): TournamentScore[] {
 }
 
 describe('tournament domain', () => {
+  it('allows Beach Stadium tournaments and rejects the slot-only Insla location', () => {
+    const draft = makeTournament('beach', { ...input, venueId: 'beach-stadium' }, admin, now)
+    expect(draft.venueId).toBe('beach-stadium')
+    expect(() => makeTournament('insla', { ...input, venueId: 'insla' }, admin, now)).toThrow(/circolo valido/)
+    expect(() => editTournament(draft, { ...input, venueId: 'insla' }, admin, now)).toThrow(/circolo valido/)
+    const historical = { ...draft, status: 'cancelled' as const }
+    expect(() => editTournament(historical, { ...historical, venueId: 'insla' }, admin, now)).toThrow(/circolo valido/)
+  })
+
   it('replaces computer-drawn fixed teams throughout the saved schedule before play', () => {
     const t = running({ format: 'round-robin', pairing: 'random-fixed' })
     const pairs = t.teams.map(team => [...team.playerIds] as [string, string])

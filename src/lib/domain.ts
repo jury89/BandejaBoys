@@ -1,4 +1,4 @@
-import { DEFAULT_VENUE_ID, slotVenueId, slotVenueName, validateVenueId } from './venues'
+import { DEFAULT_VENUE_ID, slotVenueId, slotVenueName, validateClubVenueId, validateVenueId } from './venues'
 import { getFantasySeasonForRound } from './fantasySeasons'
 import { isSlotAdmin, SLOT_ADMIN_USER_ID } from './admin'
 import type { Tournament, TournamentInput, TournamentMatch, TournamentOrganization, TournamentRegistration, TournamentScore, TournamentStanding, TournamentTeam } from './tournamentTypes'
@@ -2093,7 +2093,7 @@ export function validateTournamentInput(input: TournamentInput, now: number): To
   if (scoringMode === 'timed' && totalMinutes === null && input.courts < Math.floor(input.capacity / 4)) throw new Error(`Servono almeno ${Math.floor(input.capacity / 4)} campi: le partite del turno a tempo iniziano insieme.`)
   const plan = totalMinutes === null ? null : getTimedTournamentPlan(input)
   if (plan && !plan.feasible) throw new Error(`Tempo insufficiente: con ${input.capacity} giocatori e ${input.courts} campi servono almeno ${plan.minimumMinutes} minuti per incontri da 5 minuti. Aumenta la durata o i campi, oppure riduci la capienza.`)
-  return { title, startsAt: input.startsAt, venueId: validateVenueId(input.venueId), format: input.format,
+  return { title, startsAt: input.startsAt, venueId: validateClubVenueId(input.venueId), format: input.format,
     pairing: input.pairing, capacity: input.capacity, courts: input.courts, rounds: input.rounds,
     pointsPerMatch: input.pointsPerMatch, scoreAccess: input.scoreAccess, scoringMode, matchMinutes: plan?.matchMinutes ?? matchMinutes, warmupMinutes, changeoverMinutes, totalMinutes }
 }
@@ -2153,7 +2153,7 @@ export function editTournament(tournament: Tournament, input: TournamentInput, a
     if (fields.some(key => (input[key] ?? defaults[key as keyof typeof defaults]) !== (tournament[key] ?? defaults[key as keyof typeof defaults]))) throw new Error('Il tabellone è protetto: puoi modificare soltanto nome e circolo.')
     const title = input.title.trim()
     if (title.length < 3 || title.length > 80) throw new Error('Il nome del torneo deve avere da 3 a 80 caratteri.')
-    return { ...tournament, title, venueId: validateVenueId(input.venueId), updatedAt: now }
+    return { ...tournament, title, venueId: validateClubVenueId(input.venueId), updatedAt: now }
   }
   if (input.capacity < Object.keys(tournament.registrations).length) throw new Error('Il massimo partecipanti non può essere inferiore agli iscritti: nessuno verrà rimosso.')
   if (Object.keys(tournament.registrations).length > 0 && (

@@ -10,6 +10,28 @@ const input = { startsAt: '2026-09-15T18:00', durationMinutes: 90 }
 const legacy: PadelSlot = { id: 'old', ...input, venue: '', signups: [] }
 
 describe('circoli e preferenze', () => {
+  it.each([
+    ['beach-stadium', 'Beach Stadium', '#campi/beach-stadium'],
+    ['insla', 'Insla', undefined],
+  ] as const)('conserva %s nello slot, nella prenotazione e nel calendario', (venueId, name, href) => {
+    const poll = { id: 'new-venue', ...makePoll({ slots: [{ ...input, venueId }] }, player) }
+    const slot = poll.slots[0]
+    expect(slotVenueName(slot)).toBe(name)
+    expect(venueInfoHref(slot)).toBe(href)
+    expect(buildSlotCalendar(poll, slot)).toContain(`LOCATION:${name}`)
+    const booked = setSlotBooking(slot, player, 10)
+    expect(booked.venue).toBe(name)
+    expect(setSlotBooking(booked, null)).toMatchObject({ venueId, venue: '' })
+    expect(rescheduleSlot(poll, slot.id, '2026-09-16T18:00').slots[0].venueId).toBe(venueId)
+    expect(matchesVenueFilter(slot, [])).toBe(true)
+  })
+
+  it('include Beach Stadium nei cinque preferiti ma limita Insla agli slot', () => {
+    expect(validatePreferredVenueIds(['oasi-boschetto', 'tennis-club-mantova', 'sport-city-mantova', 'time-to-padel', 'beach-stadium'])).toHaveLength(5)
+    expect(normalizePreferredVenueIds(['insla', 'beach-stadium'])).toEqual(['beach-stadium'])
+    expect(() => validatePreferredVenueIds(['insla'])).toThrow()
+  })
+
   it('usa Time to Padel per slot, prenotazione, calendario, filtri e posto fisso', () => {
     const poll = { id: 'time', ...makePoll({ slots: [{ ...input, venueId: 'time-to-padel' }] }, player) }
     const slot = poll.slots[0]

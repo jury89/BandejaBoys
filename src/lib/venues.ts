@@ -2,12 +2,17 @@ import type { PadelSlot, VenueId } from '../types'
 import { PADEL_TIME_ZONE } from './format'
 
 export const DEFAULT_VENUE_ID: VenueId = 'oasi-boschetto'
-export const VENUES: ReadonlyArray<{ id: VenueId; name: string; address: string; phone?: string; website?: string }> = [
+export const VENUES: ReadonlyArray<{ id: VenueId; name: string; address?: string; phone?: string; website?: string; slotOnly?: boolean }> = [
   { id: 'oasi-boschetto', name: 'Oasi Boschetto', address: 'Mantova', phone: '+390376290058' },
   { id: 'tennis-club-mantova', name: 'Tennis Club Mantova', address: 'Via Learco Guerra, 2 · Mantova', phone: '+390376327915', website: 'https://www.tennisclubmantova.com/' },
   { id: 'sport-city-mantova', name: 'Sport City Mantova', address: 'Via Palmiro Azzi, 5 · Mantova', website: 'https://www.mantovasportcity.it/' },
   { id: 'time-to-padel', name: 'Time to Padel', address: 'Via Premana, 26 · Gazoldo degli Ippoliti', website: 'https://www.anytimes.it/club/time-to-padel/' },
+  { id: 'beach-stadium', name: 'Beach Stadium', address: 'Via Marco Biagi, 14 · Bagnolo San Vito', phone: '+393318044637', website: 'https://beachstadium.it/sport/padel' },
+  { id: 'insla', name: 'Insla', slotOnly: true },
 ]
+
+/** Slot-only locations have no club page, preferences or tournament option. */
+export const CLUB_VENUES = VENUES.filter((venue) => !venue.slotOnly)
 
 export type SlotVenue = Pick<PadelSlot, 'venueId'> & Partial<Pick<PadelSlot, 'venue'>>
 
@@ -19,6 +24,12 @@ export function validateVenueId(value: unknown): VenueId {
   if (value === undefined) return DEFAULT_VENUE_ID
   if (!isVenueId(value)) throw new Error('Scegli un campo valido.')
   return value
+}
+
+export function validateClubVenueId(value: unknown): VenueId {
+  const id = validateVenueId(value)
+  if (!CLUB_VENUES.some((venue) => venue.id === id)) throw new Error('Scegli un circolo valido per il torneo.')
+  return id
 }
 
 export function slotVenueId(slot: SlotVenue): VenueId {
@@ -36,11 +47,11 @@ export function slotVenueName(slot: SlotVenue): string {
 }
 
 export function normalizePreferredVenueIds(value: unknown): VenueId[] {
-  return Array.isArray(value) ? VENUES.filter((venue) => value.includes(venue.id)).map((venue) => venue.id) : []
+  return Array.isArray(value) ? CLUB_VENUES.filter((venue) => value.includes(venue.id)).map((venue) => venue.id) : []
 }
 
 export function validatePreferredVenueIds(value: unknown): VenueId[] {
-  if (!Array.isArray(value) || value.length > VENUES.length || value.some((id) => !isVenueId(id)) || new Set(value).size !== value.length) {
+  if (!Array.isArray(value) || value.length > CLUB_VENUES.length || value.some((id) => !CLUB_VENUES.some((venue) => venue.id === id)) || new Set(value).size !== value.length) {
     throw new Error('Scegli campi preferiti validi, senza duplicati.')
   }
   return normalizePreferredVenueIds(value)
@@ -53,7 +64,7 @@ export function matchesVenueFilter(slot: SlotVenue, venueIds: readonly VenueId[]
 
 export function venueInfoHref(slot: SlotVenue): string | undefined {
   const id = slotVenueId(slot)
-  return id === DEFAULT_VENUE_ID ? undefined : `#campi/${id}`
+  return id !== DEFAULT_VENUE_ID && CLUB_VENUES.some((venue) => venue.id === id) ? `#campi/${id}` : undefined
 }
 
 const bookingDateFormatter = new Intl.DateTimeFormat('en-CA', {
