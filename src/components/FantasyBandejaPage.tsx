@@ -972,7 +972,11 @@ export function FantasyBandejaPage({
     () => [...visibleRounds].sort((left, right) => left.locksAt - right.locksAt),
     [visibleRounds],
   )
-  const openRounds = orderedRounds.filter((round) => round.status === 'open' && now < round.locksAt)
+  const openRounds = orderedRounds.filter((round) => (
+    round.status === 'open'
+    && now < round.locksAt
+    && !round.participantIds.includes(user.id)
+  ))
   const lockedRounds = orderedRounds.filter((round) => round.status === 'open' && now >= round.locksAt)
   const finishedRounds = [...orderedRounds]
     .filter((round) => round.status === 'scored' || round.status === 'void')
@@ -1183,7 +1187,7 @@ export function FantasyBandejaPage({
                   <h2>Non ci sono coppie da schierare.</h2>
                   <p>{selectedSeasonIsArchived
                     ? 'Le formazioni di questa stagione sono chiuse e restano disponibili nei risultati.'
-                    : 'I round già iniziati passano nei Risultati; la prossima formazione comparirà qui.'}</p>
+                    : 'Qui compaiono solo le partite in cui non sei titolare e puoi schierare una coppia. I round già iniziati sono nei Risultati.'}</p>
                 </section>
               ) : (
                 <section className="fantasy-section" aria-labelledby="fantasy-open-title">

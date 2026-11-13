@@ -327,7 +327,17 @@ describe('FantaBandeja', () => {
 
   it('permette a uno spettatore di scegliere due giocatori e il capitano', async () => {
     const user = userEvent.setup()
-    const { onSave } = renderPage()
+    const ownMatch: FantasyRound = {
+      ...round,
+      id: 'own-match',
+      pollTitle: 'Partita in cui sono titolare',
+      participantIds: ['manager', 'b', 'c', 'd'],
+      participants: [manager, ...members.slice(1, 4)].map(({ id, displayName }) => ({ userId: id, displayName })),
+      rosterKey: '["b","c","d","manager"]',
+    }
+    const { onSave } = renderPage({ rounds: [ownMatch, round] })
+    expect(screen.getByLabelText('1 formazioni aperte')).toHaveTextContent('1')
+    expect(screen.queryByText(ownMatch.pollTitle)).not.toBeInTheDocument()
     const court = screen.getByLabelText('I quattro titolari disponibili')
 
     await user.click(within(court).getByRole('button', { name: /Ale/i }))
@@ -357,14 +367,26 @@ describe('FantaBandeja', () => {
     expect(styles).toContain('.fantasy-player:not(.is-selected):hover:not(:disabled)')
   })
 
-  it('non fa giocare uno dei quattro titolari', () => {
+  it('nasconde le partite da titolare e mostra lo stato vuoto se non ci sono coppie da schierare', async () => {
+    const user = userEvent.setup()
     renderPage({ user: members[0] as SessionUser })
 
-    expect(screen.getByText('Tu sei in campo.')).toBeInTheDocument()
+    expect(screen.getByLabelText('0 formazioni aperte')).toHaveTextContent('0')
+    expect(screen.getByRole('tab', { name: /Classifica/i })).toHaveAttribute('aria-selected', 'true')
+    await user.click(screen.getByRole('tab', { name: /Partite/i }))
+    expect(screen.getByText('Non ci sono coppie da schierare.')).toBeInTheDocument()
+    expect(screen.queryByText(round.pollTitle)).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('I quattro titolari disponibili')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Salva formazione' })).not.toBeInTheDocument()
-    within(screen.getByLabelText('I quattro titolari disponibili'))
-      .getAllByRole('button')
-      .forEach((button) => expect(button).toBeDisabled())
+  })
+
+  it('mantiene nei risultati le proprie partite da titolare dopo il blocco', () => {
+    renderPage({ user: members[0] as SessionUser, now: round.locksAt })
+
+    expect(screen.getByLabelText('0 formazioni aperte')).toHaveTextContent('0')
+    expect(screen.getByRole('tab', { name: /Risultati/i })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByText(round.pollTitle)).toBeInTheDocument()
+    expect(screen.getByText('Round in calcolo')).toBeInTheDocument()
   })
 
   it('rende pubbliche le formazioni soltanto dopo il blocco', () => {
