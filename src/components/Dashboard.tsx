@@ -1078,12 +1078,14 @@ export function Dashboard() {
           <div className="venue-filter__heading"><strong id="venue-filter-title">Dove vuoi giocare?</strong><a href="#campi">Campi e costi ↗</a></div>
           <details className="venue-filter__details">
           <summary><span className="venue-filter__label-full">Scegli i campi</span><span className="venue-filter__label-short">Campi</span> <span>{selectedVenueIds.length === 0 ? 'Tutti' : `${selectedVenueIds.length} selezionati`}</span></summary>
+          <div className="venue-filter__body">
           <div className="venue-filter__actions">
             <button type="button" aria-pressed={selectedVenueIds.length === 0} onClick={() => setVenueFilterOverride({ key: venueFilterKey, ids: [] })}>Tutti i campi</button>
             {preferredVenueIds.length > 0 && <button type="button" onClick={() => setVenueFilterOverride(null)}>Ripristina i preferiti</button>}
           </div>
           <VenueChoices value={selectedVenueIds} onChange={(ids) => setVenueFilterOverride({ key: venueFilterKey, ids })} />
           <p>{selectedVenueIds.length === 0 ? 'Vedi tutti i circoli.' : `Stai filtrando ${selectedVenueIds.length} ${selectedVenueIds.length === 1 ? 'circolo' : 'circoli'}.`} Questa vista non modifica i preferiti del profilo.</p>
+          </div>
           </details>
         </section>
 

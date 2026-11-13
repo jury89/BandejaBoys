@@ -11,7 +11,7 @@ Direzione approvata: mobile-first, stessa identità Bandeja, partite e azioni pr
 
 ## Homepage compatta su telefono
 
-Sotto i 760 px, la sola bacheca Clubhouse raccoglie saluto e Nuovo slot sulla stessa riga, compatta la prossima partita mantenendo data/ora e prenotazione, e dispone i tre filtri principali sopra Campi e prenotazione. Campi si espande a tutta larghezza e conserva selezione multipla, ripristino dei preferiti e link Campi e costi. Il titolo settimanale mantiene conteggio, pulsante di apertura/chiusura con etichetta accessibile e aggiunta slot, con meno spazio verticale.
+Sotto i 760 px, la sola bacheca Clubhouse raccoglie saluto e Nuovo slot sulla stessa riga, compatta la prossima partita mantenendo data/ora e prenotazione, e dispone i tre filtri principali sopra Campi e prenotazione. I comandi Campi e prenotazione rimangono affiancati anche quando Campi è aperto; il riepilogo mantiene la propria larghezza e il corpo dell’elenco si espande sotto entrambi, in un pannello separato a tutta larghezza con selezione multipla, ripristino dei preferiti e link Campi e costi. Il titolo settimanale mantiene conteggio, pulsante di apertura/chiusura con etichetta accessibile e aggiunta slot, con meno spazio verticale.
 
 Gli override sono circoscritti a `.ux-new .dashboard--feed` e al breakpoint mobile. Desktop da 760 px e interfaccia classica conservano la presentazione precedente. Nessuna modifica a filtri, adesioni, letture o scritture del repository.
 

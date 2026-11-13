@@ -331,10 +331,10 @@ body.modal-open .app-shell.ux-new .toast { visibility: hidden; }
 }
 
 /* Compact only the phone feed. Explicit rows keep booking beside the venue
-   picker; opening the picker expands it under both controls. Desktop keeps
+   picker; its separate body opens below both controls. Desktop keeps
    the original block/grid layout and the full labels. */
 @media (max-width: 759px) {
-  .app-shell.ux-new .dashboard--feed { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); column-gap: 8px; padding-top: 16px; }
+  .app-shell.ux-new .dashboard--feed { --feed-filter-gap: 8px; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); column-gap: var(--feed-filter-gap); padding-top: 16px; }
   .app-shell.ux-new .dashboard--feed > * { grid-column: 1 / -1; min-width: 0; }
   .app-shell.ux-new .dashboard--feed .dashboard-intro { grid-row: 1; flex-direction: row; flex-wrap: nowrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
   .app-shell.ux-new .dashboard--feed .dashboard-intro > div { min-width: 0; }
@@ -357,19 +357,21 @@ body.modal-open .app-shell.ux-new .toast { visibility: hidden; }
   .app-shell.ux-new .dashboard--feed .club-filters button { grid-column: span 2; grid-row: 4; min-width: 0; min-height: 44px; justify-content: center; gap: 6px; margin-bottom: 8px; padding: 6px 8px; font-size: 12px; }
   .app-shell.ux-new .dashboard--feed .club-filters button span { min-width: 0; }
   .app-shell.ux-new .dashboard--feed .club-filters button strong { flex-shrink: 0; }
-  .app-shell.ux-new .dashboard--feed .club-booking-filter { position: relative; z-index: 1; grid-column: 5 / -1; grid-row: 5; align-self: start; margin: 0; }
+  .app-shell.ux-new .dashboard--feed .club-booking-filter { position: relative; grid-column: 5 / -1; grid-row: 5; align-self: start; margin: 0; }
   .app-shell.ux-new .dashboard--feed .club-booking-filter__caption { position: absolute; left: 9px; top: 5px; display: block; color: var(--muted); font-size: 10px; line-height: 12px; pointer-events: none; }
   .app-shell.ux-new .dashboard--feed .club-booking-filter select { min-height: 46px; margin: 0; padding: 18px 8px 4px; font-size: 12px; }
-  .app-shell.ux-new .dashboard--feed .venue-filter { position: relative; display: flex; flex-direction: column; grid-column: 1 / 5; grid-row: 5; margin: 0; padding: 0 10px; border-radius: 8px; }
+  .app-shell.ux-new .dashboard--feed .venue-filter { display: flex; flex-direction: column; grid-column: 1 / 5; grid-row: 5; margin: 0; padding: 0; border: 0; border-radius: 0; background: transparent; }
   .app-shell.ux-new .dashboard--feed .venue-filter__heading { display: none; }
   .app-shell.ux-new .dashboard--feed .venue-filter:has(.venue-filter__details[open]) { grid-column: 1 / -1; }
-  .app-shell.ux-new .dashboard--feed .venue-filter:has(.venue-filter__details[open]) .venue-filter__heading { display: flex; order: 2; justify-content: flex-end; margin: 0; }
+  .app-shell.ux-new .dashboard--feed .venue-filter:has(.venue-filter__details[open]) .venue-filter__heading { display: flex; order: 2; justify-content: flex-end; margin: 0; padding: 0 10px 8px; border: 1px solid var(--line); border-top: 0; border-radius: 0 0 8px 8px; background: var(--white); }
   .app-shell.ux-new .dashboard--feed .venue-filter__heading strong { display: none; }
   .app-shell.ux-new .dashboard--feed .venue-filter__heading a { display: inline-flex; align-items: center; min-height: 44px; font-size: 12px; }
-  .app-shell.ux-new .dashboard--feed .venue-filter__details > summary { display: flex; align-items: center; gap: 6px; min-height: 44px; padding: 8px 0; font-size: 13px; list-style: none; }
+  .app-shell.ux-new .dashboard--feed .venue-filter__details > summary { display: flex; align-items: center; gap: 6px; min-height: 46px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--white); font-size: 13px; list-style: none; }
   .app-shell.ux-new .dashboard--feed .venue-filter__details > summary::-webkit-details-marker { display: none; }
   .app-shell.ux-new .dashboard--feed .venue-filter__details > summary::before { content: ''; flex-shrink: 0; width: 6px; height: 6px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(-45deg); }
-  .app-shell.ux-new .dashboard--feed .venue-filter__details[open] > summary { max-width: calc(100% - 120px); margin-bottom: 8px; }
+  /* Match four of the six feed columns, including their three inner gaps. */
+  .app-shell.ux-new .dashboard--feed .venue-filter__details[open] > summary { width: calc((200% - var(--feed-filter-gap)) / 3); margin-bottom: 8px; }
+  .app-shell.ux-new .dashboard--feed .venue-filter__body { padding: 10px; border: 1px solid var(--line); border-bottom: 0; border-radius: 8px 8px 0 0; background: var(--white); }
   .app-shell.ux-new .dashboard--feed .venue-filter__details[open] > summary::before { transform: rotate(45deg); }
   .app-shell.ux-new .dashboard--feed .venue-filter__details .venue-filter__label-full { display: none; }
   .app-shell.ux-new .dashboard--feed .venue-filter__details .venue-filter__label-short { display: inline; float: none; margin: 0; color: inherit; font-size: inherit; }
