@@ -234,16 +234,6 @@
 .app-shell.ux-new .group-match__panel-heading > span { width: 32px; height: 32px; border-radius: 6px; }
 
 /* Fanta preserves every rule, timer and season transition. */
-.app-shell.ux-new .fantasy-hero { min-height: 0; padding: 16px; border-radius: 12px; gap: 12px; }
-.app-shell.ux-new .fantasy-hero > div:first-child { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; width: 100%; }
-.app-shell.ux-new .fantasy-hero .eyebrow, .app-shell.ux-new .fantasy-hero__mark { display: none; }
-.app-shell.ux-new .fantasy-hero .fantasy-hero__intro { grid-column: 1 / -1; grid-row: 2; margin: 0; font-size: 12px; }
-.app-shell.ux-new .fantasy-hero .fantasy-hero__rules-button { grid-column: 2; grid-row: 1; min-height: 44px; margin: 0; padding: 8px; font-size: 11px; }
-.app-shell.ux-new .fantasy-hero .fantasy-hero__rules-button svg { display: none; }
-.app-shell.ux-new .fantasy-hero h1 { font-size: clamp(30px, 7vw, 46px); }
-.app-shell.ux-new .fantasy-hero h1 { margin: 0; }
-.app-shell.ux-new .fantasy-hero p { font-size: 13px; max-width: 60ch; }
-.app-shell.ux-new .fantasy-season { border-radius: 12px; margin: 16px 0; }
 .app-shell.ux-new .fantasy-season__summary { padding: 16px; gap: 16px; }
 .app-shell.ux-new .fantasy-season h2 { font-size: 26px; }
 .app-shell.ux-new .fantasy-season p { font-size: 12px; }

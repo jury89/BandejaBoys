@@ -6264,116 +6264,120 @@ p {
   background: rgba(255, 255, 255, 0.72);
 }
 
-.fantasy-hero {
+.fantasy-page__header {
   display: grid;
-  overflow: hidden;
-  min-height: 210px;
+  grid-template-columns: minmax(0, 1fr) minmax(180px, 250px) auto;
   align-items: center;
+  gap: 12px;
   margin-bottom: 16px;
-  padding: 34px 40px;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 40px;
-  border: 1px solid #0b4a68;
-  border-radius: 18px;
-  background: var(--ink);
-  color: var(--white);
-  box-shadow: var(--shadow);
 }
 
-.fantasy-hero .eyebrow {
-  color: var(--ball);
-}
-
-.fantasy-hero h1 {
-  display: flex;
-  align-items: baseline;
-  margin-bottom: 14px;
+.fantasy-page__header h1 {
+  margin: 0;
+  color: var(--ink);
   font-family: var(--display);
-  font-size: clamp(4.1rem, 8vw, 6.8rem);
+  font-size: 2rem;
   font-weight: 750;
-  gap: 0.035em;
-  letter-spacing: -0.045em;
-  line-height: 0.76;
+  line-height: 1.1;
   text-transform: uppercase;
 }
 
-.fantasy-hero__title-main {
-  color: var(--white);
-}
-
-.fantasy-hero__title-accent {
-  color: var(--ball);
-}
-
-.fantasy-hero__intro {
-  max-width: 650px;
-  margin: 0;
-  color: #c9d9df;
-  font-size: 0.9rem;
-  line-height: 1.65;
-}
-
-.fantasy-hero__rules-button {
+.fantasy-page__rules {
   display: inline-flex;
-  min-height: 42px;
+  grid-column: 3;
+  grid-row: 1;
+  min-height: 44px;
   align-items: center;
   justify-content: center;
-  margin-top: 22px;
-  padding: 10px 15px;
-  gap: 9px;
-  border: 1px solid rgba(255, 255, 255, 0.42);
-  border-radius: 9px;
-  background: rgba(255, 255, 255, 0.08);
-  color: var(--white);
-  font-size: 0.68rem;
-  font-weight: 850;
-  letter-spacing: 0.01em;
-  transition: 150ms ease;
+  gap: 7px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--white);
+  color: var(--court);
+  font-size: 0.8rem;
+  font-weight: 750;
+  cursor: pointer;
 }
 
-.fantasy-hero__rules-button:hover {
-  border-color: var(--ball);
-  background: rgba(209, 255, 37, 0.12);
-  color: var(--ball);
-  transform: translateY(-1px);
+.fantasy-page__season {
+  display: grid;
+  grid-column: 2;
+  grid-row: 1;
+  min-width: 0;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.8rem;
 }
 
-.fantasy-hero__rules-button:focus-visible {
-  outline: 3px solid rgba(209, 255, 37, 0.42);
+.fantasy-page__season label,
+.fantasy-page__season select {
+  min-width: 0;
+  width: 100%;
+}
+
+.fantasy-page__season select {
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--white);
+  color: var(--court);
+  font: inherit;
+  font-weight: 750;
+}
+
+.fantasy-page__season small {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.75rem;
+}
+
+.fantasy-page__info {
+  margin-top: 28px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+}
+
+.fantasy-page__info > summary {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 0;
+  font-size: 0.8rem;
+  font-weight: 750;
+  cursor: pointer;
+  list-style: none;
+}
+
+.fantasy-page__info > summary::-webkit-details-marker {
+  display: none;
+}
+
+.fantasy-page__info[open] > summary svg {
+  transform: rotate(180deg);
+}
+
+.fantasy-page__rules:focus-visible,
+.fantasy-page__season select:focus-visible,
+.fantasy-page__info > summary:focus-visible {
+  outline: 2px solid var(--ocean);
   outline-offset: 3px;
 }
 
-.fantasy-hero__mark {
-  position: relative;
-  display: grid;
-  width: 142px;
-  height: 142px;
-  place-items: center;
-  border: 2px solid rgba(255, 255, 255, 0.75);
-  background: var(--court);
-  color: var(--ball);
-  box-shadow: 13px 13px 0 var(--ball);
-  transform: rotate(-3deg);
-}
-
-.fantasy-hero__mark span {
-  position: absolute;
-  right: 8px;
-  bottom: 4px;
-  color: rgba(255, 255, 255, 0.32);
-  font-family: var(--display);
-  font-size: 2.4rem;
-  font-weight: 800;
-  line-height: 1;
+.fantasy-page__intro {
+  margin: 8px 0 16px;
+  max-width: 65ch;
+  font-size: 0.8rem;
+  line-height: 1.6;
 }
 
 .fantasy-season {
   overflow: hidden;
-  margin-bottom: 16px;
-  border: 1px solid #b9d1d9;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.88);
-  box-shadow: 0 12px 28px rgba(7, 58, 80, 0.09);
+  border-top: 1px solid var(--line);
 }
 
 .fantasy-season.is-archived {
@@ -6481,74 +6485,6 @@ p {
   border-radius: 50%;
   background: #0a897d;
   box-shadow: 0 0 0 4px rgba(10, 137, 125, 0.13);
-}
-
-.fantasy-season__switcher {
-  display: grid;
-  padding: 6px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px;
-  border-top: 1px solid #d8e5e9;
-  background: #eaf2f4;
-}
-
-.fantasy-season__switcher button {
-  display: flex;
-  min-width: 0;
-  min-height: 52px;
-  align-items: center;
-  justify-content: space-between;
-  padding: 9px 14px;
-  gap: 12px;
-  border: 1px solid transparent;
-  border-radius: 10px;
-  background: transparent;
-  color: #4c6872;
-  text-align: left;
-  transition: 150ms ease;
-}
-
-.fantasy-season__switcher button:hover {
-  border-color: #bfd3d9;
-  background: rgba(255, 255, 255, 0.55);
-}
-
-.fantasy-season__switcher button:focus-visible {
-  outline: 3px solid rgba(12, 110, 147, 0.24);
-  outline-offset: 1px;
-}
-
-.fantasy-season__switcher button.is-active {
-  border-color: #a9c8d1;
-  background: var(--white);
-  color: var(--ink);
-  box-shadow: 0 5px 14px rgba(7, 58, 80, 0.08);
-}
-
-.fantasy-season__switcher button > span {
-  display: grid;
-  min-width: 0;
-  gap: 2px;
-}
-
-.fantasy-season__switcher strong {
-  overflow: hidden;
-  font-size: 0.72rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.fantasy-season__switcher small {
-  color: var(--muted);
-  font-size: 0.55rem;
-  font-weight: 750;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-}
-
-.fantasy-season__switcher svg {
-  flex: 0 0 auto;
-  color: var(--court);
 }
 
 .fantasy-season__archive-note {
@@ -8102,34 +8038,24 @@ p {
     margin-bottom: 14px;
   }
 
-  .fantasy-hero {
-    min-height: 0;
-    padding: 25px 24px;
-    grid-template-columns: minmax(0, 1fr) 82px;
-    gap: 18px;
+  .fantasy-page__header {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px 12px;
   }
 
-  .fantasy-hero h1 {
-    font-size: clamp(2.8rem, 9vw, 4.6rem);
+  .fantasy-page__header h1 {
+    font-size: 1.75rem;
   }
 
-  .fantasy-hero__intro {
-    font-size: 0.82rem;
-    line-height: 1.5;
+  .fantasy-page__rules {
+    grid-column: 2;
+    padding-inline: 9px;
+    font-size: 0.75rem;
   }
 
-  .fantasy-hero__mark {
-    width: 72px;
-    height: 88px;
-    box-shadow: 7px 7px 0 var(--ball);
-  }
-
-  .fantasy-hero__mark svg {
-    width: 31px;
-  }
-
-  .fantasy-hero__mark span {
-    font-size: 1.35rem;
+  .fantasy-page__season {
+    grid-column: 1 / -1;
+    grid-row: 2;
   }
 
   .fantasy-season__summary {
@@ -8774,29 +8700,6 @@ p {
 }
 
 @media (max-width: 420px) {
-  .fantasy-hero {
-    padding: 20px 18px;
-    grid-template-columns: 1fr;
-  }
-
-  .fantasy-hero h1 {
-    align-items: baseline;
-    flex-direction: row;
-    margin-bottom: 11px;
-    gap: 0;
-    font-size: clamp(2.55rem, 12.5vw, 3.45rem);
-    line-height: 0.82;
-  }
-
-  .fantasy-hero__mark {
-    display: none;
-  }
-
-  .fantasy-hero__rules-button {
-    width: auto;
-    min-height: 44px;
-  }
-
   .fantasy-season__summary {
     padding: 18px 16px;
   }
@@ -8816,15 +8719,6 @@ p {
 
   .fantasy-season__countdown strong {
     font-size: 1.28rem;
-  }
-
-  .fantasy-season__switcher button {
-    min-height: 49px;
-    padding: 8px 10px;
-  }
-
-  .fantasy-season__switcher strong {
-    font-size: 0.64rem;
   }
 
   .fantasy-hub-nav {

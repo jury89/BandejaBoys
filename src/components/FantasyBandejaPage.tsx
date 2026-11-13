@@ -1017,87 +1017,39 @@ export function FantasyBandejaPage({
         <ArrowLeft size={18} /> Torna alla bacheca
       </button>
 
-      <section className="fantasy-hero">
-        <div>
-          <p className="eyebrow">Il fantasy del gruppo</p>
-          <h1>
-            <span className="fantasy-hero__title-main">Fanta</span>
-            <span className="fantasy-hero__title-accent">Bandeja</span>
-          </h1>
-          <p className="fantasy-hero__intro">
-            Scegli la coppia. Affida la fascia. Prenditi la gloria senza nemmeno
-            entrare in campo.
-          </p>
-          <button
-            className="fantasy-hero__rules-button"
-            type="button"
-            onClick={() => setRulesOpen(true)}
-          >
-            <BookOpenText size={18} />
-            Come si gioca
-          </button>
+      <header className="fantasy-page__header">
+        <h1>FantaBandeja</h1>
+        <button
+          className="fantasy-page__rules"
+          type="button"
+          onClick={() => setRulesOpen(true)}
+        >
+          <BookOpenText size={18} aria-hidden="true" />
+          Come si gioca
+        </button>
+        <div className="fantasy-page__season">
+          {seasonSwitcherAvailable ? (
+            <label>
+              <span className="sr-only">Stagione FantaBandeja</span>
+              <select
+                value={selectedSeason.id}
+                onChange={(event) => setSelectedSeasonId(event.target.value === currentSeason.id ? null : event.target.value as FantasySeason['id'])}
+              >
+                {FANTASY_SEASONS.map((season) => (
+                  <option key={season.id} value={season.id}>
+                    {season.label} · {seasonStatus(season, countdownNow)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : (
+            <span>{selectedSeason.label} · {seasonStatus(selectedSeason, countdownNow)}</span>
+          )}
+          {selectedSeasonIsArchived && <small><LockKeyhole size={14} aria-hidden="true" /> Sola consultazione.</small>}
         </div>
-        <div className="fantasy-hero__mark" aria-hidden="true">
-          <Trophy size={44} />
-          <span>FB</span>
-        </div>
-      </section>
+      </header>
 
       {rulesOpen && <FantasyRulesModal onClose={() => setRulesOpen(false)} season={selectedSeason} />}
-
-      <section className={`fantasy-season${selectedSeasonIsArchived ? ' is-archived' : ''}`} aria-labelledby="fantasy-season-title">
-        <div className="fantasy-season__summary">
-          <div>
-            <p className="eyebrow">{selectedSeason.eyebrow}</p>
-            <h2 id="fantasy-season-title">{selectedSeason.label}</h2>
-            <p>
-              {selectedSeasonIsArchived
-                ? 'Stagione conclusa: classifica e risultati restano consultabili.'
-                : selectedSeasonIsUpcoming
-                  ? 'La nuova classifica parte con le partite del 28 settembre.'
-                  : selectedSeason.courtScoring === 'placement-v2'
-                    ? 'In campo si gioca per il podio: 5, 3, 1 e 0 punti. Formazioni Fanta, stesse regole.'
-                    : 'Si chiude domenica 27 settembre alle 23:59.'}
-            </p>
-          </div>
-          {typeof selectedSeason.endsAt === 'number' ? (
-            <SeasonCountdown
-              label={selectedSeasonIsArchived ? 'Stagione conclusa' : 'Alla chiusura'}
-              targetAt={selectedSeason.endsAt}
-              now={countdownNow}
-            />
-          ) : selectedSeasonIsUpcoming ? (
-            <SeasonCountdown label="Al calcio d’inizio" targetAt={selectedSeason.startsAt} now={countdownNow} />
-          ) : (
-            <div className="fantasy-season__live"><span /> Stagione in corso</div>
-          )}
-        </div>
-        {seasonSwitcherAvailable && (
-          <div className="fantasy-season__switcher" aria-label="Stagioni FantaBandeja">
-            {FANTASY_SEASONS.map((season) => {
-              const active = season.id === selectedSeason.id
-              return (
-                <button
-                  key={season.id}
-                  type="button"
-                  className={active ? 'is-active' : ''}
-                  aria-pressed={active}
-                  onClick={() => setSelectedSeasonId(season.id === currentSeason.id ? null : season.id)}
-                >
-                  <span><strong>{season.label}</strong><small>{seasonStatus(season, countdownNow)}</small></span>
-                  {active && <Check size={17} aria-hidden="true" />}
-                </button>
-              )
-            })}
-          </div>
-        )}
-        {selectedSeasonIsArchived && (
-          <div className="fantasy-season__archive-note">
-            <LockKeyhole size={18} aria-hidden="true" />
-            <span><strong>Sola consultazione.</strong> Questa stagione non riceve più nuovi round o punti.</span>
-          </div>
-        )}
-      </section>
 
       <nav className="fantasy-hub-nav" aria-label="Sezioni FantaBandeja" role="tablist">
         <button
@@ -1295,6 +1247,44 @@ export function FantasyBandejaPage({
           )}
         </>
       )}
+      <details className="fantasy-page__info">
+        <summary>Informazioni sulla stagione <ChevronDown size={17} aria-hidden="true" /></summary>
+        <p className="fantasy-page__intro">Scegli la coppia. Affida la fascia. Prenditi la gloria senza nemmeno entrare in campo.</p>
+        <section className={`fantasy-season${selectedSeasonIsArchived ? ' is-archived' : ''}`} aria-labelledby="fantasy-season-title">
+          <div className="fantasy-season__summary">
+            <div>
+              <p className="eyebrow">{selectedSeason.eyebrow}</p>
+              <h2 id="fantasy-season-title">{selectedSeason.label}</h2>
+              <p>
+                {selectedSeasonIsArchived
+                  ? 'Stagione conclusa: classifica e risultati restano consultabili.'
+                  : selectedSeasonIsUpcoming
+                    ? 'La nuova classifica parte con le partite del 28 settembre.'
+                    : selectedSeason.courtScoring === 'placement-v2'
+                      ? 'In campo si gioca per il podio: 5, 3, 1 e 0 punti. Formazioni Fanta, stesse regole.'
+                      : 'Si chiude domenica 27 settembre alle 23:59.'}
+              </p>
+            </div>
+            {typeof selectedSeason.endsAt === 'number' ? (
+              <SeasonCountdown
+                label={selectedSeasonIsArchived ? 'Stagione conclusa' : 'Alla chiusura'}
+                targetAt={selectedSeason.endsAt}
+                now={countdownNow}
+              />
+            ) : selectedSeasonIsUpcoming ? (
+              <SeasonCountdown label="Al calcio d’inizio" targetAt={selectedSeason.startsAt} now={countdownNow} />
+            ) : (
+              <div className="fantasy-season__live"><span /> Stagione in corso</div>
+            )}
+          </div>
+          {selectedSeasonIsArchived && (
+            <div className="fantasy-season__archive-note">
+              <LockKeyhole size={18} aria-hidden="true" />
+              <span>Questa stagione non riceve più nuovi round o punti.</span>
+            </div>
+          )}
+        </section>
+      </details>
     </main>
   )
 }

@@ -87,7 +87,7 @@ describe('FantaBandeja', () => {
     await user.click(screen.getByRole('button', { name: 'Mostra dettaglio punti di Ale' }))
     expect(screen.getByRole('region', { name: 'Dettaglio punti di Ale' })).toHaveTextContent('1° in campo · Miglior giocatore · 10 fantasy pt')
     expect(screen.getByRole('region', { name: 'Dettaglio punti di Ale' })).toHaveTextContent('5 = 5 pt')
-    await user.click(screen.getByRole('button', { name: /Estate 2026.*Archivio/ }))
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Stagione FantaBandeja' }), 'summer-2026')
     expect(screen.getByRole('button', { name: /dettaglio punti di Ale/ })).toHaveTextContent('2pt')
     expect(screen.getByRole('button', { name: /dettaglio punti di Brescio/ })).toHaveTextContent('3pt')
     expect(screen.queryByText(/1° in campo/)).not.toBeInTheDocument()
@@ -111,7 +111,7 @@ describe('FantaBandeja', () => {
   it('in estate annuncia la novità senza applicarla e il regolamento segue la stagione consultata', async () => {
     const user = userEvent.setup()
     renderPage({ now: FANTASY_SUMMER_2026_ENDS_AT + 1 })
-    await user.click(screen.getByRole('button', { name: /Estate 2026.*Archivio/ }))
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Stagione FantaBandeja' }), 'summer-2026')
     await user.click(screen.getByRole('button', { name: 'Come si gioca' }))
     const dialog = screen.getByRole('dialog', { name: 'Come si gioca' })
     expect(within(dialog).getByRole('heading', { name: 'Punti in campo · Estate 2026' })).toBeInTheDocument()
@@ -119,13 +119,23 @@ describe('FantaBandeja', () => {
     expect(within(dialog).getByText(/Le partite estive conservano le regole attuali anche se calcolate più tardi/)).toBeInTheDocument()
   })
 
-  it('mostra soltanto la stagione corrente e il countdown prima della chiusura', () => {
+  it('tiene le informazioni richiuse in fondo e mostra solo la stagione corrente prima della chiusura', async () => {
+    const user = userEvent.setup()
     renderPage()
 
-    expect(screen.getByRole('heading', { name: 'Estate 2026' })).toBeInTheDocument()
-    expect(screen.getByRole('timer', { name: /Alla chiusura/ })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /Estate 2026.*In corso/ })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /Inverno 2026\/27/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'FantaBandeja' })).toBeInTheDocument()
+    expect(screen.getByText('Estate 2026 · In corso')).toBeVisible()
+    expect(screen.queryByRole('combobox', { name: 'Stagione FantaBandeja' })).not.toBeInTheDocument()
+    expect(screen.getByRole('timer')).not.toBeVisible()
+    const disclosure = screen.getByText('Informazioni sulla stagione')
+    expect(disclosure.closest('details')).not.toHaveAttribute('open')
+    expect(screen.getByRole('tablist').compareDocumentPosition(disclosure) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+
+    await user.click(disclosure)
+    expect(screen.getByRole('heading', { name: 'Estate 2026' })).toBeVisible()
+    expect(screen.getByRole('timer', { name: /Alla chiusura/ })).toBeVisible()
+    await user.click(disclosure)
+    expect(screen.getByRole('timer')).not.toBeVisible()
   })
 
   it('separa classifica invernale e archivio estivo dalla data della partita', async () => {
@@ -160,15 +170,16 @@ describe('FantaBandeja', () => {
 
     renderPage({ rounds: [summerRound, winterRound], now: winterNow })
 
-    expect(screen.getByRole('heading', { name: 'Inverno 2026/27' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Inverno 2026\/27.*In corso/ })).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByRole('button', { name: /Estate 2026.*Archivio/ })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByRole('combobox', { name: 'Stagione FantaBandeja' })).toHaveValue('winter-2026-27')
+    expect(screen.getByRole('option', { name: 'Estate 2026 · Archivio' })).toBeInTheDocument()
     await user.click(screen.getByRole('tab', { name: /Classifica/i }))
     expect(screen.getByRole('button', { name: /dettaglio punti di Jury/i })).toHaveTextContent('3pt')
 
-    await user.click(screen.getByRole('button', { name: /Estate 2026.*Archivio/ }))
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Stagione FantaBandeja' }), 'summer-2026')
     expect(screen.getByText('Sola consultazione.')).toBeInTheDocument()
-    expect(screen.getByRole('timer', { name: /Stagione conclusa: 0 giorni/ })).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: 'Stagione FantaBandeja' })).toHaveValue('summer-2026')
+    await user.click(screen.getByText('Informazioni sulla stagione'))
+    expect(screen.getByRole('timer', { name: /Stagione conclusa: 0 giorni/ })).toBeVisible()
     expect(screen.getByRole('button', { name: /dettaglio punti di Jury/i })).toHaveTextContent('5pt')
   })
 
