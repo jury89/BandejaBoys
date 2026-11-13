@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { FantasyEntry, FantasyRound, MemberProfile, SessionUser } from '../types'
 import styles from '../styles.css?raw'
@@ -14,6 +14,11 @@ const members: MemberProfile[] = [
   { id: 'manager', displayName: 'Jury', email: 'manager@example.test', createdAt: 1 },
 ]
 const manager = members[4] as SessionUser
+
+afterEach(() => {
+  vi.unstubAllGlobals()
+  window.history.replaceState(null, '', '/')
+})
 const round: FantasyRound = {
   id: 'poll-1__slot-1',
   pollId: 'poll-1',
@@ -69,6 +74,29 @@ function courtRound(locksAt: number, totals = [10, 8, 8.5, 3.5]): FantasyRound {
 }
 
 describe('FantaBandeja', () => {
+  it('mantiene i punti iniziali distinti nella vista compatta anche prima della prima partita', async () => {
+    const user = userEvent.setup()
+    vi.stubGlobal('innerWidth', 440)
+    window.history.replaceState(null, '', '/?ux=nuova')
+    const credited: MemberProfile = {
+      ...manager, fantasyStartingCredits: { 'winter-2026-27': {
+        points: 20, reason: 'Ingresso a stagione in corso',
+        grantedAt: FANTASY_SUMMER_2026_ENDS_AT + 86_400_000, grantedBy: 'admin',
+      } },
+    }
+    renderPage({ rounds: [], members: [...members.slice(0, 4), credited], user: credited, now: FANTASY_SUMMER_2026_ENDS_AT + 2 * 86_400_000 })
+    await user.click(screen.getByRole('tab', { name: /Classifica/i }))
+    await user.click(screen.getByRole('button', { name: 'Mostra dettaglio punti di Jury' }))
+    const overview = screen.getByLabelText('Riepilogo punti campionato')
+    expect(within(overview).getByText('Totale').parentElement).toHaveTextContent('20pt')
+    expect(within(overview).getByText('In campo').parentElement).toHaveTextContent('0pt')
+    expect(within(overview).getByText('Punti iniziali').parentElement).toHaveTextContent('20pt')
+    expect(screen.getByText('Ingresso a stagione in corso')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Nascondi dettaglio punti di Jury' })).toHaveTextContent('0 vittorie Fanta · 0 round · 0 fantasy pt')
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Stagione FantaBandeja' }), 'summer-2026')
+    expect(screen.queryByRole('button', { name: /dettaglio punti di Jury/ })).not.toBeInTheDocument()
+  })
+
   it('mostra i punti iniziali anche senza partite e li mantiene nella sola stagione di accredito', async () => {
     const user = userEvent.setup()
     const credited: MemberProfile = {
@@ -92,6 +120,34 @@ describe('FantaBandeja', () => {
     expect(details).toHaveTextContent('20 = 20 pt')
     await user.selectOptions(screen.getByRole('combobox', { name: 'Stagione FantaBandeja' }), 'summer-2026')
     expect(screen.queryByRole('button', { name: /dettaglio punti di Jury/ })).not.toBeInTheDocument()
+  })
+
+  it('mostra lo storico compatto solo nella nuova interfaccia mobile e lo azzera al cambio stagione', async () => {
+    const user = userEvent.setup()
+    vi.stubGlobal('innerWidth', 440)
+    window.history.replaceState(null, '', '/?ux=nuova')
+    const winter = courtRound(FANTASY_SUMMER_2026_ENDS_AT)
+    const summer = courtRound(FANTASY_SUMMER_2026_ENDS_AT - 1)
+    renderPage({ rounds: [winter, summer], now: winter.locksAt + 3 * 86_400_000 })
+    await user.click(screen.getByRole('tab', { name: /Classifica/i }))
+    await user.click(screen.getByRole('button', { name: 'Mostra dettaglio punti di Ale' }))
+    expect(screen.getByRole('heading', { name: /Storico punti/ })).toBeInTheDocument()
+    act(() => {
+      vi.stubGlobal('innerWidth', 1280)
+      window.dispatchEvent(new Event('resize'))
+    })
+    expect(screen.queryByRole('heading', { name: /Storico punti/ })).not.toBeInTheDocument()
+    expect(screen.getByText('5 = 5 pt')).toBeInTheDocument()
+    act(() => {
+      vi.stubGlobal('innerWidth', 440)
+      window.dispatchEvent(new Event('resize'))
+    })
+    expect(screen.getByRole('heading', { name: /Storico punti/ })).toBeInTheDocument()
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Stagione FantaBandeja' }), 'summer-2026')
+    expect(screen.getByRole('button', { name: 'Mostra dettaglio punti di Ale' })).toHaveAttribute('aria-expanded', 'false')
+    await user.click(screen.getByRole('button', { name: 'Mostra dettaglio punti di Ale' }))
+    expect(screen.getByLabelText('2 punti campionato')).toBeInTheDocument()
+    expect(screen.getByText(/Presenza · 10 punti Fanta/)).toBeInTheDocument()
   })
 
   it('annuncia i due punteggi e permette di confrontare più calcoli usando la tastiera', async () => {

@@ -54,6 +54,8 @@ I risultati FantaBandeja su telefono nella nuova interfaccia usano righe giocato
 
 La testata dei round conclusi Clubhouse sotto i 760 px è un riepilogo verticale a larghezza piena: data e settimana precedono vincitore e risultato personale, senza il divisore laterale né l’etichetta ripetuta. È un override CSS: markup, etichette accessibili, espansioni, paginazione e dati restano quelli di `RoundResult`. Round annullati, desktop e classica mantengono le rispettive presentazioni.
 
+Il dettaglio della classifica Clubhouse su telefono usa `FantasyLeaderboardHistory`: espone su una riga il totale già derivato e i subtotali di visualizzazione per formazioni/in campo, poi un’unica riga con mese e conteggio e le contribuzioni esistenti in ordine cronologico inverso, raggruppate per mese nel fuso `Europe/Rome`. Mostra cinque risultati per volta; il caricamento successivo non limita il totale né legge altri dati. Mostra meno ritorna ai primi cinque e sposta focus/scorrimento sul titolo dello storico. Un listener locale di resize, rimosso allo smontaggio, seleziona questa sola presentazione sotto i 760 px; desktop e classica conservano somma ed elenco originali. Il cambio stagione rimonta la classifica per azzerare espansioni e paginazione. Gli accrediti iniziali già derivati restano separati dai punti in campo: il riepilogo aggiunge una riga condizionale Punti iniziali e lo storico espone la motivazione, senza data di partita o punteggio Fanta inventati. Nessuna modifica a ranking, fonti dei punti, pari merito, modelli estivi/invernali o repository.
+
 ## Produzione
 
 - URL: [bandeja-boys.web.app](https://bandeja-boys.web.app)

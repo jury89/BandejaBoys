@@ -27,6 +27,16 @@ Collaudo con dati demo a 320, 390 e 440 px: selettori, stati di prenotazione, st
 
 Verifica della gerarchia: a 320/390/440 px esiste un solo titolo visibile Partite, sopra Le mie/Gli altri e Prossime/Giocate, senza titoli fra i selettori. Confermati navigazione, storico, referti, statistiche e stati vuoti; screenshot desktop identici alla versione precedente. Il test responsive copre anche il ritorno alla testata originale dopo il resize. `npm run check`: 610 test e tutti i controlli superati.
 
+## Dettaglio della classifica Fanta su telefono
+
+Nella nuova interfaccia sotto i 760 px, il nome espanso mostra Totale, Formazioni e In campo su una sola riga di tre colonne. Il riepilogo considera sempre l’intera stagione. Se esiste un accredito stagionale, una riga aggiuntiva Punti iniziali lo distingue dai punti guadagnati; la relativa voce storica mostra la motivazione, senza presentarlo come una partita. Il mese più recente e il conteggio dei risultati condividono la riga successiva; il titolo accessibile conserva il contesto Storico punti. I mesi successivi mantengono i propri separatori, senza ripetere il primo mese.
+
+Lo storico contiene inizialmente i cinque risultati più recenti, raggruppati per mese e anno nel fuso italiano. Ogni riga espone data breve e ora, origine e motivo, punti Fanta e contributo campionato separato. Le descrizioni restano complete, con caratteri da 13/12 px e spaziature compatte. Data completa e titolo storico rimangono accessibili alle tecnologie assistive.
+
+Mostra altri aggiunge fino a cinque risultati e il contatore annuncia quanti sono visibili. Al termine, Mostra meno riporta ai primi cinque e restituisce focus e scorrimento al titolo dello storico, sotto la navigazione. I comandi mantengono aree di tocco di almeno 44 px. Le espansioni dei diversi giocatori restano indipendenti; il cambio stagione le azzera. Classica e desktop conservano la presentazione originale. Tutto deriva dalle contribuzioni già caricate, senza cambiare punteggi o letture Firestore.
+
+Collaudo con dati demo a 320/390/440/759 px: i tre totali restano su una riga e mese/conteggio non si sovrappongono; nessun testo troncato, overflow, errore JavaScript o richiesta Firebase. Nei confronti a 390/440 px, il blocco introduttivo fino alla prima data passa da 156 a circa 103 px (−34%), mantenendo identiche le righe dei risultati. Superati 21 scenari browser con storici da 2/12/60 risultati, pari merito, zero punti, focus, archivio estivo e cambio stagione. Verificati anche gli accrediti iniziali con e senza partite, esclusi dai punti in campo e senza alterare i round giocati. Screenshot desktop identici a 760/1280 px e classica identica a 390 px. `npm run check`: 630 test e tutti i controlli superati. La verifica mobile usa viewport emulati.
+
 ## Risultati Fanta su telefono
 
 La testata dei round Clubhouse sotto i 760 px usa un unico riepilogo verticale: data completa e settimana sopra vincitore e risultato personale, con la freccia di apertura accanto alla data. Elimina le colonne strette, l’etichetta ripetuta e il trofeo decorativo duplicato; conserva tutte le informazioni della partita e il controllo di espansione esistente. I round annullati mantengono il proprio stato distinto. Desktop e interfaccia classica non ricevono questi override.

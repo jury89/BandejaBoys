@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type KeyboardEvent } from 'react'
 import {
   ArrowLeft,
   BookOpenText,
@@ -49,6 +49,15 @@ import {
 import { resolveMemberName } from '../lib/memberNames'
 import { Modal } from './Modal'
 import { ProfileAvatar } from './ProfileAvatar'
+import { useInterfaceMode } from '../InterfaceContext'
+import { FantasyLeaderboardHistory } from './FantasyLeaderboardHistory'
+
+const subscribeToViewport = (notify: () => void) => {
+  window.addEventListener('resize', notify)
+  return () => window.removeEventListener('resize', notify)
+}
+const isPhoneViewport = () => window.innerWidth < 760
+const desktopServerViewport = () => false
 
 interface FantasyBandejaPageProps {
   rounds: FantasyRound[]
@@ -837,10 +846,12 @@ function Leaderboard({
   rows,
   user,
   members,
+  compact,
 }: {
   rows: FantasyLeaderboardRow[]
   user: SessionUser
   members: MemberProfile[]
+  compact: boolean
 }) {
   return (
     <section className="fantasy-leaderboard" aria-labelledby="fantasy-leaderboard-title">
@@ -859,6 +870,7 @@ function Leaderboard({
               row={row}
               isCurrentUser={row.managerId === user.id}
               displayName={resolveMemberName(members, row.managerId, row.managerName)}
+              compact={compact}
             />
           ))}
         </ol>
@@ -882,10 +894,12 @@ function LeaderboardRow({
   row,
   isCurrentUser,
   displayName,
+  compact,
 }: {
   row: FantasyLeaderboardRow
   isCurrentUser: boolean
   displayName: string
+  compact: boolean
 }) {
   const [expanded, setExpanded] = useState(false)
   const detailsId = `fantasy-leaderboard-details-${row.managerId.replace(/[^a-zA-Z0-9_-]/g, '-')}`
@@ -918,22 +932,28 @@ function LeaderboardRow({
           role="region"
           aria-label={`Dettaglio punti di ${displayName}`}
         >
-          <p className="fantasy-leaderboard__sum">
-            <span>Totale campionato</span>
-            <strong>{row.contributions.map(({ leaguePoints }) => leaguePoints).join(' + ')} = {row.leaguePoints} pt</strong>
-          </p>
-          <ul>
-            {row.contributions.map((contribution) => (
-              <li key={`${contribution.roundId}:${contribution.source}`}>
-                <CalendarDays size={18} aria-hidden="true" />
-                <span>
-                  <strong>{contribution.source === 'starting-credit' ? contributionLabel(contribution) : sentenceCase(matchFormatter.format(new Date(contribution.playedAt)))}</strong>
-                  <small>{contribution.pollTitle}{contribution.source !== 'starting-credit' && ` · ${contributionLabel(contribution)}`}</small>
-                </span>
-                <strong>+{contribution.leaguePoints} pt</strong>
-              </li>
-            ))}
-          </ul>
+          {compact ? (
+            <FantasyLeaderboardHistory row={row} id={detailsId} />
+          ) : (
+            <>
+              <p className="fantasy-leaderboard__sum">
+                <span>Totale campionato</span>
+                <strong>{row.contributions.map(({ leaguePoints }) => leaguePoints).join(' + ')} = {row.leaguePoints} pt</strong>
+              </p>
+              <ul>
+                {row.contributions.map((contribution) => (
+                  <li key={`${contribution.roundId}:${contribution.source}`}>
+                    <CalendarDays size={18} aria-hidden="true" />
+                    <span>
+                      <strong>{contribution.source === 'starting-credit' ? contributionLabel(contribution) : sentenceCase(matchFormatter.format(new Date(contribution.playedAt)))}</strong>
+                      <small>{contribution.pollTitle}{contribution.source !== 'starting-credit' && ` · ${contributionLabel(contribution)}`}</small>
+                    </span>
+                    <strong>+{contribution.leaguePoints} pt</strong>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
         </div>
       )}
     </li>
@@ -953,6 +973,8 @@ export function FantasyBandejaPage({
   onRetry,
   onSave,
 }: FantasyBandejaPageProps) {
+  const isNewInterface = useInterfaceMode() === 'nuova'
+  const phoneViewport = useSyncExternalStore(subscribeToViewport, isPhoneViewport, desktopServerViewport)
   const [rulesOpen, setRulesOpen] = useState(false)
   const [selectedView, setSelectedView] = useState<FantasyView | null>(null)
   const [selectedSeasonId, setSelectedSeasonId] = useState<FantasySeason['id'] | null>(null)
@@ -1185,7 +1207,7 @@ export function FantasyBandejaPage({
               role="tabpanel"
               aria-labelledby="fantasy-tab-leaderboard"
             >
-              <Leaderboard rows={leaderboard} user={user} members={members} />
+              <Leaderboard key={selectedSeason.id} rows={leaderboard} user={user} members={members} compact={isNewInterface && phoneViewport} />
             </div>
           )}
 
