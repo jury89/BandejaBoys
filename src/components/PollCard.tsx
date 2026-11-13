@@ -74,7 +74,7 @@ export function PollCard({ group, user, members, slotFilter = 'all', onPollChang
                 onClick={() => setSlotsCollapsed((current) => !current)}
               >
                 {slotsCollapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
-                {slotsCollapsed ? 'Mostra slot' : 'Nascondi slot'}
+                <span className="poll-card__collapse-label">{slotsCollapsed ? 'Mostra slot' : 'Nascondi slot'}</span>
               </button>
             </p>
           </div>

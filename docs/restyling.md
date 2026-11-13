@@ -9,6 +9,14 @@ Direzione approvata: mobile-first, stessa identità Bandeja, partite e azioni pr
 - Una scheda per partita, separatori leggeri per le settimane e un campo con quattro posti sempre visibile. Su desktop una colonna di partite e un riepilogo personale laterale evitano schede eccessivamente larghe.
 - Quattro destinazioni persistenti. Dentro Partite restano i percorsi “Le mie” e “Gli altri”; il Fanta conserva le sue tre tab e le transizioni stagionali esistenti.
 
+## Homepage compatta su telefono
+
+Sotto i 760 px, la sola bacheca Clubhouse raccoglie saluto e Nuovo slot sulla stessa riga, compatta la prossima partita mantenendo data/ora e prenotazione, e dispone i tre filtri principali sopra Campi e prenotazione. Campi si espande a tutta larghezza e conserva selezione multipla, ripristino dei preferiti e link Campi e costi. Il titolo settimanale mantiene conteggio, pulsante di apertura/chiusura con etichetta accessibile e aggiunta slot, con meno spazio verticale.
+
+Gli override sono circoscritti a `.ux-new .dashboard--feed` e al breakpoint mobile. Desktop da 760 px e interfaccia classica conservano la presentazione precedente. Nessuna modifica a filtri, adesioni, letture o scritture del repository.
+
+Collaudo con dati demo a 320, 390 e 440 px: filtri, apertura Campi senza sovrapposizioni, ripristino dei preferiti, apertura/annullamento Nuovo slot, collasso settimanale e navigazione alla prossima partita; controlli di almeno 44 px, nessun overflow o richiesta Firebase. A 390 px il primo slot passa da 756 a 462 px dall’inizio della pagina. Gli screenshot desktop a 760 e 1280 px sono identici byte per byte alla versione precedente. `npm run check`: 601 test, lint, build e controlli notifiche/scheduler superati.
+
 ## Interazioni
 
 - Filtri Tutti / Posti liberi / Sono iscritto; prenotazione selezionabile separatamente (il selettore cambia il filtro corrente, non aggiunge una seconda condizione).

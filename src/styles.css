@@ -13,6 +13,8 @@
 .venue-filter__actions button[aria-pressed="true"] { background: var(--ball); border-color: var(--deep); }
 .venue-filter__details > summary { min-height: 44px; padding: 10px 0; cursor: pointer; font-weight: 750; color: var(--deep); }
 .venue-filter__details > summary span { float: right; margin-left: 8px; color: var(--muted); font-size: 13px; }
+.venue-filter__details > summary .venue-filter__label-full { float: none; margin-left: 0; color: inherit; font-size: inherit; }
+.venue-filter__label-short { display: none; }
 .venue-filter__details[open] > summary { margin-bottom: 10px; }
 .venue-link { color: inherit; text-underline-offset: 4px; text-decoration-thickness: 1px; }
 .venue-link span { font-size: .85em; }

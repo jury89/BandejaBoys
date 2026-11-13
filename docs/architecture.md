@@ -40,6 +40,8 @@ Validazione: suite completa, test semantici Firestore (profili propri/altrui, id
 
 Le presentazioni classica e Clubhouse condividono controller, listener e mutazioni. I componenti classici aggiunti contengono soltanto presentazione; `clubhouse.css` applica gli override generali sotto `.app-shell.ux-new`. Non esistono database o punteggi separati per la preview e non cambiano il notifier o la chiusura delle stagioni Fanta. Per pubblicare occorrono Hosting e regole profilo aggiornate; nessun deploy scheduler.
 
+La bacheca Clubhouse sotto i 760 px usa una griglia di presentazione locale a `.dashboard--feed`: testata compatta, prossima partita, filtri principali e riga Campi/prenotazione. Aprire Campi estende il relativo pannello a tutta larghezza senza coprire i controlli e rende disponibile anche Campi e costi. I pulsanti di chiusura settimanale mantengono `aria-controls` e `aria-expanded` con etichetta accessibile; le aree di tocco restano di almeno 44 px. Da 760 px e nella classica non si applicano questi override. Stato dei filtri, preferiti, ordinamento, repository e autorizzazioni sono quelli esistenti.
+
 ## Produzione
 
 - URL: [bandeja-boys.web.app](https://bandeja-boys.web.app)

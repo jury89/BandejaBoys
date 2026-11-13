@@ -1055,7 +1055,7 @@ export function Dashboard() {
         <section className="venue-filter" aria-labelledby="venue-filter-title">
           <div className="venue-filter__heading"><strong id="venue-filter-title">Dove vuoi giocare?</strong><a href="#campi">Campi e costi ↗</a></div>
           <details className="venue-filter__details">
-          <summary>Scegli i campi <span>{selectedVenueIds.length === 0 ? 'Tutti' : `${selectedVenueIds.length} selezionati`}</span></summary>
+          <summary><span className="venue-filter__label-full">Scegli i campi</span><span className="venue-filter__label-short">Campi</span> <span>{selectedVenueIds.length === 0 ? 'Tutti' : `${selectedVenueIds.length} selezionati`}</span></summary>
           <div className="venue-filter__actions">
             <button type="button" aria-pressed={selectedVenueIds.length === 0} onClick={() => setVenueFilterOverride({ key: venueFilterKey, ids: [] })}>Tutti i campi</button>
             {preferredVenueIds.length > 0 && <button type="button" onClick={() => setVenueFilterOverride(null)}>Ripristina i preferiti</button>}
@@ -1078,8 +1078,9 @@ export function Dashboard() {
               </button>
             ))}
             <label className="club-booking-filter">
-              <span className="sr-only">Filtra per prenotazione</span>
-              <select value={feedFilter === 'booking' || feedFilter === 'booked' ? feedFilter : ''}
+              <span className="sr-only" id="club-booking-filter-label">Filtra per prenotazione</span>
+              <span className="club-booking-filter__caption" aria-hidden="true">Prenotazione</span>
+              <select aria-labelledby="club-booking-filter-label" value={feedFilter === 'booking' || feedFilter === 'booked' ? feedFilter : ''}
                 onChange={(event) => setFeedFilter((event.target.value || 'all') as FeedFilter)}>
                 <option value="">Tutti</option>
                 <option value="booking">Da prenotare ({bookingCandidateSlotCount})</option>
