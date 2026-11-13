@@ -359,3 +359,9 @@ Nessun listener dei tornei viene aperto nella bacheca o nello scheduler: l’ele
 ## Modalità demo
 
 Se manca la configurazione Firebase, lo stesso contratto `PadelRepository` usa `localStorage`. Il seed contiene due slot e cinque membri fittizi per mostrare subito titolari e riserve; risposte e giudizi vengono conservati in un record locale dedicato, i referti condividono un secondo record e round ed entry FantaBandeja usano un ulteriore store riconciliato dagli stessi metodi puri della produzione. La modalità è dichiarata chiaramente nell'interfaccia e non deve essere usata come backend condiviso.
+
+## Focus delle form e interazione touch
+
+`watchInputModality` viene installato una sola volta da `main.tsx` prima del rendering. `pointerdown` touch/pen e il fallback passivo `touchstart` impostano `data-input-modality="touch"` sul documento; Tab/Shift+Tab ripristinano la modalità tastiera e il mouse quella pointer. La digitazione della tastiera virtuale non riattiva il contorno. Il cleanup rimuove gli ascoltatori e ripristina l’attributo precedente, anche in HMR. Non vengono bloccati eventi né salvate preferenze.
+
+Gli stili condivisi sopprimono outline e tap highlight dei controlli dopo il tocco, anche quando Safari considera un campo `:focus-visible`. Bordi e aloni riservati al focus vengono applicati soltanto fuori dalla modalità touch, inclusi data/ora, punteggi e radio dei giudizi. Restano gli indicatori di errore e selezione, i bordi ordinari e il focus da tastiera in entrambe le interfacce. Nessuna modifica ai dati o al comportamento delle form; rilascio solo Hosting.

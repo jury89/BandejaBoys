@@ -123,3 +123,7 @@ Esito finale del 10 settembre 2026: `npm run check` completato con 354 test in 4
 ## Testata Fanta compatta
 
 La pagina Fanta usa una testata condivisa compatta: titolo e **Come si gioca**, con il menu della stagione subito sotto su mobile e sulla stessa riga su desktop. I precedenti riquadri introduttivi sono sostituiti da **Informazioni sulla stagione** in fondo ai contenuti, chiuso inizialmente. Descrizione, stato e countdown restano consultabili aprendolo. L’archivio mantiene l’avviso di sola consultazione visibile vicino al menu; prima del cambio stagione non si anticipa il selettore. Nessuna modifica a round, punteggi, formazioni o sottoscrizioni.
+
+## Focus dei campi su mobile
+
+Tutte le form condividono la distinzione tra tocco e tastiera: dopo un tocco non compaiono outline o aloni aggiuntivi su input, select e aree di testo. La regola vale per classica e nuova interfaccia, accesso, profilo, filtri, Fanta e moduli di slot, referti e tornei. Tab/Shift+Tab mantengono un indicatore visibile, anche con una tastiera esterna su mobile; scrivere sulla tastiera virtuale non riattiva il contorno. Errori e selezioni restano riconoscibili.

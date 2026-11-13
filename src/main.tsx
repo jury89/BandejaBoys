@@ -9,7 +9,10 @@ import { App } from './App'
 import { AuthProvider } from './AuthContext'
 import { watchForAppUpdates } from './lib/appUpdates'
 import { registerNotificationWorker } from './lib/notifications'
+import { watchInputModality } from './lib/inputModality'
 
+const stopInputModalityTracking = watchInputModality()
+if (import.meta.hot) import.meta.hot.dispose(stopInputModalityTracking)
 watchForAppUpdates()
 void registerNotificationWorker()
 

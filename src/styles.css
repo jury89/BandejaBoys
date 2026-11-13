@@ -126,7 +126,9 @@ body.modal-open {
 
 button,
 input,
-select {
+select,
+textarea,
+[contenteditable='true'] {
   font: inherit;
 }
 
@@ -144,9 +146,20 @@ select {
 button:focus-visible,
 a:focus-visible,
 input:focus-visible,
-select:focus-visible {
+select:focus-visible,
+textarea:focus-visible,
+[contenteditable='true']:focus-visible {
   outline: 3px solid rgba(14, 116, 144, 0.35);
   outline-offset: 2px;
+}
+
+/* A touch-focused field may still match :focus-visible, notably in iOS Safari. */
+:root[data-input-modality='touch'] :is(input, select, textarea, button, [contenteditable='true']):focus {
+  outline: none;
+}
+
+:root[data-input-modality='touch'] :is(input, select, textarea, button, [contenteditable='true']) {
+  -webkit-tap-highlight-color: transparent;
 }
 
 button:disabled {
@@ -670,8 +683,8 @@ p {
   border-color: #9db8c3;
 }
 
-.field input:focus,
-.field select:focus {
+:where(:root:not([data-input-modality='touch'])) .field input:focus,
+:where(:root:not([data-input-modality='touch'])) .field select:focus {
   border-color: var(--court);
   box-shadow: 0 0 0 3px rgba(14, 116, 144, 0.1);
 }
@@ -744,8 +757,8 @@ p {
   border-color: #9db8c3;
 }
 
-.slot-date-time__part input:focus,
-.slot-date-time__part select:focus {
+:where(:root:not([data-input-modality='touch'])) .slot-date-time__part input:focus,
+:where(:root:not([data-input-modality='touch'])) .slot-date-time__part select:focus {
   border-color: var(--court);
   box-shadow: 0 0 0 3px rgba(14, 116, 144, 0.1);
 }
@@ -4815,7 +4828,7 @@ p {
   transform: translateX(2px);
 }
 
-.feedback-level:has(input:focus-visible) {
+:where(:root:not([data-input-modality='touch'])) .feedback-level:has(input:focus-visible) {
   outline: 3px solid rgba(0, 107, 146, 0.3);
   outline-offset: 2px;
 }
@@ -5106,7 +5119,7 @@ p {
   appearance: textfield;
 }
 
-.match-set-scoreboard__score input:focus {
+:where(:root:not([data-input-modality='touch'])) .match-set-scoreboard__score input:focus {
   border-color: var(--ball);
   box-shadow: 0 5px 0 rgba(1, 37, 50, 0.2), 0 0 0 3px rgba(217, 255, 67, 0.28);
 }
