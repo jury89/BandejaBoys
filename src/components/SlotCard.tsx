@@ -17,6 +17,7 @@ import {
   PencilLine,
   PhoneCall,
   ShieldCheck,
+  Share2,
   Trash2,
   UserRoundPlus,
 } from 'lucide-react'
@@ -35,7 +36,8 @@ import { slotDateParts } from '../lib/format'
 import { resolveMemberName } from '../lib/memberNames'
 import { repository } from '../lib/repository'
 import { slotViewSessionKey, trackSustainedSlotView } from '../lib/slotViewTracking'
-import { slotElementId } from '../lib/slotNavigation'
+import { slotElementId, slotShareUrl } from '../lib/slotNavigation'
+import { Modal } from './Modal'
 import { EditSlotModal } from './EditSlotModal'
 import { AdminSlotRosterModal } from './AdminSlotRosterModal'
 import { GuestPlayerModal } from './GuestPlayerModal'
@@ -73,6 +75,7 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
   const [scheduleOpen, setScheduleOpen] = useState(false)
   const [substitutionOpen, setSubstitutionOpen] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [shareLink, setShareLink] = useState<string | null>(null)
   const date = slotDateParts(slot.startsAt)
   const starters = getStarters(slot)
   const reserves = getReserves(slot)
@@ -185,6 +188,24 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
   const addToCalendar = () => {
     downloadSlotCalendar(poll, slot)
     onNotify('Evento calendario pronto: aprilo per aggiungere la partita.')
+  }
+
+  const shareSlot = async () => {
+    const url = slotShareUrl(window.location.href, { pollId: poll.id, slotId: slot.id })
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: 'Padel · Bandeja Boys', text: `Padel · ${date.full} alle ${date.time} · ${slotVenueName(slot)}`, url })
+        return
+      } catch (error) {
+        if (error && typeof error === 'object' && 'name' in error && error.name === 'AbortError') return
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(url)
+      onNotify('Link dello slot copiato. Puoi incollarlo in chat.')
+    } catch {
+      setShareLink(url)
+    }
   }
 
   return (
@@ -454,6 +475,9 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
         {isNewInterface && <button className="button button--ghost club-calendar" type="button" onClick={addToCalendar} aria-label={`Aggiungi lo slot di ${date.full} alle ${date.time} al calendario`}>
           <CalendarPlus size={17} /><span>Calendario</span>
         </button>}
+        <button className="button button--ghost club-calendar" type="button" onClick={shareSlot}>
+          <Share2 size={17} aria-hidden="true" /><span>Condividi slot</span>
+        </button>
 
         {!disabled && wansportUrl && (
           <a
@@ -492,6 +516,12 @@ export function SlotCard({ poll, slot, user, members, disabled, onPollChange, on
         )}
       </footer>
 
+      {shareLink && <Modal title="Condividi slot" onClose={() => setShareLink(null)}>
+        <p>Copia questo link e invialo in chat. Chi lo apre arriva direttamente allo slot dopo l’accesso.</p>
+        <label className="field"><span>Link dello slot</span>
+          <input type="text" readOnly value={shareLink} onFocus={(event) => event.currentTarget.select()} />
+        </label>
+      </Modal>}
       {scheduleOpen && (
         <EditSlotModal
           slot={slot}

@@ -1379,6 +1379,15 @@ p {
   box-shadow: inset 0 3px 0 var(--pending);
 }
 
+.shared-slot-page {
+  width: min(620px, calc(100% - 32px));
+  margin: 24px auto 100px;
+}
+
+.shared-slot-page h1 {
+  margin: 20px 0;
+}
+
 .slot-card--booked {
   border-color: #50a69d;
   box-shadow: inset 0 3px 0 var(--booked);

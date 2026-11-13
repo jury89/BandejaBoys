@@ -44,7 +44,7 @@ import {
 import { notificationStateLabel, usePushNotifications } from '../lib/notifications'
 import { FEEDBACK_TEST_QUERY_PARAM, isFeedbackTestRequested, makeFeedbackTestPrompt } from '../lib/feedbackTest'
 import { repository } from '../lib/repository'
-import { slotElementId, type SlotNavigationTarget } from '../lib/slotNavigation'
+import { slotElementId, slotTargetFromHash, type SlotNavigationTarget } from '../lib/slotNavigation'
 import { matchesSlotFilter } from '../lib/slotFilters'
 import { usePageScroll } from '../lib/usePageScroll'
 import { Brand } from './Brand'
@@ -66,9 +66,10 @@ import type { VenueId } from '../types'
 import { VenueChoices } from './VenuePicker'
 import { VenuesPage } from './VenuesPage'
 import { TournamentsPage } from './TournamentsPage'
+import { SharedSlotPage } from './SharedSlotPage'
 
 type FeedFilter = PollSlotFilter
-type DashboardView = 'feed' | 'matches' | 'group-matches' | 'statistics' | 'fantasy' | 'notifications' | 'venues' | 'tournaments'
+type DashboardView = 'feed' | 'matches' | 'group-matches' | 'statistics' | 'fantasy' | 'notifications' | 'venues' | 'tournaments' | 'slot'
 
 const PERSONAL_MATCHES_HASH = '#i-miei-match'
 const GROUP_MATCHES_HASH = '#gli-altri-match'
@@ -88,6 +89,7 @@ function subscribeToViewport(listener: () => void) {
 }
 
 function dashboardViewFromLocation(): DashboardView {
+  if (window.location.hash === '#slot' || window.location.hash.startsWith('#slot/')) return 'slot'
   if (window.location.hash === '#tornei' || window.location.hash.startsWith('#tornei/')) return 'tournaments'
   if (window.location.hash === '#campi' || window.location.hash.startsWith('#campi/')) return 'venues'
   if (window.location.hash === PERSONAL_MATCHES_HASH) return 'matches'
@@ -160,6 +162,7 @@ export function Dashboard() {
   const venueFilterKey = `${user?.id}:${preferredVenueIds.join(',')}`
   const selectedVenueIds = venueFilterOverride?.key === venueFilterKey ? venueFilterOverride.ids : preferredVenueIds
   const [dashboardView, setDashboardView] = useState<DashboardView>(dashboardViewFromLocation)
+  const [sharedSlotTarget, setSharedSlotTarget] = useState(() => slotTargetFromHash(window.location.hash))
   const showCompactMatchHeader = isNewInterface && phoneViewport
     && (dashboardView === 'matches' || dashboardView === 'group-matches')
   const [statisticsPlayerId, setStatisticsPlayerId] = useState(
@@ -491,6 +494,7 @@ export function Dashboard() {
   useEffect(() => {
     const syncViewWithHistory = () => {
       setDashboardView(dashboardViewFromLocation())
+      setSharedSlotTarget(slotTargetFromHash(window.location.hash))
       setVenuePageId(window.location.hash.slice('#campi/'.length))
       setStatisticsPlayerId(statisticsPlayerIdFromLocation() ?? user?.id ?? '')
     }
@@ -507,7 +511,8 @@ export function Dashboard() {
       : dashboardView === 'statistics' || dashboardView === 'group-matches' ? groupMatchReportsLoaded
         : dashboardView === 'matches' ? matchReportsLoaded : true
   )
-  usePageScroll(dashboardView, pageReady, dashboardView === 'feed' && Boolean(slotNavigationTarget))
+  const scrollView = dashboardView === 'slot' ? `slot:${sharedSlotTarget?.pollId}:${sharedSlotTarget?.slotId}` : dashboardView
+  usePageScroll(scrollView, pageReady, dashboardView === 'feed' && Boolean(slotNavigationTarget))
 
   useEffect(() => {
     if (dashboardView !== 'feed' || loading || !slotNavigationTarget) return
@@ -661,6 +666,7 @@ export function Dashboard() {
     }
     return feedbackPrompts[0] ?? null
   }, [feedbackPrompts, requestedFeedback])
+  const visibleFeedbackPrompt = dashboardView === 'slot' ? null : activeFeedbackPrompt
   const feedbackTestPrompt = useMemo(() => (
     feedbackTestOpen && user
       ? makeFeedbackTestPrompt(user, members, feedbackTestStartedAt)
@@ -857,7 +863,7 @@ export function Dashboard() {
     setDashboardView('feed')
   }
   const mainSections = [
-    { label: 'Bacheca', icon: LayoutList, active: dashboardView === 'feed', open: openBoard },
+    { label: 'Bacheca', icon: LayoutList, active: dashboardView === 'feed' || dashboardView === 'slot', open: openBoard },
     { label: 'Partite', icon: CalendarDays, active: dashboardView === 'matches' || dashboardView === 'group-matches', open: openPlayerMatches },
     { label: 'Fanta', icon: Trophy, active: dashboardView === 'fantasy', open: openFantasy },
     { label: 'Statistiche', icon: BarChart3, active: dashboardView === 'statistics', open: () => openStatistics() },
@@ -955,7 +961,7 @@ export function Dashboard() {
         {mainSections.map(({ label, icon: Icon, active, open }) => (
           <button key={label} type="button" aria-current={active ? 'page' : undefined} onClick={() => {
             setAccountOpen(false)
-            if (active) return
+            if (active && dashboardView !== 'slot') return
             open()
           }}><Icon size={21} aria-hidden="true" /><span>{label}</span></button>
         ))}
@@ -986,7 +992,11 @@ export function Dashboard() {
         </nav>
       )}
 
-      {dashboardView === 'tournaments' ? <TournamentsPage user={user} members={matchNameMembers} onBack={openBoard} /> : dashboardView === 'venues' ? <VenuesPage selectedId={venuePageId} onBack={openBoard} /> : dashboardView === 'matches' ? (
+      {dashboardView === 'slot' ? (
+        <SharedSlotPage target={sharedSlotTarget} polls={polls} user={user} members={matchNameMembers}
+          loading={loading} error={loadingError} now={now} onBack={openBoard} onRetry={retryDashboardData}
+          onPollChange={updatePoll} onNotify={notify} onError={reportError} />
+      ) : dashboardView === 'tournaments' ? <TournamentsPage user={user} members={matchNameMembers} onBack={openBoard} /> : dashboardView === 'venues' ? <VenuesPage selectedId={venuePageId} onBack={openBoard} /> : dashboardView === 'matches' ? (
         <MyMatchesPage
           matches={playerMatches}
           loading={loading || !feedbackSummariesLoaded || !matchReportsLoaded}
@@ -1192,15 +1202,15 @@ export function Dashboard() {
           onDismiss={dismissFeedbackTest}
           onSubmit={completeFeedbackTest}
         />
-      ) : activeFeedbackPrompt && (
+      ) : visibleFeedbackPrompt && (
         <MatchFeedbackModal
-          key={activeFeedbackPrompt.id}
-          prompt={activeFeedbackPrompt}
+          key={visibleFeedbackPrompt.id}
+          prompt={visibleFeedbackPrompt}
           onDismiss={dismissFeedbackPrompt}
           onSubmit={submitFeedback}
         />
       )}
-      {!reportMatch && !feedbackTestPrompt && !activeFeedbackPrompt && (notifications.shouldPrompt || notificationPanelOpen) && (
+      {!reportMatch && !feedbackTestPrompt && !visibleFeedbackPrompt && ((dashboardView !== 'slot' && notifications.shouldPrompt) || notificationPanelOpen) && (
         <NotificationCallup
           state={notifications.state}
           busy={notifications.busy}

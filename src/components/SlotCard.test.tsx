@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { SlotCard } from './SlotCard'
 
 vi.mock('../InterfaceContext', () => ({ useInterfaceMode: () => 'nuova', clearInterfaceOverride: vi.fn() }))
@@ -36,6 +36,58 @@ const poll: PadelPoll = {
 }
 
 describe('azioni dello slot', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    window.history.replaceState({}, '', '/')
+  })
+
+  it('condivide il link diretto con il menu di sistema senza includere parametri personali', async () => {
+    const share = vi.fn().mockResolvedValue(undefined)
+    vi.stubGlobal('navigator', { share })
+    window.history.replaceState({}, '', '/?ux=nuova&notificationEvent=private#fantabandeja')
+    const onNotify = vi.fn()
+    render(<SlotCard poll={poll} slot={slot} user={user} members={[user]} onPollChange={vi.fn()} onNotify={onNotify} onError={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Condividi slot' }))
+    await waitFor(() => expect(share).toHaveBeenCalledOnce())
+    const data = share.mock.calls[0][0]
+    expect(data).toMatchObject({ title: 'Padel · Bandeja Boys', url: `${window.location.origin}/#slot/poll-1/slot-1` })
+    expect(data.text).toContain('19:00')
+    expect(data.text).toContain('Oasi Boschetto')
+    expect(onNotify).not.toHaveBeenCalled()
+  })
+
+  it('copia il link quando la condivisione di sistema non è disponibile', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    vi.stubGlobal('navigator', { clipboard: { writeText } })
+    const onNotify = vi.fn()
+    render(<SlotCard poll={poll} slot={slot} user={user} members={[user]} onPollChange={vi.fn()} onNotify={onNotify} onError={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Condividi slot' }))
+    await waitFor(() => expect(onNotify).toHaveBeenCalledWith('Link dello slot copiato. Puoi incollarlo in chat.'))
+    expect(writeText).toHaveBeenCalledWith(`${window.location.origin}/#slot/poll-1/slot-1`)
+  })
+
+  it('rispetta l’annullamento del menu di sistema senza copiare né mostrare errori', async () => {
+    const writeText = vi.fn()
+    vi.stubGlobal('navigator', { share: vi.fn().mockRejectedValue(new DOMException('Cancelled', 'AbortError')), clipboard: { writeText } })
+    const onError = vi.fn()
+    render(<SlotCard poll={poll} slot={slot} user={user} members={[user]} onPollChange={vi.fn()} onNotify={vi.fn()} onError={onError} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Condividi slot' }))
+    await act(async () => {})
+    expect(writeText).not.toHaveBeenCalled()
+    expect(onError).not.toHaveBeenCalled()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('offre un link selezionabile anche se condivisione e clipboard sono bloccate', async () => {
+    vi.stubGlobal('navigator', { share: vi.fn().mockRejectedValue(new Error('Blocked')), clipboard: { writeText: vi.fn().mockRejectedValue(new Error('Denied')) } })
+    render(<SlotCard poll={poll} slot={slot} user={user} members={[user]} onPollChange={vi.fn()} onNotify={vi.fn()} onError={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Condividi slot' }))
+    expect(await screen.findByRole('dialog', { name: 'Condividi slot' })).toBeInTheDocument()
+    const link = screen.getByRole('textbox', { name: 'Link dello slot' })
+    expect(link).toHaveValue(`${window.location.origin}/#slot/poll-1/slot-1`)
+    expect(link).toHaveAttribute('readonly')
+  })
+
   it('mostra sempre il campo con quattro posti, iniziali e posizione personale', () => {
     render(<SlotCard poll={poll} slot={slot} user={user} members={[user]} onPollChange={vi.fn()} onNotify={vi.fn()} onError={vi.fn()} />)
     const lineup = screen.getByRole('region', { name: 'Titolari' })

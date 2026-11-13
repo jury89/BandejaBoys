@@ -1,5 +1,11 @@
 # Architettura e regole di dominio
 
+## Link condivisi degli slot
+
+`slotNavigation.ts` genera URL `#slot/{pollId}/{slotId}` con entrambi gli identificativi codificati e senza query personali, filtri UX o parametri delle notifiche. `SlotCard` usa Web Share API nel gesto del clic; in assenza/supporto negato ripiega sulla clipboard e infine su un campo selezionabile. L’annullamento del menu di sistema non produce errori o copie involontarie. Il testo condiviso contiene data, ora e circolo, senza nomi dei giocatori.
+
+`Dashboard` riconosce la route al montaggio dopo l’autenticazione e a ogni `hashchange`/`popstate`. `SharedSlotPage` risolve la coppia esatta dai sondaggi già sottoscritti e riusa `SlotCard`, con gli stessi comandi e aggiornamenti realtime. La pagina non dipende da filtri, preferiti, settimana o iscrizione del destinatario; nessuna nuova query, scrittura automatica o autorizzazione. Attende il caricamento e offre il recupero in caso di errore; un riferimento assente o malformato mostra uno stato esplicito. Slot passati o chiusi sono di sola consultazione. I popup automatici per giudizi e attivazione notifiche vengono rinviati all’uscita dal dettaglio, senza salvare risposte o preferenze. Bacheca e navigazione nativa restano disponibili; il link nell’URL sopravvive a login, ricaricamento e aggiornamento PWA. Non cambiano repository, Rules, scheduler o dati: deploy del solo Hosting.
+
 ## Accrediti iniziali per stagione Fanta
 
 Il campo opzionale `users/{uid}.fantasyStartingCredits` è una mappa per ID stagione (`summer-2026`, `winter-2026-27`): ogni voce conserva `points` (intero positivo), `reason`, `grantedAt` (millisecondi) e `grantedBy` (UID amministratore). È un accredito esplicito, gestito con credenziali amministrative; le Rules impediscono ai client di crearlo, aggiungerlo, modificarlo o rimuoverlo e consentono i normali salvataggi del profilo con il campo invariato. Gli aggiornamenti parziali dei client esistenti conservano la mappa.

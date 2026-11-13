@@ -166,6 +166,108 @@ describe('menu account', () => {
     vi.useRealTimers()
   })
 
+  const sharedPoll = (): PadelPoll => ({
+    id: 'shared-poll', title: 'Padel', targetWeekStart: '2099-01-05', createdAt: 1, updatedAt: 1,
+    createdBy: 'a', createdByName: 'A', status: 'open',
+    slots: [
+      { id: 'shared-slot', startsAt: '2099-01-05T19:30:00+01:00', durationMinutes: 90, venueId: 'sport-city-mantova', venue: '', signups: [] },
+      { id: 'other-slot', startsAt: '2099-01-06T20:30:00+01:00', durationMinutes: 90, venueId: 'tennis-club-mantova', venue: '', signups: [] },
+    ],
+  })
+
+  it.each([1280, 390])('apre solo lo slot condiviso anche fuori dai preferiti e senza iscrizione a %i px', (width) => {
+    const previousWidth = window.innerWidth
+    window.innerWidth = width
+    dashboardTestState.preferredVenueIds = ['tennis-club-mantova']
+    dashboardTestState.polls = [sharedPoll()]
+    window.history.replaceState({}, '', '/#slot/shared-poll/shared-slot')
+    render(<Dashboard />)
+    expect(screen.getByRole('heading', { name: 'Slot condiviso' })).toBeInTheDocument()
+    expect(document.querySelectorAll('.slot-card')).toHaveLength(1)
+    expect(document.getElementById(slotElementId({ pollId: 'shared-poll', slotId: 'shared-slot' }))).toHaveTextContent('Sport City Mantova')
+    expect(screen.getByRole('button', { name: 'Segnati come titolare' })).toBeEnabled()
+    expect(window.location.hash).toBe('#slot/shared-poll/shared-slot')
+    expect(dashboardTestState.preferredVenueIds).toEqual(['tennis-club-mantova'])
+    window.innerWidth = previousWidth
+  })
+
+  it('segue link successivi e navigazione Indietro/Avanti con entrambi gli identificativi', async () => {
+    const user = userEvent.setup()
+    dashboardTestState.polls = [sharedPoll(), { ...sharedPoll(), id: 'another-poll' }]
+    window.history.replaceState({}, '', '/#slot/shared-poll/shared-slot')
+    render(<Dashboard />)
+    act(() => {
+      window.history.pushState({}, '', '/#slot/another-poll/other-slot')
+      window.dispatchEvent(new HashChangeEvent('hashchange'))
+    })
+    expect(document.querySelectorAll('.slot-card')).toHaveLength(1)
+    expect(document.getElementById(slotElementId({ pollId: 'another-poll', slotId: 'other-slot' }))).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Torna alla bacheca' }))
+    expect(window.location.hash).toBe('')
+    expect(screen.queryByRole('heading', { name: 'Slot condiviso' })).not.toBeInTheDocument()
+    act(() => {
+      window.history.replaceState({}, '', '/#slot/shared-poll/shared-slot')
+      window.dispatchEvent(new PopStateEvent('popstate'))
+    })
+    expect(document.querySelectorAll('.slot-card')).toHaveLength(1)
+    expect(document.getElementById(slotElementId({ pollId: 'shared-poll', slotId: 'shared-slot' }))).toBeInTheDocument()
+  })
+
+  it('mantiene consultabili e condivisibili gli slot passati e archiviati senza riaprire le adesioni', () => {
+    const poll = sharedPoll()
+    poll.status = 'closed'
+    poll.slots[0].startsAt = '2020-01-05T19:30:00+01:00'
+    dashboardTestState.polls = [poll]
+    window.history.replaceState({}, '', '/#slot/shared-poll/shared-slot')
+    render(<Dashboard />)
+    expect(screen.getByText(/Slot archiviato/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Condividi slot' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Segnati come titolare' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Modifica lo slot' })).not.toBeInTheDocument()
+  })
+
+  it('mostra subito lo slot e rinvia i giudizi pendenti al ritorno in bacheca', async () => {
+    const pending = sharedPoll()
+    pending.id = 'pending-feedback'
+    pending.slots = [{ ...pending.slots[0],
+      startsAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(), bookedAt: 1,
+      signups: ['jury', 'a', 'b', 'c'].map((id, index) => ({ id, userId: id, displayName: id, joinedAt: index + 1 })),
+    }]
+    dashboardTestState.polls = [sharedPoll(), pending]
+    window.history.replaceState({}, '', '/#slot/shared-poll/shared-slot')
+    render(<Dashboard />)
+    expect(screen.getByRole('heading', { name: 'Slot condiviso' })).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Torna alla bacheca' }))
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+  })
+
+  it.each([
+    ['/#slot/missing/shared-slot', 'Questo slot non è più disponibile.'],
+    ['/#slot/shared-poll/missing', 'Questo slot non è più disponibile.'],
+    ['/#slot/%E0%A4/shared-slot', 'Il link dello slot non è valido.'],
+  ])('gestisce il link non disponibile %s senza mostrare un altro slot', (url, heading) => {
+    dashboardTestState.polls = [sharedPoll()]
+    window.history.replaceState({}, '', url)
+    render(<Dashboard />)
+    expect(screen.getByRole('heading', { name: heading })).toBeInTheDocument()
+    expect(document.querySelectorAll('.slot-card')).toHaveLength(0)
+    expect(screen.getByRole('button', { name: 'Torna alla bacheca' })).toBeInTheDocument()
+  })
+
+  it('attende i dati e conserva il link durante il recupero di una connessione lenta', () => {
+    vi.useFakeTimers()
+    dashboardTestState.pollSubscriptionMode = 'stalled-once'
+    dashboardTestState.polls = [sharedPoll()]
+    window.history.replaceState({}, '', '/#slot/shared-poll/shared-slot')
+    render(<Dashboard />)
+    expect(screen.getByText('Apriamo lo slot…')).toBeInTheDocument()
+    expect(screen.queryByText('Questo slot non è più disponibile.')).not.toBeInTheDocument()
+    act(() => vi.advanceTimersByTime(6_100))
+    expect(document.querySelectorAll('.slot-card')).toHaveLength(1)
+    expect(window.location.hash).toBe('#slot/shared-poll/shared-slot')
+  })
+
   it('mantiene Tornei nel menu admin e apre la pagina di creazione senza uscire dall’app', async () => {
     dashboardTestState.userId = SLOT_ADMIN_USER_ID
     const user = userEvent.setup()
