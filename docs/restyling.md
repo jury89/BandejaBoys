@@ -27,6 +27,14 @@ Collaudo con dati demo a 320, 390 e 440 px: selettori, stati di prenotazione, st
 
 Verifica della gerarchia: a 320/390/440 px esiste un solo titolo visibile Partite, sopra Le mie/Gli altri e Prossime/Giocate, senza titoli fra i selettori. Confermati navigazione, storico, referti, statistiche e stati vuoti; screenshot desktop identici alla versione precedente. Il test responsive copre anche il ritorno alla testata originale dopo il resize. `npm run check`: 610 test e tutti i controlli superati.
 
+## Risultati Fanta su telefono
+
+Sotto i 760 px, i giocatori dei risultati Clubhouse formano una lista a tutta larghezza: identità e totale hanno spazi separati, Punti Fanta è distinto dai punti campionato e Mostra/Nascondi calcolo rende esplicito il dettaglio. Le espansioni restano indipendenti per confrontare più giocatori. La formula usa colonne responsive, comprese le quattro componenti MVP storiche; descrizioni e importi del calcolo rimangono allineati senza invadere altre schede. Lo stato espanso e il riepilogo dei punteggi sono annunciati anche alle tecnologie assistive.
+
+La modifica riguarda la presentazione mobile. Desktop e classica mantengono la griglia precedente; punteggi, pari merito, stagioni e dati persistiti non cambiano.
+
+Collaudo in Chromium con dati demo isolati a 320/390/440/759 px: dettagli indipendenti, focus, nomi lunghi, storico paginato, cambio stagione e formule feedback-v3/mvp-v2/ratings-v1, senza overflow, errori JavaScript o richieste Firebase. Confermati totali e premi invernali condivisi; controlli giocatore di almeno 44 px. Screenshot desktop identici byte per byte a 760/1280 px e classica invariata a 390 px. Il test accessibile copre apertura con Invio, chiusura con Spazio e due calcoli contemporaneamente. `npm run check`: 611 test e tutti i controlli superati. I viewport mobile sono emulati, non una prova su iPhone fisico.
+
 ## Interazioni
 
 - Filtri Tutti / Posti liberi / Sono iscritto; prenotazione selezionabile separatamente (il selettore cambia il filtro corrente, non aggiunge una seconda condizione).

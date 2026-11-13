@@ -421,6 +421,39 @@ body.modal-open .app-shell.ux-new .toast { visibility: hidden; }
   .app-shell.ux-new .personal-matches .group-match__player { padding: 8px 0; }
 }
 
+/* Result disclosures need the full phone width, including 440px iPhones that
+   previously kept the desktop's two-column player grid. */
+@media (max-width: 759px) {
+  .app-shell.ux-new .fantasy-player-scores { grid-template-columns: minmax(0, 1fr); align-items: start; gap: 10px; margin: 12px; }
+  .app-shell.ux-new .fantasy-player-scores > h4 { margin: 2px 0 4px; font-size: 12px; line-height: 1.5; }
+  .app-shell.ux-new .fantasy-player-score { border-radius: 10px; overflow: hidden; }
+  .app-shell.ux-new .fantasy-player-score__toggle { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; min-height: 72px; padding: 12px; }
+  .app-shell.ux-new .fantasy-player-score__person { display: flex; flex: 1; min-width: 0; align-items: flex-start; gap: 10px; }
+  .app-shell.ux-new .fantasy-player-score__person > .avatar { flex-shrink: 0; margin-top: 2px; }
+  .app-shell.ux-new .fantasy-player-score__identity { gap: 4px; }
+  .app-shell.ux-new .fantasy-player-score__identity strong { overflow: visible; white-space: normal; overflow-wrap: anywhere; font-size: 14px; line-height: 1.4; }
+  .app-shell.ux-new .fantasy-player-score__identity small { font-size: 12px; line-height: 1.5; }
+  .app-shell.ux-new .fantasy-player-score__identity .fantasy-player-score__court-points { margin: 0; overflow-wrap: normal; font-size: 11px; }
+  .app-shell.ux-new .fantasy-player-score__action { display: block; margin-top: 3px; color: var(--deep); font-size: 11px; font-weight: 800; line-height: 1.4; }
+  .app-shell.ux-new .fantasy-player-score__metric { display: grid; flex-shrink: 0; grid-template-columns: auto 16px; gap: 4px; align-items: center; text-align: right; }
+  .app-shell.ux-new .fantasy-player-score__metric-label { display: block; grid-column: 1 / -1; grid-row: 1; color: var(--muted); font-size: 10px; line-height: 1.4; }
+  .app-shell.ux-new .fantasy-player-score__total { grid-column: 1; grid-row: 2; font-size: 28px; line-height: 1; }
+  .app-shell.ux-new .fantasy-player-score__metric > svg:not(.fantasy-player-score__chevron) { grid-column: 2; grid-row: 2; }
+  .app-shell.ux-new .fantasy-player-score__chevron { grid-column: 2; grid-row: 3; }
+  .app-shell.ux-new .fantasy-player-score__details { min-width: 0; padding: 12px; border-top-style: solid; }
+  .app-shell.ux-new .fantasy-player-score__formula { grid-template-columns: repeat(3, minmax(0, 1fr)) 12px minmax(40px, .9fr); gap: 6px; margin-bottom: 12px; font-size: 20px; }
+  .app-shell.ux-new .fantasy-player-score__formula--mvp { grid-template-columns: repeat(4, minmax(0, 1fr)) 12px minmax(40px, .9fr); }
+  .app-shell.ux-new .fantasy-player-score__formula > * { min-width: 0; min-height: 32px; }
+  .app-shell.ux-new .fantasy-player-score__details dl > div { grid-template-columns: minmax(0, 1fr) minmax(44px, auto); gap: 12px; padding: 10px; }
+  .app-shell.ux-new .fantasy-player-score__details dt { font-size: 13px; line-height: 1.4; }
+  .app-shell.ux-new .fantasy-player-score__details dt small { font-size: 12px; line-height: 1.45; }
+  .app-shell.ux-new .fantasy-player-score__details dd { font-size: 22px; text-align: right; }
+  .app-shell.ux-new .fantasy-player-score__details > footer { gap: 12px; font-size: 11px; line-height: 1.5; }
+  .app-shell.ux-new .fantasy-player-score__details > footer strong { flex-shrink: 0; font-size: 28px; }
+  .app-shell.ux-new .fantasy-player-score__court-award { font-size: 12px; line-height: 1.6; }
+  .app-shell.ux-new .fantasy-player-score__court-award > strong:first-child { display: block; margin-bottom: 4px; }
+}
+
 @media (min-width: 760px) {
   .app-shell.ux-new { --club-header: 76px; }
   .app-shell.ux-new .topbar { padding-right: max(24px, calc((100vw - 1160px) / 2)); }

@@ -724,6 +724,10 @@ function FantasyPlayerScoreRow({
   const [expanded, setExpanded] = useState(false)
   const playerName = resolveMemberName(members, score.userId, score.displayName)
   const detailId = `fantasy-score-${roundId}-${score.userId}`
+  const summaryId = `${detailId}-summary`
+  const scoreDescription = `${fantasyNumber(score.fantasyScore)} punti Fanta.${courtStanding
+    ? ` Posizione in campo: ${courtStanding.rank}°${courtStanding.tied ? ' ex aequo' : ''}, +${courtStanding.leaguePoints} punti campionato.`
+    : ''}`
   const usesMvpScoring = score.scoringModel === 'mvp-v2'
   const usesFeedbackScoring = score.scoringModel === 'feedback-v3'
   const modifiers = [score.resultBonus, score.differenceBonus]
@@ -742,27 +746,35 @@ function FantasyPlayerScoreRow({
         aria-expanded={expanded}
         aria-controls={detailId}
         aria-label={`${expanded ? 'Nascondi' : 'Mostra'} il calcolo del punteggio di ${playerName}`}
+        aria-describedby={summaryId}
         onClick={() => setExpanded((current) => !current)}
       >
-        <PlayerAvatar player={score} members={members} />
-        <span className="fantasy-player-score__identity">
-          <strong>{playerName}</strong>
-          <small>
-            {usesFeedbackScoring
-              ? feedbackSource(score)
-              : usesMvpScoring
-              ? `Base ${fantasyNumber(score.baseRating)} · ${mvpVoteSource(score)}`
-              : `Pagella ${fantasyNumber(score.baseRating)}${score.usedDefaultRating ? ' d’ufficio' : ''}`}
-          </small>
-          {courtStanding && <small className="fantasy-player-score__court-points">
-            {courtStanding.rank}° in campo{courtStanding.tied ? ' ex aequo' : ''} · +{courtStanding.leaguePoints} pt campionato
-          </small>}
+        <span className="sr-only" id={summaryId}>{scoreDescription}</span>
+        <span className="fantasy-player-score__person">
+          <PlayerAvatar player={score} members={members} />
+          <span className="fantasy-player-score__identity">
+            <strong>{playerName}</strong>
+            <small>
+              {usesFeedbackScoring
+                ? feedbackSource(score)
+                : usesMvpScoring
+                ? `Base ${fantasyNumber(score.baseRating)} · ${mvpVoteSource(score)}`
+                : `Pagella ${fantasyNumber(score.baseRating)}${score.usedDefaultRating ? ' d’ufficio' : ''}`}
+            </small>
+            {courtStanding && <small className="fantasy-player-score__court-points">
+              {courtStanding.rank}° in campo{courtStanding.tied ? ' ex aequo' : ''} · +{courtStanding.leaguePoints} pt campionato
+            </small>}
+            <span className="fantasy-player-score__action" aria-hidden="true">{expanded ? 'Nascondi calcolo' : 'Mostra calcolo'}</span>
+          </span>
         </span>
-        <strong className="fantasy-player-score__total">{fantasyNumber(score.fantasyScore)}</strong>
-        {(score.isTopPerformer || score.isMvp) && (
-          <Sparkles size={15} aria-label={score.isTopPerformer ? 'Miglior giudizio medio' : 'MVP'} />
-        )}
-        <ChevronDown className="fantasy-player-score__chevron" size={16} aria-hidden="true" />
+        <span className="fantasy-player-score__metric">
+          <span className="fantasy-player-score__metric-label" aria-hidden="true">Punti Fanta</span>
+          <strong className="fantasy-player-score__total">{fantasyNumber(score.fantasyScore)}</strong>
+          {(score.isTopPerformer || score.isMvp) && (
+            <Sparkles size={15} aria-label={score.isTopPerformer ? 'Miglior giudizio medio' : 'MVP'} />
+          )}
+          <ChevronDown className="fantasy-player-score__chevron" size={16} aria-hidden="true" />
+        </span>
       </button>
 
       {expanded && (
@@ -772,7 +784,7 @@ function FantasyPlayerScoreRow({
           role="region"
           aria-label={`Calcolo punteggio di ${playerName}`}
         >
-          <p className="fantasy-player-score__formula" aria-label={formulaLabel}>
+          <p className={`fantasy-player-score__formula${usesMvpScoring ? ' fantasy-player-score__formula--mvp' : ''}`} aria-label={formulaLabel}>
             <span>{fantasyNumber(score.baseRating)}</span>
             <small>{fantasyModifier(score.resultBonus)}</small>
             <small>{fantasyModifier(score.differenceBonus)}</small>

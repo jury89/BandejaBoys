@@ -69,6 +69,27 @@ function courtRound(locksAt: number, totals = [10, 8, 8.5, 3.5]): FantasyRound {
 }
 
 describe('FantaBandeja', () => {
+  it('annuncia i due punteggi e permette di confrontare più calcoli usando la tastiera', async () => {
+    const user = userEvent.setup()
+    const winter = courtRound(FANTASY_SUMMER_2026_ENDS_AT)
+    renderPage({ rounds: [winter], now: winter.locksAt + 3 * 86_400_000 })
+    const ale = screen.getByRole('button', { name: 'Mostra il calcolo del punteggio di Ale' })
+    const baru = screen.getByRole('button', { name: 'Mostra il calcolo del punteggio di Baru' })
+    expect(ale).toHaveAccessibleDescription('10 punti Fanta. Posizione in campo: 1°, +5 punti campionato.')
+    ale.focus()
+    await user.keyboard('{Enter}')
+    expect(ale).toHaveAttribute('aria-expanded', 'true')
+    expect(within(ale).getByText('Nascondi calcolo')).toBeInTheDocument()
+    await user.click(baru)
+    expect(screen.getByRole('region', { name: 'Calcolo punteggio di Ale' })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Calcolo punteggio di Baru' })).toBeInTheDocument()
+    ale.focus()
+    await user.keyboard(' ')
+    expect(ale).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByRole('region', { name: 'Calcolo punteggio di Ale' })).not.toBeInTheDocument()
+    expect(baru).toHaveAttribute('aria-expanded', 'true')
+  })
+
   it('mostra piazzamenti invernali, zero punti e somma auditabile senza cambiare l’archivio estivo', async () => {
     const user = userEvent.setup()
     const summer = courtRound(FANTASY_SUMMER_2026_ENDS_AT - 1)

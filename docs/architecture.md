@@ -44,6 +44,8 @@ La bacheca Clubhouse sotto i 760 px usa una griglia di presentazione locale a `.
 
 Sotto i 760 px, Dashboard mostra una sola testata generale Partite prima dei selettori Le mie/Gli altri e Prossime/Giocate; i titoli specifici e i ritorni duplicati delle pagine figlie sono nascosti. `useSyncExternalStore` segue soltanto il breakpoint locale con un listener resize rimosso allo smontaggio: da 760 px si ripristina la presentazione desktop originale, senza azzerare il periodo selezionato. Il ritorno alla bacheca riusa i callback delle rispettive viste. Dati, listener Firestore, filtri, referti e interfaccia classica non cambiano.
 
+I risultati FantaBandeja su telefono nella nuova interfaccia usano righe giocatore a larghezza piena. I gruppi trasparenti di identità e punteggio conservano la griglia desktop; il disclosure esistente mantiene le espansioni indipendenti e aggiunge una descrizione accessibile con totale fantasy e punti campionato. Formula e dettaglio leggono sempre i componenti già materializzati, senza nuovi calcoli, query o scritture. I modelli feedback-v3, mvp-v2 e ratings-v1 conservano i rispettivi campi e bonus.
+
 ## Produzione
 
 - URL: [bandeja-boys.web.app](https://bandeja-boys.web.app)
