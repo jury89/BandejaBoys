@@ -1126,7 +1126,6 @@ export function FantasyBandejaPage({
         >
           <Trophy size={20} />
           <span><strong>Classifica</strong><small>Campionato</small></span>
-          <em>{leaderboard.length}</em>
         </button>
         <button
           ref={(node) => { tabRefs.current[2] = node }}
@@ -1142,7 +1141,6 @@ export function FantasyBandejaPage({
         >
           <ShieldCheck size={20} />
           <span><strong>Risultati</strong><small>In calcolo e conclusi</small></span>
-          <em>{resultRoundsCount}</em>
         </button>
       </nav>
 

@@ -222,6 +222,9 @@ describe('FantaBandeja', () => {
     const playTab = screen.getByRole('tab', { name: /Partite/i })
     expect(playTab).toHaveAttribute('aria-selected', 'true')
     expect(playTab).toHaveAttribute('tabindex', '0')
+    expect(within(playTab).getByLabelText('1 formazioni aperte')).toHaveTextContent('1')
+    expect(screen.getByRole('tab', { name: /Classifica/i })).toHaveTextContent(/^ClassificaCampionato$/)
+    expect(screen.getByRole('tab', { name: /Risultati/i })).toHaveTextContent(/^RisultatiIn calcolo e conclusi$/)
     expect(screen.getByText('Schiera la coppia')).toBeInTheDocument()
     expect(screen.queryByText('Classifica generale')).not.toBeInTheDocument()
     expect(screen.queryByText('Risultati dei round')).not.toBeInTheDocument()
@@ -267,7 +270,7 @@ describe('FantaBandeja', () => {
 
     const resultsTab = screen.getByRole('tab', { name: /Risultati/i })
     expect(resultsTab).toHaveAttribute('aria-selected', 'true')
-    expect(resultsTab).toHaveTextContent('1')
+    expect(resultsTab).toHaveTextContent(/^RisultatiIn calcolo e conclusi$/)
     expect(screen.getByLabelText('0 formazioni aperte')).toHaveTextContent('0')
     expect(screen.getByText('Round in calcolo')).toBeInTheDocument()
 
