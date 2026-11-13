@@ -46,6 +46,8 @@ Sotto i 760 px, Dashboard mostra una sola testata generale Partite prima dei sel
 
 I risultati FantaBandeja su telefono nella nuova interfaccia usano righe giocatore a larghezza piena. I gruppi trasparenti di identità e punteggio conservano la griglia desktop; il disclosure esistente mantiene le espansioni indipendenti e aggiunge una descrizione accessibile con totale fantasy e punti campionato. Formula e dettaglio leggono sempre i componenti già materializzati, senza nuovi calcoli, query o scritture. I modelli feedback-v3, mvp-v2 e ratings-v1 conservano i rispettivi campi e bonus.
 
+La testata dei round conclusi Clubhouse sotto i 760 px è un riepilogo verticale a larghezza piena: data e settimana precedono vincitore e risultato personale, senza il divisore laterale né l’etichetta ripetuta. È un override CSS: markup, etichette accessibili, espansioni, paginazione e dati restano quelli di `RoundResult`. Round annullati, desktop e classica mantengono le rispettive presentazioni.
+
 ## Produzione
 
 - URL: [bandeja-boys.web.app](https://bandeja-boys.web.app)

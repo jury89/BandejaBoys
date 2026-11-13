@@ -421,9 +421,21 @@ body.modal-open .app-shell.ux-new .toast { visibility: hidden; }
   .app-shell.ux-new .personal-matches .group-match__player { padding: 8px 0; }
 }
 
-/* Result disclosures need the full phone width, including 440px iPhones that
-   previously kept the desktop's two-column player grid. */
+/* Round summaries and player disclosures need the full phone width, including
+   440px iPhones that previously kept the desktop's narrow columns. */
 @media (max-width: 759px) {
+  .app-shell.ux-new .fantasy-result:not(.fantasy-result--void) > .fantasy-result__toggle { grid-template-columns: minmax(0, 1fr) 20px; align-items: start; min-height: 0; gap: 10px 12px; padding: 14px; }
+  .app-shell.ux-new .fantasy-result__toggle .fantasy-result__header { grid-column: 1; grid-row: 1; min-width: 0; padding: 0; }
+  .app-shell.ux-new .fantasy-result__header > div { min-width: 0; }
+  .app-shell.ux-new .fantasy-result__header .eyebrow,
+  .app-shell.ux-new .fantasy-result__header > svg { display: none; }
+  .app-shell.ux-new .fantasy-result__header h3 { margin: 0 0 3px; font-size: 16px; line-height: 1.4; }
+  .app-shell.ux-new .fantasy-result__header > div > span { display: block; font-size: 12px; line-height: 1.5; }
+  .app-shell.ux-new .fantasy-result__summary { grid-column: 1 / -1; grid-row: 2; align-self: auto; gap: 4px; padding: 0; border: 0; }
+  .app-shell.ux-new .fantasy-result__summary > span { align-items: baseline; font-size: 12px; font-weight: 700; line-height: 1.5; overflow-wrap: anywhere; }
+  .app-shell.ux-new .fantasy-result__summary > span:first-child { color: var(--deep); font-size: 13px; font-weight: 800; }
+  .app-shell.ux-new .fantasy-result__summary > span > svg { flex-shrink: 0; align-self: center; }
+  .app-shell.ux-new .fantasy-result:not(.fantasy-result--void) > .fantasy-result__toggle > .fantasy-result__chevron { grid-column: 2; grid-row: 1; align-self: start; margin-top: 1px; }
   .app-shell.ux-new .fantasy-player-scores { grid-template-columns: minmax(0, 1fr); align-items: start; gap: 10px; margin: 12px; }
   .app-shell.ux-new .fantasy-player-scores > h4 { margin: 2px 0 4px; font-size: 12px; line-height: 1.5; }
   .app-shell.ux-new .fantasy-player-score { border-radius: 10px; overflow: hidden; }

@@ -29,6 +29,10 @@ Verifica della gerarchia: a 320/390/440 px esiste un solo titolo visibile Partit
 
 ## Risultati Fanta su telefono
 
+La testata dei round Clubhouse sotto i 760 px usa un unico riepilogo verticale: data completa e settimana sopra vincitore e risultato personale, con la freccia di apertura accanto alla data. Elimina le colonne strette, l’etichetta ripetuta e il trofeo decorativo duplicato; conserva tutte le informazioni della partita e il controllo di espansione esistente. I round annullati mantengono il proprio stato distinto. Desktop e interfaccia classica non ricevono questi override.
+
+Collaudo della testata con dati demo a 320/390/440/759 px: nomi lunghi, risultati personali da manager e da titolare, classifica vuota, round annullati, apertura/chiusura con focus conservato, dettagli giocatore e paginazione. Nessun overflow, errore JavaScript o richiesta Firebase; controlli del round di almeno 44 px. Altezza del riepilogo standard da 167 a 123 px a 390 px e da 215 a 123 px a 440 px. Screenshot desktop identici byte per byte a 760/1280 px e classica identica a 390 px; testata annullata sempre di 94 px. `npm run check`: 611 test e tutti i controlli superati. Verifica mobile su viewport emulati.
+
 Sotto i 760 px, i giocatori dei risultati Clubhouse formano una lista a tutta larghezza: identità e totale hanno spazi separati, Punti Fanta è distinto dai punti campionato e Mostra/Nascondi calcolo rende esplicito il dettaglio. Le espansioni restano indipendenti per confrontare più giocatori. La formula usa colonne responsive, comprese le quattro componenti MVP storiche; descrizioni e importi del calcolo rimangono allineati senza invadere altre schede. Lo stato espanso e il riepilogo dei punteggi sono annunciati anche alle tecnologie assistive.
 
 La modifica riguarda la presentazione mobile. Desktop e classica mantengono la griglia precedente; punteggi, pari merito, stagioni e dati persistiti non cambiano.
