@@ -1109,8 +1109,10 @@ export function FantasyBandejaPage({
           onKeyDown={(event) => handleTabKeyDown(event, 'play')}
         >
           <CalendarDays size={20} />
-          <span><strong>Partite</strong><small>Formazioni aperte</small></span>
-          <em aria-label={`${openRounds.length} formazioni aperte`}>{openRounds.length}</em>
+          <span>
+            <strong>Partite<em aria-label={`${openRounds.length} formazioni aperte`}>{openRounds.length}</em></strong>
+            <small>Formazioni aperte</small>
+          </span>
         </button>
         <button
           ref={(node) => { tabRefs.current[1] = node }}

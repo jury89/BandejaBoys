@@ -6588,12 +6588,11 @@ p {
 }
 
 .fantasy-hub-nav button {
-  display: grid;
+  display: flex;
   min-width: 0;
   min-height: 64px;
   align-items: center;
   padding: 10px 14px;
-  grid-template-columns: 25px minmax(0, 1fr) auto;
   gap: 11px;
   border: 1px solid transparent;
   border-radius: 10px;
@@ -6628,7 +6627,14 @@ p {
   flex-direction: column;
 }
 
+.fantasy-hub-nav button > svg {
+  flex-shrink: 0;
+}
+
 .fantasy-hub-nav strong {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   color: currentColor;
   font-size: 0.8rem;
   font-weight: 900;
@@ -8156,7 +8162,6 @@ p {
   .fantasy-hub-nav button {
     min-height: 58px;
     padding: 8px 10px;
-    grid-template-columns: 22px minmax(0, 1fr) auto;
     gap: 8px;
   }
 
@@ -8830,7 +8835,6 @@ p {
   .fantasy-hub-nav button {
     min-height: 52px;
     padding: 7px 8px;
-    grid-template-columns: minmax(0, 1fr) auto;
     gap: 4px;
   }
 
@@ -9287,13 +9291,8 @@ p {
 
 @media (max-width: 350px) {
   .fantasy-hub-nav button {
-    justify-items: center;
+    justify-content: center;
     padding-inline: 4px;
-    grid-template-columns: 1fr;
-  }
-
-  .fantasy-hub-nav em {
-    display: none;
   }
 }
 
