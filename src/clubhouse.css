@@ -389,6 +389,12 @@ body.modal-open .app-shell.ux-new .toast { visibility: hidden; }
    the introductory panel so the first fixture starts closer to the controls. */
 @media (max-width: 759px) {
   .app-shell.ux-new .club-match-switch { gap: 6px; margin-top: 12px; }
+  .app-shell.ux-new .club-matches-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: min(1160px, calc(100% - 32px)); min-height: 44px; margin: 12px auto 0; }
+  .app-shell.ux-new .club-matches-header h1 { margin: 0; font-family: var(--display); font-size: 28px; font-weight: 700; line-height: 1.1; text-transform: uppercase; }
+  .app-shell.ux-new .club-matches-header .personal-matches__back { margin: 0; }
+  .app-shell.ux-new.has-compact-match-header .club-match-switch { margin-top: 8px; }
+  .app-shell.ux-new.has-compact-match-header .personal-matches { padding-top: 8px; }
+  .app-shell.ux-new.has-compact-match-header .personal-matches :is(.personal-matches__hero, .personal-matches__back) { display: none; }
   .app-shell.ux-new .club-match-switch button { flex: 1; padding: 8px 12px; font-size: 13px; }
   .app-shell.ux-new .personal-matches { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 8px; padding-top: 12px; }
   .app-shell.ux-new .personal-matches > * { grid-column: 1 / -1; min-width: 0; }

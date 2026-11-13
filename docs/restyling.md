@@ -19,11 +19,13 @@ Collaudo con dati demo a 320, 390 e 440 px: filtri, apertura Campi senza sovrapp
 
 ## Partite compatte su telefono
 
-Sotto i 760 px, Le mie e Gli altri mantengono entrambi i percorsi ma usano una testata essenziale: titolo e ritorno alla bacheca sulla stessa riga, senza il grande pannello introduttivo. Prossime/Giocate e conteggi restano visibili; liste e schede riducono spazi e padding, conservando data, ora, circolo, prenotazione, giudizi e referti. I collegamenti alle statistiche e i pulsanti di compilazione restano gli stessi, con controlli di almeno 44 px.
+Sotto i 760 px, un’unica testata generale **Partite** con ritorno alla bacheca precede i selettori: prima Le mie/Gli altri e, nella vista personale, Prossime/Giocate. Nessun titolo specifico interrompe i due selettori; conteggi e periodo attivo restano visibili; liste e schede riducono spazi e padding, conservando data, ora, circolo, prenotazione, giudizi e referti. I collegamenti alle statistiche e i pulsanti di compilazione restano gli stessi, con controlli di almeno 44 px.
 
-Gli override riguardano solo la nuova interfaccia mobile. Desktop da 760 px, classica, ordinamento, paginazione, permessi e listener non cambiano.
+Gli override riguardano solo la nuova interfaccia mobile. Da 760 px si ripristinano le testate originali, anche ridimensionando la finestra. Classica, ordinamento, paginazione, permessi e listener dei dati non cambiano.
 
 Collaudo con dati demo a 320, 390 e 440 px: selettori, stati di prenotazione, storico paginato, apertura/chiusura dei referti, ritorno allo slot evidenziato e accesso alle statistiche. Nessun overflow, errore JavaScript o richiesta Firebase; controlli principali di almeno 44 px. A 440 px il primo match personale passa da 521 a 313 px e quello degli altri da 465 a 261 px. Screenshot desktop identici a 760/1280 px per Le mie e a 1280 px per Gli altri. `npm run check`: 609 test e tutti i controlli superati.
+
+Verifica della gerarchia: a 320/390/440 px esiste un solo titolo visibile Partite, sopra Le mie/Gli altri e Prossime/Giocate, senza titoli fra i selettori. Confermati navigazione, storico, referti, statistiche e stati vuoti; screenshot desktop identici alla versione precedente. Il test responsive copre anche il ritorno alla testata originale dopo il resize. `npm run check`: 610 test e tutti i controlli superati.
 
 ## Interazioni
 

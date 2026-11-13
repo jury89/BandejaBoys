@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, vi } from 'vitest'
 import type {
@@ -249,6 +249,37 @@ describe('menu account', () => {
     await user.click(screen.getByRole('button', { name: 'Bacheca' }))
     expect(window.location.hash).toBe('')
     expect(screen.getByRole('button', { name: /Posti liberi/ })).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('su telefono mette Partite prima dei due selettori e ripristina la testata desktop al resize', async () => {
+    const originalWidth = window.innerWidth
+    const setWidth = (width: number) => {
+      Object.defineProperty(window, 'innerWidth', { configurable: true, writable: true, value: width })
+      window.dispatchEvent(new Event('resize'))
+    }
+    try {
+      setWidth(390)
+      window.history.replaceState({}, '', '/#i-miei-match')
+      const user = userEvent.setup()
+      render(<Dashboard />)
+      const header = screen.getByRole('region', { name: 'Partite' })
+      const matchFilter = screen.getByRole('navigation', { name: 'Quali partite' })
+      const periodFilter = screen.getByRole('navigation', { name: 'Periodo delle tue partite' })
+      expect(within(header).getByRole('heading', { name: 'Partite', level: 1 })).toBeInTheDocument()
+      expect(header.compareDocumentPosition(matchFilter) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+      expect(matchFilter.compareDocumentPosition(periodFilter) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+      await user.click(within(matchFilter).getByRole('button', { name: 'Gli altri' }))
+      expect(screen.getByRole('region', { name: 'Partite' })).toBeInTheDocument()
+      expect(screen.queryByRole('navigation', { name: 'Periodo delle tue partite' })).not.toBeInTheDocument()
+      act(() => setWidth(1280))
+      expect(screen.queryByRole('region', { name: 'Partite' })).not.toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: 'Gli altri match' })).toBeInTheDocument()
+      act(() => setWidth(390))
+      await user.click(within(screen.getByRole('region', { name: 'Partite' })).getByRole('button', { name: 'Torna alla bacheca' }))
+      expect(screen.getByRole('heading', { name: /Ci vediamo in campo/ })).toBeInTheDocument()
+    } finally {
+      act(() => setWidth(originalWidth))
+    }
   })
 
   it('resta aperto al suo interno e si chiude con un clic esterno o con Escape', async () => {

@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { BarChart3, Bell, BellRing, CalendarCheck2, CalendarDays, CalendarPlus, CheckCircle2, ChevronDown, CircleUserRound, History, LayoutList, LogOut, PhoneCall, RefreshCw, Trophy, UsersRound } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { ArrowLeft, BarChart3, Bell, BellRing, CalendarCheck2, CalendarDays, CalendarPlus, CheckCircle2, ChevronDown, CircleUserRound, History, LayoutList, LogOut, PhoneCall, RefreshCw, Trophy, UsersRound } from 'lucide-react'
 import { useAuth } from '../AuthContext'
 import { clearInterfaceOverride, useInterfaceMode } from '../InterfaceContext'
 import { ClassicBoardFilters, ClassicBoardSummary } from './ClassicBoard'
@@ -78,6 +78,15 @@ const NOTIFICATION_HISTORY_HASH = '#notifiche'
 const INITIAL_DATA_TIMEOUT_MS = 6_000
 const INITIAL_DATA_AUTO_RETRIES = 2
 
+// Match the phone breakpoint in clubhouse.css and restore the original header
+// on resize, without changing the page's data subscriptions or period state.
+const isPhoneViewport = () => window.innerWidth < 760
+const desktopServerViewport = () => false
+function subscribeToViewport(listener: () => void) {
+  window.addEventListener('resize', listener)
+  return () => window.removeEventListener('resize', listener)
+}
+
 function dashboardViewFromLocation(): DashboardView {
   if (window.location.hash === '#tornei' || window.location.hash.startsWith('#tornei/')) return 'tournaments'
   if (window.location.hash === '#campi' || window.location.hash.startsWith('#campi/')) return 'venues'
@@ -137,6 +146,7 @@ const feedCopy: Record<FeedFilter, {
 
 export function Dashboard() {
   const isNewInterface = useInterfaceMode() === 'nuova'
+  const phoneViewport = useSyncExternalStore(subscribeToViewport, isPhoneViewport, desktopServerViewport)
   const { user, signOut, updateProfile } = useAuth()
   const [polls, setPolls] = useState<PadelPoll[]>([])
   const [members, setMembers] = useState<MemberProfile[]>([])
@@ -150,6 +160,8 @@ export function Dashboard() {
   const venueFilterKey = `${user?.id}:${preferredVenueIds.join(',')}`
   const selectedVenueIds = venueFilterOverride?.key === venueFilterKey ? venueFilterOverride.ids : preferredVenueIds
   const [dashboardView, setDashboardView] = useState<DashboardView>(dashboardViewFromLocation)
+  const showCompactMatchHeader = isNewInterface && phoneViewport
+    && (dashboardView === 'matches' || dashboardView === 'group-matches')
   const [statisticsPlayerId, setStatisticsPlayerId] = useState(
     () => statisticsPlayerIdFromLocation() ?? user?.id ?? '',
   )
@@ -852,7 +864,7 @@ export function Dashboard() {
   ]
 
   return (
-    <div className={`app-shell ${isNewInterface ? 'ux-new' : 'ux-classic'}`} data-ux={isNewInterface ? 'nuova' : 'classica'}>
+    <div className={`app-shell ${isNewInterface ? 'ux-new' : 'ux-classic'}${showCompactMatchHeader ? ' has-compact-match-header' : ''}`} data-ux={isNewInterface ? 'nuova' : 'classica'}>
       <PullToRefresh />
       <header className="topbar">
         <Brand compact />
@@ -955,6 +967,16 @@ export function Dashboard() {
         <div className="demo-banner">
           <span /> <strong>Demo locale:</strong> i dati restano in questo browser finché Firebase non viene collegato.
         </div>
+      )}
+
+      {showCompactMatchHeader && (
+        <section className="club-matches-header" aria-labelledby="club-matches-title">
+          <h1 id="club-matches-title">Partite</h1>
+          <button className="button button--ghost personal-matches__back" type="button"
+            onClick={dashboardView === 'matches' ? closePlayerMatches : closeGroupMatches}>
+            <ArrowLeft size={18} aria-hidden="true" /> Torna alla bacheca
+          </button>
+        </section>
       )}
 
       {isNewInterface && (dashboardView === 'matches' || dashboardView === 'group-matches') && (

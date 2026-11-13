@@ -42,7 +42,7 @@ Le presentazioni classica e Clubhouse condividono controller, listener e mutazio
 
 La bacheca Clubhouse sotto i 760 px usa una griglia di presentazione locale a `.dashboard--feed`: testata compatta, prossima partita, filtri principali e riga Campi/prenotazione. Aprire Campi estende il relativo pannello a tutta larghezza senza coprire i controlli e rende disponibile anche Campi e costi. I pulsanti di chiusura settimanale mantengono `aria-controls` e `aria-expanded` con etichetta accessibile; le aree di tocco restano di almeno 44 px. Da 760 px e nella classica non si applicano questi override. Stato dei filtri, preferiti, ordinamento, repository e autorizzazioni sono quelli esistenti.
 
-Le pagine Partite della nuova interfaccia usano sotto i 760 px una testata compatta con titolo e ritorno alla bacheca, mantenendo entrambi i selettori esistenti (Le mie/Gli altri e Prossime/Giocate). Il cambiamento è limitato al CSS di presentazione delle pagine `.personal-matches`: nessun nuovo stato, filtro, listener o modifica ai referti. I dati e le azioni delle schede restano gli stessi; desktop e classica non applicano gli override.
+Sotto i 760 px, Dashboard mostra una sola testata generale Partite prima dei selettori Le mie/Gli altri e Prossime/Giocate; i titoli specifici e i ritorni duplicati delle pagine figlie sono nascosti. `useSyncExternalStore` segue soltanto il breakpoint locale con un listener resize rimosso allo smontaggio: da 760 px si ripristina la presentazione desktop originale, senza azzerare il periodo selezionato. Il ritorno alla bacheca riusa i callback delle rispettive viste. Dati, listener Firestore, filtri, referti e interfaccia classica non cambiano.
 
 ## Produzione
 
