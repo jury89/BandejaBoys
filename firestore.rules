@@ -63,7 +63,8 @@ service cloud.firestore {
       return request.resource.data.keys()
           .hasOnly([
             'id', 'displayName', 'email', 'createdAt', 'avatarDataUrl',
-            'notificationPreferences', 'fixedSeatPreference', 'interfaceMode', 'preferredVenueIds'
+            'notificationPreferences', 'fixedSeatPreference', 'interfaceMode', 'preferredVenueIds',
+            'fantasyStartingCredits'
           ])
         && request.resource.data.id == userId
         && request.resource.data.displayName is string
@@ -71,6 +72,8 @@ service cloud.firestore {
         && request.resource.data.displayName.size() <= 40
         && request.resource.data.email is string
         && request.resource.data.createdAt is number
+        && (!request.resource.data.keys().hasAny(['fantasyStartingCredits'])
+          || request.resource.data.fantasyStartingCredits is map)
         && validAvatar()
         && validNotificationPreferences()
         && (!request.resource.data.keys().hasAny(['preferredVenueIds'])
@@ -469,9 +472,11 @@ service cloud.firestore {
       allow read: if isMember() || isNotifier();
       allow create: if isMember()
         && request.auth.uid == userId
+        && !request.resource.data.keys().hasAny(['fantasyStartingCredits'])
         && validUserProfile(userId);
       allow update: if isMember()
         && request.auth.uid == userId
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['fantasyStartingCredits'])
         && validUserProfile(userId)
         && request.resource.data.email == resource.data.email
         && request.resource.data.createdAt == resource.data.createdAt

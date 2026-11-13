@@ -69,6 +69,31 @@ function courtRound(locksAt: number, totals = [10, 8, 8.5, 3.5]): FantasyRound {
 }
 
 describe('FantaBandeja', () => {
+  it('mostra i punti iniziali anche senza partite e li mantiene nella sola stagione di accredito', async () => {
+    const user = userEvent.setup()
+    const credited: MemberProfile = {
+      ...manager,
+      fantasyStartingCredits: {
+        'winter-2026-27': {
+          points: 20, reason: 'Ingresso a stagione in corso',
+          grantedAt: FANTASY_SUMMER_2026_ENDS_AT + 86_400_000, grantedBy: 'admin',
+        },
+      },
+    }
+    renderPage({ rounds: [], members: [...members.slice(0, 4), credited], user: credited, now: FANTASY_SUMMER_2026_ENDS_AT + 2 * 86_400_000 })
+    await user.click(screen.getByRole('tab', { name: /Classifica/i }))
+    const row = screen.getByRole('button', { name: 'Mostra dettaglio punti di Jury' })
+    expect(row).toHaveTextContent('20pt')
+    expect(row).toHaveTextContent('0 vittorie Fanta · 0 round · 0 fantasy pt')
+    await user.click(row)
+    const details = screen.getByRole('region', { name: 'Dettaglio punti di Jury' })
+    expect(within(details).getByText('Punti iniziali')).toBeInTheDocument()
+    expect(within(details).getByText('Ingresso a stagione in corso')).toBeInTheDocument()
+    expect(details).toHaveTextContent('20 = 20 pt')
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Stagione FantaBandeja' }), 'summer-2026')
+    expect(screen.queryByRole('button', { name: /dettaglio punti di Jury/ })).not.toBeInTheDocument()
+  })
+
   it('annuncia i due punteggi e permette di confrontare più calcoli usando la tastiera', async () => {
     const user = userEvent.setup()
     const winter = courtRound(FANTASY_SUMMER_2026_ENDS_AT)

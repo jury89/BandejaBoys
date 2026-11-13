@@ -1,5 +1,9 @@
 # Bandeja Boys
 
+## Punti iniziali FantaBandeja
+
+Un nuovo partecipante può ricevere un accredito iniziale per la stagione corrente, su decisione esplicita dell’amministratore. La classifica lo mostra come **Punti iniziali** con la motivazione e lo somma ai successivi punti campionato; vittorie, round giocati e punteggio fantasy restano quelli ottenuti nelle partite. L’accredito vale soltanto per la stagione indicata ed è assegnato tramite amministrazione fidata. Il rilascio richiede Hosting e Firestore Rules; il notifier resta invariato e usa i profili già letti.
+
 ## Tornei del gruppo
 
 Durante il gioco la vista **Turno in corso** riunisce timer, risultati dei campi e conferma del turno; **Classifica** e **Dettagli** separano consultazione e impostazioni. Al passaggio successivo la pagina torna ai comandi del nuovo turno, senza cercarli tra iscritti e regolamento. Nei gironi a tempo, **Concludi turno** ferma anticipatamente il timer per tutti dopo conferma dell’organizzatore/admin: i punteggi restano modificabili e servono comunque tutti i risultati prima di proseguire. La simulazione privata segue lo stesso flusso.

@@ -271,8 +271,29 @@ const fixedSeatProfile = {
   createdAt,
   fixedSeatPreference: { weekday: 2, startMinutes: 18 * 60, endMinutes: 20 * 60 },
 }
+const creditedProfile = {
+  ...fixedSeatProfile,
+  fantasyStartingCredits: {
+    'winter-2026-27': { points: 20, reason: 'Ingresso a stagione in corso', grantedAt: createdAt, grantedBy: 'admin' },
+  },
+}
 
 const tests: TestDefinition[] = [
+  ...[
+    { label: 'creazione con accredito inventato', method: 'create' as const, before: undefined, after: creditedProfile, expectation: 'DENY' as const },
+    { label: 'aggiunta autonoma accredito', method: 'update' as const, before: fixedSeatProfile, after: creditedProfile, expectation: 'DENY' as const },
+    { label: 'modifica autonoma accredito', method: 'update' as const, before: creditedProfile, after: { ...creditedProfile, fantasyStartingCredits: {} }, expectation: 'DENY' as const },
+    { label: 'rimozione autonoma accredito', method: 'update' as const, before: creditedProfile, after: fixedSeatProfile, expectation: 'DENY' as const },
+    { label: 'profilo modificabile con accredito invariato', method: 'update' as const, before: creditedProfile, after: { ...creditedProfile, interfaceMode: 'nuova' }, expectation: 'ALLOW' as const },
+  ].map(({ label, method, before, after, expectation }): TestDefinition => ({
+    label,
+    testCase: {
+      expectation,
+      request: { auth: auth(userId), path: fixedSeatProfilePath, method, resource: { data: after } },
+      ...(before ? { resource: { data: before } } : {}),
+      expressionReportLevel: 'FULL',
+    },
+  })),
   ...[
     { value: [], expectation: 'ALLOW' as const, uid: userId },
     { value: ['sport-city-mantova', 'tennis-club-mantova'], expectation: 'ALLOW' as const, uid: userId },

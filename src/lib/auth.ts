@@ -69,6 +69,7 @@ function accountProfile(account: LocalAccount): MemberProfile {
     notificationPreferences: normalizeNotificationPreferences(account.notificationPreferences),
     fixedSeatPreference: normalizeFixedSeatPreference(account.fixedSeatPreference),
     interfaceMode: normalizeInterfaceMode(account.interfaceMode),
+    fantasyStartingCredits: account.fantasyStartingCredits,
     preferredVenueIds: normalizePreferredVenueIds(account.preferredVenueIds),
   }
 }

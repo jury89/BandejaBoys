@@ -18,6 +18,7 @@ Run `npm run check` before every commit or push. It must complete lint, all test
 - Private tournament rehearsal is restricted to the exact configured admin UID (no local preview override). It uses a separate browser store/clock and the same domain/UI logic; never route any rehearsal mutation or subscription to the shared repository. Copy settings only, never real registrations, ids, dates, draws or scores. Rehearsals cannot be published/shared; reset replaces only rehearsal data. Cover direct URLs, account switching, all formulas, persistence and zero remote calls.
 
 - Fantasy court points are versioned by the match season (`locksAt`), never settlement/current time. Summer keeps 2/3 attendance points; winter uses individual fantasy-score rank 5/3/1/0 with shared ties and skipped occupied places. Do not change manager scoring or the best-mean captain bonus.
+- Explicit seasonal starting credits live in trusted `users.fantasyStartingCredits`. Apply once to championship points for the selected season; preserve match count, wins, raw fantasy scores and historical results. Member clients must never create, change or remove credits, including during profile edits.
 
 - Signup precedence is chronological. Never reorder signups manually in UI code.
 - The first four ordered signups are starters; all later signups are reserves.

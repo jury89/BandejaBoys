@@ -870,6 +870,7 @@ function Leaderboard({
 }
 
 function contributionLabel(contribution: FantasyLeaderboardContribution): string {
+  if (contribution.source === 'starting-credit') return 'Punti iniziali'
   if (contribution.source === 'court-placement') return `${contribution.rank}° in campo${contribution.tied ? ' ex aequo' : ''}${contribution.rank === 1 ? ' · Miglior giocatore' : ''} · ${fantasyNumber(contribution.rawFantasyPoints)} fantasy pt`
   if (contribution.source === 'top-performer') return 'Miglior giudizio medio · bonus presenza'
   if (contribution.source === 'mvp') return 'MVP in campo · bonus presenza'
@@ -926,8 +927,8 @@ function LeaderboardRow({
               <li key={`${contribution.roundId}:${contribution.source}`}>
                 <CalendarDays size={18} aria-hidden="true" />
                 <span>
-                  <strong>{sentenceCase(matchFormatter.format(new Date(contribution.playedAt)))}</strong>
-                  <small>{contribution.pollTitle} · {contributionLabel(contribution)}</small>
+                  <strong>{contribution.source === 'starting-credit' ? contributionLabel(contribution) : sentenceCase(matchFormatter.format(new Date(contribution.playedAt)))}</strong>
+                  <small>{contribution.pollTitle}{contribution.source !== 'starting-credit' && ` · ${contributionLabel(contribution)}`}</small>
                 </span>
                 <strong>+{contribution.leaguePoints} pt</strong>
               </li>
@@ -993,7 +994,7 @@ export function FantasyBandejaPage({
   const finishedRounds = [...orderedRounds]
     .filter((round) => round.status === 'scored' || round.status === 'void')
     .sort((left, right) => right.locksAt - left.locksAt)
-  const leaderboard = getFantasyLeaderboard(visibleRounds)
+  const leaderboard = getFantasyLeaderboard(visibleRounds, { members, seasonId: selectedSeason.id })
   const resultRoundsCount = lockedRounds.length + finishedRounds.length
   const visibleFinishedRounds = finishedRounds.slice(0, visibleResultCount)
   const remainingResultsCount = Math.max(0, finishedRounds.length - visibleFinishedRounds.length)
@@ -1128,7 +1129,7 @@ export function FantasyBandejaPage({
             </div>
           </div>
         </div>
-      ) : visibleRounds.length === 0 ? (
+      ) : visibleRounds.length === 0 && leaderboard.length === 0 ? (
         <section className="fantasy-empty">
           <Trophy size={34} />
           <p className="eyebrow">Spogliatoi ancora vuoti</p>

@@ -1,5 +1,11 @@
 # Architettura e regole di dominio
 
+## Accrediti iniziali per stagione Fanta
+
+Il campo opzionale `users/{uid}.fantasyStartingCredits` è una mappa per ID stagione (`summer-2026`, `winter-2026-27`): ogni voce conserva `points` (intero positivo), `reason`, `grantedAt` (millisecondi) e `grantedBy` (UID amministratore). È un accredito esplicito, gestito con credenziali amministrative; le Rules impediscono ai client di crearlo, aggiungerlo, modificarlo o rimuoverlo e consentono i normali salvataggi del profilo con il campo invariato. Gli aggiornamenti parziali dei client esistenti conservano la mappa.
+
+`getFantasyLeaderboard(rounds, { members, seasonId })` applica una sola volta l’accredito della stagione selezionata, anche per chi non ha ancora giocato, e filtra i round per la stessa stagione. Ignora metadati incompleti o punti non interi/positivi. La contribuzione `starting-credit` incrementa soltanto i punti campionato; vittorie, round giocati e punteggi fantasy grezzi derivano dalle partite. La UI espone **Punti iniziali** e motivazione nel dettaglio della generale. I membri arrivano dal listener profili esistente, incluso il backend demo: nessun nuovo listener, round artificiale o ricalcolo dello storico. Pubblicare Hosting e Rules prima di inserire un accredito tramite ADC; nessun cambiamento al notifier.
+
 ## Punti in campo dalla stagione invernale
 
 La scheda della stagione invernale presenta il nuovo podio senza riutilizzare la data di chiusura estiva: una scadenza invernale non è ancora configurata.

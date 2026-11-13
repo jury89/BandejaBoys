@@ -1,6 +1,13 @@
 export type PollStatus = 'open' | 'closed'
 export type InterfaceMode = 'classica' | 'nuova'
 
+export interface FantasyStartingCredit {
+  points: number
+  reason: string
+  grantedAt: number
+  grantedBy: string
+}
+
 export interface NotificationPreferences {
   mondayMotivation: boolean
   newSlots: boolean
@@ -34,6 +41,8 @@ export interface MemberProfile {
   notificationPreferences?: NotificationPreferences
   fixedSeatPreference?: FixedSeatPreference
   interfaceMode?: InterfaceMode
+  /** Trusted seasonal credits; members cannot create, change or remove them. */
+  fantasyStartingCredits?: Record<string, FantasyStartingCredit>
 }
 
 export type SessionUser = MemberProfile
@@ -408,7 +417,7 @@ export interface FantasyLeaderboardContribution {
   roundId: string
   pollTitle: string
   playedAt: number
-  source: 'formation' | 'starter' | 'mvp' | 'top-performer' | 'court-placement'
+  source: 'formation' | 'starter' | 'mvp' | 'top-performer' | 'court-placement' | 'starting-credit'
   leaguePoints: number
   rawFantasyPoints: number
   rank?: number

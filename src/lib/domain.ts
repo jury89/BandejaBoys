@@ -1,5 +1,5 @@
 import { DEFAULT_VENUE_ID, slotVenueId, slotVenueName, validateClubVenueId, validateVenueId } from './venues'
-import { getFantasySeasonForRound } from './fantasySeasons'
+import { getFantasySeasonForRound, type FantasySeason } from './fantasySeasons'
 import { isSlotAdmin, SLOT_ADMIN_USER_ID } from './admin'
 import type { Tournament, TournamentInput, TournamentMatch, TournamentOrganization, TournamentRegistration, TournamentScore, TournamentStanding, TournamentTeam } from './tournamentTypes'
 import type {
@@ -1453,7 +1453,10 @@ export function getFantasyCourtStandings(round: FantasyRound): FantasyCourtStand
   }).sort((left, right) => left.rank - right.rank || left.userId.localeCompare(right.userId))
 }
 
-export function getFantasyLeaderboard(rounds: FantasyRound[]): FantasyLeaderboardRow[] {
+export function getFantasyLeaderboard(
+  rounds: FantasyRound[],
+  { members = [], seasonId }: { members?: MemberProfile[]; seasonId?: FantasySeason['id'] } = {},
+): FantasyLeaderboardRow[] {
   const rows = new Map<string, Omit<FantasyLeaderboardRow, 'rank'>>()
 
   const addContribution = ({
@@ -1477,14 +1480,15 @@ export function getFantasyLeaderboard(rounds: FantasyRound[]): FantasyLeaderboar
         (current?.rawFantasyPoints ?? 0) + contribution.rawFantasyPoints,
         2,
       ),
-      roundsPlayed: (current?.roundsPlayed ?? 0) + 1,
+      roundsPlayed: (current?.roundsPlayed ?? 0) + (contribution.source === 'starting-credit' ? 0 : 1),
       contributions: [...(current?.contributions ?? []), contribution]
         .sort((left, right) => right.playedAt - left.playedAt || left.roundId.localeCompare(right.roundId)),
     })
   }
 
   rounds
-    .filter((round) => round.status === 'scored')
+    .filter((round) => round.status === 'scored'
+      && (!seasonId || getFantasySeasonForRound(round).id === seasonId))
     .forEach((round) => {
       ;(round.standings ?? []).forEach((standing) => {
         addContribution({
@@ -1547,6 +1551,32 @@ export function getFantasyLeaderboard(rounds: FantasyRound[]): FantasyLeaderboar
         })
       })
     })
+
+  // Apply a trusted credit once for the explicitly selected season, even with no rounds.
+  // It adds championship points without inventing a match, victory or fantasy score.
+  if (seasonId) {
+    for (const member of new Map(members.map((profile) => [profile.id, profile])).values()) {
+      const credit = member.fantasyStartingCredits?.[seasonId]
+      if (!credit
+        || !Number.isSafeInteger(credit.points) || credit.points <= 0
+        || !Number.isFinite(credit.grantedAt) || credit.grantedAt <= 0
+        || typeof credit.reason !== 'string' || !credit.reason.trim()
+        || typeof credit.grantedBy !== 'string' || !credit.grantedBy.trim()) continue
+      addContribution({
+        managerId: member.id,
+        managerName: member.displayName,
+        wins: 0,
+        contribution: {
+          roundId: `starting-credit:${seasonId}:${member.id}`,
+          pollTitle: credit.reason,
+          playedAt: credit.grantedAt,
+          source: 'starting-credit',
+          leaguePoints: credit.points,
+          rawFantasyPoints: 0,
+        },
+      })
+    }
+  }
 
   const sorted = [...rows.values()].sort((left, right) => (
     right.leaguePoints - left.leaguePoints
