@@ -385,6 +385,34 @@ body.modal-open .app-shell.ux-new .toast { visibility: hidden; }
   .app-shell.ux-new .dashboard--feed .poll-card__collapse-label { display: none; }
 }
 
+/* Match pages keep the same navigation and results; the mobile title replaces
+   the introductory panel so the first fixture starts closer to the controls. */
+@media (max-width: 759px) {
+  .app-shell.ux-new .club-match-switch { gap: 6px; margin-top: 12px; }
+  .app-shell.ux-new .club-match-switch button { flex: 1; padding: 8px 12px; font-size: 13px; }
+  .app-shell.ux-new .personal-matches { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 8px; padding-top: 12px; }
+  .app-shell.ux-new .personal-matches > * { grid-column: 1 / -1; min-width: 0; }
+  .app-shell.ux-new .personal-matches__back { grid-column: 2; grid-row: 1; margin: 0; align-self: center; }
+  .app-shell.ux-new .personal-matches__hero { grid-column: 1; grid-row: 1; min-height: 44px; align-items: center; margin: 0; padding: 0; border-radius: 0; background: transparent; color: var(--ink); }
+  .app-shell.ux-new .personal-matches__hero::after { display: none; }
+  .app-shell.ux-new .personal-matches__hero > div:first-child { min-width: 0; }
+  .app-shell.ux-new .personal-matches__hero p { display: none; }
+  .app-shell.ux-new .personal-matches__hero h1 { margin: 0; font-size: 26px; line-height: 1.1; }
+  .app-shell.ux-new .personal-matches .club-period-switch { gap: 6px; margin: 0; }
+  .app-shell.ux-new .personal-matches .club-period-switch button { flex: 1; padding: 8px 12px; font-size: 13px; }
+  .app-shell.ux-new .personal-matches .club-period-switch button span { padding-left: 6px; }
+  .app-shell.ux-new .personal-matches__grid { gap: 12px; margin-top: 0; }
+  .app-shell.ux-new .personal-matches__section-heading { align-items: center; margin: 0 0 8px; }
+  .app-shell.ux-new .personal-matches__section-heading h2 { font-size: 18px; }
+  .app-shell.ux-new .personal-matches__section-heading > strong { padding: 0; font-size: 16px; }
+  .app-shell.ux-new .personal-matches__list { gap: 10px; }
+  .app-shell.ux-new .personal-matches .personal-match { grid-template-columns: 48px minmax(0, 1fr); gap: 10px; padding: 12px; }
+  .app-shell.ux-new .personal-matches .personal-match__status { padding: 8px; }
+  .app-shell.ux-new .personal-matches :is(.personal-match__report, .group-match__panel) { padding: 10px; }
+  .app-shell.ux-new .personal-matches .group-match__content { gap: 10px; }
+  .app-shell.ux-new .personal-matches .group-match__player { padding: 8px 0; }
+}
+
 @media (min-width: 760px) {
   .app-shell.ux-new { --club-header: 76px; }
   .app-shell.ux-new .topbar { padding-right: max(24px, calc((100vw - 1160px) / 2)); }

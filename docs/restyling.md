@@ -17,6 +17,14 @@ Gli override sono circoscritti a `.ux-new .dashboard--feed` e al breakpoint mobi
 
 Collaudo con dati demo a 320, 390 e 440 px: filtri, apertura Campi senza sovrapposizioni, ripristino dei preferiti, apertura/annullamento Nuovo slot, collasso settimanale e navigazione alla prossima partita; controlli di almeno 44 px, nessun overflow o richiesta Firebase. A 390 px il primo slot passa da 756 a 462 px dall’inizio della pagina. Gli screenshot desktop a 760 e 1280 px sono identici byte per byte alla versione precedente. `npm run check`: 601 test, lint, build e controlli notifiche/scheduler superati.
 
+## Partite compatte su telefono
+
+Sotto i 760 px, Le mie e Gli altri mantengono entrambi i percorsi ma usano una testata essenziale: titolo e ritorno alla bacheca sulla stessa riga, senza il grande pannello introduttivo. Prossime/Giocate e conteggi restano visibili; liste e schede riducono spazi e padding, conservando data, ora, circolo, prenotazione, giudizi e referti. I collegamenti alle statistiche e i pulsanti di compilazione restano gli stessi, con controlli di almeno 44 px.
+
+Gli override riguardano solo la nuova interfaccia mobile. Desktop da 760 px, classica, ordinamento, paginazione, permessi e listener non cambiano.
+
+Collaudo con dati demo a 320, 390 e 440 px: selettori, stati di prenotazione, storico paginato, apertura/chiusura dei referti, ritorno allo slot evidenziato e accesso alle statistiche. Nessun overflow, errore JavaScript o richiesta Firebase; controlli principali di almeno 44 px. A 440 px il primo match personale passa da 521 a 313 px e quello degli altri da 465 a 261 px. Screenshot desktop identici a 760/1280 px per Le mie e a 1280 px per Gli altri. `npm run check`: 609 test e tutti i controlli superati.
+
 ## Interazioni
 
 - Filtri Tutti / Posti liberi / Sono iscritto; prenotazione selezionabile separatamente (il selettore cambia il filtro corrente, non aggiunge una seconda condizione).
